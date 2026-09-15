@@ -1,47 +1,124 @@
-export type MarketKind = 'blue' | 'expanding' | 'contested' | 'quiet' | 'uncertain';
-export type Confidence = 'high' | 'moderate' | 'low';
+export type MarketKind =
+  "blue" | "expanding" | "contested" | "quiet" | "uncertain";
+export type Confidence = "high" | "moderate" | "low";
 export interface Topic {
-  slug: string; name: string; keyword: string; query: string; description: string;
-  color: string; aliases: string[];
+  slug: string;
+  name: string;
+  keyword: string;
+  query: string;
+  description: string;
+  color: string;
+  aliases: string[];
 }
-export interface InterestPoint { date: string; value: number; anchor?: number; partial?: boolean }
+export interface InterestPoint {
+  date: string;
+  value: number;
+  anchor?: number;
+  partial?: boolean;
+}
 export interface DemandEvidence {
-  keyword: string; geo: string; fetchedAt: string; sourceUrl: string;
-  points: InterestPoint[]; related: {query:string; value:number; formatted:string; type:'top'|'rising'}[];
+  keyword: string;
+  geo: string;
+  fetchedAt: string;
+  sourceUrl: string;
+  points: InterestPoint[];
+  related: {
+    query: string;
+    value: number;
+    formatted: string;
+    type: "top" | "rising";
+  }[];
   error?: string;
   collectionError?: string;
 }
 export interface Repo {
-  name:string; description:string; url:string; stars:number; forks:number; language:string|null;
-  license:string|null; archived:boolean; createdAt:string; pushedAt:string; topics:string[];
-  starHistory: {date:string; count:number}[];
-  growth7d:number|null; growth30d:number|null; growthWindowEnd:string|null;
-  openIssues:number; issueResponseHours:number|null; issueSampleSize:number; unansweredIssues:number;
-  contributors:number|null; topContributorShare:number|null;
-  fetchedAt:string; errors:string[];
+  name: string;
+  description: string;
+  url: string;
+  stars: number;
+  forks: number;
+  language: string | null;
+  license: string | null;
+  archived: boolean;
+  createdAt: string;
+  pushedAt: string;
+  topics: string[];
+  starHistory: { date: string; count: number }[];
+  growth7d: number | null;
+  growth30d: number | null;
+  growthWindowEnd: string | null;
+  openIssues: number;
+  issueResponseHours: number | null;
+  issueSampleSize: number;
+  unansweredIssues: number;
+  contributors: number | null;
+  topContributorShare: number | null;
+  fetchedAt: string;
+  errors: string[];
 }
 export interface SupplyEvidence {
-  query:string; sourceUrl:string; fetchedAt:string; total:number; complete:boolean;
-  repositories:Repo[]; error?:string;
+  query: string;
+  sourceUrl: string;
+  fetchedAt: string;
+  total: number;
+  complete: boolean;
+  repositories: Repo[];
+  error?: string;
 }
 export interface DemandMetrics {
-  recent:number; baseline:number; growth:number|null; lower:number|null; upper:number|null;
-  yearOverYear:number|null; slope:number; nonzeroShare:number; points:number;
-  anchorRatio:number|null; persistence:number; fast:boolean|null; seasonal:boolean; regularWeekly:boolean;
+  recent: number;
+  baseline: number;
+  growth: number | null;
+  lower: number | null;
+  upper: number | null;
+  yearOverYear: number | null;
+  slope: number;
+  nonzeroShare: number;
+  points: number;
+  anchorRatio: number | null;
+  persistence: number;
+  fast: boolean | null;
+  seasonal: boolean;
+  regularWeekly: boolean;
 }
 export interface Gap {
-  title:string; url:string; repo:string; reactions:number; createdAt:string; updatedAt:string;
-  state:string; label:'feature-request'|'alternative'|'friction'; excerpt:string;
+  title: string;
+  url: string;
+  repo: string;
+  reactions: number;
+  createdAt: string;
+  updatedAt: string;
+  state: string;
+  label: "feature-request" | "alternative" | "friction";
+  excerpt: string;
 }
 export interface Market {
-  id:string; version:string; topic:Topic; geo:string; asOf:string; kind:MarketKind;
-  confidence:Confidence; headline:string; strategy:string; reasons:string[]; limitations:string[];
-  demand:DemandEvidence; supply:SupplyEvidence; metrics:DemandMetrics;
-  supplyDensity:'dense'|'sparse'|'unknown'; concentration:number|null;
-  gaps:Gap[]; score:number|null;
+  id: string;
+  version: string;
+  topic: Topic;
+  geo: string;
+  asOf: string;
+  kind: MarketKind;
+  confidence: Confidence;
+  headline: string;
+  strategy: string;
+  reasons: string[];
+  limitations: string[];
+  demand: DemandEvidence;
+  supply: SupplyEvidence;
+  metrics: DemandMetrics;
+  supplyDensity: "dense" | "sparse" | "unknown";
+  concentration: number | null;
+  gaps: Gap[];
+  score: number | null;
 }
-export interface MarketSummary extends Omit<Market,'demand'|'supply'|'gaps'> {
-  demand: Omit<DemandEvidence,'points'|'related'> & {points:InterestPoint[]};
-  supply: Omit<SupplyEvidence,'repositories'> & {repositories:Repo[]};
-  gapCount:number;
+export interface MarketSummary extends Omit<
+  Market,
+  "demand" | "supply" | "gaps"
+> {
+  demand: Omit<DemandEvidence, "points" | "related"> & {
+    points: InterestPoint[];
+  };
+  supply: Omit<SupplyEvidence, "repositories"> & { repositories: Repo[] };
+  gapCount: number;
 }

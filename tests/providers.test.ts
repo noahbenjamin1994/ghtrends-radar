@@ -1,10 +1,55 @@
-import {test} from 'node:test';
-import assert from 'node:assert/strict';
-import {parseGoogleJson,parseTimeline} from '../src/providers/trends.js';
-import {Store} from '../src/core/store.js';
-import {mkdtempSync,rmSync} from 'node:fs';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-test('Google XSSI and partial observations retain their meaning',()=>{const d=parseGoogleJson(")]}'\n"+JSON.stringify({default:{timelineData:[{time:'1750000000',value:[23,10],isPartial:true}]}}));assert.equal(parseTimeline(d)[0]?.partial,true);assert.equal(parseTimeline(d)[0]?.anchor,10);});
-test('watchlists survive reopen and do not duplicate repositories',()=>{const dir=mkdtempSync(join(tmpdir(),'ghtrends-'));const s=new Store(dir);s.watchAdd('a/b');s.watchAdd('a/b');s.close();const reopened=new Store(dir);assert.deepEqual(reopened.watchList(),['a/b']);reopened.watchRemove('a/b');assert.deepEqual(reopened.watchList(),[]);reopened.close();rmSync(dir,{recursive:true});});
-test('imported evidence must match the requested keyword and region',async()=>{const {importDemand}=await import('../src/core/import.js');const evidence={keyword:'mcp servers',geo:'US',fetchedAt:'2026-09-15T00:00:00Z',sourceUrl:'https://trends.google.com/trends/explore',points:[{date:'2026-09-06T00:00:00Z',value:30}],related:[]};assert.equal(importDemand(evidence,'mcp servers','US').points.length,1);assert.throws(()=>importDemand(evidence,'mcp servers',''));assert.throws(()=>importDemand(evidence,'local llm','US'));assert.throws(()=>importDemand({...evidence,points:[{date:'yesterday',value:1000}]},'mcp servers','US'));});
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { parseGoogleJson, parseTimeline } from "../src/providers/trends.js";
+import { Store } from "../src/core/store.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+test("Google XSSI and partial observations retain their meaning", () => {
+  const d = parseGoogleJson(
+    ")]}'\n" +
+      JSON.stringify({
+        default: {
+          timelineData: [
+            { time: "1750000000", value: [23, 10], isPartial: true },
+          ],
+        },
+      }),
+  );
+  assert.equal(parseTimeline(d)[0]?.partial, true);
+  assert.equal(parseTimeline(d)[0]?.anchor, 10);
+});
+test("watchlists survive reopen and do not duplicate repositories", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-"));
+  const s = new Store(dir);
+  s.watchAdd("a/b");
+  s.watchAdd("a/b");
+  s.close();
+  const reopened = new Store(dir);
+  assert.deepEqual(reopened.watchList(), ["a/b"]);
+  reopened.watchRemove("a/b");
+  assert.deepEqual(reopened.watchList(), []);
+  reopened.close();
+  rmSync(dir, { recursive: true });
+});
+test("imported evidence must match the requested keyword and region", async () => {
+  const { importDemand } = await import("../src/core/import.js");
+  const evidence = {
+    keyword: "mcp servers",
+    geo: "US",
+    fetchedAt: "2026-09-15T00:00:00Z",
+    sourceUrl: "https://trends.google.com/trends/explore",
+    points: [{ date: "2026-09-06T00:00:00Z", value: 30 }],
+    related: [],
+  };
+  assert.equal(importDemand(evidence, "mcp servers", "US").points.length, 1);
+  assert.throws(() => importDemand(evidence, "mcp servers", ""));
+  assert.throws(() => importDemand(evidence, "local llm", "US"));
+  assert.throws(() =>
+    importDemand(
+      { ...evidence, points: [{ date: "yesterday", value: 1000 }] },
+      "mcp servers",
+      "US",
+    ),
+  );
+});
