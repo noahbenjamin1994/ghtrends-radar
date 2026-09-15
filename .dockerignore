@@ -1,0 +1,10 @@
+.git
+node_modules
+dist
+web-dist
+data
+.env
+.env.*
+*.pem
+*.key
+*.tgz
