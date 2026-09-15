@@ -11,6 +11,10 @@ Find growing categories, inspect the competition, and share the evidence.
 
 </div>
 
+[![Build checks](https://github.com/noahbenjamin1994/ghtrends-radar/actions/workflows/check.yml/badge.svg)](https://github.com/noahbenjamin1994/ghtrends-radar/actions/workflows/check.yml)
+
+[![The live ghtrends opportunity radar](.github/assets/radar-preview.png)](https://radar.ghtrends.dev)
+
 ## What does it tell you?
 
 | Active open-source supply | Sustained search growth | Landscape |
@@ -28,6 +32,14 @@ Every result includes its source queries, dates, methodology version and limitat
 **No installation:** [radar.ghtrends.dev](https://radar.ghtrends.dev).
 
 **CLI, local UI and MCP:** Node.js 22.13 or newer.
+
+Launch without a global installation:
+
+```sh
+npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
+```
+
+Or install the CLI:
 
 ```sh
 npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.0/ghtrends-radar-0.1.0.tgz
