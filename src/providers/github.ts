@@ -23,7 +23,7 @@ export class GitHub {
       headers: {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2026-03-10",
-        "User-Agent": "ghtrends/0.1.0",
+        "User-Agent": "ghtrends/0.1.1",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       signal: AbortSignal.timeout(25000),

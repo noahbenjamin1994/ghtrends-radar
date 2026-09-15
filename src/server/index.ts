@@ -327,7 +327,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.0/ghtrends-radar-0.1.0.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.1/ghtrends-radar-0.1.1.tgz",
     ),
   );
   app.get("/sitemap.xml", (_q, r) =>
