@@ -727,11 +727,25 @@ function MarketView({
   if (!m || error)
     return (
       <Empty
-        title="This category is waiting for its first scan"
+        title={
+          path.startsWith("/report/")
+            ? "This report is unavailable"
+            : "This category is waiting for its first scan"
+        }
         description={error}
         action={
-          <button className="button" onClick={() => onScan(path.slice(8))}>
-            Scan this category <ArrowUpRight size={16} />
+          <button
+            className="button"
+            onClick={() =>
+              path.startsWith("/report/")
+                ? navigate("/")
+                : onScan(path.slice(8))
+            }
+          >
+            {path.startsWith("/report/")
+              ? "Back to the radar"
+              : "Scan this category"}{" "}
+            <ArrowUpRight size={16} />
           </button>
         }
       />
@@ -1540,7 +1554,7 @@ function Docs() {
           App for larger scans.
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.2/ghtrends-radar-0.1.2.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.3/ghtrends-radar-0.1.3.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton value="ghtrends scan --topic mcp-servers --json" />
         </div>
         <h3>Connect an MCP client</h3>

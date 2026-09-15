@@ -25,7 +25,7 @@ Find growing categories, inspect the competition, and share the evidence.
 | Few projects | Not fast | **Quiet waters** — validate whether it is early, niche or inactive |
 | Missing or weak evidence | Unknown | **Uncharted** — gather evidence before classifying |
 
-Every result includes its source queries, dates, methodology version and limitations. Search interest measures attention, not paying customers. A quadrant is a research starting point, not a prediction of commercial success.
+Every result includes its source queries, dates, methodology version and limitations. Category and report pages include readable HTML evidence before JavaScript loads, and shared links show the specific report in their previews. Search interest measures attention, not paying customers. A quadrant is a research starting point, not a prediction of commercial success.
 
 ## Try it in 60 seconds
 
@@ -42,7 +42,7 @@ npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.2/ghtrends-radar-0.1.2.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.3/ghtrends-radar-0.1.3.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json

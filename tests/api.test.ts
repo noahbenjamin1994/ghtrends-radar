@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../src/server/index.js";
@@ -37,6 +37,16 @@ test("API validates inputs and keeps protocol errors structured", async () => {
     assert.throws(
       () => new GitHub(engine.store).base({ private: true }),
       /Only public/,
+    );
+    const fixture = JSON.parse(
+      readFileSync(new URL("../public/seed.json", import.meta.url), "utf8"),
+    )[0];
+    engine.store.saveMarket(fixture);
+    const report = await fetch(`${base}/api/reports/${fixture.id}?format=md`);
+    assert.equal(report.status, 200);
+    assert.ok(
+      (await report.text()).includes(`${base}/report/${fixture.id}`),
+      "local exports link to the local report",
     );
   } finally {
     await new Promise<void>((r) => server.close(() => r()));

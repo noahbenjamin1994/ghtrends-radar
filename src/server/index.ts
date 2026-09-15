@@ -16,6 +16,7 @@ import {
 import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
 import { marketMarkdown } from "../core/report.js";
 import type { Market } from "../core/types.js";
+import { renderDocument } from "./html.js";
 interface Job {
   id: string;
   state: "queued" | "running" | "complete" | "failed";
@@ -50,7 +51,9 @@ export function createApp(engine = new Engine()) {
       );
   const jobs = new Map<string, Job>(),
     limits = new Map<string, { count: number; reset: number }>();
-  const base = process.env.PUBLIC_URL || "https://radar.ghtrends.dev";
+  const baseURL = (q: express.Request) =>
+    new URL(process.env.PUBLIC_URL || `${q.protocol}://${q.get("host")}`)
+      .origin;
   const escape = (s: string) =>
     s.replace(
       /[&<>"']/g,
@@ -213,7 +216,7 @@ export function createApp(engine = new Engine()) {
       if (!m) return r.status(404).json({ error: "Report not found." });
       r.set("Cache-Control", "public,max-age=31536000,immutable");
       if (q.query.format === "md")
-        return r.type("text/markdown").send(marketMarkdown(m, base));
+        return r.type("text/markdown").send(marketMarkdown(m, baseURL(q)));
       return r.json(m);
     }),
   );
@@ -225,11 +228,12 @@ export function createApp(engine = new Engine()) {
         return r.status(400).json({ error: "Invalid report ID." });
       const m = engine.store.report(id);
       if (!m) return r.status(404).json({ error: "Report not found." });
+      const base = baseURL(q);
       const svg = marketCard(m, `${base}/report/${m.id}`);
       r.set("Cache-Control", "public,max-age=31536000,immutable");
       if (String(q.params.file).endsWith(".svg"))
         return r.type("image/svg+xml").send(svg);
-      const key = `card:${id}`,
+      const key = `card:${base}:${id}`,
         cached = engine.store.get<string>(key);
       const bytes = cached
         ? Buffer.from(cached, "base64")
@@ -335,52 +339,85 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.2/ghtrends-radar-0.1.2.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.3/ghtrends-radar-0.1.3.tgz",
     ),
   );
-  app.get("/sitemap.xml", (_q, r) =>
+  app.get("/sitemap.xml", (q, r) =>
     r
       .type("application/xml")
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/docs", ...dashboardMarkets().map((m) => "/market/" + m.topic.slug)].map((path) => `<url><loc>${escape(base + path)}</loc></url>`).join("")}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/docs", "/gaps", ...dashboardMarkets().map((m) => "/market/" + m.topic.slug)].map((path) => `<url><loc>${escape(baseURL(q) + path)}</loc></url>`).join("")}</urlset>`,
       ),
   );
-  app.get("/robots.txt", (_q, r) =>
+  app.get("/robots.txt", (q, r) =>
     r
       .type("text/plain")
       .send(
-        `User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${base}/sitemap.xml\n`,
+        `User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${baseURL(q)}/sitemap.xml\n`,
       ),
   );
-  app.get("/{*path}", (q, r) => {
-    const file = resolve(web, "index.html");
-    if (!existsSync(file))
-      return r.status(503).send("The interface is being built.");
-    r.set("Cache-Control", "no-cache");
-    let html = readFileSync(file, "utf8");
-    const isReport = q.path.startsWith("/report/"),
-      isMarket = q.path.startsWith("/market/");
-    const m = isReport
-      ? engine.store.report(q.path.slice(8))
-      : isMarket
-        ? engine.store.market(q.path.slice(8), String(q.query.geo || ""))
-        : null;
-    if ((isReport || isMarket) && !m) r.status(404);
-    const title = m
-      ? `${m.topic.name}: ${m.headline} · ghtrends`
-      : "ghtrends — Know where to build";
-    const description = m
-      ? m.strategy
-      : "GitHub supply × Google search demand. Explore the open-source opportunity radar, inspect the evidence, and share what you discover.";
-    const canonical = base + q.path;
-    html = html
-      .replace(/<title>.*?<\/title>/, `<title>${escape(title)}</title>`)
-      .replace(
-        "</head>",
-        `<link rel="canonical" href="${escape(canonical)}"><meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}"><meta property="og:url" content="${escape(canonical)}"><meta property="og:type" content="website">${m ? `<meta property="og:image" content="${base}/api/cards/${m.id}.png"><meta name="twitter:card" content="summary_large_image">` : ""}</head>`,
-      );
-    return r.type("html").send(html);
-  });
+  app.get(
+    "/{*path}",
+    safe((q, r) => {
+      const file = resolve(web, "index.html");
+      if (!existsSync(file))
+        return r.status(503).send("The interface is being built.");
+      r.set("Cache-Control", "no-cache");
+      const path = q.path.replace(/\/+$/, "") || "/";
+      if (path !== q.path)
+        return r.redirect(308, path + q.url.slice(q.path.length));
+      const isReport = /^\/report\/[a-f0-9]{16}$/.test(path),
+        isMarket = /^\/market\/[^/]+$/.test(path),
+        geo =
+          path === "/" || isMarket
+            ? validateGeo(String(q.query.geo || ""))
+            : "";
+      let m: Market | null = null;
+      if (isReport) m = engine.store.report(path.slice(8));
+      if (isMarket) {
+        let input: string;
+        try {
+          input = decodeURIComponent(path.slice(8));
+        } catch {
+          return r.status(400).type("text").send("Invalid category URL.");
+        }
+        const topic = resolveTopic(input);
+        if (path.slice(8) !== topic.slug)
+          return r.redirect(
+            308,
+            `/market/${topic.slug}${geo ? `?geo=${geo}` : ""}`,
+          );
+        m = engine.store.market(topic.slug, geo);
+      }
+      let repository = false;
+      if (path.startsWith("/repo/")) {
+        try {
+          validateRepo(decodeURIComponent(path.slice(6)));
+          repository = true;
+        } catch {
+          /* Invalid repository paths are real 404 pages. */
+        }
+      }
+      const known =
+        ["/", "/docs", "/gaps", "/compare", "/watch"].includes(path) ||
+        repository;
+      const status = m || known ? 200 : 404;
+      const markets = dashboardMarkets(geo);
+      const html = renderDocument(readFileSync(file, "utf8"), {
+        base: baseURL(q),
+        path,
+        geo,
+        market: m,
+        markets,
+        status,
+        noindex:
+          repository ||
+          ["/compare", "/watch"].includes(path) ||
+          (path === "/" && !markets.length),
+      });
+      return r.status(status).type("html").send(html);
+    }),
+  );
   app.use(
     (
       error: Error,
