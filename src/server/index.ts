@@ -40,6 +40,14 @@ export function createApp(engine = new Engine()) {
     });
     next();
   });
+  const dashboardMarkets = (geo = "") =>
+    engine.store
+      .markets(geo)
+      .filter(
+        (m) =>
+          process.env.GHTRENDS_HOSTED !== "1" ||
+          TOPICS.some((t) => t.slug === m.topic.slug),
+      );
   const jobs = new Map<string, Job>(),
     limits = new Map<string, { count: number; reset: number }>();
   const base = process.env.PUBLIC_URL || "https://radar.ghtrends.dev";
@@ -143,7 +151,7 @@ export function createApp(engine = new Engine()) {
     r.json({
       status: "ok",
       version: ALGORITHM_VERSION,
-      markets: engine.store.markets().length,
+      markets: dashboardMarkets().length,
     }),
   );
   app.get("/api/methodology", (_q, r) =>
@@ -157,7 +165,7 @@ export function createApp(engine = new Engine()) {
   );
   app.get("/api/gaps", (_q, r) => {
     const unique = new Map<string, Market["gaps"][number]>();
-    for (const m of engine.store.markets())
+    for (const m of dashboardMarkets())
       for (const gap of m.gaps) unique.set(gap.url, gap);
     r.set("Cache-Control", "public,max-age=300").json(
       [...unique.values()].sort((a, b) => b.reactions - a.reactions),
@@ -168,7 +176,7 @@ export function createApp(engine = new Engine()) {
     safe((q, r) => {
       const geo = validateGeo(String(q.query.geo ?? ""));
       r.set("Cache-Control", "public,max-age=60").json({
-        markets: engine.store.markets(geo).map((m) => ({
+        markets: dashboardMarkets(geo).map((m) => ({
           ...m,
           demand: {
             ...m.demand,
@@ -240,7 +248,7 @@ export function createApp(engine = new Engine()) {
           typeof q.body.keyword === "string" ? q.body.keyword : undefined,
         ),
         geo = validateGeo(q.body.geo ?? "");
-      const existing = engine.store.market(topic.slug, geo);
+      const existing = engine.store.market(topic.slug, geo, topic.keyword);
       if (
         existing &&
         existing.topic.keyword === topic.keyword &&
@@ -327,14 +335,14 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.1/ghtrends-radar-0.1.1.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.2/ghtrends-radar-0.1.2.tgz",
     ),
   );
   app.get("/sitemap.xml", (_q, r) =>
     r
       .type("application/xml")
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/docs", ...engine.store.markets().map((m) => "/market/" + m.topic.slug)].map((path) => `<url><loc>${escape(base + path)}</loc></url>`).join("")}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/docs", ...dashboardMarkets().map((m) => "/market/" + m.topic.slug)].map((path) => `<url><loc>${escape(base + path)}</loc></url>`).join("")}</urlset>`,
       ),
   );
   app.get("/robots.txt", (_q, r) =>

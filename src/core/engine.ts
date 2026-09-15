@@ -49,7 +49,7 @@ export class Engine {
   ): Promise<Market> {
     const topic = resolveTopic(input, options.keyword),
       geo = validateGeo(options.geo ?? "");
-    const existing = this.store.market(topic.slug, geo);
+    const existing = this.store.market(topic.slug, geo, topic.keyword);
     if (
       !options.refresh &&
       !options.demand &&

@@ -53,3 +53,27 @@ test("imported evidence must match the requested keyword and region", async () =
     ),
   );
 });
+test("custom keyword scans cannot replace canonical radar evidence", async () => {
+  const { readFileSync } = await import("node:fs");
+  const markets = JSON.parse(
+    readFileSync(new URL("../public/seed.json", import.meta.url), "utf8"),
+  );
+  const canonical = markets.find((m: any) => m.topic.slug === "mcp-servers");
+  const variant = structuredClone(canonical);
+  variant.id = "fedcba9876543210";
+  variant.topic.keyword = "weather";
+  variant.asOf = "2026-09-16T00:00:00Z";
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-variants-"));
+  const s = new Store(dir);
+  try {
+    s.saveMarket(canonical);
+    s.saveMarket(variant);
+    assert.equal(s.market("mcp-servers")?.id, canonical.id);
+    assert.equal(s.markets().length, 1);
+    assert.equal(s.market("mcp-servers", "", "weather")?.id, variant.id);
+    assert.equal(s.report(variant.id)?.topic.keyword, "weather");
+  } finally {
+    s.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

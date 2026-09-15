@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { resolveTopic } from "./topics.js";
 import type { Market, Repo } from "./types.js";
 export class Store {
   private db: DatabaseSync;
@@ -35,12 +36,16 @@ export class Store {
       .prepare("INSERT OR IGNORE INTO markets VALUES(?,?,?,?,?)")
       .run(m.id, m.topic.slug, m.geo, m.asOf, JSON.stringify(m));
   }
-  market(topic: string, geo = ""): Market | null {
+  market(
+    topic: string,
+    geo = "",
+    keyword = resolveTopic(topic).keyword,
+  ): Market | null {
     const r = this.db
       .prepare(
-        "SELECT payload FROM markets WHERE topic=? AND geo=? ORDER BY created DESC LIMIT 1",
+        "SELECT payload FROM markets WHERE topic=? AND geo=? AND LOWER(json_extract(payload,'$.topic.keyword'))=LOWER(?) ORDER BY created DESC LIMIT 1",
       )
-      .get(topic, geo) as { payload: string } | undefined;
+      .get(topic, geo, keyword) as { payload: string } | undefined;
     return r ? JSON.parse(r.payload) : null;
   }
   report(id: string): Market | null {
@@ -53,10 +58,16 @@ export class Store {
     return (
       this.db
         .prepare(
-          `SELECT payload FROM markets WHERE geo=? AND id IN (SELECT id FROM (SELECT id,ROW_NUMBER() OVER(PARTITION BY topic,geo ORDER BY created DESC) AS row FROM markets) WHERE row=1) ORDER BY created DESC`,
+          `SELECT payload FROM markets WHERE geo=? AND id IN (SELECT id FROM (SELECT id,ROW_NUMBER() OVER(PARTITION BY topic,geo,LOWER(json_extract(payload,'$.topic.keyword')) ORDER BY created DESC) AS row FROM markets) WHERE row=1) ORDER BY created DESC`,
         )
         .all(geo) as { payload: string }[]
-    ).map((r) => JSON.parse(r.payload));
+    )
+      .map((r) => JSON.parse(r.payload) as Market)
+      .filter(
+        (m) =>
+          m.topic.keyword.toLowerCase() ===
+          resolveTopic(m.topic.slug).keyword.toLowerCase(),
+      );
   }
   watchList(): string[] {
     return (

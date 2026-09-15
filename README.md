@@ -42,7 +42,7 @@ npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.1/ghtrends-radar-0.1.1.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.2/ghtrends-radar-0.1.2.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -159,7 +159,7 @@ docker run --rm -p 3721:3721 -v ghtrends-data:/app/data \
   -e HOST=0.0.0.0 ghtrends
 ```
 
-For a hosted instance, set `PUBLIC_URL` and optionally `GHTRENDS_AUTO_COLLECT=1`. Set `TRUST_PROXY` only to your actual trusted reverse-proxy network. The collector and public scan queue share a bounded, paced workflow. Public scans are rate limited; scheduled collection refreshes curated categories daily.
+For a shared public instance, set `GHTRENDS_HOSTED=1` to keep the homepage restricted to curated categories; custom scans still get permanent report URLs. Search-term variants are stored separately and cannot replace canonical category evidence. Set `PUBLIC_URL` and optionally `GHTRENDS_AUTO_COLLECT=1`. Set `TRUST_PROXY` only to your actual trusted reverse-proxy network. The collector and public scan queue share a bounded, paced workflow. Public scans are rate limited; scheduled collection refreshes curated categories daily.
 
 ## Contributing
 
