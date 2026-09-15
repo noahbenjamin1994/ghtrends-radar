@@ -5,7 +5,7 @@ import { GitHub } from "../providers/github.js";
 import { Trends } from "../providers/trends.js";
 import { resolveTopic, validateGeo, validateRepo, TOPICS } from "./topics.js";
 import { importDemand } from "./import.js";
-import { analyze } from "./analyze.js";
+import { analyze, ALGORITHM_VERSION } from "./analyze.js";
 import type { Market, DemandEvidence } from "./types.js";
 export class Engine {
   github: GitHub;
@@ -30,6 +30,13 @@ export class Engine {
             86400000 - (Date.now() - Date.parse(m.demand.fetchedAt)),
           );
       }
+    for (const m of store.markets())
+      if (
+        m.version !== ALGORITHM_VERSION ||
+        (m.kind !== "uncertain" &&
+          Date.now() - Date.parse(m.demand.fetchedAt) > 14 * 86400000)
+      )
+        store.saveMarket(analyze(m.topic, m.demand, m.supply, m.gaps));
   }
   async scan(
     input: string,

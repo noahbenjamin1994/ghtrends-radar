@@ -65,6 +65,7 @@ export function App() {
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [query, setQuery] = useState(""),
+    [keyword, setKeyword] = useState(""),
     [geo, setGeo] = useState(
       new URLSearchParams(location.search).get("geo") || "",
     ),
@@ -90,7 +91,10 @@ export function App() {
     window.scrollTo({ top: 0, behavior: "instant" });
   };
   useEffect(() => {
-    const pop = () => setPath(location.pathname + location.search);
+    const pop = () => {
+      setPath(location.pathname + location.search);
+      setGeo(new URLSearchParams(location.search).get("geo") || "");
+    };
     window.addEventListener("popstate", pop);
     return () => window.removeEventListener("popstate", pop);
   }, []);
@@ -136,7 +140,11 @@ export function App() {
       const d = await api<any>("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: input, geo }),
+        body: JSON.stringify({
+          topic: input,
+          geo,
+          keyword: keyword.trim() || undefined,
+        }),
       });
       if (d.state === "complete") {
         await refresh();
@@ -437,6 +445,22 @@ export function App() {
                   <ChevronDown size={13} />
                 </label>
               </div>
+              <details className="keyword-options">
+                <summary>Choose a different Google search term</summary>
+                <label>
+                  Demand keyword
+                  <input
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                    maxLength={100}
+                    placeholder="Optional — e.g. AI agent memory"
+                  />
+                </label>
+                <p>
+                  Keep the GitHub topic above; use this field to measure a more
+                  familiar phrase people search for.
+                </p>
+              </details>
               <div className="filter-tabs">
                 <button
                   className={filter === "all" ? "active" : ""}

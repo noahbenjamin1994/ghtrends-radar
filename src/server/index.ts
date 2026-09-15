@@ -100,6 +100,12 @@ export function createApp(engine = new Engine()) {
       Promise.resolve(handler(req, res)).catch(next);
   if (process.env.GHTRENDS_AUTO_COLLECT === "1") {
     const schedule = () => {
+      for (const [id, job] of jobs)
+        if (
+          Date.now() - job.created > 3600000 &&
+          !["queued", "running"].includes(job.state)
+        )
+          jobs.delete(id);
       for (const topic of TOPICS) {
         const m = engine.store.market(topic.slug);
         if (m && Date.now() - Date.parse(m.asOf) < 86400000) continue;

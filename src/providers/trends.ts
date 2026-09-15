@@ -55,7 +55,15 @@ export class Trends {
       this.cookie = [...cookies.values()].join("; ");
       if (r.status === 429 && attempt === 0) {
         await r.body?.cancel();
-        await new Promise((r) => setTimeout(r, 30000));
+        const seconds = Math.max(
+          30,
+          Number(r.headers.get("retry-after")) || 30,
+        );
+        if (seconds > 60)
+          throw new Error(
+            `Google Trends requested a ${seconds}-second cooldown. Retry later.`,
+          );
+        await new Promise((r) => setTimeout(r, seconds * 1000));
         continue;
       }
       if (!r.ok)

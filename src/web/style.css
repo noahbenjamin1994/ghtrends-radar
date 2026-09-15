@@ -2515,3 +2515,36 @@ footer small {
 .shared-chart .footnote {
   margin: 0;
 }
+.keyword-options {
+  font-size: 12px;
+  color: #9bad8f;
+  margin: 0 0 18px;
+}
+.keyword-options summary {
+  cursor: pointer;
+  padding: 6px 0;
+}
+.keyword-options label {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 12px 0;
+}
+.keyword-options input {
+  background: #152010;
+  border: 1px solid #3b512e;
+  color: #dfe9d6;
+  border-radius: 5px;
+  padding: 11px 13px;
+  max-width: 400px;
+  width: 100%;
+  outline: 0;
+}
+.keyword-options input:focus {
+  border-color: var(--lime);
+}
+.keyword-options p {
+  max-width: 620px;
+  font-size: 12px;
+  line-height: 1.6;
+}

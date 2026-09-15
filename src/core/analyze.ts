@@ -8,7 +8,7 @@ import type {
   MarketKind,
   Gap,
 } from "./types.js";
-export const ALGORITHM_VERSION = "1.0.0";
+export const ALGORITHM_VERSION = "1.0.1";
 // Operational thresholds, published and configurable in code; not universal market laws.
 export const POLICY = {
   denseSupply: 50,
