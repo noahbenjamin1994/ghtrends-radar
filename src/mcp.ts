@@ -4,7 +4,7 @@ import { z } from "zod";
 import { Engine } from "./core/engine.js";
 export async function startMcp() {
   const engine = new Engine(),
-    server = new McpServer({ name: "ghtrends", version: "0.1.3" });
+    server = new McpServer({ name: "ghtrends", version: "0.1.4" });
   const result = (data: unknown) => ({
     content: [{ type: "text" as const, text: JSON.stringify(data) }],
   });

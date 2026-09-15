@@ -42,7 +42,7 @@ npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.3/ghtrends-radar-0.1.3.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.4/ghtrends-radar-0.1.4.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
