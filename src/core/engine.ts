@@ -1,3 +1,5 @@
+import {existsSync,readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {Store} from './store.js';
 import {GitHub} from '../providers/github.js';
 import {Trends} from '../providers/trends.js';
@@ -7,7 +9,14 @@ import {analyze} from './analyze.js';
 import type {Market,DemandEvidence} from './types.js';
 export class Engine {
   github:GitHub;trends:Trends;
-  constructor(public store=new Store()){this.github=new GitHub(store);this.trends=new Trends(store);}
+  constructor(public store=new Store()){
+    this.github=new GitHub(store);this.trends=new Trends(store);
+    const seed=fileURLToPath(new URL('../../web-dist/seed.json',import.meta.url));
+    if(!store.markets().length&&existsSync(seed))for(const m of JSON.parse(readFileSync(seed,'utf8')) as Market[]){
+      const current=Date.now()-Date.parse(m.asOf)>14*86400000?analyze(m.topic,m.demand,m.supply,m.gaps):m;store.saveMarket(current);
+      if(Date.now()-Date.parse(m.demand.fetchedAt)<86400000)store.set(`trends:v1:${m.topic.keyword}:${m.geo}`,m.demand,86400000-(Date.now()-Date.parse(m.demand.fetchedAt)));
+    }
+  }
   async scan(input:string,options:{geo?:string;keyword?:string;refresh?:boolean;demand?:DemandEvidence}={}):Promise<Market>{
     const topic=resolveTopic(input,options.keyword),geo=validateGeo(options.geo??'');
     const existing=this.store.market(topic.slug,geo);

@@ -9,3 +9,5 @@ data/
 *.key
 *.sqlite*
 .DS_Store
+*.tgz
+import-evidence/

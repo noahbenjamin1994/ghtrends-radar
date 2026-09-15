@@ -93,6 +93,7 @@ export GITHUB_PRIVATE_KEY_PATH=/secure/path/github-app.pem
 
 The App installation token refreshes automatically. Only public repositories are returned. Never put credentials in source control or expose them in a browser.
 
+- The release includes dated public starter snapshots so the local radar is useful on first launch. They retain their source dates; snapshots older than 14 days are reclassified as insufficient evidence until refreshed.
 - SQLite defaults to `~/.ghtrends`; override with `GHTRENDS_DATA_DIR`.
 - CLI watchlists are stored in SQLite. Hosted Web watchlists are stored only in the current browser; they are not synchronized with the CLI.
 - `GOOGLE_TRENDS_PROXY` optionally configures an HTTP proxy for the public Trends collector.

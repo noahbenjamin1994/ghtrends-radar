@@ -82,6 +82,6 @@ export function analyze(topic:Topic,demand:DemandEvidence,supply:SupplyEvidence,
   };
   // A transparent ranking aid, not a prediction. Missing evidence never earns a score.
   const score=usable?Math.round(100*(.55*clamp((metrics.growth!+.25)/1.25)+.3/(1+supply.total/POLICY.denseSupply)+.15*metrics.persistence)):null;
-  const id=createHash('sha256').update(JSON.stringify({v:ALGORITHM_VERSION,topic,geo:demand.geo,demand,supply,gaps})).digest('hex').slice(0,16);
+  const id=createHash('sha256').update(JSON.stringify({v:ALGORITHM_VERSION,asOf,topic,geo:demand.geo,demand,supply,gaps})).digest('hex').slice(0,16);
   return {id,version:ALGORITHM_VERSION,topic,geo:demand.geo,asOf,kind,confidence,headline:labels[kind],strategy:strategies[kind],reasons,limitations,demand,supply,metrics,supplyDensity:supplyKnown?(dense?'dense':'sparse'):'unknown',concentration,gaps,score};
 }
