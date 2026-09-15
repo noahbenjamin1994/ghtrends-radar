@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { completeWeeklySeries } from "./evidence.js";
 import type {
   DemandEvidence,
   DemandMetrics,
@@ -8,7 +9,7 @@ import type {
   MarketKind,
   Gap,
 } from "./types.js";
-export const ALGORITHM_VERSION = "1.0.1";
+export const ALGORITHM_VERSION = "1.0.2";
 // Operational thresholds, published and configurable in code; not universal market laws.
 export const POLICY = {
   denseSupply: 50,
@@ -63,24 +64,7 @@ export function demandMetrics(
   evidence: DemandEvidence,
   asOf: string,
 ): DemandMetrics {
-  const seen = new Set<string>();
-  const points = [...evidence.points]
-    .filter((p) => {
-      const key = String(Date.parse(p.date));
-      if (
-        p.partial ||
-        !Number.isFinite(p.value) ||
-        p.value < 0 ||
-        p.value > 100 ||
-        !Number.isFinite(Date.parse(p.date)) ||
-        Date.parse(p.date) > Date.parse(asOf) ||
-        seen.has(key)
-      )
-        return false;
-      seen.add(key);
-      return true;
-    })
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const { points, hasConflicts } = completeWeeklySeries(evidence, asOf);
   const values = points.map((p) => p.value),
     recent = values.slice(-8),
     base = values.slice(-16, -8);
@@ -88,6 +72,7 @@ export function demandMetrics(
     current = median(recent);
   const regularWeekly =
     points.length > 1 &&
+    !hasConflicts &&
     points.every(
       (p, i) =>
         i === 0 ||
@@ -120,11 +105,15 @@ export function demandMetrics(
     (recent.length || 1);
   const seasonal =
     growth !== null &&
-    growth > POLICY.fastGrowth &&
+    growth >= POLICY.fastGrowth &&
     yearOverYear !== null &&
     yearOverYear <= 0.1;
   const recentPoints = points.slice(-8),
-    anchorMean = mean(recentPoints.map((p) => p.anchor ?? 0));
+    anchorMean =
+      recentPoints.length === 8 &&
+      recentPoints.every((p) => p.anchor !== undefined)
+        ? mean(recentPoints.map((p) => p.anchor!))
+        : 0;
   const fast =
     usable && nonzeroShare >= POLICY.minNonzero
       ? growth! >= POLICY.fastGrowth &&
@@ -174,10 +163,7 @@ export function analyze(
     (supply.complete || supply.repositories.length >= POLICY.denseSupply);
   const demandStale = stale(demand.fetchedAt),
     supplyStale = stale(supply.fetchedAt);
-  const lastPoint = [...demand.points]
-    .filter((p) => !p.partial)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .at(-1);
+  const lastPoint = completeWeeklySeries(demand, asOf).points.at(-1);
   const seriesStale = !lastPoint || stale(lastPoint.date);
   const usable =
     supplyKnown &&
@@ -215,7 +201,7 @@ export function analyze(
     );
   if (!metrics.regularWeekly)
     limitations.push(
-      "The time series must contain consecutive weekly observations; missing or differently spaced observations cannot be classified.",
+      "The time series must contain consecutive weekly observations; missing, conflicting or differently spaced observations cannot be classified.",
     );
   if (metrics.nonzeroShare < POLICY.minNonzero)
     limitations.push(
@@ -242,6 +228,22 @@ export function analyze(
     reasons.push(
       `${Math.round(metrics.persistence * 8)} of the last eight weeks stayed above the prior baseline; growth survives resampling.`,
     );
+  if (metrics.fast === false && metrics.growth !== null && metrics.growth > 0) {
+    if (metrics.growth < POLICY.fastGrowth)
+      reasons.push(
+        `Search growth is below the ${POLICY.fastGrowth * 100}% fast-growth threshold.`,
+      );
+    else {
+      if ((metrics.lower ?? 0) <= 0)
+        reasons.push(
+          "The lower resampling bound does not establish positive growth.",
+        );
+      if (metrics.persistence < 0.75)
+        reasons.push(
+          `Only ${Math.round(metrics.persistence * 8)} of the last eight complete weeks stayed above the prior baseline; at least six are required.`,
+        );
+    }
+  }
   const stars = supply.repositories.map((r) => r.stars).sort((a, b) => b - a),
     totalStars = stars.reduce((a, b) => a + b, 0);
   const concentration =

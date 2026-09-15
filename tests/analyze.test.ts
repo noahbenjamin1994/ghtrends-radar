@@ -59,6 +59,12 @@ test("annual seasonal rebound is not a breakout", () => {
   const m = analyze(TOPICS[0]!, demand("seasonal"), supply(10), [], asOf);
   assert.equal(m.metrics.seasonal, true);
   assert.equal(m.kind, "quiet");
+  const boundary = demand("seasonal");
+  for (const p of boundary.points) if (p.value === 40) p.value = 25;
+  const exact = analyze(TOPICS[0]!, boundary, supply(10), [], asOf);
+  assert.equal(exact.metrics.growth, 0.25);
+  assert.equal(exact.metrics.seasonal, true);
+  assert.equal(exact.kind, "quiet");
 });
 test("zero search values mean insufficient evidence, never a dead market", () => {
   const m = analyze(TOPICS[0]!, demand("zero"), supply(0), [], asOf);
@@ -121,3 +127,73 @@ test("daily or missing-week data cannot be mistaken for weekly demand", () => {
 });
 test("keyword overrides are validated for curated categories too", () =>
   assert.throws(() => resolveTopic("mcp", "<script>")));
+
+test("an unfinished week without a partial flag cannot complete a breakout", () => {
+  const d = demand();
+  [20, 40, 20, 40, 20, 40, 40, 40].forEach((value, i) => {
+    d.points[96 + i]!.value = value;
+  });
+  const before = analyze(TOPICS[0]!, d, supply(12), [], asOf);
+  d.points.push({ date: "2026-09-13T00:00:00Z", value: 40 });
+  const after = analyze(TOPICS[0]!, d, supply(12), [], asOf);
+  assert.equal(before.kind, "quiet");
+  assert.equal(after.kind, before.kind);
+  assert.deepEqual(after.metrics, before.metrics);
+  assert.match(
+    after.reasons.join(" "),
+    /Only 5 of the last eight complete weeks/,
+  );
+});
+
+test("invalid fresh rows cannot revive stale historical growth", () => {
+  const d = demand("growing");
+  d.points = d.points.map((p) => ({
+    ...p,
+    date: new Date(Date.parse(p.date) - 56 * 86400000).toISOString(),
+  }));
+  assert.equal(analyze(TOPICS[0]!, d, supply(12), [], asOf).kind, "uncertain");
+  d.points.push({ date: "2026-09-06T00:00:00Z", value: NaN });
+  const m = analyze(TOPICS[0]!, d, supply(12), [], asOf);
+  assert.equal(m.kind, "uncertain");
+  assert.equal(m.score, null);
+  assert.match(m.limitations.join(" "), /stale or missing/);
+});
+
+test("conflicting duplicate weeks cannot classify differently by input order", () => {
+  const d = demand("growing");
+  d.points.push(...d.points.slice(-8).map((p) => ({ ...p, value: 20 })));
+  const first = analyze(TOPICS[0]!, d, supply(12), [], asOf);
+  d.points.reverse();
+  const second = analyze(TOPICS[0]!, d, supply(12), [], asOf);
+  assert.equal(first.kind, "uncertain");
+  assert.equal(second.kind, "uncertain");
+  assert.deepEqual(first.metrics, second.metrics);
+  assert.match(first.limitations.join(" "), /conflicting/);
+});
+
+test("time passing cannot complete an observation collected midweek", () => {
+  const d = demand("growing");
+  d.points.push({ date: "2026-09-13T00:00:00Z", value: 40 });
+  const weekEnd = "2026-09-20T00:00:00Z";
+  assert.equal(demandMetrics(d, weekEnd).points, 104);
+  d.fetchedAt = weekEnd;
+  assert.equal(demandMetrics(d, weekEnd).points, 105);
+});
+
+test("rejected future rows do not override a valid recent series", () => {
+  const d = demand("growing");
+  d.points.push({ date: "2027-01-01T00:00:00Z", value: 100 });
+  assert.equal(analyze(TOPICS[0]!, d, supply(12), [], asOf).kind, "blue");
+});
+
+test("missing reference values are not interpreted as zero search interest", () => {
+  const d = demand("growing");
+  assert.equal(demandMetrics(d, asOf).anchorRatio, 4);
+  delete d.points.at(-1)!.anchor;
+  assert.equal(demandMetrics(d, asOf).anchorRatio, null);
+  d.points.at(-1)!.anchor = NaN;
+  const m = analyze(TOPICS[0]!, d, supply(12), [], asOf);
+  assert.equal(m.metrics.anchorRatio, null);
+  assert.equal(m.metrics.points, 104);
+  assert.equal(m.kind, "blue");
+});

@@ -41,6 +41,7 @@ import {
   kindColors,
 } from "./components.js";
 import { downloadCard } from "./export.js";
+import { completeWeeklySeries } from "../core/evidence.js";
 const SOURCE = "https://github.com/noahbenjamin1994/ghtrends-radar";
 async function api<T>(url: string, options?: RequestInit): Promise<T> {
   const r = await fetch(url, options);
@@ -515,9 +516,8 @@ export function App() {
                       </h3>
                       <p>{m.topic.description}</p>
                       <Sparkline
-                        values={m.demand.points
-                          .filter((p) => !p.partial)
-                          .slice(-26)
+                        values={completeWeeklySeries(m.demand, m.asOf)
+                          .points.slice(-26)
                           .map((p) => p.value)}
                         color={m.topic.color}
                         height={49}
@@ -751,6 +751,7 @@ function MarketView({
       />
     );
   const share = location.origin + "/report/" + m.id;
+  const demandPoints = completeWeeklySeries(m.demand, m.asOf).points;
   return (
     <div className="detail-page">
       <button className="back-link" onClick={() => navigate("/")}>
@@ -850,7 +851,7 @@ function MarketView({
           </div>
           <div className="chart-caption">
             <span>Relative search interest for “{m.demand.keyword}”</span>
-            <span>{m.metrics.points} complete observations</span>
+            <span>{demandPoints.length} complete observations</span>
           </div>
           <div className="large-chart">
             <div className="chart-grid">
@@ -859,9 +860,7 @@ function MarketView({
               <span>0</span>
             </div>
             <Sparkline
-              values={m.demand.points
-                .filter((p) => !p.partial)
-                .map((p) => p.value)}
+              values={demandPoints.map((p) => p.value)}
               color={m.topic.color}
               height={180}
               fill
@@ -869,8 +868,8 @@ function MarketView({
             />
           </div>
           <div className="chart-dates">
-            <span>{m.demand.points[0]?.date.slice(0, 10) || "No history"}</span>
-            <span>{m.demand.points.at(-1)?.date.slice(0, 10)}</span>
+            <span>{demandPoints[0]?.date.slice(0, 10) || "No history"}</span>
+            <span>{demandPoints.at(-1)?.date.slice(0, 10)}</span>
           </div>
           <p className="footnote">
             Original values are relative Google Trends indices on a 0–100 scale,
@@ -1498,6 +1497,11 @@ function Docs() {
             six recent weeks above the prior baseline.
           </p>
           <p>
+            A weekly observation is usable only after that week ended at
+            collection time. Invalid rows cannot refresh old evidence, and
+            conflicting values for the same week prevent classification.
+          </p>
+          <p>
             Two-week block resampling tests sensitivity to individual
             observations. A year-over-year comparison checks recurring seasonal
             rebounds. These diagnostics are not probabilities of business
@@ -1554,7 +1558,7 @@ function Docs() {
           App for larger scans.
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.4/ghtrends-radar-0.1.4.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.5/ghtrends-radar-0.1.5.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton value="ghtrends scan --topic mcp-servers --json" />
         </div>
         <h3>Connect an MCP client</h3>

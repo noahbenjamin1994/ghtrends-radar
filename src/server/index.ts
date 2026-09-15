@@ -17,12 +17,14 @@ import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
 import { marketMarkdown } from "../core/report.js";
 import type { Market } from "../core/types.js";
 import { renderDocument } from "./html.js";
+import { sourceEvidenceIsFresh } from "../core/evidence.js";
 interface Job {
   id: string;
   state: "queued" | "running" | "complete" | "failed";
   topic: string;
   geo: string;
   keyword?: string;
+  refresh?: boolean;
   created: number;
   market?: Market;
   error?: string;
@@ -91,13 +93,14 @@ export function createApp(engine = new Engine()) {
             job.market = await engine.scan(job.topic, {
               geo: job.geo,
               keyword: job.keyword,
+              refresh: job.refresh,
             });
             job.state = "complete";
           } catch (e) {
             job.error = (e as Error).message;
             job.state = "failed";
           }
-          await new Promise((r) => setTimeout(r, 35000));
+          await new Promise<void>((r) => setTimeout(r, 35000).unref());
         }
     } finally {
       processing = false;
@@ -119,7 +122,14 @@ export function createApp(engine = new Engine()) {
           jobs.delete(id);
       for (const topic of TOPICS) {
         const m = engine.store.market(topic.slug);
-        if (m && Date.now() - Date.parse(m.asOf) < 86400000) continue;
+        if (
+          m &&
+          sourceEvidenceIsFresh(m) &&
+          !m.demand.error &&
+          !m.demand.collectionError &&
+          !m.supply.error
+        )
+          continue;
         if (
           [...jobs.values()].some(
             (j) =>
@@ -135,6 +145,7 @@ export function createApp(engine = new Engine()) {
           topic: topic.slug,
           geo: "",
           keyword: topic.keyword,
+          refresh: true,
           created: Date.now(),
         };
         jobs.set(job.id, job);
@@ -255,6 +266,8 @@ export function createApp(engine = new Engine()) {
       const existing = engine.store.market(topic.slug, geo, topic.keyword);
       if (
         existing &&
+        existing.version === ALGORITHM_VERSION &&
+        (existing.kind === "uncertain" || sourceEvidenceIsFresh(existing)) &&
         existing.topic.keyword === topic.keyword &&
         Date.now() - Date.parse(existing.asOf) <
           (existing.kind === "uncertain" ? 300000 : 86400000)
@@ -339,7 +352,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.4/ghtrends-radar-0.1.4.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.5/ghtrends-radar-0.1.5.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>

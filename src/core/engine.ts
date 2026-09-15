@@ -6,6 +6,7 @@ import { Trends } from "../providers/trends.js";
 import { resolveTopic, validateGeo, validateRepo, TOPICS } from "./topics.js";
 import { importDemand } from "./import.js";
 import { analyze, ALGORITHM_VERSION } from "./analyze.js";
+import { sourceEvidenceIsFresh } from "./evidence.js";
 import type { Market, DemandEvidence } from "./types.js";
 export class Engine {
   github: GitHub;
@@ -54,6 +55,8 @@ export class Engine {
       !options.refresh &&
       !options.demand &&
       existing &&
+      existing.version === ALGORITHM_VERSION &&
+      (existing.kind === "uncertain" || sourceEvidenceIsFresh(existing)) &&
       existing.topic.keyword === topic.keyword &&
       Date.now() - Date.parse(existing.asOf) <
         (existing.kind === "uncertain" ? 300000 : 86400000)

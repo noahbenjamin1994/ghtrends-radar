@@ -42,7 +42,7 @@ npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.4/ghtrends-radar-0.1.4.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.5/ghtrends-radar-0.1.5.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -133,11 +133,11 @@ ghtrends scan --topic mcp-servers --trends-file demand.json --json
 5. At least 6 of 8 recent weeks above 112.5% of the prior median.
 6. No identified repeat of the previous year's seasonal level.
 
-Missing, stale, irregular, near-zero or failed evidence produces **Uncharted**. A single spike cannot establish fast growth. The resampling band tests stability; it is not a calibrated probability. The 50-project threshold and opportunity-score weights are published heuristics that still require empirical calibration across categories.
+Missing, stale, irregular, near-zero or failed evidence produces **Uncharted**. A weekly interval must have ended by both the collection time and the analysis time, even if the provider omitted its partial-week flag. Freshness uses the same valid complete weeks as the growth calculation; invalid rows cannot make old data fresh. Conflicting values for the same week prevent classification. A single spike cannot establish fast growth. The resampling band tests stability; it is not a calibrated probability. The 50-project threshold and opportunity-score weights are published heuristics that still require empirical calibration across categories.
 
 **Repository evidence:** official GitHub star-history calendar buckets, a bounded recent issue sample, human maintainer responses, and returned contributor commit counts. Calendar buckets are not rolling 24-hour net star changes. Contributor and issue sample limits appear beside the results. Open issues are leads for research, not proven market gaps.
 
-**Reproducibility:** source evidence and the method version determine each report ID. Hosted report links are immutable snapshots. Local reports stay local unless you deliberately share them.
+**Reproducibility:** source evidence, analysis date and method version determine each report ID. Hosted report links are immutable snapshots. Local reports stay local unless you deliberately share them.
 
 ## Development
 
@@ -159,7 +159,7 @@ docker run --rm -p 3721:3721 -v ghtrends-data:/app/data \
   -e HOST=0.0.0.0 ghtrends
 ```
 
-For a shared public instance, set `GHTRENDS_HOSTED=1` to keep the homepage restricted to curated categories; custom scans still get permanent report URLs. Search-term variants are stored separately and cannot replace canonical category evidence. Set `PUBLIC_URL` and optionally `GHTRENDS_AUTO_COLLECT=1`. Set `TRUST_PROXY` only to your actual trusted reverse-proxy network. The collector and public scan queue share a bounded, paced workflow. Public scans are rate limited; scheduled collection refreshes curated categories daily.
+For a shared public instance, set `GHTRENDS_HOSTED=1` to keep the homepage restricted to curated categories; custom scans still get permanent report URLs. Search-term variants are stored separately and cannot replace canonical category evidence. Set `PUBLIC_URL` and optionally `GHTRENDS_AUTO_COLLECT=1`. Set `TRUST_PROXY` only to your actual trusted reverse-proxy network. The collector and public scan queue share a bounded, paced workflow. Public scans are rate limited; scheduled collection refreshes curated categories daily using source collection times. Recalculating a report does not postpone collection. Method upgrades invalidate old analysis caches.
 
 ## Contributing
 
