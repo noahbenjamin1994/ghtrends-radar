@@ -158,8 +158,8 @@ git clone https://github.com/noahbenjamin1994/ghtrends-radar.git
 cd ghtrends-radar
 npm ci
 npm run check
-npm test
 npm run build
+npm test
 npm start
 ```
 
