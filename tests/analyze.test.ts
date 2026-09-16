@@ -2,7 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { analyze, demandMetrics } from "../src/core/analyze.js";
 import { TOPICS, validateRepo, resolveTopic } from "../src/core/topics.js";
-import type { DemandEvidence, SupplyEvidence } from "../src/core/types.js";
+import type {
+  DemandEvidence,
+  SupplyEvidence,
+  Repo,
+} from "../src/core/types.js";
 const asOf = "2026-09-15T12:00:00.000Z";
 function demand(
   mode: "growing" | "flat" | "spike" | "zero" | "seasonal" = "flat",
@@ -35,7 +39,36 @@ function supply(n: number): SupplyEvidence {
     fetchedAt: asOf,
     total: n,
     complete: true,
-    repositories: [],
+    repositories: Array.from({ length: Math.min(n, 150) }, (_, i): Repo => ({
+      name: `team-${i}/mcp-server`,
+      description: "A usable MCP server",
+      url: `https://github.com/team-${i}/mcp-server`,
+      stars: 250,
+      forks: 20,
+      language: "TypeScript",
+      license: "MIT",
+      archived: false,
+      createdAt: "2024-01-01T00:00:00Z",
+      pushedAt: "2026-09-10T00:00:00Z",
+      topics: ["mcp-server"],
+      starHistory: [],
+      growth7d: null,
+      growth30d: null,
+      growthWindowEnd: null,
+      openIssues: 0,
+      issueResponseHours: null,
+      issueSampleSize: 0,
+      unansweredIssues: 0,
+      contributors: null,
+      topContributorShare: null,
+      fetchedAt: asOf,
+      errors: [],
+      relevance: {
+        role: "direct",
+        method: "rules",
+        reason: "Matches researched category",
+      },
+    })),
   };
 }
 for (const [kind, n, mode] of [
@@ -322,6 +355,7 @@ test("a trustworthy supply lower bound remains dense without enumerating every r
     "expanding",
   );
   s.total = 12;
+  s.repositories = s.repositories.slice(0, 12);
   assert.equal(
     analyze(TOPICS[0]!, demand("growing"), s, [], asOf).kind,
     "uncertain",

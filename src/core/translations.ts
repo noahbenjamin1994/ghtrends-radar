@@ -1,4 +1,104 @@
 export const zh: Record<string, string> = {
+  "Original search filters shown below.": "原始筛选条件见下方来源。",
+  "Further categories and qualified search signals appear in the list.":
+    "更多类别与待核对的搜索信号见下方列表。",
+  "Established alternatives · search history pending":
+    "成熟替代项目 · 搜索历史待补充",
+  "Established alternatives · mixed search signals":
+    "成熟替代项目 · 搜索信号分歧",
+  "Stable, falling, mixed or pending": "平稳、下降、分歧或待补充",
+  "Search windows or related terms show mixed directions. The competition assessment remains tied to the observed alternatives; compare the source curves for search momentum.":
+    "搜索窗口或相关词呈现方向分歧。竞争判断依据已观察的替代项目；搜索动向可结合来源曲线进一步研究。",
+  "Independent alternatives, maintained project adoption signals, and established leaders determine pressure. Project roles keep resources and integrations in their own groups.":
+    "竞争压力结合独立替代项目、持续维护与开发者关注、成熟头部项目计算。资源资料与周边集成项目单独归类。",
+  "Pressure combines independent teams (50 points), established alternatives (30), and leading project strength (20). The published boundary is 45/100. Project maturity considers stars, forks, age and maintenance. This index describes observed open-source competition; commercial validation adds another layer.":
+    "竞争压力由独立替代项目（50 分）、成熟替代项目（30 分）、头部项目实力（20 分）组成，分类参考线为 45/100。成熟度结合 Star、Fork、项目年龄与维护记录。该指标描述已观察到的开源竞争，商业判断需结合用户验证。",
+  "GitHub searches use relevant topics and specific name or description phrases. Original, active projects qualify with at least one star and a push within 365 days. We review their roles, group projects by owner, and calculate pressure from direct alternatives.":
+    "GitHub 检索使用相关主题及名称、描述中的具体短语。初筛保留至少 1 Star、365 天内有提交的原创活跃项目，再核对角色、按所属组织分组，并根据直接替代项目计算竞争压力。",
+  "Search direction compares 4-, 8- and 13-week windows, sustained changes and a resampling range. Slow growth can qualify across a full quarter. A repeating annual pattern switches the direction comparison to the same period last year. Opposing synonyms keep a mixed signal.":
+    "搜索方向结合 4、8、13 周窗口、变化持续性与重采样区间。缓慢增长可通过完整季度确认；出现年度重复形态时，采用去年同期比较。同义词方向相反时保留混合信号。",
+  "Annual patterns require at least 40 paired weeks, correlation of 0.75 or more, and a substantial rise and fall in both annual profiles. Two-week block resampling checks sensitivity. These are evidence diagnostics for research decisions.":
+    "年度形态要求至少 40 对同期周、相关系数达到 0.75，且两个年度均存在明显的上升与回落。两周分块重采样用于检查敏感性。这些诊断帮助评估研究证据。",
+  "Search attention is rising alongside established open-source alternatives. Focus on a specific audience, workflow or product advantage.":
+    "搜索关注上升，成熟开源替代项目已有规模。聚焦具体受众、工作流或产品优势。",
+  "Established open-source alternatives shape this category. Compare their strengths and find a concrete reason for users to choose your product.":
+    "该类别已有成熟开源替代项目。比较其优势，找到用户选择你的产品的具体理由。",
+  "Observed competition is limited and search interest is stable or cooling. Explore a focused niche and validate user needs.":
+    "已观察竞争较少，搜索关注平稳或回落。探索聚焦的小众场景，并验证用户需求。",
+  "Review the measured search direction and project roles. Complete the highlighted evidence before choosing a market strategy.":
+    "先查看已测得的搜索方向与项目角色，补齐重点证据，再确定切入策略。",
+  "A recurring annual search pattern is present. Direction uses the same eight-week period last year; recent-window change remains visible separately.":
+    "搜索曲线呈年度重复形态。方向采用去年相同 8 周的比较，近期窗口变化另行展示。",
+  "Search direction follows a sustained thirteen-week change, supported by the shorter windows and the resampling range.":
+    "搜索方向依据持续的 13 周变化，并由较短窗口和重采样区间支持。",
+  "Competition pressure is an operational index of observed open-source alternatives. Stars and forks indicate developer attention and reuse; user adoption and commercial products deserve separate research.":
+    "竞争压力是已观察开源替代项目的研究指标。Star 与 Fork 反映开发者关注和代码复用；实际用户采用和商业产品需进一步研究。",
+  "The displayed projects form a stars-ranked sample. Competition pressure is a lower bound; wider coverage can strengthen the assessment.":
+    "展示项目为按 Star 排序的样本，竞争压力代表下限；扩展覆盖可进一步完善判断。",
+  "Some project roles await closer review. The pressure range includes their possible contribution.":
+    "部分项目角色待进一步核对，压力区间已计入其可能影响。",
+  "Project roles use local metadata rules. A refreshed scan can add an AI review of the descriptions.":
+    "项目角色采用本地元数据规则，刷新扫描可补充 AI 对描述的核对。",
+  "This field spans several user workflows. Use the search trajectory as context and compare alternatives within one workflow.":
+    "该领域涵盖多种用户工作流。搜索趋势可作背景，具体竞争需围绕单一工作流比较。",
+  "Competition pressure": "竞争压力",
+  "Operational index / 100": "研究指标 / 100",
+  "Direct alternatives": "直接替代项目",
+  "Within {sample} inspected projects": "基于已检查的 {sample} 个项目",
+  "Observed GitHub search scope": "当前 GitHub 检索范围",
+  "Direction basis": "判断依据",
+  "basis.recent-windows": "近期多窗口趋势",
+  "basis.sustained-quarter": "持续的季度变化",
+  "basis.seasonal-year": "年度重复形态，采用同期比较",
+  "pressure.limited": "竞争较少",
+  "pressure.established": "竞争已有规模",
+  "pressure.pending": "竞争范围待补充",
+  "role.direct": "直接替代",
+  "role.adjacent": "周边项目",
+  "role.resource": "资源资料",
+  "role.unclear": "待核对",
+  "How competition is assessed": "竞争压力如何得出",
+  "Independent alternatives": "独立替代项目",
+  "Established alternatives": "成熟替代项目",
+  "Leading project strength": "头部项目实力",
+  "Roles in the inspected sample": "已检查项目的角色",
+  "≥1 star · pushed within 365 days": "至少 1 Star · 365 天内有提交",
+  "All matches in this search scope were inspected.":
+    "已检查当前检索范围内的全部匹配项目。",
+  "The inspected projects form a sample; the displayed pressure is a lower bound.":
+    "当前已检查部分项目，展示的竞争压力为下限。",
+  "The range includes projects whose role awaits review.":
+    "指标区间计入了角色待核对项目的可能影响。",
+  "Roles use local metadata rules. A refreshed scan can add AI review.":
+    "项目角色采用本地元数据规则，刷新研究可补充 AI 核对。",
+  "Top 3 owner attention share": "前三个组织的关注占比",
+  "Limited observed competition": "已观察竞争较少",
+  "Review project roles": "核对项目角色",
+  "AI review": "AI 核对",
+  "Metadata rules": "元数据规则",
+  "Resource collection or learning material": "资源集合或学习资料",
+  "Category phrase in project name or description": "名称或描述包含该类别短语",
+  "Project role awaiting closer review": "项目角色待进一步核对",
+  "Direct alternatives appear first, followed by other matching projects.":
+    "优先展示直接替代项目，再展示其他匹配项目。",
+  "Choose a workflow within this field": "选择领域中的具体工作流",
+  "Use the measured search trajectory to understand the field, then compare tools that serve one audience and one task.":
+    "先用搜索趋势了解领域变化，再围绕同一类用户、同一个任务比较具体工具。",
+  "Seasonal pattern · compare the same period last year":
+    "年度重复形态 · 采用去年同期比较",
+  "The annual search pattern repeats. The landscape uses year-over-year direction; the recent-window change shows the current seasonal phase.":
+    "搜索曲线呈年度重复形态。赛道判断采用同期变化，近期窗口反映当前所处阶段。",
+  "Field overview": "领域概览",
+  "Search rising · limited observed competition": "搜索上升 · 已观察竞争较少",
+  "Search rising · established alternatives": "搜索上升 · 成熟替代项目较多",
+  "Search falling · established alternatives": "搜索下降 · 成熟替代项目较多",
+  "Search stable · established alternatives": "搜索平稳 · 成熟替代项目较多",
+  "Search falling · limited observed competition": "搜索下降 · 已观察竞争较少",
+  "Search stable · limited observed competition": "搜索平稳 · 已观察竞争较少",
+  "COMPETITION PRESSURE →": "竞争压力 →",
+  "SEARCH DIRECTION →": "搜索方向 →",
+  "Opportunity map: competition pressure from left to right, sustained search direction from bottom to top":
+    "机会图：从左到右表示竞争压力，从下到上表示持续搜索方向",
   "Your saved projects, with cached evidence. Open a project to request a fresh analysis.":
     "查看已保存项目与已有证据，打开项目可主动发起新分析。",
   "{remaining} of {limit} research credits left today":

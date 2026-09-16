@@ -103,7 +103,10 @@ test("HTTP-date cooldown keeps a dated successful snapshot and fresh cached quer
     assert.equal(cached.points.length, previous.points.length);
     const freshSupply = { ...seed.supply, fetchedAt: new Date().toISOString() };
     const old = { ...d, fetchedAt: "2000-01-01T00:00:00Z" };
-    assert.equal(analyze(seed.topic, old, freshSupply).kind, "uncertain");
+    const assessment = analyze(seed.topic, old, freshSupply);
+    assert.equal(assessment.kind, "contested");
+    assert.equal(assessment.confidence, "low");
+    assert.match(assessment.headline, /search history pending/);
     mock.assertNoPendingInterceptors();
   });
 });
@@ -112,13 +115,11 @@ test("concurrent identical queries share one successful collection", async () =>
   await fixture(async (_store, trends, mock) => {
     let timelines = 0;
     const pool = mock.get("https://trends.google.com");
-    pool
-      .intercept({ path: "/trends/?geo=US" })
-      .reply(200, "page", {
-        headers: {
-          "set-cookie": "NID=anonymous-test; Path=/; Secure; HttpOnly",
-        },
-      });
+    pool.intercept({ path: "/trends/?geo=US" }).reply(200, "page", {
+      headers: {
+        "set-cookie": "NID=anonymous-test; Path=/; Secure; HttpOnly",
+      },
+    });
     pool
       .intercept({
         path: /^\/trends\/api\/explore/,
@@ -221,7 +222,9 @@ test("collection gaps stay pending instead of becoming measured zero baselines",
     retryAt: new Date(Date.now() + 60000).toISOString(),
   };
   const m = analyze(seed.topic, d, seed.supply, [], seed.asOf);
-  assert.equal(m.kind, "uncertain");
+  assert.equal(m.kind, "contested");
+  assert.equal(m.confidence, "low");
+  assert.equal(m.metrics.trend, "unknown");
   assert.equal(m.metrics.growth, null);
   assert.ok(
     !m.limitations.some((v) =>
@@ -361,6 +364,113 @@ test("a failed anonymous session bootstrap stops before protected API requests",
     const d = await trends.demand("cat translator");
     assert.match(d.error!, /503/);
     assert.equal(d.retryAt, undefined);
+    mock.assertNoPendingInterceptors();
+  });
+});
+
+test("a rate-limited route restarts the full token sequence on one isolated backup", async () => {
+  await fixture(async (store, trends, mock) => {
+    const backup = new Trends(store, {
+      cooldownKey: "trends:cooldown:test-backup",
+    });
+    (trends as any).fallback = backup;
+    const pool = mock.get("https://trends.google.com");
+    const widget = (token: string) =>
+      JSON.stringify({
+        widgets: [
+          {
+            id: "TIMESERIES",
+            token,
+            request: {
+              resolution: "WEEK",
+              comparisonItem: [
+                {
+                  complexKeywordsRestriction: {
+                    keyword: [{ value: "context compression" }],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      });
+    pool
+      .intercept({ path: "/trends/?geo=US" })
+      .reply(200, "page", { headers: { "set-cookie": "NID=primary; Path=/" } });
+    pool
+      .intercept({
+        path: /^\/trends\/api\/explore/,
+        headers: { cookie: "NID=primary" },
+      })
+      .reply(200, widget("primary-token"));
+    pool
+      .intercept({
+        path: /^\/trends\/api\/widgetdata\/multiline.*token=primary-token/,
+        headers: { cookie: "NID=primary" },
+      })
+      .reply(429, "cooling", { headers: { "retry-after": "120" } });
+    pool
+      .intercept({ path: "/trends/?geo=US" })
+      .reply(200, "page", { headers: { "set-cookie": "NID=backup; Path=/" } });
+    pool
+      .intercept({
+        path: /^\/trends\/api\/explore/,
+        headers: { cookie: "NID=backup" },
+      })
+      .reply(200, widget("backup-token"));
+    pool
+      .intercept({
+        path: /^\/trends\/api\/widgetdata\/multiline.*token=backup-token/,
+        headers: { cookie: "NID=backup" },
+      })
+      .reply(
+        200,
+        JSON.stringify({
+          default: {
+            timelineData: [
+              { time: "1788652800", value: [30], hasData: [true] },
+            ],
+          },
+        }),
+      );
+    const d = await trends.demand("context compression");
+    assert.equal(d.error, undefined);
+    assert.equal(d.retryAt, undefined);
+    assert.equal(d.points[0]?.value, 30);
+    assert.equal(trends.status().coolingRoutes, 1);
+    assert.equal(trends.status().routes, 2);
+    assert.equal(trends.status().retryAt, null);
+    assert.deepEqual(await trends.demand("context compression"), d);
+    mock.assertNoPendingInterceptors();
+  });
+});
+
+test("two cooling routes stop requests and retain the earliest recovery across restarts", async () => {
+  await fixture(async (store, trends, mock) => {
+    (trends as any).fallback = new Trends(store, {
+      cooldownKey: "trends:cooldown:test-backup",
+    });
+    const pool = mock.get("https://trends.google.com");
+    pool
+      .intercept({ path: "/trends/?geo=US" })
+      .reply(429, "cooling", { headers: { "retry-after": "120" } });
+    pool
+      .intercept({ path: "/trends/?geo=US" })
+      .reply(429, "cooling", { headers: { "retry-after": "300" } });
+    const d = await trends.demand("first query");
+    assert.equal(trends.status().coolingRoutes, 2);
+    assert.equal(d.retryAt, trends.status().retryAt);
+    assert.ok(Date.parse(d.retryAt!) < Date.now() + 121000);
+    const next = new Trends(store);
+    (next as any).fallback = new Trends(store, {
+      cooldownKey: "trends:cooldown:test-backup",
+    });
+    try {
+      assert.equal((await next.demand("second query")).retryAt, d.retryAt);
+      assert.equal(next.status().coolingRoutes, 2);
+    } finally {
+      await next.close();
+    }
     mock.assertNoPendingInterceptors();
   });
 });

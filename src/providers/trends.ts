@@ -4,6 +4,7 @@ import type { ProviderCall } from "../core/operations.js";
 import { fetch as request, ProxyAgent } from "undici";
 import type { DemandEvidence, InterestPoint } from "../core/types.js";
 import { Store } from "../core/store.js";
+import { createHash } from "node:crypto";
 import { validateGeo } from "../core/topics.js";
 const ORIGIN = "https://trends.google.com";
 export function parseGoogleJson(text: string): any {
@@ -38,7 +39,8 @@ export class Trends {
   private warmup?: Promise<void>;
   private warmupExpiresAt = 0;
   private inFlight = new Map<string, Promise<DemandEvidence>>();
-  private readonly cooldownKey = "trends:cooldown:v1";
+  private readonly cooldownKey: string;
+  private fallback?: Trends;
   private readonly interval = Math.max(
     1000,
     Math.min(10000, Number(process.env.GHTRENDS_TRENDS_INTERVAL_MS) || 1500),
@@ -55,8 +57,17 @@ export class Trends {
     );
   }
   private dispatcher: ProxyAgent | undefined;
-  constructor(private store: Store) {
-    const proxy = process.env.GOOGLE_TRENDS_PROXY;
+  constructor(
+    private store: Store,
+    route?: { proxy?: string; cooldownKey?: string },
+  ) {
+    const proxy = route ? route.proxy : process.env.GOOGLE_TRENDS_PROXY;
+    this.cooldownKey =
+      route?.cooldownKey ||
+      (proxy
+        ? "trends:cooldown:route:" +
+          createHash("sha256").update(proxy).digest("hex").slice(0, 24)
+        : "trends:cooldown:v1");
     if (proxy) {
       try {
         const url = new URL(proxy);
@@ -68,15 +79,27 @@ export class Trends {
         );
       }
     }
+    const fallback = process.env.GOOGLE_TRENDS_PROXY_FALLBACK;
+    if (!route && proxy && fallback && fallback !== proxy)
+      this.fallback = new Trends(store, { proxy: fallback });
   }
   status() {
-    const until = this.cooldown();
+    const now = Date.now();
+    const routes = [
+      this.cooldown(),
+      ...(this.fallback ? [this.fallback.cooldown()] : []),
+    ];
+    const until = routes.every((until) => until > now)
+      ? Math.min(...routes)
+      : 0;
     return {
       proxy: !!this.dispatcher,
       region: this.dispatcher
         ? process.env.GHTRENDS_TRENDS_PROXY_REGION || "configured"
         : "direct",
-      retryAt: until > Date.now() ? new Date(until).toISOString() : null,
+      retryAt: until > now ? new Date(until).toISOString() : null,
+      routes: routes.length,
+      coolingRoutes: routes.filter((until) => until > now).length,
     };
   }
   private async read(
@@ -264,7 +287,7 @@ export class Trends {
     const requestKey = JSON.stringify([keyword.toLowerCase(), geo]);
     let pending = this.inFlight.get(requestKey);
     if (!pending) {
-      pending = this.collect(keyword, geo, onTimeline);
+      pending = this.collectWithFallback(keyword, geo, onTimeline);
       this.inFlight.set(requestKey, pending);
       void pending
         .finally(() => this.inFlight.delete(requestKey))
@@ -273,6 +296,26 @@ export class Trends {
     const data = await pending;
     onTimeline?.(data);
     return data;
+  }
+  private async collectWithFallback(
+    keyword: string,
+    geo: string,
+    onTimeline?: (data: DemandEvidence) => void,
+  ): Promise<DemandEvidence> {
+    const primary = await this.collect(keyword, geo, onTimeline);
+    if (!this.fallback || !primary.retryAt) return primary;
+    // Each route owns its cookies, proxy connection, paced queue and persisted
+    // cooldown. Restart the whole Google token sequence on the backup route.
+    // One alternate route bounds traffic; neither route bypasses its cooldown.
+    const backup = await this.fallback.demand(keyword, geo, onTimeline);
+    if (!backup.error && !backup.collectionError) return backup;
+    const result =
+      primary.points.length &&
+      (!backup.points.length ||
+        Date.parse(primary.fetchedAt) > Date.parse(backup.fetchedAt))
+        ? primary
+        : backup;
+    return { ...result, retryAt: this.status().retryAt || undefined };
   }
   private async collect(
     keyword: string,
@@ -429,5 +472,6 @@ export class Trends {
   }
   async close() {
     await this.dispatcher?.close();
+    await this.fallback?.close();
   }
 }

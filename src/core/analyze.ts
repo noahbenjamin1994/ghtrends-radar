@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { assessCompetition, repoRelevance } from "./competition.js";
 import { completeWeeklySeries } from "./evidence.js";
 import type {
   DemandEvidence,
@@ -13,9 +14,8 @@ import { ALGORITHM_VERSION } from "./version.js";
 export { ALGORITHM_VERSION } from "./version.js";
 // Operational thresholds, published and configurable in code; not universal market laws.
 export const POLICY = {
-  denseSupply: 50,
-  minStars: 5,
-  activeDays: 180,
+  minStars: 1,
+  activeDays: 365,
   minWeeks: 26,
   windowWeeks: 8,
   fastGrowth: 0.25,
@@ -147,8 +147,56 @@ export function demandMetrics(
   const persistence =
     recent.filter((v) => v > baseline * (1 + POLICY.fastGrowth / 2)).length /
     (recent.length || 1);
-  // Two levels one year apart do not establish a recurring seasonal cycle.
-  const seasonal = false;
+  // Recurring shape across two full annual cycles, rather than just two levels.
+  // Exact date pairing tolerates older gaps without shifting the seasonal phase.
+  const annual = points.slice(-52).flatMap((p) => {
+    const prior = byDate.get(Date.parse(p.date) - 52 * 7 * 86400000);
+    return prior === undefined ? [] : [{ current: p.value, prior }];
+  });
+  const correlation = (a: number[], b: number[]) => {
+    const am = mean(a),
+      bm = mean(b);
+    const numerator = a.reduce((s, v, i) => s + (v - am) * (b[i]! - bm), 0);
+    const denominator = Math.sqrt(
+      a.reduce((s, v) => s + (v - am) ** 2, 0) *
+        b.reduce((s, v) => s + (v - bm) ** 2, 0),
+    );
+    return denominator > 0 ? numerator / denominator : 0;
+  };
+  const cycling = (a: number[]) => {
+    // Four-week blocks retain narrow holiday peaks that quarterly medians erase.
+    const blocks = Math.floor(a.length / 4);
+    const q = Array.from({ length: blocks }, (_, i) =>
+      median(
+        a.slice(
+          Math.floor((i * a.length) / blocks),
+          Math.floor(((i + 1) * a.length) / blocks),
+        ),
+      ),
+    );
+    const changes = q.slice(1).map((v, i) => v - q[i]!);
+    const range = Math.max(...q) - Math.min(...q);
+    return (
+      range >= Math.max(5, median(a) * 0.35) &&
+      changes.some((d) => d > range * 0.15) &&
+      changes.some((d) => d < -range * 0.15)
+    );
+  };
+  const seasonalCorrelation =
+    annual.length >= 40
+      ? correlation(
+          annual.map((p) => p.current),
+          annual.map((p) => p.prior),
+        )
+      : null;
+  const seasonal =
+    validHistory &&
+    annual.length >= 40 &&
+    (seasonalCorrelation ?? 0) >= 0.75 &&
+    cycling(annual.map((p) => p.current)) &&
+    cycling(annual.map((p) => p.prior));
+  const yearBand =
+    yearOverYear !== null ? growthBand(recent, priorYear) : [null, null];
   const recentPoints = points.slice(-8),
     anchorMean =
       recentPoints.length === 8 &&
@@ -166,6 +214,7 @@ export function demandMetrics(
   if (fast !== null && growth !== null && quarterGrowth !== null) {
     if (
       growth >= POLICY.meaningfulGrowth &&
+      current - baseline >= 2 &&
       (band[0] ?? 0) > 0 &&
       quarterGrowth >= -POLICY.meaningfulGrowth &&
       (shortGrowth ?? -1) >= -POLICY.meaningfulGrowth
@@ -173,6 +222,7 @@ export function demandMetrics(
       trend = "rising";
     else if (
       growth <= -POLICY.meaningfulGrowth &&
+      baseline - current >= 2 &&
       (band[1] ?? 0) < 0 &&
       quarterGrowth <= POLICY.meaningfulGrowth &&
       (shortGrowth ?? 1) <= POLICY.meaningfulGrowth
@@ -184,6 +234,64 @@ export function demandMetrics(
       Math.abs(shortGrowth ?? 1) < 0.2
     )
       trend = "stable";
+    else trend = "mixed";
+  }
+  let directionBasis: DemandMetrics["directionBasis"] = "recent-windows";
+  // Slow, persistent changes can be clear over a quarter while an eight-week
+  // percentage stays below 10%. Require agreement, a stable band and a real
+  // index change, rather than raising a trend from year-on-year context alone.
+  if (
+    usable &&
+    growth !== null &&
+    Math.abs(growth) < POLICY.meaningfulGrowth &&
+    quarterGrowth !== null
+  ) {
+    const qr = values.slice(-13),
+      qb = values.slice(-26, -13);
+    const qband = growthBand(qr, qb);
+    if (
+      quarterGrowth >= POLICY.meaningfulGrowth &&
+      growth > 0 &&
+      (shortGrowth ?? -1) >= 0 &&
+      qband[0] > 0 &&
+      median(qr) - median(qb) >= 2
+    ) {
+      trend = "rising";
+      directionBasis = "sustained-quarter";
+    }
+    if (
+      quarterGrowth <= -POLICY.meaningfulGrowth &&
+      growth < 0 &&
+      (shortGrowth ?? 1) <= 0 &&
+      qband[1] < 0 &&
+      median(qb) - median(qr) >= 2
+    ) {
+      trend = "falling";
+      directionBasis = "sustained-quarter";
+    }
+  }
+  // Seasonal categories compare the same eight calendar weeks year over year.
+  // Keep the raw sequential-window percentage visible as a separate measurement.
+  if (
+    seasonal &&
+    yearOverYear !== null &&
+    usable &&
+    recentNonzeroShare >= POLICY.minNonzero
+  ) {
+    directionBasis = "seasonal-year";
+    if (
+      yearOverYear >= POLICY.meaningfulGrowth &&
+      (yearBand[0] ?? 0) > 0 &&
+      current - median(priorYear) >= 2
+    )
+      trend = "rising";
+    else if (
+      yearOverYear <= -POLICY.meaningfulGrowth &&
+      (yearBand[1] ?? 0) < 0 &&
+      median(priorYear) - current >= 2
+    )
+      trend = "falling";
+    else if (Math.abs(yearOverYear) < POLICY.meaningfulGrowth) trend = "stable";
     else trend = "mixed";
   }
   const horizon: DemandMetrics["horizon"] =
@@ -213,6 +321,10 @@ export function demandMetrics(
   };
   return {
     horizon,
+    directionBasis,
+    seasonalCorrelation,
+    yearLower: yearBand[0] ?? null,
+    yearUpper: yearBand[1] ?? null,
     emerging,
     windows: {
       short: windowDates(4),
@@ -246,6 +358,13 @@ export function analyze(
   gaps: Gap[] = [],
   asOf = new Date().toISOString(),
 ): Market {
+  supply = {
+    ...supply,
+    repositories: supply.repositories.map((r) => ({
+      ...r,
+      relevance: r.relevance || repoRelevance(r, topic),
+    })),
+  };
   const metrics = demandMetrics(demand, asOf);
   const alternateTrends = (demand.alternatives || [])
     .filter((d) => {
@@ -263,6 +382,17 @@ export function analyze(
   const opposing =
     (metrics.trend === "rising" && alternateTrends.includes("falling")) ||
     (metrics.trend === "falling" && alternateTrends.includes("rising"));
+  metrics.synonymAgreement = {
+    measured: alternateTrends.length + Number(metrics.trend !== "unknown"),
+    agreeing:
+      alternateTrends.filter((t) => t === metrics.trend).length +
+      Number(metrics.trend !== "unknown"),
+    opposing: alternateTrends.filter(
+      (t) =>
+        (metrics.trend === "rising" && t === "falling") ||
+        (metrics.trend === "falling" && t === "rising"),
+    ).length,
+  };
   if (opposing) metrics.trend = "mixed";
   const reasons: string[] = [],
     limitations: string[] = [
@@ -273,12 +403,9 @@ export function analyze(
     !Number.isFinite(Date.parse(date)) ||
     Date.parse(date) > Date.parse(asOf) + 60000 ||
     (Date.parse(asOf) - Date.parse(date)) / 86400000 > POLICY.staleDays;
-  const dense = supply.total >= POLICY.denseSupply;
-  const supplyKnown =
-    !supply.error &&
-    Number.isFinite(supply.total) &&
-    supply.total >= 0 &&
-    (supply.complete || supply.total >= POLICY.denseSupply);
+  const competition = assessCompetition(topic, supply, asOf);
+  const dense = competition.level === "established";
+  const supplyKnown = competition.level !== "pending";
   const demandStale = stale(demand.fetchedAt),
     supplyStale = stale(supply.fetchedAt);
   const lastPoint = completeWeeklySeries(demand, asOf).points.at(-1);
@@ -290,15 +417,17 @@ export function analyze(
     !supplyStale &&
     !seriesStale;
   const kind: MarketKind =
-    !usable || metrics.trend === "mixed" || metrics.trend === "unknown"
+    topic.scope === "field" || !supplyKnown || supplyStale
       ? "uncertain"
       : dense
-        ? metrics.trend === "rising"
+        ? usable && metrics.trend === "rising"
           ? "expanding"
           : "contested"
-        : metrics.trend === "rising"
-          ? "blue"
-          : "quiet";
+        : !usable || metrics.trend === "mixed" || metrics.trend === "unknown"
+          ? "uncertain"
+          : metrics.trend === "rising"
+            ? "blue"
+            : "quiet";
   if (demand.error)
     limitations.push(`Search-demand collection: ${demand.error}`);
   if (demand.collectionError)
@@ -346,7 +475,7 @@ export function analyze(
     );
   if (metrics.trend === "mixed")
     limitations.push(
-      "Short and longer search windows or related terms do not agree. A single market label would overstate the evidence.",
+      "Search windows or related terms show mixed directions. The competition assessment remains tied to the observed alternatives; compare the source curves for search momentum.",
     );
   if (opposing)
     limitations.push(
@@ -387,26 +516,66 @@ export function analyze(
     reasons.push(
       `Four-week search change: ${(metrics.shortGrowth * 100).toFixed(0)}%; thirteen-week change: ${(metrics.quarterGrowth * 100).toFixed(0)}%. These windows check the direction of the eight-week comparison.`,
     );
-  const stars = supply.repositories.map((r) => r.stars).sort((a, b) => b - a),
-    totalStars = stars.reduce((a, b) => a + b, 0);
-  const concentration =
-    totalStars > 0
-      ? stars.slice(0, 3).reduce((a, b) => a + b, 0) / totalStars
-      : null;
-  // Coverage cannot validate query intent or measure customer demand.
+  const concentration = competition.concentration;
+  if (metrics.directionBasis === "sustained-quarter")
+    reasons.push(
+      "Search direction follows a sustained thirteen-week change, supported by the shorter windows and the resampling range.",
+    );
+  if (metrics.seasonal)
+    reasons.push(
+      "A recurring annual search pattern is present. Direction uses the same eight-week period last year; recent-window change remains visible separately.",
+    );
+  if (competition.sampled) {
+    reasons.push(
+      `Project roles: ${competition.direct} direct alternatives, ${competition.adjacent} adjacent projects, ${competition.resources} resources, ${competition.unclear} awaiting review.`,
+    );
+    reasons.push(
+      `Competition pressure: ${competition.score.toFixed(0)}–${competition.upper.toFixed(0)}/100; breadth ${competition.breadth.toFixed(0)}, established alternatives ${competition.incumbency.toFixed(0)}, leading project strength ${competition.dominance.toFixed(0)}.`,
+    );
+  }
+  limitations.push(
+    "Competition pressure is an operational index of observed open-source alternatives. Stars and forks indicate developer attention and reuse; user adoption and commercial products deserve separate research.",
+  );
+  if (!competition.enumerated)
+    limitations.push(
+      "The displayed projects form a stars-ranked sample. Competition pressure is a lower bound; wider coverage can strengthen the assessment.",
+    );
+  if (competition.unclear)
+    limitations.push(
+      "Some project roles await closer review. The pressure range includes their possible contribution.",
+    );
+  if (supply.review?.status === "fallback")
+    limitations.push(
+      "Project roles use local metadata rules. A refreshed scan can add an AI review of the descriptions.",
+    );
   const confidence =
-    kind === "uncertain" || metrics.emerging ? "low" : "moderate";
+    kind === "uncertain" ||
+    !usable ||
+    metrics.trend === "mixed" ||
+    metrics.emerging ||
+    competition.boundary ||
+    competition.direct < 3 ||
+    supply.review?.status === "fallback"
+      ? "low"
+      : "moderate";
+  if (topic.scope === "field")
+    limitations.push(
+      "This field spans several user workflows. Use the search trajectory as context and compare alternatives within one workflow.",
+    );
   const labels = {
-    blue: "Search rising · limited observed supply",
-    expanding: "Search rising · established supply",
-    contested:
-      metrics.trend === "falling"
-        ? "Search falling · established supply"
-        : "Search stable · established supply",
+    blue: "Search rising · limited observed competition",
+    expanding: "Search rising · established alternatives",
+    contested: !usable
+      ? "Established alternatives · search history pending"
+      : metrics.trend === "mixed"
+        ? "Established alternatives · mixed search signals"
+        : metrics.trend === "falling"
+          ? "Search falling · established alternatives"
+          : "Search stable · established alternatives",
     quiet:
       metrics.trend === "falling"
-        ? "Search falling · limited observed supply"
-        : "Search stable · limited observed supply",
+        ? "Search falling · limited observed competition"
+        : "Search stable · limited observed competition",
     uncertain:
       metrics.trend === "mixed"
         ? "Mixed search signals"
@@ -415,13 +584,13 @@ export function analyze(
   const strategies = {
     blue: "Investigate an underserved use case. Validate the problem with users, then move quickly on a focused product.",
     expanding:
-      "Search attention is rising and many repositories match this query. Check which projects solve the same user problem before drawing a competition conclusion.",
+      "Search attention is rising alongside established open-source alternatives. Focus on a specific audience, workflow or product advantage.",
     contested:
-      "Many active repositories match this scope. Check the search direction, alternatives and specific user problems before choosing an entry point.",
+      "Established open-source alternatives shape this category. Compare their strengths and find a concrete reason for users to choose your product.",
     quiet:
-      "A small category without sustained search growth. Check external demand before investing; it may be early, niche or inactive.",
+      "Observed competition is limited and search interest is stable or cooling. Explore a focused niche and validate user needs.",
     uncertain:
-      "Gather stronger evidence or refine the demand keyword. The available data does not support a reliable quadrant.",
+      "Review the measured search direction and project roles. Complete the highlighted evidence before choosing a market strategy.",
   };
   // No calibrated opportunity score: keyword scope changes counts and scale.
   const score = null;
@@ -461,6 +630,7 @@ export function analyze(
     metrics,
     supplyDensity: supplyKnown ? (dense ? "dense" : "sparse") : "unknown",
     concentration,
+    competition,
     gaps,
     score,
   };

@@ -19,13 +19,14 @@ Find growing categories, inspect the competition, and share the evidence.
 
 ## What does it tell you?
 
-| Landscape | Search direction | Matching active projects | Starting strategy |
+| Landscape | Search direction | Observed competition | Starting strategy |
 |---|---|---|---|
-| Blue ocean | Rising | Fewer than 50 | Validate an underserved use case |
-| Growing red ocean | Rising | At least 50 | Find a specific audience or advantage |
-| Red ocean | Stable / falling | At least 50 | Identify a reason users would switch |
-| Quiet ocean | Stable / falling | Fewer than 50 | Check whether it is early, niche or inactive |
-| Needs validation | Conflicting / insufficient evidence | Any | Inspect known facts and validate the missing evidence |
+| Blue ocean | Rising | Limited, covered search results | Validate a focused use case |
+| Growing red ocean | Rising | Established alternatives | Find a specific audience or advantage |
+| Red ocean | Stable / falling / mixed / pending | Established alternatives | Find a reason users would switch; inspect search status separately |
+| Quiet ocean | Stable / falling | Limited, covered search results | Validate a focused niche |
+| Needs validation | Any | Coverage or project roles need review | Inspect measured facts and complete the highlighted evidence |
+| Field overview | Measured separately | Several workflows or a broader market | Choose one software task for the next scan |
 
 Ocean names summarize the observed search and open-source signals; they do not establish commercial competition. A quiet ocean can still be a valuable niche.
 
@@ -56,7 +57,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.10.0/ghtrends-radar-0.10.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.11.0/ghtrends-radar-0.11.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -122,7 +123,8 @@ The App installation token refreshes automatically. Only public repositories are
 - The release includes dated public starter snapshots so the local radar is useful on first launch. They retain their source dates; snapshots older than 14 days are reclassified as insufficient evidence until refreshed.
 - SQLite defaults to `~/.ghtrends`; override with `GHTRENDS_DATA_DIR`.
 - Hosted history and watchlists are saved by account in SQLite; self-hosted CLI, MCP and Web share the local workspace. Completed scans appear in My research.
-- `GOOGLE_TRENDS_PROXY` optionally configures a stable HTTP proxy for the public Trends collector. Keep the exit region consistent for comparable collection.
+- Anonymous Trends sessions first visit the Trends home page to obtain a session cookie, then use the JSON endpoints on the same proxy route. Session renewal happens every ten minutes; a sticky residential session of at least thirty minutes is suitable.
+- `GOOGLE_TRENDS_PROXY` configures the primary HTTP(S) proxy. Optional `GOOGLE_TRENDS_PROXY_FALLBACK` adds one fixed backup in the same region. Each route keeps its own anonymous cookies, paced queue and persistent recovery window. A limited primary route triggers one complete attempt through the backup. Both routes cooling down yields the earliest recovery time; successful cached evidence remains available. Admin shows the route and cooling counts.
 - Google Trends collection shares a paced queue (1.5 seconds between requests; `GHTRENDS_TRENDS_INTERVAL_MS` configures 1–10 seconds), and concurrent identical queries share a request. HTTP 429/403 pauses collection until `Retry-After` or a default 15-minute recovery window. Cooldown survives restarts, successful cached queries stay available, and a prior successful snapshot keeps its original date. The report displays the next refresh time.
 - Google Trends web endpoints may rate-limit requests or change. Temporary connection/5xx errors get one bounded retry. Classification requires fresh, usable weekly evidence. Collection state and measured zero values have separate meanings; baseline claims require observed weekly data.
 - Product copy and AI briefs use affirmative facts, current status and specific next actions. Saved narrative text is checked at display time; source evidence retains its original record.
@@ -158,7 +160,7 @@ export DEEPSEEK_MODEL=deepseek-flash
 ghtrends ui
 ```
 
-The model proposes one primary Trends phrase, up to two genuine synonyms, and bounded GitHub topic/phrase queries. Ambiguous acronyms request clarification. It then summarizes **collected evidence** in English and Chinese; it does not calculate or override metrics. Queries go to DeepSeek, Google and GitHub as needed. Do not enter secrets. A failed brief leaves the source report usable.
+The model proposes one primary Trends phrase, up to two genuine synonyms, and bounded GitHub topic/phrase queries. It also reviews project roles using quoted repository metadata; deterministic code calculates pressure and search direction. Ambiguous acronyms request clarification. It then summarizes **collected evidence** in English and Chinese; it does not calculate or override metrics. Queries go to DeepSeek, Google and GitHub as needed. Do not enter secrets. A failed brief leaves the source report usable.
 
 `PUBLIC_URL` may include a directory, for example `https://example.com/radar`. The same build supports both directory hosting and a local root URL. Forward that prefix unchanged to the server and configure the matching Logto callback.
 
@@ -194,21 +196,32 @@ AI usage recording begins at upgrade: earlier consumption is **unknown**. Missin
 
 ## How the method works
 
-**Supply:** GitHub topic and repository-name/description phrase searches (each query is displayed); non-fork, non-archived repositories with at least 5 stars and a push in the last 180 days. At least 50 qualifying repositories is the current dense-supply rule. Counts refer to the displayed search scope, not a census of every competing product. We use the search count and display up to 100 leaders; we do not claim to enumerate beyond GitHub's search result limit.
+### Competition pressure · method 2.0.0
 
-Known categories use their published query scope directly, without a model call. Compound requirements use intersecting GitHub topics. For incomplete unions, the lower bound is the larger of the deduplicated sample and any complete individual search count.
+GitHub searches use topics and specific name/description phrases. Initial coverage includes original, active repositories with at least **1 star and a push within 365 days**. Each query returns up to 100 leaders; overlapping results are deduplicated. An exact search count and an enumerated project sample are separate properties. Known categories keep their published query scope; compound requirements use topic intersections.
 
-**Search interest (method 1.3.1):** two years of Google Trends data. Compare the median of the last 8 complete weeks with the previous 8; check 4-week and 13-week comparisons as well. Each term is independently normalized in the same region/time range, preventing a popular synonym from rounding a niche one to zero in a comparison. If the primary has unusable evidence, select the first usable same-intent variant in the planned order and show the reason. We never sum indices or select by growth direction.
+Projects are classified as **direct alternatives, adjacent integrations, resources, or awaiting review**. An optional model reviews the top 60 project descriptions, with a verified verbatim source quotation for each accepted result. Invalid or ambiguous review items retain local metadata rules. Reports show every project's role, quote and review method. Direct alternatives are grouped by GitHub owner as a proxy for independent teams; each owner's strongest project contributes to three components:
 
-- For percentage-based direction, require the most recent 26 weeks to be consecutive and complete (older gaps do not invalidate this window), at least 60% nonzero values in the most recent 26 weeks, and a prior median of at least 3.
-- Rising/falling requires at least ±10% eight-week change, a resampling band entirely on the same side of zero, and no opposing short or longer change of more than 10%.
-- Stable requires less than 10% eight-week change and less than 20% four/thirteen-week change. Other usable cases or fresh, opposite-moving synonyms are **mixed**.
-- A low-base rise is reported without a percentage when the prior median is below 3, at least six of the last eight weekly indices reach 10, and the last-four-week median retains at least 80% of the first four. It remains a low-confidence early signal; sparse or isolated spikes stay unconfirmed.
-- Missing, stale, irregular, sparse or failed evidence stays **uncertain**. A week must have ended when collected; conflicting values prevent classification. The resampling band is a stability diagnostic, not a probability of success.
+- **Breadth, up to 50 points:** `50 × (1 − exp(−effectiveTeams / 12))`. Team weights combine log-scaled stars, forks and maintenance.
+- **Established alternatives, up to 30 points:** `30 × (1 − exp(−2 × sum(maturity)))`. Maturity combines project age, stars, forks and maintenance.
+- **Leading project strength, up to 20 points:** `20 × max(maturity)`. Top-three owner star share provides separate descriptive context.
 
-The raw legacy `fast` field still describes a stricter 25% breakout diagnostic; the displayed direction and classification use `metrics.trend`. “50 repositories” is a published scope-dependent heuristic, **not proof of commercial competition**. Google search attention is **not customer demand growth**. Source dates, the actual terms and limits are shown alongside every result.
+The operational reference line is **45/100**, with lower confidence within 5 points. A lower bound at or above 45 supports established competition even from a partial sample. Limited competition requires complete enumeration of the displayed scope, at least one direct alternative, and an upper bound below 45 after including projects awaiting review. Truncated samples show `≥ score`; complete samples can show a role-uncertainty interval. Zero direct matches prompt further research. See [the exact weights and equations](src/core/competition.ts).
 
-The same-period comparison uses timestamps 52 weeks apart, rather than row positions. A recent pullback above last year's level and a recovery below last year's level receive distinct context. Neither proves seasonality. The uncalibrated opportunity score has been removed (`score: null`); results sort by measured search change or update date. Confidence is capped at moderate because data coverage cannot establish intent match or customer demand. Older report links retain their snapshot and show an upgrade prompt.
+These versioned heuristics describe **observed open-source competition**. Stars indicate developer attention, forks indicate reuse, and owners approximate teams. Commercial products, customer adoption and willingness to pay deserve separate evidence. Broad fields and physical-product markets receive a field overview and guidance toward a concrete software workflow.
+
+### Search direction
+
+Two years of Google Trends data provide 4-, 8- and 13-week comparisons. Each phrase is independently normalized for the same region and period. Primary-term fallback follows the planned synonym order and data quality. Values stay separate; opposite measured synonym directions display as mixed.
+
+- Percentage direction requires 26 consecutive complete weeks, at least 60% positive values in that window, and a baseline median of at least 3. Completed weeks are checked against the source collection time.
+- Rising/falling normally requires an 8-week median change of at least ±10%, an absolute change of at least 2 index points, a two-week-block resampling band on the same side of zero, and supporting 4-/13-week checks.
+- Gradual change can qualify over 13 weeks when its percentage, absolute change and resampling band pass the same checks and shorter windows agree. The report names the direction basis.
+- Recurring annual shapes require at least 40 date-paired weeks, correlation ≥0.75, and material rises and falls in both annual profiles using four-week block medians. Direction then uses the same eight weeks a year earlier. The recent-window percentage remains visible separately.
+- A baseline below 3 can produce an **early rise** when at least six of eight weeks reach 10 and the final four-week median retains 80% of the preceding four. Its percentage stays empty and confidence stays low.
+- Conflicting, rounded or sparse measurements retain a qualified direction. Collection gaps display recovery actions. Established competition can still support red-ocean guidance with a separate pending/mixed search status; growing-red and blue labels require usable rising search evidence.
+
+The resampling bands diagnose stability. The overall opportunity score stays `null`; competition pressure has its own named scale. Confidence is capped at moderate; low evidence, boundary cases and early signals receive low confidence. Every report retains source dates, queries, roles and method version. Refreshing creates a new snapshot.
 
 **Repository evidence:** official GitHub star-history calendar buckets, a bounded recent issue sample, human maintainer responses, and returned contributor commit counts. Calendar buckets are not rolling 24-hour net star changes. Contributor and issue sample limits appear beside the results. Open issues are leads for research, not proven market gaps.
 

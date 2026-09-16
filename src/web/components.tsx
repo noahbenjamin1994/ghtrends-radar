@@ -1,3 +1,5 @@
+import { COMPETITION_POLICY } from "../core/competition.js";
+import { competitionPressure, marketAssessment } from "../core/assessment.js";
 import { t, locale } from "./i18n.js";
 import { MARKET_LABELS } from "../core/i18n.js";
 import React, { useId, useState } from "react";
@@ -166,14 +168,35 @@ export function Radar({
   onSelect: (m: Market) => void;
 }) {
   const [hover, setHover] = useState<string | null>(null);
-  const plotted = markets.filter((m) => m.kind !== "uncertain");
+  const plotted = markets.filter(
+    (m) =>
+      m.kind !== "uncertain" &&
+      marketAssessment(m).searchReady &&
+      ["rising", "falling", "stable"].includes(m.metrics.trend || ""),
+  );
   const positions = plotted.map((m, i) => {
-    const dense = m.supplyDensity === "dense",
-      count = m.supply.total;
-    const x = dense
-      ? 355 + Math.min(1, Math.log10(Math.max(count / 50, 1)) / 3) * 215
-      : 290 - Math.min(1, (50 - count) / 50) * 185;
-    const strength = Math.min(1, Math.abs(m.metrics.growth ?? 0) / 2);
+    const pressure = m.competition?.score;
+    const x =
+      pressure === undefined
+        ? m.supplyDensity === "dense"
+          ? 435
+          : 190
+        : pressure >= COMPETITION_POLICY.threshold
+          ? 355 +
+            ((pressure - COMPETITION_POLICY.threshold) /
+              (100 - COMPETITION_POLICY.threshold)) *
+              215
+          : 100 + (pressure / COMPETITION_POLICY.threshold) * 190;
+    const strength = Math.min(
+      1,
+      Math.abs(
+        (m.metrics.directionBasis === "seasonal-year"
+          ? m.metrics.yearOverYear
+          : m.metrics.directionBasis === "sustained-quarter"
+            ? m.metrics.quarterGrowth
+            : m.metrics.growth) ?? 0,
+      ) / 2,
+    );
     const y =
       m.metrics.trend === "rising"
         ? 215 - strength * 130
@@ -187,7 +210,7 @@ export function Radar({
         className="radar"
         role="img"
         aria-label={t(
-          "Opportunity map: active repository supply from left to right, sustained search demand growth from bottom to top",
+          "Opportunity map: competition pressure from left to right, sustained search direction from bottom to top",
         )}
       >
         <defs>
@@ -251,10 +274,10 @@ export function Radar({
           textAnchor="middle"
           className="axis-label"
         >
-          {t("SEARCH INTEREST CHANGE →")}
+          {t("SEARCH DIRECTION →")}
         </text>
         <text x="334" y="451" textAnchor="middle" className="axis-label">
-          {t("ACTIVE PROJECT SUPPLY →")}
+          {t("COMPETITION PRESSURE →")}
         </text>
         {positions.map(({ m, x, y }, i) => (
           <g
@@ -302,9 +325,8 @@ export function Radar({
               />
             )}
             <title>
-              {t(m.topic.name)}: {m.supply.total}
-              {t("active projects ·")} {pct(m.metrics.growth)}
-              {t("search growth")}
+              {t(m.topic.name)}: {t("Competition pressure")}{" "}
+              {competitionPressure(m)} · {t("trend." + m.metrics.trend)}
             </title>
           </g>
         ))}
@@ -336,10 +358,7 @@ export function Radar({
                 fill="#666666"
                 fontSize="9"
               >
-                {m.supply.total}
-                {t("projects ·")}
-                {pct(m.metrics.growth)}
-                {t("search")}
+                {competitionPressure(m)} / 100 · {t("trend." + m.metrics.trend)}
               </text>
             </g>
           ))}
@@ -366,6 +385,13 @@ export function Radar({
           </g>
         )}
       </svg>
+      {plotted.length < markets.length && (
+        <p className="chart-note">
+          {t(
+            "Further categories and qualified search signals appear in the list.",
+          )}
+        </p>
+      )}
       <div className="radar-category-keys">
         {plotted.map((m) => (
           <button
@@ -459,6 +485,11 @@ export function RepoRow({
         <span>
           <strong>{repo.name}</strong>
           <small>{repo.description || t("No description provided.")}</small>
+          {repo.relevance && (
+            <small className="repo-role">
+              {t("role." + repo.relevance.role)}
+            </small>
+          )}
         </span>
       </button>
       <div className="repo-stats">

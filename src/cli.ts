@@ -2,7 +2,8 @@
 import { Command } from "commander";
 import { writeFileSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { marketAssessment } from "./core/assessment.js";
+import { competitionPressure, marketAssessment } from "./core/assessment.js";
+import { text } from "./core/i18n.js";
 import { Engine } from "./core/engine.js";
 import { marketMarkdown, compareMarkdown } from "./core/report.js";
 import { validateRepo } from "./core/topics.js";
@@ -12,7 +13,7 @@ const program = new Command()
   .description(
     "GitHub supply × Google search demand. Find your next open-source opportunity.",
   )
-  .version("0.10.0");
+  .version("0.11.0");
 const withEngine = (fn: (engine: Engine) => Promise<void>) => async () => {
   const e = new Engine();
   try {
@@ -27,18 +28,32 @@ const summary = (m: Market) => {
     `\n${m.topic.name} · ${marketAssessment(m).landscape} · ${m.headline}\n${m.strategy}\n`,
   );
   console.table({
-    supply: { value: m.supply.total },
+    competitionPressure: { value: competitionPressure(m) },
+    directAlternatives: {
+      value: m.competition?.direct ?? "Review project roles",
+    },
+    searchDirection: { value: m.metrics.trend || "unknown" },
+    directionBasis: {
+      value: text(
+        "basis." + (m.metrics.directionBasis || "recent-windows"),
+        "en",
+      ),
+    },
+    matchingProjects: {
+      value: `${m.supply.complete ? "" : "≥"}${m.supply.total}`,
+    },
     searchGrowth: {
-      value:
-        m.metrics.emerging ? "low-base rise (no reliable percentage)" : m.metrics.growth === null
-          ? "insufficient data"
+      value: m.metrics.emerging
+        ? "Early rise from a small baseline"
+        : m.metrics.growth === null
+          ? "Search history pending"
           : `${(m.metrics.growth * 100).toFixed(1)}%`,
     },
     confidence: { value: m.confidence },
     region: { value: m.geo || "Worldwide" },
   });
-  for (const r of m.reasons) console.log("• " + r);
-  for (const l of m.limitations) console.log("  " + l);
+  for (const r of m.reasons) console.log("• " + text(r, "en"));
+  for (const l of m.limitations) console.log("  " + text(l, "en"));
   console.log(`\nReport: ${m.id}\n`);
 };
 program

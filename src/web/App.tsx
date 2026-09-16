@@ -1,3 +1,4 @@
+import { COMPETITION_POLICY } from "../core/competition.js";
 import { selectGapSignals } from "../core/gaps.js";
 import { enableEngagement, track } from "./engagement.js";
 import { AdminView } from "./admin.js";
@@ -54,7 +55,7 @@ import {
   topicColor,
 } from "./components.js";
 import { downloadCard } from "./export.js";
-import { marketAssessment } from "../core/assessment.js";
+import { marketAssessment, competitionPressure } from "../core/assessment.js";
 import { resolveTopic } from "../core/topics.js";
 import type { ScanProgress } from "../core/engine.js";
 import { completeWeeklySeries } from "../core/evidence.js";
@@ -783,18 +784,31 @@ export function App() {
                               value={
                                 m.metrics.fast === null
                                   ? null
-                                  : m.metrics.growth
+                                  : m.metrics.directionBasis === "seasonal-year"
+                                    ? m.metrics.yearOverYear
+                                    : m.metrics.directionBasis ===
+                                        "sustained-quarter"
+                                      ? (m.metrics.quarterGrowth ?? null)
+                                      : m.metrics.growth
                               }
                             />
                           )}
                         </div>
                         <div>
-                          <small>{t("Active projects")}</small>
+                          <small>
+                            {t(
+                              m.competition
+                                ? "Competition pressure"
+                                : "Active projects",
+                            )}
+                          </small>
                           <strong>
-                            {m.supply.error
-                              ? "—"
-                              : (m.supply.complete ? "" : "≥") +
-                                number(m.supply.total)}
+                            {m.competition
+                              ? competitionPressure(m)
+                              : m.supply.error
+                                ? "—"
+                                : (m.supply.complete ? "" : "≥") +
+                                  number(m.supply.total)}
                           </strong>
                         </div>
                         <div>
@@ -1490,6 +1504,10 @@ function MarketView({
           {t("trend." + (m.metrics.trend || "unknown"))}
         </strong>
         <span>
+          {t("Direction basis")}:{" "}
+          {t("basis." + (m.metrics.directionBasis || "recent-windows"))}
+        </span>
+        <span>
           {t("4-week change")}: {pct(m.metrics.shortGrowth ?? null)}
         </span>
         <span>
@@ -1521,13 +1539,27 @@ function MarketView({
           <small>{assessment.demandNote}</small>
         </div>
         <div>
-          <span>{t("Matching active projects")}</span>
+          <span>
+            {t(
+              m.competition
+                ? "Competition pressure"
+                : "Matching active projects",
+            )}
+          </span>
           <strong>
-            {m.supply.error
-              ? "—"
-              : (m.supply.complete ? "" : "≥") + number(m.supply.total)}
+            {m.competition
+              ? competitionPressure(m)
+              : m.supply.error
+                ? "—"
+                : (m.supply.complete ? "" : "≥") + number(m.supply.total)}
           </strong>
-          <small>{t("≥5 stars · pushed within 180 days")}</small>
+          <small>
+            {m.competition
+              ? t("pressure." + m.competition.level) +
+                " · " +
+                t("Operational index / 100")
+              : t("Observed GitHub search scope")}
+          </small>
         </div>
         <div>
           <span>{t("Year-over-year search change")}</span>
@@ -1537,15 +1569,93 @@ function MarketView({
           <small>{t("Same 8-week window, one year apart")}</small>
         </div>
         <div>
-          <span>{t("Top 3 attention share")}</span>
+          <span>
+            {t(m.competition ? "Direct alternatives" : "Top 3 attention share")}
+          </span>
           <strong>
+            {m.competition
+              ? number(m.competition.direct)
+              : m.concentration === null
+                ? "—"
+                : (m.concentration * 100).toFixed(0) + "%"}
+          </strong>
+          <small>
+            {m.competition
+              ? t("Within {sample} inspected projects", {
+                  sample: m.competition.sampled,
+                })
+              : t("Share of stars within returned projects")}
+          </small>
+        </div>
+      </div>
+      {m.competition && (
+        <details className="panel competition-evidence">
+          <summary>{t("How competition is assessed")}</summary>
+          <p>
+            {t(
+              "Independent alternatives, maintained project adoption signals, and established leaders determine pressure. Project roles keep resources and integrations in their own groups.",
+            )}
+          </p>
+          <dl className="competition-breakdown">
+            <div>
+              <dt>{t("Independent alternatives")}</dt>
+              <dd>
+                {m.competition.breadth.toFixed(1)} /{" "}
+                {COMPETITION_POLICY.breadthWeight}
+              </dd>
+            </div>
+            <div>
+              <dt>{t("Established alternatives")}</dt>
+              <dd>
+                {m.competition.incumbency.toFixed(1)} /{" "}
+                {COMPETITION_POLICY.incumbencyWeight}
+              </dd>
+            </div>
+            <div>
+              <dt>{t("Leading project strength")}</dt>
+              <dd>
+                {m.competition.dominance.toFixed(1)} /{" "}
+                {COMPETITION_POLICY.dominanceWeight}
+              </dd>
+            </div>
+          </dl>
+          <p>
+            {t("Roles in the inspected sample")}: {t("role.direct")}{" "}
+            {m.competition.direct} · {t("role.adjacent")}{" "}
+            {m.competition.adjacent} · {t("role.resource")}{" "}
+            {m.competition.resources} · {t("role.unclear")}{" "}
+            {m.competition.unclear}
+          </p>
+          <p>
+            {t("Matching active projects")}: {m.supply.complete ? "" : "≥"}
+            {number(m.supply.total)} ·{" "}
+            {t("Original search filters shown below.")}
+          </p>
+          <p>
+            {t(
+              m.competition.enumerated
+                ? "All matches in this search scope were inspected."
+                : "The inspected projects form a sample; the displayed pressure is a lower bound.",
+            )}
+          </p>
+          {!!m.competition.unclear && (
+            <p>{t("The range includes projects whose role awaits review.")}</p>
+          )}
+          {m.supply.review?.status === "fallback" && (
+            <p>
+              {t(
+                "Roles use local metadata rules. A refreshed scan can add AI review.",
+              )}
+            </p>
+          )}
+          <p>
+            {t("Top 3 owner attention share")}:{" "}
             {m.concentration === null
               ? "—"
               : (m.concentration * 100).toFixed(0) + "%"}
-          </strong>
-          <small>{t("Share of stars within returned projects")}</small>
-        </div>
-      </div>
+          </p>
+        </details>
+      )}
       <div className="detail-columns">
         <section className="panel demand-panel">
           <div className="panel-title">
@@ -1643,7 +1753,9 @@ function MarketView({
           <div>
             <h3>{t("The projects shaping this space")}</h3>
             <p>
-              {t("Leading repositories by stars within the selected topic.")}
+              {t(
+                "Direct alternatives appear first, followed by other matching projects.",
+              )}
             </p>
           </div>
           <a href={m.supply.sourceUrl} target="_blank" rel="noreferrer">
@@ -1656,6 +1768,36 @@ function MarketView({
             "Search matches can include libraries, integrations and resource lists. A topic tag does not prove a project is a direct competitor.",
           )}
         </p>
+        {m.competition && (
+          <details className="project-review">
+            <summary>
+              {t("Review project roles")} · {m.competition.sampled}
+            </summary>
+            {m.supply.repositories.map((r) => (
+              <div className="project-review-row" key={r.name}>
+                <a href={r.url} target="_blank" rel="noreferrer">
+                  {r.name}
+                </a>
+                <span>
+                  {t("role." + (r.relevance?.role || "unclear"))} ·{" "}
+                  {t(
+                    r.relevance?.method === "model"
+                      ? "AI review"
+                      : "Metadata rules",
+                  )}
+                </span>
+                <small>
+                  {r.relevance?.method === "model"
+                    ? r.relevance.reason
+                    : t(
+                        r.relevance?.reason ||
+                          "Project role awaiting closer review",
+                      )}
+                </small>
+              </div>
+            ))}
+          </details>
+        )}
         {(m.supply.searches?.length || 0) > 1 && (
           <div className="search-scopes">
             <p>
@@ -1676,25 +1818,32 @@ function MarketView({
             ))}
           </div>
         )}
-        {m.supply.repositories.slice(0, 10).map((r) => (
-          <RepoRow
-            key={r.name}
-            repo={r}
-            selected={selected.includes(r.name)}
-            onSelect={() =>
-              setSelected((current) =>
-                current.includes(r.name)
-                  ? current.filter((n) => n !== r.name)
-                  : current.length < 6
-                    ? [...current, r.name]
-                    : current,
-              )
-            }
-            watched={watch.includes(r.name)}
-            onWatch={() => onWatch(r.name)}
-            onView={() => navigate("/repo/" + r.name)}
-          />
-        ))}
+        {[...m.supply.repositories]
+          .sort(
+            (a, b) =>
+              Number(b.relevance?.role === "direct") -
+              Number(a.relevance?.role === "direct"),
+          )
+          .slice(0, 10)
+          .map((r) => (
+            <RepoRow
+              key={r.name}
+              repo={r}
+              selected={selected.includes(r.name)}
+              onSelect={() =>
+                setSelected((current) =>
+                  current.includes(r.name)
+                    ? current.filter((n) => n !== r.name)
+                    : current.length < 6
+                      ? [...current, r.name]
+                      : current,
+                )
+              }
+              watched={watch.includes(r.name)}
+              onWatch={() => onWatch(r.name)}
+              onView={() => navigate("/repo/" + r.name)}
+            />
+          ))}
         {!m.supply.repositories.length && (
           <Empty
             title={t("No matching projects returned")}
@@ -2331,7 +2480,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.10.0/ghtrends-radar-0.10.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.11.0/ghtrends-radar-0.11.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}
@@ -2402,7 +2551,7 @@ function Docs() {
               <td>
                 <Pill kind="blue" />
               </td>
-              <td>{t("Under 50 projects")}</td>
+              <td>{t("Limited observed competition")}</td>
               <td>{t("trend.rising")}</td>
               <td>{t("Validate an underserved use case.")}</td>
             </tr>
@@ -2410,7 +2559,7 @@ function Docs() {
               <td>
                 <Pill kind="expanding" />
               </td>
-              <td>{t("50+ projects")}</td>
+              <td>{t("Established alternatives")}</td>
               <td>{t("trend.rising")}</td>
               <td>{t("Find a specific audience or advantage.")}</td>
             </tr>
@@ -2418,15 +2567,15 @@ function Docs() {
               <td>
                 <Pill kind="contested" />
               </td>
-              <td>{t("50+ projects")}</td>
-              <td>{t("Stable or falling")}</td>
+              <td>{t("Established alternatives")}</td>
+              <td>{t("Stable, falling, mixed or pending")}</td>
               <td>{t("Identify a reason people would switch.")}</td>
             </tr>
             <tr>
               <td>
                 <Pill kind="quiet" />
               </td>
-              <td>{t("Under 50 projects")}</td>
+              <td>{t("Limited observed competition")}</td>
               <td>{t("Stable or falling")}</td>
               <td>{t("Check if the market is early, niche or inactive.")}</td>
             </tr>
@@ -2449,7 +2598,7 @@ function Docs() {
           <h2>{t("Look past the spike.")}</h2>
           <p>
             {t(
-              "We compare the last 8 complete weeks with the previous 8, alongside 4-week and 13-week changes. Rising or falling requires a 10% change, a resampling band on the same side of zero, and no opposing short or longer trend. Conflicting windows and opposite-moving synonyms are marked mixed.",
+              "Search direction compares 4-, 8- and 13-week windows, sustained changes and a resampling range. Slow growth can qualify across a full quarter. A repeating annual pattern switches the direction comparison to the same period last year. Opposing synonyms keep a mixed signal.",
             )}
           </p>
           <p>
@@ -2459,7 +2608,7 @@ function Docs() {
           </p>
           <p>
             {t(
-              "Two-week block resampling tests sensitivity to individual observations. The year-over-year window adds long-term context; it cannot prove seasonality. These diagnostics are not probabilities of business success.",
+              "Annual patterns require at least 40 paired weeks, correlation of 0.75 or more, and a substantial rise and fall in both annual profiles. Two-week block resampling checks sensitivity. These are evidence diagnostics for research decisions.",
             )}
           </p>
           <p>
@@ -2492,12 +2641,12 @@ function Docs() {
           </p>
           <p>
             {t(
-              "GitHub searches use relevant topics and specific repository-name or description phrases. Results are deduplicated and require at least five stars, a push within 180 days, and no forks or archived projects.",
+              "GitHub searches use relevant topics and specific name or description phrases. Original, active projects qualify with at least one star and a push within 365 days. We review their roles, group projects by owner, and calculate pressure from direct alternatives.",
             )}
           </p>
           <p>
             {t(
-              "Fifty qualifying repositories is the published dense-supply threshold. This is a transparent operational rule, not a universal economic law. Topic labels are imperfect; untagged projects and commercial competitors are outside this sample.",
+              "Pressure combines independent teams (50 points), established alternatives (30), and leading project strength (20). The published boundary is 45/100. Project maturity considers stars, forks, age and maintenance. This index describes observed open-source competition; commercial validation adds another layer.",
             )}
           </p>
           <p>

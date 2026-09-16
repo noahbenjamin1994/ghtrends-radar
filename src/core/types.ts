@@ -10,6 +10,7 @@ export interface Topic {
   description: string;
   color: string;
   aliases: string[];
+  scope?: "category" | "field";
   plan?: QueryPlan;
 }
 export interface QueryPlan {
@@ -84,6 +85,11 @@ export interface Repo {
   fetchedAt: string;
   errors: string[];
   matchedQueries?: string[];
+  relevance?: {
+    role: "direct" | "adjacent" | "resource" | "unclear";
+    method: "rules" | "model";
+    reason: string;
+  };
 }
 export interface SupplyEvidence {
   query: string;
@@ -94,6 +100,30 @@ export interface SupplyEvidence {
   repositories: Repo[];
   searches?: { query: string; url: string; total: number; complete: boolean }[];
   error?: string;
+  review?: {
+    version: string;
+    model: string;
+    reviewed: number;
+    status: "complete" | "partial" | "fallback";
+  };
+}
+export interface CompetitionMetrics {
+  score: number;
+  upper: number;
+  level: "limited" | "established" | "pending";
+  direct: number;
+  adjacent: number;
+  resources: number;
+  unclear: number;
+  sampled: number;
+  enumerated: boolean;
+  effectiveTeams: number;
+  establishedTeams: number;
+  concentration: number | null;
+  breadth: number;
+  incumbency: number;
+  dominance: number;
+  boundary: boolean;
 }
 export interface DemandMetrics {
   recent: number;
@@ -115,6 +145,11 @@ export interface DemandMetrics {
   trend?: "rising" | "falling" | "stable" | "mixed" | "unknown";
   recentNonzeroShare?: number;
   emerging?: boolean;
+  directionBasis?: "recent-windows" | "sustained-quarter" | "seasonal-year";
+  seasonalCorrelation?: number | null;
+  yearLower?: number | null;
+  yearUpper?: number | null;
+  synonymAgreement?: { measured: number; agreeing: number; opposing: number };
   horizon?:
     "cooling-above-year" | "rebounding-below-year" | "aligned" | "unavailable";
   windows?: {
@@ -157,6 +192,7 @@ export interface Market {
   metrics: DemandMetrics;
   supplyDensity: "dense" | "sparse" | "unknown";
   concentration: number | null;
+  competition?: CompetitionMetrics;
   gaps: Gap[];
   score: number | null;
   brief?: Brief;

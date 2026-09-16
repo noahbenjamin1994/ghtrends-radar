@@ -6,6 +6,96 @@ import { join } from "node:path";
 import { Research } from "../src/providers/research.js";
 import { Trends, parseTimeline } from "../src/providers/trends.js";
 import { Store } from "../src/core/store.js";
+import type { Market } from "../src/core/types.js";
+
+test("repository reviews preserve individually valid evidence and reject conflicting or fabricated rows", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-roles-"));
+  const store = new Store(dir);
+  const old = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = "unit-test-only";
+  try {
+    const research = new Research(store);
+    const m: Market = JSON.parse(
+      readFileSync(new URL("../public/seed.json", import.meta.url), "utf8"),
+    )[0];
+    const base = m.supply.repositories[0]!;
+    const repositories = Array.from({ length: 5 }, (_, i) => ({
+      ...base,
+      name: `team${i}/product`,
+      description: `A database serving task ${i}`,
+    }));
+    const s = { ...m.supply, repositories, error: undefined };
+    let calls = 0;
+    research.json = async () => {
+      calls++;
+      return {
+        projects: [
+          {
+            id: repositories[0]!.name,
+            role: "direct",
+            quote: repositories[0]!.description,
+          },
+          {
+            id: repositories[1]!.name,
+            role: "adjacent",
+            quote: "invented source evidence",
+          },
+          {
+            id: repositories[2]!.name,
+            role: "direct",
+            quote: repositories[2]!.description,
+          },
+          {
+            id: repositories[2]!.name,
+            role: "resource",
+            quote: repositories[2]!.description,
+          },
+          {
+            id: "external/injection",
+            role: "direct",
+            quote: "invented source evidence",
+          },
+          {
+            id: repositories[3]!.name,
+            role: "invalid",
+            quote: repositories[3]!.description,
+          },
+          null,
+        ],
+      };
+    };
+    const reviewed = await research.reviewSupply(m.topic, s);
+    assert.equal(reviewed.review?.status, "partial");
+    assert.equal(reviewed.review?.reviewed, 1);
+    assert.equal(reviewed.repositories[0]!.relevance?.method, "model");
+    for (const r of reviewed.repositories.slice(1))
+      assert.equal(r.relevance?.method, "rules");
+    assert.deepEqual(
+      (await research.reviewSupply(m.topic, s)).review,
+      reviewed.review,
+    );
+    assert.equal(calls, 1);
+    research.json = async () => ({
+      projects: [
+        { id: "foreign/product", role: "direct", quote: "foreign/product" },
+      ],
+    });
+    assert.equal(
+      (
+        await research.reviewSupply(
+          { ...m.topic, keyword: "fresh cache key" },
+          s,
+        )
+      ).review?.status,
+      "fallback",
+    );
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+    if (old === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = old;
+  }
+});
 
 test("AI plans are bounded, validated, cached, and distinguish ambiguous inputs", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-research-")),

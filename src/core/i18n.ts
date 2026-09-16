@@ -33,6 +33,16 @@ export function text(
 function translateEvidence(value: string): string {
   const patterns: [RegExp, (...groups: string[]) => string][] = [
     [
+      /^Project roles: (\d+) direct alternatives, (\d+) adjacent projects, (\d+) resources, (\d+) awaiting review\.$/,
+      (d, a, r, u) =>
+        `项目角色：直接替代 ${d} 个、周边项目 ${a} 个、资源资料 ${r} 个、待核对 ${u} 个。`,
+    ],
+    [
+      /^Competition pressure: (\d+)–(\d+)\/100; breadth (\d+), established alternatives (\d+), leading project strength (\d+)\.$/,
+      (l, u, b, i, d) =>
+        `竞争压力：${l}–${u}/100；独立替代项目 ${b} 分、成熟替代项目 ${i} 分、头部项目实力 ${d} 分。`,
+    ],
+    [
       /^Google Trends (?:returned|refresh returned HTTP) (\d+).*$/,
       (status) =>
         `Google Trends 刷新状态：HTTP ${status}。可查看来源，或稍后刷新。`,

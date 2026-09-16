@@ -2,6 +2,7 @@ import { selectGapSignals } from "../core/gaps.js";
 import type { ProviderCall } from "../core/operations.js";
 import { githubToken } from "./github-auth.js";
 import { Store } from "../core/store.js";
+import { repoRelevance } from "../core/competition.js";
 import { POLICY, median } from "../core/analyze.js";
 import { validateRepo } from "../core/topics.js";
 import type { Repo, SupplyEvidence, Topic, Gap } from "../core/types.js";
@@ -280,12 +281,16 @@ export class GitHub {
         // First-page deduplication alone can undercount a 6,000-repo query as 100.
         result.total = Math.max(
           unique.size,
-          ...result.searches!
-            .filter((search) => search.complete)
+          ...result
+            .searches!.filter((search) => search.complete)
             .map((search) => search.total),
         );
         result.complete = allEnumerated;
       }
+      result.repositories = result.repositories.map((r) => ({
+        ...r,
+        relevance: repoRelevance(r, topic),
+      }));
       onBase?.(structuredClone(result));
       // Three bounded workers avoid serial head-of-line delay without flooding GitHub.
       let cursor = 0;
@@ -299,6 +304,7 @@ export class GitHub {
                 result.repositories[index] = {
                   ...(await this.repo(result.repositories[index]!.name, false)),
                   matchedQueries: result.repositories[index]!.matchedQueries,
+                  relevance: result.repositories[index]!.relevance,
                 };
               } catch (e) {
                 result.repositories[index]!.errors.push((e as Error).message);

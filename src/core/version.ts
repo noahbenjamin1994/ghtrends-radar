@@ -1,1 +1,1 @@
-export const ALGORITHM_VERSION = "1.3.1";
+export const ALGORITHM_VERSION = "2.0.0";

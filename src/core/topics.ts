@@ -88,6 +88,7 @@ const KNOWN_TOPICS: Topic[] = [
   {
     slug: "vibe-coding",
     name: "Vibe coding",
+    scope: "field",
     keyword: "vibe coding",
     query: "topic:vibe-coding",
     queries: ["topic:vibe-coding", '"vibe coding" in:name,description'],
@@ -110,6 +111,7 @@ const KNOWN_TOPICS: Topic[] = [
   {
     slug: "ai-for-science",
     name: "AI for Science",
+    scope: "field",
     keyword: "AI for Science",
     query: "topic:ai4science",
     queries: ["topic:ai4science", "topic:ai-for-science", "topic:ai4s"],

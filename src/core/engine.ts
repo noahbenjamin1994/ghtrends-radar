@@ -119,11 +119,13 @@ export class Engine {
             onDemand,
             topic.plan?.trends.slice(1),
           ),
-      this.github.supply(topic, (data) => {
-        initialSupply = data;
-        options.onProgress?.({ stage: "github", supplyCount: data.total });
-        preview();
-      }),
+      this.github
+        .supply(topic, (data) => {
+          initialSupply = data;
+          options.onProgress?.({ stage: "github", supplyCount: data.total });
+          preview();
+        })
+        .then((data) => (ai ? this.research.reviewSupply(topic, data) : data)),
     ]);
     if (options.demand)
       this.store.set(
@@ -135,7 +137,11 @@ export class Engine {
       stage: "details",
       preview: analyze(topic, demand, supply),
     });
-    const gaps = await this.github.gaps(supply.repositories);
+    const gaps = await this.github.gaps(
+      supply.repositories.filter(
+        (r) => !r.relevance || r.relevance.role === "direct",
+      ),
+    );
     const market = analyze(topic, demand, supply, gaps);
     if (ai && (market.metrics.points > 0 || market.supply.total > 0)) {
       options.onProgress?.({ stage: "brief", preview: market });

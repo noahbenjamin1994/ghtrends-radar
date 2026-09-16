@@ -104,7 +104,13 @@ interface AdminData {
     dailyLimit: number;
     serviceLimit: number;
     attemptLimit: number;
-    trends: { proxy: boolean; region: string; retryAt: string | null };
+    trends: {
+      proxy: boolean;
+      region: string;
+      retryAt: string | null;
+      routes?: number;
+      coolingRoutes?: number;
+    };
     usageToday: { kind: string; state: string; count: number }[];
     adminUserIds: string[];
     pricingConfigured: boolean;
@@ -425,7 +431,9 @@ export function AdminView({ account }: { account: Account | null }) {
                         <small>
                           {m.operation === "plan"
                             ? l("Query planning", "搜索词整理")
-                            : l("Research brief", "简短报告")}
+                            : m.operation === "relevance"
+                              ? l("Project relevance", "项目相关性")
+                              : l("Research brief", "简短报告")}
                         </small>
                       </th>
                       <td>
@@ -634,6 +642,15 @@ export function AdminView({ account }: { account: Account | null }) {
                   ? l("Fixed proxy", "固定代理")
                   : l("Direct", "直连")}{" "}
                 · {data.configuration.trends.region}
+                {" · "}
+                {data.configuration.trends.routes || 1} {l("routes", "个出口")}
+                {!!data.configuration.trends.coolingRoutes && (
+                  <>
+                    {" "}
+                    · {data.configuration.trends.coolingRoutes}{" "}
+                    {l("cooling down", "个等待恢复")}
+                  </>
+                )}
                 {data.configuration.trends.retryAt && (
                   <>
                     {" "}

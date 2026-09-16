@@ -4304,3 +4304,55 @@ footer small {
     font-size: 12px;
   }
 }
+
+.competition-evidence {
+  margin: 24px 0;
+}
+.competition-evidence summary,
+.project-review summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.competition-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin: 24px 0;
+}
+.competition-breakdown dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.competition-breakdown dd {
+  margin: 8px 0 0;
+  font-size: 22px;
+}
+.project-review {
+  margin: 20px 0;
+}
+.project-review[open] {
+  max-height: 480px;
+  overflow-y: auto;
+}
+.project-review-row {
+  display: grid;
+  gap: 6px;
+  padding: 16px 0;
+  border-bottom: 1px solid #eee;
+}
+.project-review-row small,
+.project-review-row span {
+  color: #666;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.repo-main .repo-role {
+  color: #315f9c;
+  margin-top: 5px;
+}
+@media (max-width: 600px) {
+  .competition-breakdown {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}

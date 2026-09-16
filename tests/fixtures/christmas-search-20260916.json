@@ -1,0 +1,538 @@
+{
+  "asOf": "2026-09-16T17:20:37.901Z",
+  "demand": {
+    "keyword": "christmas decorations",
+    "geo": "",
+    "sourceUrl": "https://trends.google.com/trends/explore?date=2024-09-16%202026-09-16&geo=&q=christmas%20decorations",
+    "fetchedAt": "2026-09-16T17:20:13.122Z",
+    "resolution": "WEEK",
+    "related": [],
+    "points": [
+      {
+        "date": "2024-09-15T00:00:00.000Z",
+        "value": 9,
+        "partial": false
+      },
+      {
+        "date": "2024-09-22T00:00:00.000Z",
+        "value": 11,
+        "partial": false
+      },
+      {
+        "date": "2024-09-29T00:00:00.000Z",
+        "value": 15,
+        "partial": false
+      },
+      {
+        "date": "2024-10-06T00:00:00.000Z",
+        "value": 17,
+        "partial": false
+      },
+      {
+        "date": "2024-10-13T00:00:00.000Z",
+        "value": 19,
+        "partial": false
+      },
+      {
+        "date": "2024-10-20T00:00:00.000Z",
+        "value": 23,
+        "partial": false
+      },
+      {
+        "date": "2024-10-27T00:00:00.000Z",
+        "value": 37,
+        "partial": false
+      },
+      {
+        "date": "2024-11-03T00:00:00.000Z",
+        "value": 59,
+        "partial": false
+      },
+      {
+        "date": "2024-11-10T00:00:00.000Z",
+        "value": 71,
+        "partial": false
+      },
+      {
+        "date": "2024-11-17T00:00:00.000Z",
+        "value": 80,
+        "partial": false
+      },
+      {
+        "date": "2024-11-24T00:00:00.000Z",
+        "value": 86,
+        "partial": false
+      },
+      {
+        "date": "2024-12-01T00:00:00.000Z",
+        "value": 100,
+        "partial": false
+      },
+      {
+        "date": "2024-12-08T00:00:00.000Z",
+        "value": 71,
+        "partial": false
+      },
+      {
+        "date": "2024-12-15T00:00:00.000Z",
+        "value": 54,
+        "partial": false
+      },
+      {
+        "date": "2024-12-22T00:00:00.000Z",
+        "value": 42,
+        "partial": false
+      },
+      {
+        "date": "2024-12-29T00:00:00.000Z",
+        "value": 25,
+        "partial": false
+      },
+      {
+        "date": "2025-01-05T00:00:00.000Z",
+        "value": 10,
+        "partial": false
+      },
+      {
+        "date": "2025-01-12T00:00:00.000Z",
+        "value": 5,
+        "partial": false
+      },
+      {
+        "date": "2025-01-19T00:00:00.000Z",
+        "value": 4,
+        "partial": false
+      },
+      {
+        "date": "2025-01-26T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-02-02T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-02-09T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-02-16T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-02-23T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-03-02T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-03-09T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-03-16T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-03-23T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-03-30T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-04-06T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-04-13T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-04-20T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-04-27T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-05-04T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-05-11T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-05-18T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-05-25T00:00:00.000Z",
+        "value": 2,
+        "partial": false
+      },
+      {
+        "date": "2025-06-01T00:00:00.000Z",
+        "value": 3,
+        "partial": false
+      },
+      {
+        "date": "2025-06-08T00:00:00.000Z",
+        "value": 3,
+        "partial": false
+      },
+      {
+        "date": "2025-06-15T00:00:00.000Z",
+        "value": 3,
+        "partial": false
+      },
+      {
+        "date": "2025-06-22T00:00:00.000Z",
+        "value": 3,
+        "partial": false
+      },
+      {
+        "date": "2025-06-29T00:00:00.000Z",
+        "value": 3,
+        "partial": false
+      },
+      {
+        "date": "2025-07-06T00:00:00.000Z",
+        "value": 4,
+        "partial": false
+      },
+      {
+        "date": "2025-07-13T00:00:00.000Z",
+        "value": 4,
+        "partial": false
+      },
+      {
+        "date": "2025-07-20T00:00:00.000Z",
+        "value": 5,
+        "partial": false
+      },
+      {
+        "date": "2025-07-27T00:00:00.000Z",
+        "value": 5,
+        "partial": false
+      },
+      {
+        "date": "2025-08-03T00:00:00.000Z",
+        "value": 5,
+        "partial": false
+      },
+      {
+        "date": "2025-08-10T00:00:00.000Z",
+        "value": 6,
+        "partial": false
+      },
+      {
+        "date": "2025-08-17T00:00:00.000Z",
+        "value": 6,
+        "partial": false
+      },
+      {
+        "date": "2025-08-24T00:00:00.000Z",
+        "value": 7,
+        "partial": false
+      },
+      {
+        "date": "2025-08-31T00:00:00.000Z",
+        "value": 9,
+        "partial": false
+      },
+      {
+        "date": "2025-09-07T00:00:00.000Z",
+        "value": 9,
+        "partial": false
+      },
+      {
+        "date": "2025-09-14T00:00:00.000Z",
+        "value": 10,
+        "partial": false
+      },
+      {
+        "date": "2025-09-21T00:00:00.000Z",
+        "value": 12,
+        "partial": false
+      },
+      {
+        "date": "2025-09-28T00:00:00.000Z",
+        "value": 14,
+        "partial": false
+      },
+      {
+        "date": "2025-10-05T00:00:00.000Z",
+        "value": 16,
+        "partial": false
+      },
+      {
+        "date": "2025-10-12T00:00:00.000Z",
+        "value": 21,
+        "partial": false
+      },
+      {
+        "date": "2025-10-19T00:00:00.000Z",
+        "value": 24,
+        "partial": false
+      },
+      {
+        "date": "2025-10-26T00:00:00.000Z",
+        "value": 33,
+        "partial": false
+      },
+      {
+        "date": "2025-11-02T00:00:00.000Z",
+        "value": 58,
+        "partial": false
+      },
+      {
+        "date": "2025-11-09T00:00:00.000Z",
+        "value": 69,
+        "partial": false
+      },
+      {
+        "date": "2025-11-16T00:00:00.000Z",
+        "value": 76,
+        "partial": false
+      },
+      {
+        "date": "2025-11-23T00:00:00.000Z",
+        "value": 81,
+        "partial": false
+      },
+      {
+        "date": "2025-11-30T00:00:00.000Z",
+        "value": 96,
+        "partial": false
+      },
+      {
+        "date": "2025-12-07T00:00:00.000Z",
+        "value": 73,
+        "partial": false
+      },
+      {
+        "date": "2025-12-14T00:00:00.000Z",
+        "value": 54,
+        "partial": false
+      },
+      {
+        "date": "2025-12-21T00:00:00.000Z",
+        "value": 46,
+        "partial": false
+      },
+      {
+        "date": "2025-12-28T00:00:00.000Z",
+        "value": 26,
+        "partial": false
+      },
+      {
+        "date": "2026-01-04T00:00:00.000Z",
+        "value": 15,
+        "partial": false
+      },
+      {
+        "date": "2026-01-11T00:00:00.000Z",
+        "value": 6,
+        "partial": false
+      },
+      {
+        "date": "2026-01-18T00:00:00.000Z",
+        "value": 4,
+        "partial": false
+      },
+      {
+        "date": "2026-01-25T00:00:00.000Z",
+        "value": 4,
+        "partial": false
+      },
+      {
+        "date": "2026-02-01T00:00:00.000Z",
+        "value": 5,
+        "partial": false
+      },
+      {
+        "date": "2026-02-08T00:00:00.000Z",
+        "value": 26,
+        "partial": false
+      },
+      {
+        "date": "2026-02-15T00:00:00.000Z",
+        "value": 34,
+        "partial": false
+      },
+      {
+        "date": "2026-02-22T00:00:00.000Z",
+        "value": 19,
+        "partial": false
+      },
+      {
+        "date": "2026-03-01T00:00:00.000Z",
+        "value": 12,
+        "partial": false
+      },
+      {
+        "date": "2026-03-08T00:00:00.000Z",
+        "value": 7,
+        "partial": false
+      },
+      {
+        "date": "2026-03-15T00:00:00.000Z",
+        "value": 7,
+        "partial": false
+      },
+      {
+        "date": "2026-03-22T00:00:00.000Z",
+        "value": 6,
+        "partial": false
+      },
+      {
+        "date": "2026-03-29T00:00:00.000Z",
+        "value": 8,
+        "partial": false
+      },
+      {
+        "date": "2026-04-05T00:00:00.000Z",
+        "value": 8,
+        "partial": false
+      },
+      {
+        "date": "2026-04-12T00:00:00.000Z",
+        "value": 7,
+        "partial": false
+      },
+      {
+        "date": "2026-04-19T00:00:00.000Z",
+        "value": 6,
+        "partial": false
+      },
+      {
+        "date": "2026-04-26T00:00:00.000Z",
+        "value": 21,
+        "partial": false
+      },
+      {
+        "date": "2026-05-03T00:00:00.000Z",
+        "value": 25,
+        "partial": false
+      },
+      {
+        "date": "2026-05-10T00:00:00.000Z",
+        "value": 21,
+        "partial": false
+      },
+      {
+        "date": "2026-05-17T00:00:00.000Z",
+        "value": 8,
+        "partial": false
+      },
+      {
+        "date": "2026-05-24T00:00:00.000Z",
+        "value": 7,
+        "partial": false
+      },
+      {
+        "date": "2026-05-31T00:00:00.000Z",
+        "value": 8,
+        "partial": false
+      },
+      {
+        "date": "2026-06-07T00:00:00.000Z",
+        "value": 7,
+        "partial": false
+      },
+      {
+        "date": "2026-06-14T00:00:00.000Z",
+        "value": 15,
+        "partial": false
+      },
+      {
+        "date": "2026-06-21T00:00:00.000Z",
+        "value": 14,
+        "partial": false
+      },
+      {
+        "date": "2026-06-28T00:00:00.000Z",
+        "value": 6,
+        "partial": false
+      },
+      {
+        "date": "2026-07-05T00:00:00.000Z",
+        "value": 8,
+        "partial": false
+      },
+      {
+        "date": "2026-07-12T00:00:00.000Z",
+        "value": 7,
+        "partial": false
+      },
+      {
+        "date": "2026-07-19T00:00:00.000Z",
+        "value": 8,
+        "partial": false
+      },
+      {
+        "date": "2026-07-26T00:00:00.000Z",
+        "value": 10,
+        "partial": false
+      },
+      {
+        "date": "2026-08-02T00:00:00.000Z",
+        "value": 8,
+        "partial": false
+      },
+      {
+        "date": "2026-08-09T00:00:00.000Z",
+        "value": 8,
+        "partial": false
+      },
+      {
+        "date": "2026-08-16T00:00:00.000Z",
+        "value": 10,
+        "partial": false
+      },
+      {
+        "date": "2026-08-23T00:00:00.000Z",
+        "value": 13,
+        "partial": false
+      },
+      {
+        "date": "2026-08-30T00:00:00.000Z",
+        "value": 15,
+        "partial": false
+      },
+      {
+        "date": "2026-09-06T00:00:00.000Z",
+        "value": 15,
+        "partial": false
+      },
+      {
+        "date": "2026-09-13T00:00:00.000Z",
+        "value": 17,
+        "partial": true
+      }
+    ]
+  }
+}

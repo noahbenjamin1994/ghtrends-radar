@@ -21,6 +21,13 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
     m.supplyDensity !== "unknown" &&
     !m.supply.error &&
     fresh(m.supply.fetchedAt);
+  const latestWeek = completeWeeklySeries(m.demand, m.asOf).points.at(-1);
+  const searchReady =
+    !m.demand.error &&
+    fresh(m.demand.fetchedAt) &&
+    !!latestWeek &&
+    fresh(latestWeek.date) &&
+    (m.metrics.fast !== null || !!m.metrics.emerging);
   const provisional = m.kind === "uncertain";
   const suggested = changed
     ? resolved.keyword
@@ -86,22 +93,44 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
       );
     }
   }
-  if (!provisional && m.metrics.emerging) {
+  if (!provisional && searchReady && m.metrics.emerging) {
     title = t("Search rising from a small baseline");
     summary = t(
       "Search interest has stayed above a near-zero baseline in at least six of eight weeks. This is an early signal, so no percentage growth is reported. Check the matching projects and validate a specific use case.",
     );
   }
-  if (!provisional && m.metrics.horizon === "cooling-above-year") {
+  if (
+    !provisional &&
+    searchReady &&
+    m.metrics.trend !== "mixed" &&
+    m.metrics.horizon === "cooling-above-year"
+  ) {
     title = t("Cooling recently, still above last year");
     summary = t(
       "The recent search pullback coexists with a higher level than last year. Compare concrete use cases; neither window measures customer demand.",
     );
   }
-  if (!provisional && m.metrics.horizon === "rebounding-below-year") {
+  if (
+    !provisional &&
+    searchReady &&
+    m.metrics.trend !== "mixed" &&
+    m.metrics.horizon === "rebounding-below-year"
+  ) {
     title = t("Recovering recently, still below last year");
     summary = t(
       "Recent search attention has improved from a lower base. It has not recovered last year’s level; a seasonal explanation is unproven.",
+    );
+  }
+  if (m.topic.scope === "field") {
+    title = t("Choose a workflow within this field");
+    summary = t(
+      "Use the measured search trajectory to understand the field, then compare tools that serve one audience and one task.",
+    );
+  }
+  if (!provisional && searchReady && m.metrics.seasonal) {
+    title = t("Seasonal pattern · compare the same period last year");
+    summary = t(
+      "The annual search pattern repeats. The landscape uses year-over-year direction; the recent-window change shows the current seasonal phase.",
     );
   }
   const nextSteps = m.demand.error
@@ -139,7 +168,6 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
             "Repeat the scan with a familiar search phrase and compare the evidence before committing.",
           ),
         ];
-  const latestWeek = completeWeeklySeries(m.demand, m.asOf).points.at(-1);
   const demandNote = t(
     m.demand.error
       ? "Search history could not be collected"
@@ -156,8 +184,11 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
                 : "Last 8 complete weeks vs previous 8",
   );
   return {
+    searchReady,
     demandNote,
-    landscape: t(MARKET_LABELS[m.kind]),
+    landscape: t(
+      m.topic.scope === "field" ? "Field overview" : MARKET_LABELS[m.kind],
+    ),
     level: provisional ? ("provisional" as const) : ("measured" as const),
     title,
     summary,
@@ -197,4 +228,13 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
         }
       : {}),
   };
+}
+
+export function competitionPressure(m: Pick<Market, "competition">): string {
+  const c = m.competition;
+  if (!c || !c.sampled) return "—";
+  if (!c.enumerated) return "≥" + Math.round(c.score);
+  if (c.upper - c.score >= 1)
+    return `${Math.round(c.score)}–${Math.round(c.upper)}`;
+  return String(Math.round(c.score));
 }
