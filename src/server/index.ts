@@ -214,7 +214,8 @@ export function createApp(engine = new Engine()) {
                 geo: job.geo,
                 keyword: job.keyword,
                 refresh: job.refresh,
-                ai: job.refresh ? false : undefined,
+                // Curated query planning stays local; scheduled reports also
+                // benefit from cached, source-backed project-role review.
                 owner: job.owner,
                 private: auth.hosted && !!job.owner,
                 onProgress: (progress) => {
@@ -860,7 +861,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.11.0/ghtrends-radar-0.11.0.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.11.1/ghtrends-radar-0.11.1.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>
