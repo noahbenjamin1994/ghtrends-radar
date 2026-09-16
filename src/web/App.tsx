@@ -13,7 +13,6 @@ import {
   Search,
   SlidersHorizontal,
   Download,
-  Star,
   Terminal,
   ChevronDown,
   Globe2,
@@ -21,7 +20,6 @@ import {
   ScanLine,
   GitCompareArrows,
   Bookmark,
-  BookOpen,
   X,
   ExternalLink,
   Check,
@@ -339,28 +337,23 @@ export function App() {
           <Logo />
         </button>
         <nav
+          id="main-navigation"
           className={mobileMenu ? "is-open" : ""}
           aria-label={t("Main navigation")}
         >
           {[
-            ["radar", "Explore", Radio, "/"],
-            ...(account?.user
-              ? [["history", "My research", BookOpen, "/history"]]
-              : []),
-            ["start", "Use open source", Terminal, "/start"],
-          ].map(([key, label, Icon, href]) => {
-            const I = Icon as typeof Radio;
+            ["radar", "Explore", "/"],
+            ...(account?.user ? [["history", "My research", "/history"]] : []),
+            ["start", "Use open source", "/start"],
+          ].map(([key, label, href]) => {
             return (
               <button
                 key={String(key)}
                 className={active === key ? "active" : ""}
+                aria-current={active === key ? "page" : undefined}
                 onClick={() => navigate(String(href))}
               >
-                <I size={15} />
                 {t(String(label))}
-                {key === "watch" && watch.length > 0 && (
-                  <span className="nav-count">{watch.length}</span>
-                )}
               </button>
             );
           })}
@@ -422,22 +415,31 @@ export function App() {
           </button>
           <a
             className="github-button"
+            aria-label={t("Star on GitHub")}
+            title={t("Star on GitHub")}
             href={SOURCE}
             onClick={() => track("github_click")}
             target="_blank"
             rel="noreferrer"
           >
-            <Star size={15} />
-            <span className="github-label">{t("Star on GitHub")}</span>
-            <span className="github-short">Star</span>
-            <ArrowUpRight size={14} />
+            <svg
+              width="21"
+              height="21"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 4.73c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+            </svg>
           </a>
           <button
             className="icon-button mobile-menu"
             aria-label={t("Toggle navigation")}
+            aria-expanded={mobileMenu}
+            aria-controls="main-navigation"
             onClick={() => setMobileMenu(!mobileMenu)}
           >
-            <Menu size={22} />
+            {mobileMenu ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
       </header>
@@ -2147,7 +2149,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.7.1/ghtrends-radar-0.7.1.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.7.2/ghtrends-radar-0.7.2.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}
