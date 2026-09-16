@@ -1,3 +1,4 @@
+import { t, locale, localUrl, switchLanguage } from "./i18n.js";
 import React, { useEffect, useState } from "react";
 import {
   ArrowUpRight,
@@ -41,6 +42,9 @@ import {
   kindColors,
 } from "./components.js";
 import { downloadCard } from "./export.js";
+import { marketAssessment } from "../core/assessment.js";
+import { resolveTopic } from "../core/topics.js";
+import type { ScanProgress } from "../core/engine.js";
 import { completeWeeklySeries } from "../core/evidence.js";
 const SOURCE = "https://github.com/noahbenjamin1994/ghtrends-radar";
 async function api<T>(url: string, options?: RequestInit): Promise<T> {
@@ -78,14 +82,29 @@ export function App() {
       id: string;
       state: string;
       topic: string;
+      created?: number;
+      queuePosition?: number;
+      progress?: ScanProgress;
     } | null>(null),
     [scanning, setScanning] = useState(false),
-    [scanError, setScanError] = useState("");
+    [scanError, setScanError] = useState(""),
+    [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!scanning) return;
+    const started = Date.now();
+    setElapsed(0);
+    const timer = setInterval(
+      () => setElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => clearInterval(timer);
+  }, [scanning]);
   const navigate = (input: string) => {
-    const url =
+    const destination =
       geo && input.startsWith("/market/") && !input.includes("?")
         ? input + "?geo=" + geo
         : input;
+    const url = localUrl(destination);
     history.pushState({}, "", url);
     setPath(url);
     setMobileMenu(false);
@@ -133,7 +152,7 @@ export function App() {
       localStorage.setItem("ghtrends:watch", JSON.stringify(next));
       return next;
     });
-  const scan = async (input: string) => {
+  const scan = async (input: string, demandKeyword?: string) => {
     if (!input.trim()) return;
     setScanning(true);
     setScanError("");
@@ -144,7 +163,7 @@ export function App() {
         body: JSON.stringify({
           topic: input,
           geo,
-          keyword: keyword.trim() || undefined,
+          keyword: demandKeyword || keyword.trim() || undefined,
         }),
       });
       if (d.state === "complete") {
@@ -178,7 +197,7 @@ export function App() {
           setScanning(false);
           return;
         }
-        setJob((j) => (j ? { ...j, state: d.state } : null));
+        setJob(d);
         timer = setTimeout(poll, 3000);
       } catch (e) {
         if (!stop) {
@@ -194,6 +213,16 @@ export function App() {
       clearTimeout(timer);
     };
   }, [job?.id]);
+  const pendingAssessment = job?.progress?.preview
+    ? marketAssessment(job.progress.preview, locale)
+    : null;
+  const scanTopic = job ? resolveTopic(job.topic) : null;
+  const stageLabels = {
+    sources: "Collecting source evidence",
+    github: "GitHub supply received",
+    demand: "Search history received",
+    details: "Core evidence ready; adding project details",
+  };
   const route = path.split("?")[0]!;
   const active = route.startsWith("/compare")
     ? "compare"
@@ -208,7 +237,10 @@ export function App() {
     .filter(
       (m) =>
         (filter === "all" || m.kind === filter) &&
-        (!query || m.topic.name.toLowerCase().includes(query.toLowerCase())),
+        (!query ||
+          `${m.topic.name} ${t(m.topic.name)}`
+            .toLowerCase()
+            .includes(query.toLowerCase())),
     )
     .sort((a, b) =>
       sort === "growth"
@@ -229,13 +261,13 @@ export function App() {
         <button
           className="brand-link"
           onClick={() => navigate("/")}
-          aria-label="ghtrends home"
+          aria-label={t("ghtrends home")}
         >
           <Logo />
         </button>
         <nav
           className={mobileMenu ? "is-open" : ""}
-          aria-label="Main navigation"
+          aria-label={t("Main navigation")}
         >
           {[
             ["radar", "Radar", Radio, "/"],
@@ -252,7 +284,7 @@ export function App() {
                 onClick={() => navigate(String(href))}
               >
                 <I size={15} />
-                {String(label)}
+                {t(String(label))}
                 {key === "watch" && watch.length > 0 && (
                   <span className="nav-count">{watch.length}</span>
                 )}
@@ -261,6 +293,14 @@ export function App() {
           })}
         </nav>
         <div className="header-end">
+          <button
+            className="language-switch"
+            onClick={switchLanguage}
+            aria-label={locale === "zh" ? "Switch to English" : "切换到中文"}
+          >
+            <Globe2 size={14} />
+            {locale === "zh" ? "EN" : "中文"}
+          </button>
           <a
             className="github-button"
             href={SOURCE}
@@ -268,11 +308,12 @@ export function App() {
             rel="noreferrer"
           >
             <Star size={15} />
-            Star on GitHub <ArrowUpRight size={14} />
+            {t("Star on GitHub")}
+            <ArrowUpRight size={14} />
           </a>
           <button
             className="icon-button mobile-menu"
-            aria-label="Toggle navigation"
+            aria-label={t("Toggle navigation")}
             onClick={() => setMobileMenu(!mobileMenu)}
           >
             <Menu size={22} />
@@ -281,8 +322,8 @@ export function App() {
       </header>
       {error && (
         <div className="error-banner" role="alert">
-          {error}
-          <button onClick={() => void refresh()}>Try again</button>
+          {t(error)}
+          <button onClick={() => void refresh()}>{t("Try again")}</button>
         </div>
       )}
       <main>
@@ -292,19 +333,20 @@ export function App() {
               <div>
                 <div className="eyebrow">
                   <span className="live-dot" />
-                  THE OPEN-SOURCE OPPORTUNITY RADAR
+                  {t("THE OPEN-SOURCE OPPORTUNITY RADAR")}
                 </div>
                 <h1>
-                  Know where
+                  {t("Know where")}
                   <br />
-                  to build<span className="lime">.</span>
+                  {t("to build")}
+                  <span className="lime">.</span>
                 </h1>
               </div>
               <div className="heading-aside">
                 <p>
-                  Spot growing demand.
+                  {t("Spot growing demand.")}
                   <br />
-                  Find the gaps in open source.
+                  {t("Find the gaps in open source.")}
                 </p>
                 <div className="source-chips">
                   <span>
@@ -334,26 +376,29 @@ export function App() {
             </section>
             <section className="radar-section">
               <div className="radar-sidebar">
-                <div className="section-kicker">01 / THE BIG PICTURE</div>
+                <div className="section-kicker">
+                  {t("01 / THE BIG PICTURE")}
+                </div>
                 <h2>
-                  Follow the
+                  {t("Follow the")}
                   <br />
-                  <span className="serif-word">opportunity.</span>
+                  <span className="serif-word">{t("opportunity.")}</span>
                 </h2>
                 <p>
-                  Every signal puts search demand against active open-source
-                  supply. Explore a category to see what’s behind it.
+                  {t(
+                    "Every signal puts search demand against active open-source supply. Explore a category to see what’s behind it.",
+                  )}
                 </p>
                 <div className="overview-numbers">
                   <div>
                     <strong>
                       {markets.length.toString().padStart(2, "0")}
                     </strong>
-                    <span>categories scanned</span>
+                    <span>{t("categories scanned")}</span>
                   </div>
                   <div>
                     <strong>{number(total)}</strong>
-                    <span>matching active projects*</span>
+                    <span>{t("matching active projects*")}</span>
                   </div>
                 </div>
                 <div className="radar-legend">
@@ -374,7 +419,8 @@ export function App() {
                   )}
                 </div>
                 <button className="text-link" onClick={() => navigate("/docs")}>
-                  Understand the methodology <ArrowUpRight size={15} />
+                  {t("Understand the methodology")}
+                  <ArrowUpRight size={15} />
                 </button>
               </div>
               <Radar
@@ -386,16 +432,22 @@ export function App() {
               <div className="section-header">
                 <div>
                   <div className="section-kicker">
-                    02 / EXPLORE THE LANDSCAPE
+                    {t("02 / EXPLORE THE LANDSCAPE")}
                   </div>
                   <h2>
-                    Your next starting point<span className="lime">↗</span>
+                    {t("Your next starting point")}
+                    <span className="lime">↗</span>
                   </h2>
                 </div>
                 <span className="updated">
                   {latest
-                    ? `Updated ${new Date(latest).toLocaleDateString("en", { month: "short", day: "numeric" })}`
-                    : "Ready for your first scan"}
+                    ? t("Updated {date}", {
+                        date: new Date(latest).toLocaleDateString(
+                          locale === "zh" ? "zh-CN" : "en",
+                          { month: "short", day: "numeric" },
+                        ),
+                      })
+                    : t("Ready for your first scan")}
                 </span>
               </div>
               <div className="toolbar">
@@ -410,11 +462,12 @@ export function App() {
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Explore a topic, e.g. agent memory"
-                    aria-label="Search or scan a topic"
+                    placeholder={t("Explore a topic, e.g. agent memory")}
+                    aria-label={t("Search or scan a topic")}
                   />
                   <button disabled={scanning || !query.trim()} type="submit">
-                    Scan <ArrowUpRight size={15} />
+                    {t("Scan")}
+                    <ArrowUpRight size={15} />
                   </button>
                 </form>
                 <label className="select-field">
@@ -422,14 +475,14 @@ export function App() {
                   <select
                     value={geo}
                     onChange={(e) => setGeo(e.target.value)}
-                    aria-label="Search-demand region"
+                    aria-label={t("Search-demand region")}
                   >
-                    <option value="">Worldwide</option>
-                    <option value="US">United States</option>
-                    <option value="GB">United Kingdom</option>
-                    <option value="DE">Germany</option>
-                    <option value="JP">Japan</option>
-                    <option value="IN">India</option>
+                    <option value="">{t("Worldwide")}</option>
+                    <option value="US">{t("United States")}</option>
+                    <option value="GB">{t("United Kingdom")}</option>
+                    <option value="DE">{t("Germany")}</option>
+                    <option value="JP">{t("Japan")}</option>
+                    <option value="IN">{t("India")}</option>
                   </select>
                   <ChevronDown size={13} />
                 </label>
@@ -438,28 +491,29 @@ export function App() {
                   <select
                     value={sort}
                     onChange={(e) => setSort(e.target.value)}
-                    aria-label="Sort categories"
+                    aria-label={t("Sort categories")}
                   >
-                    <option value="opportunity">Opportunity</option>
-                    <option value="growth">Search growth</option>
+                    <option value="opportunity">{t("Opportunity")}</option>
+                    <option value="growth">{t("Search growth")}</option>
                   </select>
                   <ChevronDown size={13} />
                 </label>
               </div>
               <details className="keyword-options">
-                <summary>Choose a different Google search term</summary>
+                <summary>{t("Choose a different Google search term")}</summary>
                 <label>
-                  Demand keyword
+                  {t("Demand keyword")}
                   <input
                     value={keyword}
                     onChange={(e) => setKeyword(e.target.value)}
                     maxLength={100}
-                    placeholder="Optional — e.g. AI agent memory"
+                    placeholder={t("Optional — e.g. AI agent memory")}
                   />
                 </label>
                 <p>
-                  Keep the GitHub topic above; use this field to measure a more
-                  familiar phrase people search for.
+                  {t(
+                    "Keep the GitHub topic above; use this field to measure a more familiar phrase people search for.",
+                  )}
                 </p>
               </details>
               <div className="filter-tabs">
@@ -467,7 +521,8 @@ export function App() {
                   className={filter === "all" ? "active" : ""}
                   onClick={() => setFilter("all")}
                 >
-                  All categories <span>{markets.length}</span>
+                  {t("All categories")}
+                  <span>{markets.length}</span>
                 </button>
                 {(
                   [
@@ -511,10 +566,10 @@ export function App() {
                         <Pill kind={m.kind} />
                       </div>
                       <h3>
-                        {m.topic.name}
+                        {t(m.topic.name)}
                         <ArrowUpRight size={20} />
                       </h3>
-                      <p>{m.topic.description}</p>
+                      <p>{t(m.topic.description)}</p>
                       <Sparkline
                         values={completeWeeklySeries(m.demand, m.asOf)
                           .points.slice(-26)
@@ -525,28 +580,36 @@ export function App() {
                       />
                       <div className="card-metrics">
                         <div>
-                          <small>Search growth</small>
-                          <Growth value={m.metrics.growth} />
+                          <small>{t("Search growth")}</small>
+                          <Growth
+                            value={
+                              m.metrics.fast === null ? null : m.metrics.growth
+                            }
+                          />
                         </div>
                         <div>
-                          <small>Active projects</small>
+                          <small>{t("Active projects")}</small>
                           <strong>{number(m.supply.total)}</strong>
                         </div>
                         <div>
-                          <small>Evidence</small>
-                          <span className="evidence-level">{m.confidence}</span>
+                          <small>{t("Evidence")}</small>
+                          <span className="evidence-level">
+                            {t(m.confidence)}
+                          </span>
                         </div>
                       </div>
                       <div className="card-bottom">
-                        <span>Explore the evidence</span>
+                        <span>{t("Explore the evidence")}</span>
                         <ArrowRight size={17} />
                       </div>
                     </button>
                   ))}
                   {!shown.length && !unscanned.length && (
                     <Empty
-                      title="No matching signals"
-                      description="Try another topic or clear the category filter."
+                      title={t("No matching signals")}
+                      description={t(
+                        "Try another topic or clear the category filter.",
+                      )}
                       action={
                         <button
                           className="button"
@@ -555,7 +618,7 @@ export function App() {
                             setQuery("");
                           }}
                         >
-                          Clear filters
+                          {t("Clear filters")}
                         </button>
                       }
                     />
@@ -566,17 +629,17 @@ export function App() {
                 <div className="unscanned">
                   <div>
                     <ScanLine size={18} />
-                    <strong>Explore a new category</strong>
-                    <span>Fresh evidence takes a moment.</span>
+                    <strong>{t("Explore a new category")}</strong>
+                    <span>{t("Fresh evidence takes a moment.")}</span>
                   </div>
                   <div className="topic-chips">
-                    {unscanned.map((t) => (
+                    {unscanned.map((topic) => (
                       <button
-                        key={t.slug}
+                        key={topic.slug}
                         disabled={scanning}
-                        onClick={() => void scan(t.slug)}
+                        onClick={() => void scan(topic.slug)}
                       >
-                        {t.name}
+                        {t(topic.name)}
                         <ArrowUpRight size={14} />
                       </button>
                     ))}
@@ -589,8 +652,10 @@ export function App() {
                 <Terminal size={25} />
               </span>
               <div>
-                <h3>Take the radar into your workflow.</h3>
-                <p>The same evidence. In your terminal or your AI agent.</p>
+                <h3>{t("Take the radar into your workflow.")}</h3>
+                <p>
+                  {t("The same evidence. In your terminal or your AI agent.")}
+                </p>
               </div>
               <code>ghtrends scan --topic mcp-servers</code>
               <button
@@ -601,9 +666,9 @@ export function App() {
               </button>
             </section>
             <p className="footnote">
-              * Category counts can overlap. Search interest is a demand signal,
-              not a measure of paying customers. All classifications include
-              their evidence and limitations.
+              {t(
+                "* Category counts can overlap. Search interest is a demand signal, not a measure of paying customers. All classifications include their evidence and limitations.",
+              )}
             </p>
           </>
         ) : route.startsWith("/market/") || route.startsWith("/report/") ? (
@@ -632,11 +697,13 @@ export function App() {
           <Docs />
         ) : (
           <Empty
-            title="This page has drifted off the map"
-            description="Return to the radar to find a category or project."
+            title={t("This page has drifted off the map")}
+            description={t(
+              "Return to the radar to find a category or project.",
+            )}
             action={
               <button className="button" onClick={() => navigate("/")}>
-                Back to radar
+                {t("Back to radar")}
               </button>
             }
           />
@@ -644,17 +711,19 @@ export function App() {
       </main>
       <footer>
         <Logo />
-        <span>Built for the curious. Open for everyone.</span>
+        <span>{t("Built for the curious. Open for everyone.")}</span>
         <div>
           <a href={SOURCE}>
-            Source code <ArrowUpRight size={12} />
+            {t("Source code")}
+            <ArrowUpRight size={12} />
           </a>
           <a href="https://ghtrends.dev">
-            Daily discoveries <ArrowUpRight size={12} />
+            {t("Daily discoveries")}
+            <ArrowUpRight size={12} />
           </a>
-          <button onClick={() => navigate("/docs")}>Methodology</button>
+          <button onClick={() => navigate("/docs")}>{t("Methodology")}</button>
         </div>
-        <small>Not affiliated with GitHub, Inc.</small>
+        <small>{t("Not affiliated with GitHub, Inc.")}</small>
       </footer>
       {(scanning || scanError) && (
         <div className="scan-status" role={scanError ? "alert" : "status"}>
@@ -662,12 +731,12 @@ export function App() {
             <>
               <Info size={20} />
               <div>
-                <strong>Scan needs attention</strong>
-                <p>{scanError}</p>
+                <strong>{t("Scan needs attention")}</strong>
+                <p>{t(scanError)}</p>
               </div>
               <button
                 className="icon-button"
-                aria-label="Dismiss scan error"
+                aria-label={t("Dismiss scan error")}
                 onClick={() => setScanError("")}
               >
                 <X size={18} />
@@ -679,12 +748,61 @@ export function App() {
               <div>
                 <strong>
                   {job?.state === "queued"
-                    ? "Your scan is queued"
-                    : "Reading the landscape"}
+                    ? t("Your scan is queued")
+                    : t(stageLabels[job?.progress?.stage || "sources"])}
                 </strong>
                 <p>
-                  Checking GitHub supply and Google search demand. You can keep
-                  exploring.
+                  {t("Elapsed {seconds}s", { seconds: elapsed })}
+                  {job?.queuePosition
+                    ? " · " +
+                      t("Waiting behind {count} scan(s)", {
+                        count: job.queuePosition,
+                      })
+                    : ""}
+                </p>
+                {scanTopic && (
+                  <p>
+                    {t(
+                      "Interpreting “{input}” as {name}; search term: “{keyword}”.",
+                      {
+                        input: job!.topic,
+                        name: t(scanTopic.name),
+                        keyword:
+                          job?.progress?.preview?.demand.keyword ||
+                          scanTopic.keyword,
+                      },
+                    )}
+                  </p>
+                )}
+                <div className="scan-facts">
+                  {job?.progress?.supplyCount !== undefined && (
+                    <span>
+                      <Check size={13} />
+                      {t("{count} active projects found", {
+                        count: job.progress.supplyCount,
+                      })}
+                    </span>
+                  )}
+                  {job?.progress?.weeklyPoints !== undefined && (
+                    <span>
+                      <Check size={13} />
+                      {t("{count} complete weeks received", {
+                        count: job.progress.weeklyPoints,
+                      })}
+                    </span>
+                  )}
+                </div>
+                {pendingAssessment && (
+                  <div className="scan-preview">
+                    <small>{t("Preliminary result")}</small>
+                    <strong>{pendingAssessment.title}</strong>
+                    <p>{pendingAssessment.summary}</p>
+                  </div>
+                )}
+                <p>
+                  {t(
+                    "You can keep exploring. Source rate limits may delay a fresh scan.",
+                  )}
                 </p>
               </div>
             </>
@@ -707,7 +825,7 @@ function MarketView({
   navigate: (s: string) => void;
   watch: string[];
   onWatch: (s: string) => void;
-  onScan: (s: string) => void;
+  onScan: (s: string, keyword?: string) => void;
 }) {
   const [m, setM] = useState<Market | null>(null),
     [error, setError] = useState(""),
@@ -723,16 +841,16 @@ function MarketView({
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [path, geo]);
-  if (loading) return <Loading text="Opening the evidence…" />;
+  if (loading) return <Loading text={t("Opening the evidence…")} />;
   if (!m || error)
     return (
       <Empty
         title={
           path.startsWith("/report/")
-            ? "This report is unavailable"
-            : "This category is waiting for its first scan"
+            ? t("This report is unavailable")
+            : t("This category is waiting for its first scan")
         }
-        description={error}
+        description={t(error)}
         action={
           <button
             className="button"
@@ -743,37 +861,39 @@ function MarketView({
             }
           >
             {path.startsWith("/report/")
-              ? "Back to the radar"
-              : "Scan this category"}{" "}
+              ? t("Back to the radar")
+              : t("Scan this category")}{" "}
             <ArrowUpRight size={16} />
           </button>
         }
       />
     );
-  const share = location.origin + "/report/" + m.id;
+  const assessment = marketAssessment(m, locale);
+  const share = location.origin + localUrl("/report/" + m.id);
   const demandPoints = completeWeeklySeries(m.demand, m.asOf).points;
   return (
     <div className="detail-page">
       <button className="back-link" onClick={() => navigate("/")}>
         <ArrowLeft size={16} />
-        Back to the radar
+        {t("Back to the radar")}
       </button>
       <div className="detail-heading">
         <div>
           <div className="eyebrow">
-            CATEGORY INTELLIGENCE / {m.geo || "WORLDWIDE"}
+            {t("CATEGORY INTELLIGENCE /")}
+            {m.geo || t("WORLDWIDE")}
           </div>
           <h1>
-            {m.topic.name}
+            {t(m.topic.name)}
             <span className="lime">.</span>
           </h1>
-          <p>{m.topic.description}</p>
+          <p>{t(m.topic.description)}</p>
         </div>
         <div className="detail-actions">
-          <CopyButton value={share} label="Share report" />
+          <CopyButton value={share} label={t("Share report")} />
           <a
             className="button subtle"
-            href={`/api/reports/${m.id}?format=md`}
+            href={localUrl(`/api/reports/${m.id}?format=md`)}
             download={`ghtrends-${m.topic.slug}.md`}
           >
             <Download size={15} />
@@ -782,11 +902,13 @@ function MarketView({
           <button
             className="button"
             onClick={() =>
-              void downloadCard(m, share).catch((e) => setError(e.message))
+              void downloadCard(m, share, locale).catch((e) =>
+                setError(e.message),
+              )
             }
           >
             <Download size={15} />
-            Save image
+            {t("Save image")}
           </button>
         </div>
       </div>
@@ -796,62 +918,137 @@ function MarketView({
         </div>
         <div>
           <Pill kind={m.kind} />
-          <h2>{m.headline}</h2>
-          <p>{m.strategy}</p>
+          <h2>{assessment.title}</h2>
+          <p>{assessment.summary}</p>
+          {assessment.level === "provisional" && (
+            <small className="verdict-qualification">
+              {t("Preliminary recommendation")} ·{" "}
+              {t("Quadrant not yet established")}
+            </small>
+          )}
         </div>
         <div className="verdict-evidence">
-          <span>{m.confidence}</span>
-          <small>evidence confidence</small>
+          <span>{t(m.confidence)}</span>
+          <small>{t("evidence confidence")}</small>
           <small>
-            {new Date(m.asOf).toLocaleDateString("en", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
+            {new Date(m.asOf).toLocaleDateString(
+              locale === "zh" ? "zh-CN" : "en",
+              {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              },
+            )}
           </small>
         </div>
       </section>
+      {assessment.level === "provisional" && (
+        <section className="panel next-move">
+          <div className="panel-title">
+            <h3>{t("Your next move")}</h3>
+            <span className="method-tag">{t("Partial evidence")}</span>
+          </div>
+          <div className="assessment-columns">
+            <div>
+              <h4>{t("What we know")}</h4>
+              <ul>
+                {assessment.facts.map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h4>{t("What to do next")}</h4>
+              <ol>
+                {assessment.nextSteps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
+          {assessment.suggestedScan && (
+            <button
+              className="button"
+              onClick={() =>
+                onScan(
+                  assessment.suggestedScan!.topic,
+                  assessment.suggestedScan!.keyword,
+                )
+              }
+            >
+              <RefreshCw size={15} />
+              {t("Rescan with “{keyword}”", {
+                keyword: assessment.suggestedScan.keyword,
+              })}
+            </button>
+          )}
+          {assessment.contextSources?.map((source) => (
+            <a
+              className="text-link context-source"
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              key={source.url}
+            >
+              {t("Field context")}: {source.title}
+              <ExternalLink size={13} />
+            </a>
+          ))}
+        </section>
+      )}
       <div className="metric-grid">
         <div>
-          <span>Search demand growth</span>
+          <span>{t("Search demand growth")}</span>
           <strong>
-            <Growth value={m.metrics.growth} />
+            <Growth value={m.metrics.fast === null ? null : m.metrics.growth} />
           </strong>
-          <small>Last 8 complete weeks vs previous 8</small>
+          <small>
+            {t(
+              m.metrics.fast === null
+                ? "Search volume is too weak for a stable estimate"
+                : "Last 8 complete weeks vs previous 8",
+            )}
+          </small>
         </div>
         <div>
-          <span>Active project supply</span>
+          <span>{t("Active project supply")}</span>
           <strong>{number(m.supply.total)}</strong>
-          <small>≥5 stars · pushed within 180 days</small>
+          <small>{t("≥5 stars · pushed within 180 days")}</small>
         </div>
         <div>
-          <span>Year-over-year demand</span>
+          <span>{t("Year-over-year demand")}</span>
           <strong>
             <Growth value={m.metrics.yearOverYear} />
           </strong>
-          <small>Same 8-week window, one year apart</small>
+          <small>{t("Same 8-week window, one year apart")}</small>
         </div>
         <div>
-          <span>Top 3 attention share</span>
+          <span>{t("Top 3 attention share")}</span>
           <strong>
             {m.concentration === null
               ? "—"
               : (m.concentration * 100).toFixed(0) + "%"}
           </strong>
-          <small>Share of stars within returned projects</small>
+          <small>{t("Share of stars within returned projects")}</small>
         </div>
       </div>
       <div className="detail-columns">
         <section className="panel demand-panel">
           <div className="panel-title">
-            <h3>What demand looks like</h3>
+            <h3>{t("What demand looks like")}</h3>
             <a href={m.demand.sourceUrl} target="_blank" rel="noreferrer">
               Google Trends <ExternalLink size={13} />
             </a>
           </div>
           <div className="chart-caption">
-            <span>Relative search interest for “{m.demand.keyword}”</span>
-            <span>{demandPoints.length} complete observations</span>
+            <span>
+              {t("Relative search interest for “")}
+              {m.demand.keyword}”
+            </span>
+            <span>
+              {demandPoints.length}
+              {t("complete observations")}
+            </span>
           </div>
           <div className="large-chart">
             <div className="chart-grid">
@@ -868,40 +1065,65 @@ function MarketView({
             />
           </div>
           <div className="chart-dates">
-            <span>{demandPoints[0]?.date.slice(0, 10) || "No history"}</span>
+            <span>{demandPoints[0]?.date.slice(0, 10) || t("No history")}</span>
             <span>{demandPoints.at(-1)?.date.slice(0, 10)}</span>
           </div>
           <p className="footnote">
-            Original values are relative Google Trends indices on a 0–100 scale,
-            not search counts.
+            {t(
+              "Original values are relative Google Trends indices on a 0–100 scale, not search counts.",
+            )}
           </p>
         </section>
         <section className="panel reasoning-panel">
           <div className="panel-title">
-            <h3>Behind the classification</h3>
+            <h3>{t("Behind the classification")}</h3>
             <span className="method-tag">v{m.version}</span>
           </div>
           {m.reasons.map((r, i) => (
             <div className="reason" key={r}>
               <span>{String(i + 1).padStart(2, "0")}</span>
-              <p>{r}</p>
+              <p>{t(r)}</p>
             </div>
           ))}
           <button className="text-link" onClick={() => navigate("/docs")}>
-            Read the full method <ArrowUpRight size={15} />
+            {t("Read the full method")}
+            <ArrowUpRight size={15} />
           </button>
         </section>
       </div>
       <section className="panel">
         <div className="panel-title">
           <div>
-            <h3>The projects shaping this space</h3>
-            <p>Leading repositories by stars within the selected topic.</p>
+            <h3>{t("The projects shaping this space")}</h3>
+            <p>
+              {t("Leading repositories by stars within the selected topic.")}
+            </p>
           </div>
           <a href={m.supply.sourceUrl} target="_blank" rel="noreferrer">
-            View search <ExternalLink size={13} />
+            {t("View search")}
+            <ExternalLink size={13} />
           </a>
         </div>
+        {(m.supply.searches?.length || 0) > 1 && (
+          <div className="search-scopes">
+            <p>
+              {t(
+                "Counts are deduplicated across topic searches; incomplete searches show a lower bound.",
+              )}
+            </p>
+            {m.supply.searches!.map((source) => (
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                key={source.query}
+              >
+                <code>{source.query.split(" fork:")[0]}</code>
+                <ExternalLink size={12} />
+              </a>
+            ))}
+          </div>
+        )}
         {m.supply.repositories.slice(0, 10).map((r) => (
           <RepoRow
             key={r.name}
@@ -913,8 +1135,10 @@ function MarketView({
         ))}
         {!m.supply.repositories.length && (
           <Empty
-            title="No matching projects returned"
-            description="A narrow topic or unavailable source can leave this view empty. Check the evidence notes below."
+            title={t("No matching projects returned")}
+            description={t(
+              "A narrow topic or unavailable source can leave this view empty. Check the evidence notes below.",
+            )}
           />
         )}
         <div className="panel-bottom">
@@ -931,23 +1155,28 @@ function MarketView({
               )
             }
           >
-            Compare the leading projects <GitCompareArrows size={16} />
+            {t("Compare the leading projects")}
+            <GitCompareArrows size={16} />
           </button>
           <span className="footnote">
-            Star windows follow GitHub’s calendar buckets.
+            {t("Star windows follow GitHub’s calendar buckets.")}
           </span>
         </div>
       </section>
       <section className="panel">
         <div className="panel-title">
           <div>
-            <h3>Listen to what’s missing</h3>
+            <h3>{t("Listen to what’s missing")}</h3>
             <p>
-              Open issues with community reactions. These are leads to
-              investigate, not proven product opportunities.
+              {t(
+                "Open issues with community reactions. These are leads to investigate, not proven product opportunities.",
+              )}
             </p>
           </div>
-          <span className="method-tag">{m.gaps.length} signals</span>
+          <span className="method-tag">
+            {m.gaps.length}
+            {t("signals")}
+          </span>
         </div>
         {m.gaps.length ? (
           <div className="gap-grid">
@@ -961,7 +1190,7 @@ function MarketView({
               >
                 <div>
                   <span className="gap-label">
-                    {g.label.replaceAll("-", " ")}
+                    {t(g.label.replaceAll("-", " "))}
                   </span>
                   <span>↑ {g.reactions}</span>
                 </div>
@@ -978,8 +1207,9 @@ function MarketView({
           </div>
         ) : (
           <p className="muted">
-            No issue signals were returned for this scan. This does not
-            establish the absence of unmet demand.
+            {t(
+              "No issue signals were returned for this scan. This does not establish the absence of unmet demand.",
+            )}
           </p>
         )}
       </section>
@@ -987,25 +1217,28 @@ function MarketView({
         <div className="panel-title">
           <h3>
             <Info size={18} />
-            Know the boundaries
+            {t("Know the boundaries")}
           </h3>
           <a href={`/api/reports/${m.id}`} target="_blank" rel="noreferrer">
-            Download evidence JSON <ExternalLink size={13} />
+            {t("Download evidence JSON")}
+            <ExternalLink size={13} />
           </a>
         </div>
         <ul>
           {m.limitations.map((l) => (
-            <li key={l}>{l}</li>
+            <li key={l}>{t(l)}</li>
           ))}
         </ul>
         <div className="embed-box">
           <div>
-            <strong>Put this finding where others can discover it.</strong>
-            <p>Share a permanent snapshot of the evidence.</p>
+            <strong>
+              {t("Put this finding where others can discover it.")}
+            </strong>
+            <p>{t("Share a permanent snapshot of the evidence.")}</p>
           </div>
           <CopyButton
-            value={`[![${m.topic.name}: ${m.headline}](${location.origin}/api/cards/${m.id}.png)](${share})`}
-            label="Copy README card"
+            value={`[![${t(m.topic.name)}: ${t(m.headline)}](${location.origin}${localUrl(`/api/cards/${m.id}.png`)})](${share})`}
+            label={t("Copy README card")}
           />
         </div>
       </section>
@@ -1034,55 +1267,57 @@ function RepoView({
       .catch((e) => setError(e.message));
   }, [name]);
   if (error)
-    return <Empty title="Repository unavailable" description={error} />;
+    return <Empty title={t("Repository unavailable")} description={t(error)} />;
   if (!r)
     return (
-      <Loading text="Reading repository history and maintenance signals…" />
+      <Loading
+        text={t("Reading repository history and maintenance signals…")}
+      />
     );
   return (
     <div className="detail-page">
       <button className="back-link" onClick={() => navigate("/")}>
         <ArrowLeft size={16} />
-        Back to radar
+        {t("Back to radar")}
       </button>
       <div className="detail-heading">
         <div>
-          <div className="eyebrow">REPOSITORY INTELLIGENCE</div>
+          <div className="eyebrow">{t("REPOSITORY INTELLIGENCE")}</div>
           <h1 className="repo-title">{r.name}</h1>
           <p>{r.description}</p>
         </div>
         <button className="button" onClick={() => onWatch(r.name)}>
           <Bookmark size={15} />
-          {watch.includes(r.name) ? "Watching" : "Add to watchlist"}
+          {watch.includes(r.name) ? t("Watching") : t("Add to watchlist")}
         </button>
       </div>
       <div className="metric-grid">
         <div>
-          <span>Total stars</span>
+          <span>{t("Total stars")}</span>
           <strong>{number(r.stars)}</strong>
         </div>
         <div>
-          <span>Stars / last 7 days</span>
+          <span>{t("Stars / last 7 days")}</span>
           <strong className="positive">
             {r.growth7d === null ? "—" : "+" + number(r.growth7d)}
           </strong>
         </div>
         <div>
-          <span>Stars / last 30 days</span>
+          <span>{t("Stars / last 30 days")}</span>
           <strong>
             {r.growth30d === null ? "—" : "+" + number(r.growth30d)}
           </strong>
         </div>
         <div>
-          <span>License</span>
+          <span>{t("License")}</span>
           <strong className="small-value">
-            {r.license || "Not specified"}
+            {r.license || t("Not specified")}
           </strong>
         </div>
       </div>
       <section className="panel">
         <div className="panel-title">
-          <h3>Daily new stars</h3>
+          <h3>{t("Daily new stars")}</h3>
           <div className="segmented">
             {[7, 30, 90].map((d) => (
               <button
@@ -1090,7 +1325,8 @@ function RepoView({
                 key={d}
                 onClick={() => setDays(d)}
               >
-                {d}d
+                {d}
+                {t("d")}
               </button>
             ))}
           </div>
@@ -1107,67 +1343,71 @@ function RepoView({
           <span>{r.growthWindowEnd}</span>
         </div>
         <p className="footnote">
-          GitHub calendar-bucket counts; not rolling 24-hour net growth. Each
-          chart is scaled to its visible range.
+          {t(
+            "GitHub calendar-bucket counts; not rolling 24-hour net growth. Each chart is scaled to its visible range.",
+          )}
         </p>
       </section>
       <div className="detail-columns">
         <section className="panel">
-          <h3>Maintenance in context</h3>
+          <h3>{t("Maintenance in context")}</h3>
           <dl className="facts">
-            <dt>Last push</dt>
+            <dt>{t("Last push")}</dt>
             <dd>{r.pushedAt.slice(0, 10)}</dd>
-            <dt>Repository created</dt>
+            <dt>{t("Repository created")}</dt>
             <dd>{r.createdAt.slice(0, 10)}</dd>
-            <dt>Primary language</dt>
-            <dd>{r.language || "Not specified"}</dd>
-            <dt>Archived</dt>
-            <dd>{r.archived ? "Yes" : "No"}</dd>
-            <dt>Forks</dt>
+            <dt>{t("Primary language")}</dt>
+            <dd>{r.language || t("Not specified")}</dd>
+            <dt>{t("Archived")}</dt>
+            <dd>{r.archived ? t("Yes") : t("No")}</dd>
+            <dt>{t("Forks")}</dt>
             <dd>{number(r.forks)}</dd>
           </dl>
         </section>
         <section className="panel">
-          <h3>The people behind the project</h3>
+          <h3>{t("The people behind the project")}</h3>
           <dl className="facts">
-            <dt>Maintainer response median</dt>
+            <dt>{t("Maintainer response median")}</dt>
             <dd>
               {r.issueResponseHours === null
-                ? "Unavailable"
-                : r.issueResponseHours.toFixed(1) + " hours"}
+                ? t("Unavailable")
+                : t("{hours} hours", {
+                    hours: r.issueResponseHours.toFixed(1),
+                  })}
             </dd>
-            <dt>Issues sampled</dt>
+            <dt>{t("Issues sampled")}</dt>
             <dd>{r.issueSampleSize}</dd>
-            <dt>No maintainer response found</dt>
+            <dt>{t("No maintainer response found")}</dt>
             <dd>{r.unansweredIssues}</dd>
-            <dt>Contributors returned</dt>
+            <dt>{t("Contributors returned")}</dt>
             <dd>{number(r.contributors)}</dd>
-            <dt>Top contributor commit share</dt>
+            <dt>{t("Top contributor commit share")}</dt>
             <dd>
               {r.topContributorShare === null
-                ? "Unavailable"
+                ? t("Unavailable")
                 : (r.topContributorShare * 100).toFixed(0) + "%"}
             </dd>
           </dl>
           <p className="footnote">
-            Recent issue sample; bots and self-replies excluded. Unanswered
-            issues are reported separately. Contributor share reflects returned
-            commit counts.
+            {t(
+              "Recent issue sample; bots and self-replies excluded. Unanswered issues are reported separately. Contributor share reflects returned commit counts.",
+            )}
           </p>
         </section>
       </div>
       {r.errors.length > 0 && (
         <section className="panel">
-          <h3>Data notes</h3>
+          <h3>{t("Data notes")}</h3>
           <ul>
             {r.errors.map((e, i) => (
-              <li key={i}>{e}</li>
+              <li key={i}>{t(e)}</li>
             ))}
           </ul>
         </section>
       )}
       <a className="button" href={r.url} target="_blank" rel="noreferrer">
-        Explore on GitHub <ArrowUpRight size={16} />
+        {t("Explore on GitHub")}
+        <ArrowUpRight size={16} />
       </a>
     </div>
   );
@@ -1213,13 +1453,15 @@ function CompareView({
   }, [initial]);
   return (
     <div className="detail-page">
-      <div className="eyebrow">SIDE BY SIDE</div>
+      <div className="eyebrow">{t("SIDE BY SIDE")}</div>
       <h1>
-        Compare the contenders<span className="lime">.</span>
+        {t("Compare the contenders")}
+        <span className="lime">.</span>
       </h1>
       <p className="page-intro">
-        A shared view of growth, activity and maintenance. Choose what deserves
-        a closer look.
+        {t(
+          "A shared view of growth, activity and maintenance. Choose what deserves a closer look.",
+        )}
       </p>
       <form
         className="compare-form"
@@ -1233,19 +1475,20 @@ function CompareView({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="facebook/react vuejs/core sveltejs/svelte"
-          aria-label="Repositories to compare"
+          aria-label={t("Repositories to compare")}
         />
         <button className="button" disabled={loading}>
-          Compare <ArrowRight size={16} />
+          {t("Compare")}
+          <ArrowRight size={16} />
         </button>
       </form>
       {error && (
         <p role="alert" className="error-text">
-          {error}
+          {t(error)}
         </p>
       )}
       {loading ? (
-        <Loading text="Gathering comparable repository evidence…" />
+        <Loading text={t("Gathering comparable repository evidence…")} />
       ) : repos.length ? (
         <>
           <ComparisonChart repos={repos} />
@@ -1274,22 +1517,22 @@ function CompareView({
                   fill
                 />
                 <dl className="facts">
-                  <dt>Stars</dt>
+                  <dt>{t("Stars")}</dt>
                   <dd>{number(r.stars)}</dd>
-                  <dt>7-day new stars</dt>
+                  <dt>{t("7-day new stars")}</dt>
                   <dd>{number(r.growth7d)}</dd>
-                  <dt>30-day new stars</dt>
+                  <dt>{t("30-day new stars")}</dt>
                   <dd>{number(r.growth30d)}</dd>
-                  <dt>Forks</dt>
+                  <dt>{t("Forks")}</dt>
                   <dd>{number(r.forks)}</dd>
-                  <dt>Last push</dt>
+                  <dt>{t("Last push")}</dt>
                   <dd>{r.pushedAt.slice(0, 10)}</dd>
-                  <dt>License</dt>
-                  <dd>{r.license || "Not specified"}</dd>
-                  <dt>Maintainer response</dt>
+                  <dt>{t("License")}</dt>
+                  <dd>{r.license || t("Not specified")}</dd>
+                  <dt>{t("Maintainer response")}</dt>
                   <dd>
                     {r.issueResponseHours === null
-                      ? "Unavailable"
+                      ? t("Unavailable")
                       : r.issueResponseHours.toFixed(1) + "h"}
                   </dd>
                 </dl>
@@ -1298,23 +1541,25 @@ function CompareView({
           </div>
           <div className="compare-foot">
             <p className="footnote">
-              Sparklines use independent vertical scales. Compare numeric values
-              for magnitude; star windows follow GitHub calendar buckets.
+              {t(
+                "Sparklines use independent vertical scales. Compare numeric values for magnitude; star windows follow GitHub calendar buckets.",
+              )}
             </p>
             <CopyButton
               value={
                 location.origin +
-                "/compare?repos=" +
-                repos.map((r) => r.name).join(",")
+                localUrl("/compare?repos=" + repos.map((r) => r.name).join(","))
               }
-              label="Share comparison"
+              label={t("Share comparison")}
             />
           </div>
         </>
       ) : (
         <Empty
-          title="Bring your shortlist"
-          description="Compare two to six public repositories. Start with a category on the radar, or paste repository names above."
+          title={t("Bring your shortlist")}
+          description={t(
+            "Compare two to six public repositories. Start with a category on the radar, or paste repository names above.",
+          )}
         />
       )}
     </div>
@@ -1362,12 +1607,15 @@ function WatchView({
   }, [names.join(",")]);
   return (
     <div className="detail-page">
-      <div className="eyebrow">YOUR PERSONAL SIGNALS</div>
+      <div className="eyebrow">{t("YOUR PERSONAL SIGNALS")}</div>
       <h1>
-        Keep the good ones close<span className="lime">.</span>
+        {t("Keep the good ones close")}
+        <span className="lime">.</span>
       </h1>
       <p className="page-intro">
-        Follow projects worth returning to. Your list stays in this browser.
+        {t(
+          "Follow projects worth returning to. Your list stays in this browser.",
+        )}
       </p>
       <form
         className="compare-form"
@@ -1384,19 +1632,20 @@ function WatchView({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="owner/repository"
-          aria-label="Add repository to watchlist"
+          aria-label={t("Add repository to watchlist")}
         />
         <button className="button">
-          Add project <ArrowUpRight size={15} />
+          {t("Add project")}
+          <ArrowUpRight size={15} />
         </button>
       </form>
       {errors.map((e) => (
         <p className="error-text" key={e}>
-          {e}
+          {t(e)}
         </p>
       ))}
       {loading ? (
-        <Loading text="Refreshing your watchlist…" />
+        <Loading text={t("Refreshing your watchlist…")} />
       ) : repos.length ? (
         <section className="panel">
           {repos.map((r) => (
@@ -1411,11 +1660,14 @@ function WatchView({
         </section>
       ) : (
         <Empty
-          title="Make room for your next discovery"
-          description="Save a project from any category or add a repository above. No account required."
+          title={t("Make room for your next discovery")}
+          description={t(
+            "Save a project from any category or add a repository above. No account required.",
+          )}
           action={
             <button className="button" onClick={() => navigate("/")}>
-              Explore the radar <ArrowUpRight size={15} />
+              {t("Explore the radar")}
+              <ArrowUpRight size={15} />
             </button>
           }
         />
@@ -1426,23 +1678,25 @@ function WatchView({
 function Docs() {
   return (
     <div className="docs-page">
-      <div className="eyebrow">OPEN DATA. OPEN METHOD.</div>
+      <div className="eyebrow">{t("OPEN DATA. OPEN METHOD.")}</div>
       <h1>
-        A signal you can inspect<span className="lime">.</span>
+        {t("A signal you can inspect")}
+        <span className="lime">.</span>
       </h1>
       <p className="page-intro">
-        ghtrends puts two independent questions together: how much active
-        open-source supply exists, and whether search demand is growing.
+        {t(
+          "ghtrends puts two independent questions together: how much active open-source supply exists, and whether search demand is growing.",
+        )}
       </p>
       <section className="panel">
-        <h2>The four landscapes</h2>
+        <h2>{t("The four landscapes")}</h2>
         <table>
           <thead>
             <tr>
-              <th>Landscape</th>
-              <th>Supply</th>
-              <th>Sustained demand growth</th>
-              <th>Starting strategy</th>
+              <th>{t("Landscape")}</th>
+              <th>{t("Supply")}</th>
+              <th>{t("Sustained demand growth")}</th>
+              <th>{t("Starting strategy")}</th>
             </tr>
           </thead>
           <tbody>
@@ -1450,67 +1704,65 @@ function Docs() {
               <td>
                 <Pill kind="blue" />
               </td>
-              <td>Under 50 projects</td>
-              <td>Fast</td>
-              <td>Validate an underserved use case.</td>
+              <td>{t("Under 50 projects")}</td>
+              <td>{t("Fast")}</td>
+              <td>{t("Validate an underserved use case.")}</td>
             </tr>
             <tr>
               <td>
                 <Pill kind="expanding" />
               </td>
-              <td>50+ projects</td>
-              <td>Fast</td>
-              <td>Find a specific audience or advantage.</td>
+              <td>{t("50+ projects")}</td>
+              <td>{t("Fast")}</td>
+              <td>{t("Find a specific audience or advantage.")}</td>
             </tr>
             <tr>
               <td>
                 <Pill kind="contested" />
               </td>
-              <td>50+ projects</td>
-              <td>Not fast</td>
-              <td>Identify a reason people would switch.</td>
+              <td>{t("50+ projects")}</td>
+              <td>{t("Not fast")}</td>
+              <td>{t("Identify a reason people would switch.")}</td>
             </tr>
             <tr>
               <td>
                 <Pill kind="quiet" />
               </td>
-              <td>Under 50 projects</td>
-              <td>Not fast</td>
-              <td>Check if the market is early, niche or inactive.</td>
+              <td>{t("Under 50 projects")}</td>
+              <td>{t("Not fast")}</td>
+              <td>{t("Check if the market is early, niche or inactive.")}</td>
             </tr>
           </tbody>
         </table>
         <p>
-          “Uncharted” means the evidence is missing, stale or too weak. Zero
-          search values can be rounded or below Google’s reporting threshold;
-          they never establish that demand does not exist.
+          {t(
+            "“Uncharted” means the evidence is missing, stale or too weak. Zero search values can be rounded or below Google’s reporting threshold; they never establish that demand does not exist.",
+          )}
         </p>
       </section>
       <div className="detail-columns">
         <section className="panel">
-          <span className="section-kicker">01 / DEMAND</span>
-          <h2>Look past the spike.</h2>
+          <span className="section-kicker">{t("01 / DEMAND")}</span>
+          <h2>{t("Look past the spike.")}</h2>
           <p>
-            We compare median search interest across the last eight complete
-            weeks and the previous eight. Fast growth requires at least 25%
-            growth, positive growth in the lower resampling band, and at least
-            six recent weeks above the prior baseline.
+            {t(
+              "We compare median search interest across the last eight complete weeks and the previous eight. Fast growth requires at least 25% growth, positive growth in the lower resampling band, and at least six recent weeks above the prior baseline.",
+            )}
           </p>
           <p>
-            A weekly observation is usable only after that week ended at
-            collection time. Invalid rows cannot refresh old evidence, and
-            conflicting values for the same week prevent classification.
+            {t(
+              "A weekly observation is usable only after that week ended at collection time. Invalid rows cannot refresh old evidence, and conflicting values for the same week prevent classification.",
+            )}
           </p>
           <p>
-            Two-week block resampling tests sensitivity to individual
-            observations. A year-over-year comparison checks recurring seasonal
-            rebounds. These diagnostics are not probabilities of business
-            success.
+            {t(
+              "Two-week block resampling tests sensitivity to individual observations. A year-over-year comparison checks recurring seasonal rebounds. These diagnostics are not probabilities of business success.",
+            )}
           </p>
           <p>
-            Search terms are measured alongside a shared “github trending”
-            reference in the same region and time range. Google Trends is
-            normalized, sampled search attention, not absolute demand.
+            {t(
+              "Search terms are measured alongside a shared “github trending” reference in the same region and time range. Google Trends is normalized, sampled search attention, not absolute demand.",
+            )}
           </p>
           <a
             className="text-link"
@@ -1518,27 +1770,27 @@ function Docs() {
             target="_blank"
             rel="noreferrer"
           >
-            How Google Trends works <ArrowUpRight size={14} />
+            {t("How Google Trends works")}
+            <ArrowUpRight size={14} />
           </a>
         </section>
         <section className="panel">
-          <span className="section-kicker">02 / SUPPLY</span>
-          <h2>Count active alternatives.</h2>
+          <span className="section-kicker">{t("02 / SUPPLY")}</span>
+          <h2>{t("Count active alternatives.")}</h2>
           <p>
-            A matching repository must carry the selected GitHub topic, have at
-            least five stars, have been pushed to in the last 180 days, and be
-            neither a fork nor archived.
+            {t(
+              "A matching repository must carry the selected GitHub topic, have at least five stars, have been pushed to in the last 180 days, and be neither a fork nor archived.",
+            )}
           </p>
           <p>
-            Fifty qualifying repositories is the published dense-supply
-            threshold. This is a transparent operational rule, not a universal
-            economic law. Topic labels are imperfect; untagged projects and
-            commercial competitors are outside this sample.
+            {t(
+              "Fifty qualifying repositories is the published dense-supply threshold. This is a transparent operational rule, not a universal economic law. Topic labels are imperfect; untagged projects and commercial competitors are outside this sample.",
+            )}
           </p>
           <p>
-            Repository charts use GitHub’s official star-history calendar
-            buckets. Issue-response times cover a recent sample, separating
-            unanswered issues. All raw evidence is exportable.
+            {t(
+              "Repository charts use GitHub’s official star-history calendar buckets. Issue-response times cover a recent sample, separating unanswered issues. All raw evidence is exportable.",
+            )}
           </p>
           <a
             className="text-link"
@@ -1546,22 +1798,23 @@ function Docs() {
             target="_blank"
             rel="noreferrer"
           >
-            Inspect the algorithm <ArrowUpRight size={14} />
+            {t("Inspect the algorithm")}
+            <ArrowUpRight size={14} />
           </a>
         </section>
       </div>
       <section className="panel">
-        <h2>Your terminal. Your agent.</h2>
+        <h2>{t("Your terminal. Your agent.")}</h2>
         <p>
-          Node.js 22.13 or newer. Public queries work without credentials within
-          GitHub’s unauthenticated limits. Configure your own token or GitHub
-          App for larger scans.
+          {t(
+            "Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.",
+          )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.5/ghtrends-radar-0.1.5.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.2.0/ghtrends-radar-0.2.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton value="ghtrends scan --topic mcp-servers --json" />
         </div>
-        <h3>Connect an MCP client</h3>
+        <h3>{t("Connect an MCP client")}</h3>
         <div className="code-block">
           <pre>
             {JSON.stringify(
@@ -1576,24 +1829,25 @@ function Docs() {
           </pre>
         </div>
         <p>
-          Tools: <code>ghtrends_scan</code>, <code>ghtrends_repo</code>,{" "}
-          <code>ghtrends_compare</code>, <code>ghtrends_watch_list</code>.
-          Results include data sources, time windows, confidence and
-          limitations.
+          {t("Tools:")}
+          <code>ghtrends_scan</code>, <code>ghtrends_repo</code>,{" "}
+          <code>ghtrends_compare</code>, <code>ghtrends_watch_list</code>
+          {t(
+            ". Results include data sources, time windows, confidence and limitations.",
+          )}
         </p>
       </section>
       <section className="panel">
-        <h2>How to use a classification</h2>
+        <h2>{t("How to use a classification")}</h2>
         <p>
-          Use it to decide where to investigate next. Validate real workflows
-          with people, inspect existing alternatives and account for commercial
-          products. The opportunity score ranks the measured signals; it does
-          not predict revenue, investment outcomes or GitHub stars.
+          {t(
+            "Use it to decide where to investigate next. Validate real workflows with people, inspect existing alternatives and account for commercial products. The opportunity score ranks the measured signals; it does not predict revenue, investment outcomes or GitHub stars.",
+          )}
         </p>
         <p>
-          Reports are immutable snapshots. A fresh scan can produce a different
-          classification while the original evidence stays available at its
-          permanent link.
+          {t(
+            "Reports are immutable snapshots. A fresh scan can produce a different classification while the original evidence stays available at its permanent link.",
+          )}
         </p>
       </section>
     </div>
@@ -1622,21 +1876,23 @@ function GapView() {
   );
   return (
     <div className="detail-page">
-      <div className="eyebrow">LISTEN BEFORE YOU BUILD</div>
+      <div className="eyebrow">{t("LISTEN BEFORE YOU BUILD")}</div>
       <h1>
-        Find the friction<span className="lime">.</span>
+        {t("Find the friction")}
+        <span className="lime">.</span>
       </h1>
       <p className="page-intro">
-        Open issues people care enough to react to. Follow the source,
-        understand the workflow, and validate the need.
+        {t(
+          "Open issues people care enough to react to. Follow the source, understand the workflow, and validate the need.",
+        )}
       </p>
       <div className="search-field">
         <Search size={18} />
         <input
-          aria-label="Search demand gaps"
+          aria-label={t("Search demand gaps")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search alternative, frustrated, how to…"
+          placeholder={t("Search alternative, frustrated, how to…")}
         />
       </div>
       <div className="filter-tabs">
@@ -1646,13 +1902,13 @@ function GapView() {
             key={f}
             onClick={() => setFilter(f)}
           >
-            {f.replaceAll("-", " ")}
+            {t(f.replaceAll("-", " "))}
           </button>
         ))}
       </div>
       {error && (
         <p className="error-text" role="alert">
-          {error}
+          {t(error)}
         </p>
       )}
       {loading ? (
@@ -1660,8 +1916,10 @@ function GapView() {
       ) : visible.length ? (
         <>
           <p className="footnote">
-            {visible.length} signals · sorted by reactions · sampled from
-            leading projects in scanned categories
+            {visible.length}
+            {t(
+              "signals · sorted by reactions · sampled from leading projects in scanned categories",
+            )}
           </p>
           <div className="gap-grid">
             {visible.map((g) => (
@@ -1674,7 +1932,7 @@ function GapView() {
               >
                 <div>
                   <span className="gap-label">
-                    {g.label.replaceAll("-", " ")}
+                    {t(g.label.replaceAll("-", " "))}
                   </span>
                   <span>↑ {g.reactions}</span>
                 </div>
@@ -1692,14 +1950,16 @@ function GapView() {
         </>
       ) : (
         <Empty
-          title="No matching issue signals"
-          description="Try a broader keyword. An empty result does not prove that demand is absent."
+          title={t("No matching issue signals")}
+          description={t(
+            "Try a broader keyword. An empty result does not prove that demand is absent.",
+          )}
         />
       )}
       <p className="footnote">
-        Issue labels are keyword-based suggestions. Reactions do not establish a
-        market, and issue text may be incomplete. Always read the original
-        discussion.
+        {t(
+          "Issue labels are keyword-based suggestions. Reactions do not establish a market, and issue text may be incomplete. Always read the original discussion.",
+        )}
       </p>
     </div>
   );

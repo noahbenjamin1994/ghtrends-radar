@@ -1,4 +1,6 @@
 import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
+import { marketAssessment } from "../core/assessment.js";
+import { text, localeUrl, type Locale } from "../core/i18n.js";
 import type { Market } from "../core/types.js";
 
 const SOURCE = "https://github.com/noahbenjamin1994/ghtrends-radar";
@@ -6,55 +8,10 @@ export const escapeHtml = (value: string | number) =>
   String(value).replace(
     /[&<>"']/g,
     (c) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[c]!,
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ]!,
   );
-const number = (n: number) => n.toLocaleString("en-US");
-const growth = (m: Market) =>
-  m.metrics.growth === null
-    ? "Unavailable"
-    : `${m.metrics.growth >= 0 ? "+" : ""}${(m.metrics.growth * 100).toFixed(0)}%`;
-const link = (url: string, label: string) => {
-  try {
-    const parsed = new URL(url, "https://radar.ghtrends.dev");
-    if (!["https:", "http:"].includes(parsed.protocol))
-      return escapeHtml(label);
-    return `<a href="${escapeHtml(url)}">${escapeHtml(label)}</a>`;
-  } catch {
-    return escapeHtml(label);
-  }
-};
-const list = (values: string[]) =>
-  `<ul>${values.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>`;
-const marketPath = (m: Market) =>
-  `/market/${m.topic.slug}${m.geo ? `?geo=${m.geo}` : ""}`;
-const marketTable = (markets: Market[]) =>
-  `<div class="snapshot-table"><table><caption>Measured open-source categories</caption><thead><tr><th scope="col">Category</th><th scope="col">Landscape</th><th scope="col">Active projects</th><th scope="col">Search growth</th></tr></thead><tbody>${markets.map((m) => `<tr><th scope="row">${link(marketPath(m), m.topic.name)}</th><td>${escapeHtml(m.headline)}</td><td>${number(m.supply.total)}</td><td>${growth(m)}</td></tr>`).join("")}</tbody></table></div>`;
-
-function evidence(m: Market) {
-  return `<p class="eyebrow">CATEGORY INTELLIGENCE / ${escapeHtml(m.geo || "WORLDWIDE")}</p>
-    <h1>${escapeHtml(m.topic.name)}<span class="lime">.</span></h1>
-    <p>${escapeHtml(m.topic.description)}</p>
-    <section><h2>${escapeHtml(m.headline)}</h2><p>${escapeHtml(m.strategy)}</p>
-    <p>Report dated <time datetime="${escapeHtml(m.asOf)}">${escapeHtml(m.asOf.slice(0, 10))}</time> · Method ${escapeHtml(m.version)} · ${escapeHtml(m.confidence)} evidence confidence.</p>
-    <dl><dt>Matching active GitHub projects</dt><dd>${number(m.supply.total)}</dd><dt>Search-interest growth</dt><dd>${growth(m)} · last 8 complete weeks versus the previous 8</dd><dt>Search term and region</dt><dd>${escapeHtml(m.demand.keyword)} · ${escapeHtml(m.geo || "Worldwide")}</dd><dt>Complete weekly observations</dt><dd>${m.metrics.points}</dd></dl></section>
-    <section><h2>Why this classification</h2>${list(m.reasons)}</section>
-    <section><h2>Source evidence</h2><p>${link(m.supply.sourceUrl, "GitHub repository search")} · Collected ${escapeHtml(m.supply.fetchedAt)}</p><p><code>${escapeHtml(m.supply.query)}</code></p><p>${link(m.demand.sourceUrl, "Google Trends search interest")} · Collected ${escapeHtml(m.demand.fetchedAt)}</p></section>
-    <section><h2>Leading repositories</h2><div class="snapshot-table"><table><caption>Top ${Math.min(10, m.supply.repositories.length)} returned projects by stars</caption><thead><tr><th scope="col">Repository</th><th scope="col">Stars</th><th scope="col">Description</th></tr></thead><tbody>${m.supply.repositories
-      .slice(0, 10)
-      .map(
-        (r) =>
-          `<tr><th scope="row">${link(r.url, r.name)}</th><td>${number(r.stars)}</td><td>${escapeHtml(r.description)}</td></tr>`,
-      )
-      .join("")}</tbody></table></div></section>
-    <section><h2>Limits of this result</h2>${list(m.limitations)}<p>Search interest measures attention, not paying customers. Classification thresholds are published heuristics and still require empirical calibration.</p></section>
-    <section><h2>Use and share the evidence</h2><p>${link(`/report/${m.id}`, "Permanent report")} · ${link(`/api/reports/${m.id}?format=md`, "Markdown")} · ${link(`/api/reports/${m.id}`, "JSON")} · ${link(`/api/cards/${m.id}.png`, "PNG card")}</p><p>${link(SOURCE, "Use the open-source CLI and MCP server on GitHub")}</p></section>`;
-}
 
 export function renderDocument(
   template: string,
@@ -66,9 +23,37 @@ export function renderDocument(
     markets: Market[];
     status: number;
     noindex?: boolean;
+    locale?: Locale;
   },
 ) {
-  const { base, path, geo, market: m, markets, status } = options;
+  const { base, path, geo, market: m, markets, status } = options,
+    locale = options.locale || "en";
+  const t = (v: string, vars: Record<string, string | number> = {}) =>
+    text(v, locale, vars);
+  const e = (v: string) => escapeHtml(t(v));
+  const number = (n: number) =>
+    n.toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
+  const growth = (market: Market) =>
+    market.metrics.fast === null || market.metrics.growth === null
+      ? t("Unavailable")
+      : `${market.metrics.growth >= 0 ? "+" : ""}${(market.metrics.growth * 100).toFixed(0)}%`;
+  const link = (url: string, label: string) => {
+    try {
+      const parsed = new URL(url, base);
+      if (!["https:", "http:"].includes(parsed.protocol)) return e(label);
+      const target = url.startsWith("/") ? localeUrl(url, locale) : url;
+      return `<a href="${escapeHtml(target)}">${e(label)}</a>`;
+    } catch {
+      return e(label);
+    }
+  };
+  const list = (values: string[]) =>
+    `<ul>${values.map((s) => `<li>${e(s)}</li>`).join("")}</ul>`;
+  const marketPath = (market: Market) =>
+    `/market/${market.topic.slug}${market.geo ? `?geo=${market.geo}` : ""}`;
+  const table = () =>
+    `<div class="snapshot-table"><table><caption>${e("Measured open-source categories")}</caption><thead><tr>${["Category", "Landscape", "Active projects", "Search growth"].map((s) => `<th scope="col">${e(s)}</th>`).join("")}</tr></thead><tbody>${markets.map((market) => `<tr><th scope="row">${link(marketPath(market), market.topic.name)}</th><td>${e(marketAssessment(market, locale).title)}</td><td>${number(market.supply.total)}</td><td>${growth(market)}</td></tr>`).join("")}</tbody></table></div>`;
+  const assessment = m ? marketAssessment(m, locale) : null;
   const titles: Record<string, string> = {
     "/": "ghtrends — Know where to build",
     "/docs": "GitHub opportunity analysis: methodology, CLI and MCP · ghtrends",
@@ -78,67 +63,103 @@ export function renderDocument(
   };
   const title =
     status === 404
-      ? "Page not found · ghtrends"
+      ? t("Page not found · ghtrends")
       : m
-        ? `${m.topic.name}: ${m.headline} · ghtrends`
-        : titles[path] || "Repository intelligence · ghtrends";
+        ? `${t(m.topic.name)}: ${assessment!.title} · ghtrends`
+        : t(titles[path] || "Repository intelligence · ghtrends");
   const description = m
-    ? `${m.headline}. ${number(m.supply.total)} matching active GitHub projects; ${growth(m)} search-interest growth for “${m.demand.keyword}” in ${m.geo || "Worldwide"}. Evidence dated ${m.asOf.slice(0, 10)}.`
-    : "GitHub supply × Google search demand. Explore category evidence, compare repositories, and use the open-source CLI and MCP server.";
-  const canonical =
+    ? `${assessment!.title}. ${t("{count} active projects match the published GitHub search scope.", { count: m.supply.total })} ${t("Evidence dated {date}.", { date: m.asOf.slice(0, 10) })}`
+    : t(
+        "GitHub supply × Google search demand. Explore category evidence, compare repositories, and use the open-source CLI and MCP server.",
+      );
+  const identity =
     base +
     path +
     (geo && (path === "/" || path.startsWith("/market/")) ? `?geo=${geo}` : "");
-  const image = m ? `${base}/api/cards/${m.id}.png` : `${base}/social-card.png`;
+  const canonical = localeUrl(identity, locale);
+  const image = m
+    ? localeUrl(`${base}/api/cards/${m.id}.png`, locale)
+    : `${base}/social-card.png`;
   const noindex = status !== 200 || options.noindex;
-  let content = m
-    ? evidence(m)
-    : status === 404
-      ? `<h1>Page not found.</h1><p>This report or page is unavailable. ${link("/", "Explore the radar")} to find a current category.</p>`
-      : path === "/"
-        ? `<p class="eyebrow">GITHUB SUPPLY × GOOGLE SEARCH DEMAND</p><h1>Know where to build<span class="lime">.</span></h1><p>Explore active open-source supply and sustained search growth. Every category links to its evidence, dates and limitations.</p>${marketTable(markets)}<p>Search growth compares the last eight complete weeks with the previous eight. Counts can overlap; GitHub topic labels do not cover every competitor.</p>`
-        : path === "/docs"
-          ? `<h1>Read the signals.</h1><section><h2>Four landscapes, one evidence standard</h2><p>Few projects and fast search growth: early blue ocean. Many projects and fast growth: growth red ocean. Many projects without fast growth: established red ocean. Few projects without fast growth: quiet waters. Missing or weak evidence: uncharted.</p></section><section><h2>Published method ${ALGORITHM_VERSION}</h2><p>Supply includes non-fork, non-archived repositories with at least ${POLICY.minStars} stars and a push in the last ${POLICY.activeDays} days. ${POLICY.denseSupply} matching projects is the dense-supply threshold.</p><p>Demand compares the median of ${POLICY.windowWeeks} complete weeks with the prior ${POLICY.windowWeeks}. Fast growth requires at least ${POLICY.fastGrowth * 100}% growth, a positive lower resampling band, persistence and a seasonal check. At least ${POLICY.minWeeks} consecutive weeks are required; evidence older than ${POLICY.staleDays} days is insufficient.</p><p>Weekly intervals must have ended when collected and when analyzed. Invalid rows cannot make old evidence fresh; conflicting values for a week prevent classification. These thresholds are heuristics, not calibrated business forecasts. ${link("https://support.google.com/trends/answer/4365533", "How Google Trends measures search attention")}.</p></section><section><h2>CLI and MCP</h2><p>Requires Node.js 22.13 or newer. Start the local radar:</p><pre>npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui</pre><p>Run <code>ghtrends scan --topic mcp-servers --json</code> to inspect a category, or <code>ghtrends mcp</code> to connect an MCP client over stdio.</p><p>Tools: ghtrends_scan, ghtrends_repo, ghtrends_compare, ghtrends_watch_list. ${link(SOURCE, "Full installation and configuration instructions")}.</p></section>`
-          : path === "/gaps"
-            ? `<h1>Listen for friction.</h1><p>Open issues from leading repositories, ranked by reactions. These are research leads, not validated market gaps.</p><ul>${[
-                ...new Map(
-                  markets.flatMap((m) => m.gaps).map((g) => [g.url, g]),
-                ).values(),
-              ]
-                .sort((a, b) => b.reactions - a.reactions)
-                .slice(0, 20)
-                .map(
-                  (g) =>
-                    `<li>${link(g.url, g.title)} — ${escapeHtml(g.repo)} · ${number(g.reactions)} reactions</li>`,
-                )
-                .join("")}</ul>`
-            : `<h1>${escapeHtml(titles[path]?.replace(" · ghtrends", "") || "Repository intelligence")}</h1><p>Enable JavaScript for repository search, interactive comparisons and your browser-local watchlist. You can also use the ${link("/docs", "CLI or MCP server")}.</p>`;
-  content = `<div class="snapshot"><nav aria-label="Main navigation">${link("/", "ghtrends ↗")} ${link("/gaps", "Demand gaps")} ${link("/docs", "Method / CLI / MCP")} ${link(SOURCE, "Star on GitHub ↗")}</nav><main>${content}</main><footer>Built for the curious. Open for everyone. ${link(SOURCE, "MIT source code")}</footer></div>`;
+  let content: string;
+  if (m && assessment) {
+    const sources = m.supply.searches?.length
+      ? m.supply.searches
+      : [{ url: m.supply.sourceUrl, query: m.supply.query }];
+    content = `<p class="eyebrow">${e("CATEGORY INTELLIGENCE /")} ${e(m.geo || "WORLDWIDE")}</p><h1>${e(m.topic.name)}<span class="lime">.</span></h1><p>${e(m.topic.description)}</p>
+      <section><p>${e(assessment.level === "provisional" ? "Preliminary recommendation" : "Measured classification")}</p><h2>${escapeHtml(assessment.title)}</h2><p>${escapeHtml(assessment.summary)}</p><p>${e("Report dated")} <time datetime="${escapeHtml(m.asOf)}">${escapeHtml(m.asOf.slice(0, 10))}</time> · ${e("Method")} ${escapeHtml(m.version)} · ${e(m.confidence)} ${e("evidence confidence")}</p>
+      ${list(assessment.facts)}${m.kind === "uncertain" ? `<p>${e("Quadrant not yet established")}</p><h3>${e("What to do next")}</h3>${list(assessment.nextSteps)}` : ""}
+      <dl><dt>${e("Matching active GitHub projects")}</dt><dd>${number(m.supply.total)}</dd><dt>${e("Search-interest growth")}</dt><dd>${growth(m)} · ${e("Last 8 complete weeks vs previous 8")}</dd><dt>${e("Search term and region")}</dt><dd>${escapeHtml(m.demand.keyword)} · ${e(m.geo || "Worldwide")}</dd><dt>${e("Complete weekly observations")}</dt><dd>${m.metrics.points}</dd></dl></section>
+      <section><h2>${e("Why this classification")}</h2>${list(m.reasons)}</section>
+      <section><h2>${e("Source evidence")}</h2>${sources.map((s) => `<p>${link(s.url, "GitHub repository search")} · <code>${escapeHtml(s.query)}</code></p>`).join("")}<p>${e("Collected")} ${escapeHtml(m.supply.fetchedAt)}</p><p>${link(m.demand.sourceUrl, "Google Trends search interest")} · ${e("Collected")} ${escapeHtml(m.demand.fetchedAt)}</p></section>
+      <section><h2>${e("Leading repositories")}</h2><div class="snapshot-table"><table><thead><tr>${["Repository", "Stars", "Description"].map((s) => `<th scope="col">${e(s)}</th>`).join("")}</tr></thead><tbody>${m.supply.repositories
+        .slice(0, 10)
+        .map(
+          (r) =>
+            `<tr><th scope="row">${link(r.url, r.name)}</th><td>${number(r.stars)}</td><td>${escapeHtml(r.description)}</td></tr>`,
+        )
+        .join("")}</tbody></table></div></section>
+      <section><h2>${e("Limits of this result")}</h2>${list(m.limitations)}<p>${e("Search interest measures attention, not paying customers. Classification thresholds are published heuristics and still require empirical calibration.")}</p></section>
+      <section><h2>${e("Use and share the evidence")}</h2><p>${link(`/report/${m.id}`, "Permanent report")} · ${link(`/api/reports/${m.id}?format=md`, "Markdown")} · ${link(`/api/reports/${m.id}`, "JSON")} · ${link(`/api/cards/${m.id}.png`, "PNG card")}</p><p>${link(SOURCE, "Use the open-source CLI and MCP server on GitHub")}</p></section>`;
+  } else if (status === 404) {
+    content = `<h1>${e("Page not found.")}</h1><p>${e("This report or page is unavailable.")} ${link("/", "Explore the radar")}</p>`;
+  } else if (path === "/") {
+    content = `<p class="eyebrow">${e("GITHUB SUPPLY × GOOGLE SEARCH DEMAND")}</p><h1>${e("Know where to build")}<span class="lime">.</span></h1><p>${e("Explore active open-source supply and sustained search growth. Every category links to its evidence, dates and limitations.")}</p>${table()}<p>${e("Search growth compares the last eight complete weeks with the previous eight. Counts can overlap; GitHub topic labels do not cover every competitor.")}</p>`;
+  } else if (path === "/docs") {
+    content = `<h1>${e("Read the signals.")}</h1><section><h2>${e("The four landscapes")}</h2>${list(["Early blue ocean", "Growth red ocean", "Established red ocean", "Quiet waters"])}<p>${e("Partial evidence")}: ${e("This recommendation uses the evidence already available. It is not an LLM-generated forecast.")}</p></section>
+      <section><h2>${e("Method")} ${ALGORITHM_VERSION}</h2><p>${e("A matching repository must carry the selected GitHub topic, have at least five stars, have been pushed to in the last 180 days, and be neither a fork nor archived.")}</p><p>${e("Counts are deduplicated across topic searches; incomplete searches show a lower bound.")}</p><p>${e("We compare median search interest across the last eight complete weeks and the previous eight. Fast growth requires at least 25% growth, positive growth in the lower resampling band, and at least six recent weeks above the prior baseline.")}</p><p>${e(`At least ${POLICY.minWeeks} complete weekly observations are required.`)}</p><p>${e("A weekly observation is usable only after that week ended at collection time. Invalid rows cannot refresh old evidence, and conflicting values for the same week prevent classification.")}</p><p>${link("https://support.google.com/trends/answer/4365533", "How Google Trends works")}</p></section>
+      <section><h2>CLI / MCP</h2><p>${e("Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.")}</p><pre>npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui</pre><pre>ghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>ghtrends_scan · ghtrends_repo · ghtrends_compare · ghtrends_watch_list</p>${link(SOURCE, "Full installation and configuration instructions")}</section>`;
+  } else if (path === "/gaps") {
+    const gaps = [
+      ...new Map(
+        markets.flatMap((m) => m.gaps).map((g) => [g.url, g]),
+      ).values(),
+    ]
+      .sort((a, b) => b.reactions - a.reactions)
+      .slice(0, 20);
+    content = `<h1>${e("Find the friction")}</h1><p>${e("Open issues people care enough to react to. Follow the source, understand the workflow, and validate the need.")}</p><ul>${gaps.map((g) => `<li>${link(g.url, g.title)} — ${escapeHtml(g.repo)} · ↑ ${number(g.reactions)}</li>`).join("")}</ul>`;
+  } else {
+    content = `<h1>${e(titles[path]?.replace(" · ghtrends", "") || "Repository intelligence")}</h1><p>${e("Enable JavaScript for repository search, interactive comparisons and your browser-local watchlist.")} ${link("/docs", "CLI / MCP")}</p>`;
+  }
+  const other = locale === "zh" ? "en" : "zh",
+    switchUrl = new URL(identity);
+  switchUrl.searchParams.set("lang", other);
+  content = `<div class="snapshot"><nav aria-label="${e("Main navigation")}">${link("/", "ghtrends ↗")} ${link("/gaps", "Demand gaps")} ${link("/docs", "Methodology")} ${link(SOURCE, "Star on GitHub")} <a href="${escapeHtml(switchUrl.pathname + switchUrl.search)}" lang="${other}">${other === "zh" ? "中文" : "English"}</a></nav><main>${content}</main><footer>${e("Built for the curious. Open for everyone.")} ${link(SOURCE, "MIT source code")}</footer></div>`;
   const schema = {
     "@context": "https://schema.org",
     "@type": "WebPage",
     name: title,
     url: canonical,
     description,
+    inLanguage: locale === "zh" ? "zh-CN" : "en",
     ...(m
       ? {
           dateModified: m.asOf,
-          citation: [m.supply.sourceUrl, m.demand.sourceUrl],
+          citation: [
+            ...(m.supply.searches?.map((s) => s.url) || [m.supply.sourceUrl]),
+            m.demand.sourceUrl,
+          ],
         }
       : {}),
     isPartOf: { "@type": "WebSite", name: "ghtrends", url: base },
   };
-  // Replace template metadata rather than appending conflicting Open Graph tags.
   return template
+    .replace(
+      /<html\b[^>]*>/i,
+      `<html lang="${locale === "zh" ? "zh-CN" : "en"}">`,
+    )
     .replace(
       /<meta\b(?=[^>]*(?:name\s*=\s*["'](?:description|twitter:[^"']+|robots)["']|property\s*=\s*["']og:[^"']+["']))[^>]*>/gi,
       "",
     )
-    .replace(/<link\b(?=[^>]*rel\s*=\s*["']canonical["'])[^>]*>/gi, "")
+    .replace(
+      /<link\b(?=[^>]*rel\s*=\s*["'](?:canonical|alternate)["'])[^>]*>/gi,
+      "",
+    )
     .replace(/<title>[^]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`)
     .replace(
       "</head>",
-      `<meta name="description" content="${escapeHtml(description)}"><link rel="canonical" href="${escapeHtml(canonical)}">${noindex ? '<meta name="robots" content="noindex,follow">' : ""}<meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(canonical)}"><meta property="og:type" content="website"><meta property="og:site_name" content="ghtrends"><meta property="og:image" content="${escapeHtml(image)}"><meta property="og:image:alt" content="${escapeHtml(title)}"><meta name="twitter:card" content="summary_large_image"><script type="application/ld+json">${JSON.stringify(schema).replaceAll("<", "\\u003c")}</script></head>`,
+      `<meta name="description" content="${escapeHtml(description)}"><link rel="canonical" href="${escapeHtml(canonical)}">${(["en", "zh"] as const).map((l) => `<link rel="alternate" hreflang="${l === "zh" ? "zh-CN" : "en"}" href="${escapeHtml(localeUrl(identity, l))}">`).join("")}${noindex ? '<meta name="robots" content="noindex,follow">' : ""}<meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(canonical)}"><meta property="og:type" content="website"><meta property="og:site_name" content="ghtrends"><meta property="og:locale" content="${locale === "zh" ? "zh_CN" : "en_US"}"><meta property="og:image" content="${escapeHtml(image)}"><meta property="og:image:alt" content="${escapeHtml(title)}"><meta name="twitter:card" content="summary_large_image"><script type="application/ld+json">${JSON.stringify(schema).replaceAll("<", "\\u003c")}</script></head>`,
     )
     .replace('<div id="root"></div>', `<div id="root">${content}</div>`);
 }

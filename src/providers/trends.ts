@@ -26,6 +26,7 @@ export class Trends {
   private async read(
     path: string,
     params: Record<string, string> = {},
+    optional = false,
   ): Promise<any> {
     const url = new URL(path, ORIGIN);
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
@@ -40,7 +41,7 @@ export class Trends {
           Referer: ORIGIN + "/trends/explore",
           ...(this.cookie ? { Cookie: this.cookie } : {}),
         },
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(optional ? 7000 : 30000),
       });
       const cookies = new Map(
         this.cookie
@@ -53,7 +54,7 @@ export class Trends {
         cookies.set(pair.split("=")[0]!, pair);
       }
       this.cookie = [...cookies.values()].join("; ");
-      if (r.status === 429 && attempt === 0) {
+      if (r.status === 429 && attempt === 0 && !optional) {
         await r.body?.cancel();
         const seconds = Math.max(
           30,
@@ -74,11 +75,18 @@ export class Trends {
       return path.includes("/api/") ? parseGoogleJson(text) : null;
     }
   }
-  async demand(keyword: string, geo = ""): Promise<DemandEvidence> {
+  async demand(
+    keyword: string,
+    geo = "",
+    onTimeline?: (evidence: DemandEvidence) => void,
+  ): Promise<DemandEvidence> {
     validateGeo(geo);
     const key = `trends:v1:${keyword}:${geo}`;
     const cached = this.store.get<DemandEvidence>(key);
-    if (cached) return cached;
+    if (cached) {
+      onTimeline?.(cached);
+      return cached;
+    }
     const end = new Date(),
       start = new Date(end);
     start.setUTCFullYear(start.getUTCFullYear() - 2);
@@ -95,7 +103,7 @@ export class Trends {
     try {
       // The HTML warmup is optional; Google may rate-limit it independently.
       try {
-        await this.read("/trends/explore");
+        await this.read("/trends/explore", {}, true);
       } catch {}
       const req = {
         comparisonItem: [keyword, "github trending"].map((keyword) => ({
@@ -123,6 +131,7 @@ export class Trends {
         token: timeseries.token,
       });
       result.points = parseTimeline(timeline);
+      onTimeline?.(structuredClone(result));
       const related = explore.widgets?.find(
         (w: any) => w.id === "RELATED_QUERIES" || w.id === "RELATED_QUERIES_0",
       );
@@ -136,6 +145,7 @@ export class Trends {
               req: JSON.stringify(related.request),
               token: related.token,
             },
+            true,
           );
           result.related = (data.default?.rankedList || []).flatMap(
             (list: any, index: number) =>

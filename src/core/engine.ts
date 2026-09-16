@@ -6,8 +6,14 @@ import { Trends } from "../providers/trends.js";
 import { resolveTopic, validateGeo, validateRepo, TOPICS } from "./topics.js";
 import { importDemand } from "./import.js";
 import { analyze, ALGORITHM_VERSION } from "./analyze.js";
-import { sourceEvidenceIsFresh } from "./evidence.js";
-import type { Market, DemandEvidence } from "./types.js";
+import { sourceEvidenceIsFresh, completeWeeklySeries } from "./evidence.js";
+import type { Market, DemandEvidence, SupplyEvidence } from "./types.js";
+export interface ScanProgress {
+  stage: "sources" | "github" | "demand" | "details";
+  supplyCount?: number;
+  weeklyPoints?: number;
+  preview?: Market;
+}
 export class Engine {
   github: GitHub;
   trends: Trends;
@@ -46,6 +52,7 @@ export class Engine {
       keyword?: string;
       refresh?: boolean;
       demand?: DemandEvidence;
+      onProgress?: (progress: ScanProgress) => void;
     } = {},
   ): Promise<Market> {
     const topic = resolveTopic(input, options.keyword),
@@ -56,17 +63,48 @@ export class Engine {
       !options.demand &&
       existing &&
       existing.version === ALGORITHM_VERSION &&
+      existing.topic.query === topic.query &&
+      JSON.stringify(existing.topic.queries) ===
+        JSON.stringify(topic.queries) &&
       (existing.kind === "uncertain" || sourceEvidenceIsFresh(existing)) &&
       existing.topic.keyword === topic.keyword &&
       Date.now() - Date.parse(existing.asOf) <
         (existing.kind === "uncertain" ? 300000 : 86400000)
     )
       return existing;
+    let initialDemand: DemandEvidence | undefined,
+      initialSupply: SupplyEvidence | undefined;
+    const preview = () => {
+      if (initialDemand && initialSupply)
+        options.onProgress?.({
+          stage: "details",
+          preview: analyze(topic, initialDemand, initialSupply),
+        });
+    };
+    const onDemand = (data: DemandEvidence) => {
+      initialDemand = data;
+      options.onProgress?.({
+        stage: "demand",
+        weeklyPoints: completeWeeklySeries(data, new Date().toISOString())
+          .points.length,
+      });
+      preview();
+    };
+    options.onProgress?.({ stage: "sources" });
     const [demand, supply] = await Promise.all([
       options.demand
-        ? Promise.resolve(importDemand(options.demand, topic.keyword, geo))
-        : this.trends.demand(topic.keyword, geo),
-      this.github.supply(topic),
+        ? Promise.resolve(
+            importDemand(options.demand, topic.keyword, geo),
+          ).then((data) => {
+            onDemand(data);
+            return data;
+          })
+        : this.trends.demand(topic.keyword, geo, onDemand),
+      this.github.supply(topic, (data) => {
+        initialSupply = data;
+        options.onProgress?.({ stage: "github", supplyCount: data.total });
+        preview();
+      }),
     ]);
     if (options.demand)
       this.store.set(
@@ -74,6 +112,10 @@ export class Engine {
         demand,
         Math.max(0, 86400000 - (Date.now() - Date.parse(demand.fetchedAt))),
       );
+    options.onProgress?.({
+      stage: "details",
+      preview: analyze(topic, demand, supply),
+    });
     const gaps = await this.github.gaps(supply.repositories);
     const market = analyze(topic, demand, supply, gaps);
     this.store.saveMarket(market);

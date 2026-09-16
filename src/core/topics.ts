@@ -76,6 +76,36 @@ export const TOPICS: Topic[] = [
     ],
   },
 ];
+// These names resolve user input; they do not expand the curated daily dashboard.
+const KNOWN_TOPICS: Topic[] = [
+  ...TOPICS,
+  {
+    slug: "ai-for-science",
+    name: "AI for Science",
+    keyword: "AI for Science",
+    query: "topic:ai4science",
+    queries: ["topic:ai4science", "topic:ai-for-science", "topic:ai4s"],
+    description: "Models and tools for scientific discovery.",
+    color: "#79c9ff",
+    aliases: [
+      "ai4s",
+      "ai4science",
+      "ai for science",
+      "科学智能",
+      "人工智能科学",
+    ],
+  },
+];
+const CHINESE_TOPICS: Record<string, string> = {
+  智能体记忆: "agent-memory",
+  编程智能体: "coding-agents",
+  浏览器智能体: "browser-agents",
+  向量数据库: "vector-databases",
+  本地大模型: "local-llm",
+  语音智能体: "voice-agents",
+  检索增强: "rag",
+  mcp服务: "mcp-servers",
+};
 export function resolveTopic(input: string, keyword?: string): Topic {
   if (
     keyword !== undefined &&
@@ -85,10 +115,11 @@ export function resolveTopic(input: string, keyword?: string): Topic {
       /[\x00-\x1f<>]/.test(keyword))
   )
     throw new Error("Invalid demand keyword.");
-  const value = input.trim().toLowerCase();
+  const original = input.trim().toLowerCase();
+  const value = CHINESE_TOPICS[original] || original;
   if (!value || value.length > 80 || /[\x00-\x1f<>]/.test(value))
     throw new Error("Enter a topic between 1 and 80 characters.");
-  const found = TOPICS.find(
+  const found = KNOWN_TOPICS.find(
     (t) =>
       t.slug === value ||
       t.name.toLowerCase() === value ||

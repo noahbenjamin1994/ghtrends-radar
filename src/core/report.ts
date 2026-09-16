@@ -1,48 +1,87 @@
 import type { Market, Repo } from "./types.js";
+import { text, localeUrl, type Locale } from "./i18n.js";
+import { marketAssessment } from "./assessment.js";
 const cell = (s: string) => s.replaceAll("|", "\\|").replace(/[\r\n]+/g, " ");
-export function compareMarkdown(repos: Repo[]): string {
+export function compareMarkdown(repos: Repo[], locale: Locale = "en"): string {
+  const t = (s: string) => text(s, locale);
   return [
-    "| Repository | Stars | 7-day stars | 30-day stars | Last push | License |",
+    "| " +
+      [
+        "Repository",
+        "Stars",
+        "7-day stars",
+        "30-day stars",
+        "Last push",
+        "License",
+      ]
+        .map(t)
+        .join(" | ") +
+      " |",
     "|---|---:|---:|---:|---|---|",
     ...repos.map(
       (r) =>
-        `| [${cell(r.name)}](${r.url}) | ${r.stars} | ${r.growth7d ?? "unavailable"} | ${r.growth30d ?? "unavailable"} | ${r.pushedAt.slice(0, 10)} | ${r.license ?? "Not specified"} |`,
+        `| [${cell(r.name)}](${r.url}) | ${r.stars} | ${r.growth7d ?? t("Unavailable")} | ${r.growth30d ?? t("Unavailable")} | ${r.pushedAt.slice(0, 10)} | ${r.license ?? t("Not specified")} |`,
     ),
   ].join("\n");
 }
-export function marketMarkdown(m: Market, baseUrl?: string): string {
+export function marketMarkdown(
+  m: Market,
+  baseUrl?: string,
+  locale: Locale = "en",
+): string {
+  const t = (s: string) => text(s, locale),
+    a = marketAssessment(m, locale);
   return [
-    `# ${m.topic.name}: ${m.headline}`,
+    `# ${t(m.topic.name)}: ${a.title}`,
     "",
-    `As of ${m.asOf.slice(0, 10)} · ${m.geo || "Worldwide"} · Method ${m.version} · ${m.confidence} evidence confidence`,
+    `${m.asOf.slice(0, 10)} · ${t(m.geo || "Worldwide")} · ${t("Method")} ${m.version} · ${t(m.confidence)} ${t("evidence confidence")}`,
     "",
-    m.strategy,
+    `**${t(a.level === "provisional" ? "Preliminary recommendation" : "Measured classification")}**`,
     "",
-    "## Evidence",
+    a.summary,
     "",
-    ...m.reasons.map((x) => `- ${x}`),
+    ...(a.level === "provisional"
+      ? [
+          `## ${t("What we know")}`,
+          "",
+          ...a.facts.map((x) => `- ${x}`),
+          "",
+          `## ${t("What to do next")}`,
+          "",
+          ...a.nextSteps.map((x, i) => `${i + 1}. ${x}`),
+          "",
+        ]
+      : []),
+    `## ${t("Evidence")}`,
     "",
-    `- Search demand: [Google Trends](${m.demand.sourceUrl})`,
-    `- Supply: [GitHub search](${m.supply.sourceUrl})`,
+    ...m.reasons.map((x) => `- ${t(x)}`),
     "",
-    "## Leading repositories",
+    `- ${t("Search demand")}: [Google Trends](${m.demand.sourceUrl})`,
+    ...(m.supply.searches?.length
+      ? m.supply.searches
+      : [{ url: m.supply.sourceUrl, query: m.supply.query }]
+    ).map(
+      (source) => `- ${t("Supply")}: [${cell(source.query)}](${source.url})`,
+    ),
     "",
-    compareMarkdown(m.supply.repositories.slice(0, 10)),
+    `## ${t("Leading repositories")}`,
     "",
-    "## Open demand signals",
+    compareMarkdown(m.supply.repositories.slice(0, 10), locale),
+    "",
+    `## ${t("Open demand signals")}`,
     "",
     ...m.gaps.map(
       (g) =>
-        `- [${cell(g.title)}](${g.url}) (${g.reactions} reactions; ${g.state}; ${g.repo})`,
+        `- [${cell(g.title)}](${g.url}) (↑ ${g.reactions}; ${g.state}; ${g.repo})`,
     ),
     "",
-    "## Scope and limitations",
+    `## ${t("Scope and limitations")}`,
     "",
-    ...m.limitations.map((x) => `- ${x}`),
+    ...m.limitations.map((x) => `- ${t(x)}`),
     "",
     baseUrl
-      ? `[View this snapshot](${baseUrl}/report/${m.id}) · [ghtrends source](https://github.com/noahbenjamin1994/ghtrends-radar)`
-      : `Local report ${m.id} · [ghtrends source](https://github.com/noahbenjamin1994/ghtrends-radar)`,
+      ? `[${t("View this snapshot")}](${localeUrl(baseUrl + "/report/" + m.id, locale)}) · [ghtrends](https://github.com/noahbenjamin1994/ghtrends-radar)`
+      : `${t("Local report")} ${m.id} · [ghtrends](https://github.com/noahbenjamin1994/ghtrends-radar)`,
     "",
   ].join("\n");
 }

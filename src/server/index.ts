@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Engine } from "../core/engine.js";
+import { Engine, type ScanProgress } from "../core/engine.js";
 import {
   TOPICS,
   resolveTopic,
@@ -18,6 +18,7 @@ import { marketMarkdown } from "../core/report.js";
 import type { Market } from "../core/types.js";
 import { renderDocument } from "./html.js";
 import { sourceEvidenceIsFresh } from "../core/evidence.js";
+import { requestLocale, localeUrl, type Locale } from "../core/i18n.js";
 interface Job {
   id: string;
   state: "queued" | "running" | "complete" | "failed";
@@ -28,6 +29,7 @@ interface Job {
   created: number;
   market?: Market;
   error?: string;
+  progress?: ScanProgress;
 }
 export function createApp(engine = new Engine()) {
   const app = express();
@@ -53,6 +55,8 @@ export function createApp(engine = new Engine()) {
       );
   const jobs = new Map<string, Job>(),
     limits = new Map<string, { count: number; reset: number }>();
+  const localeFor = (q: express.Request): Locale =>
+    requestLocale(q.query.lang, q.get("cookie"), q.get("accept-language"));
   const baseURL = (q: express.Request) =>
     new URL(process.env.PUBLIC_URL || `${q.protocol}://${q.get("host")}`)
       .origin;
@@ -68,7 +72,9 @@ export function createApp(engine = new Engine()) {
           "'": "&#39;",
         })[c]!,
     );
-  let processing = false;
+  let processing = false,
+    nextBackgroundAt = 0;
+  let backgroundTimer: ReturnType<typeof setTimeout> | undefined;
   const clientIP = (q: express.Request) => {
     const trusted = process.env.GHTRENDS_CLIENT_IP_HEADER;
     const header = trusted ? q.get(trusted) : undefined;
@@ -86,22 +92,41 @@ export function createApp(engine = new Engine()) {
     if (processing) return;
     processing = true;
     try {
-      for (const job of jobs.values())
-        if (job.state === "queued") {
-          job.state = "running";
-          try {
-            job.market = await engine.scan(job.topic, {
-              geo: job.geo,
-              keyword: job.keyword,
-              refresh: job.refresh,
-            });
-            job.state = "complete";
-          } catch (e) {
-            job.error = (e as Error).message;
-            job.state = "failed";
-          }
-          await new Promise<void>((r) => setTimeout(r, 35000).unref());
+      while (true) {
+        const job = [...jobs.values()]
+          .filter((j) => j.state === "queued")
+          .sort(
+            (a, b) =>
+              Number(!!a.refresh) - Number(!!b.refresh) ||
+              a.created - b.created,
+          )[0];
+        if (!job) break;
+        if (job.refresh && Date.now() < nextBackgroundAt) {
+          clearTimeout(backgroundTimer);
+          backgroundTimer = setTimeout(
+            () => void processJobs(),
+            nextBackgroundAt - Date.now(),
+          ).unref();
+          break;
         }
+        job.state = "running";
+        try {
+          job.market = await engine.scan(job.topic, {
+            geo: job.geo,
+            keyword: job.keyword,
+            refresh: job.refresh,
+            onProgress: (progress) => {
+              job.progress = { ...job.progress, ...progress };
+            },
+          });
+          job.state = "complete";
+          delete job.progress?.preview;
+        } catch (e) {
+          job.error = (e as Error).message;
+          job.state = "failed";
+        }
+        if (job.refresh) nextBackgroundAt = Date.now() + 35000;
+      }
     } finally {
       processing = false;
     }
@@ -158,6 +183,7 @@ export function createApp(engine = new Engine()) {
     timer.unref();
     app.locals.stopCollector = () => {
       clearTimeout(first);
+      clearTimeout(backgroundTimer);
       clearInterval(timer);
     };
   }
@@ -227,7 +253,11 @@ export function createApp(engine = new Engine()) {
       if (!m) return r.status(404).json({ error: "Report not found." });
       r.set("Cache-Control", "public,max-age=31536000,immutable");
       if (q.query.format === "md")
-        return r.type("text/markdown").send(marketMarkdown(m, baseURL(q)));
+        return r
+          .type("text/markdown")
+          .send(
+            marketMarkdown(m, baseURL(q), q.query.lang === "zh" ? "zh" : "en"),
+          );
       return r.json(m);
     }),
   );
@@ -240,7 +270,14 @@ export function createApp(engine = new Engine()) {
       const m = engine.store.report(id);
       if (!m) return r.status(404).json({ error: "Report not found." });
       const base = baseURL(q);
-      const svg = marketCard(m, `${base}/report/${m.id}`);
+      const svg = marketCard(
+        m,
+        localeUrl(
+          `${base}/report/${m.id}`,
+          q.query.lang === "zh" ? "zh" : "en",
+        ),
+        q.query.lang === "zh" ? "zh" : "en",
+      );
       r.set("Cache-Control", "public,max-age=31536000,immutable");
       if (String(q.params.file).endsWith(".svg"))
         return r.type("image/svg+xml").send(svg);
@@ -267,6 +304,9 @@ export function createApp(engine = new Engine()) {
       if (
         existing &&
         existing.version === ALGORITHM_VERSION &&
+        existing.topic.query === topic.query &&
+        JSON.stringify(existing.topic.queries) ===
+          JSON.stringify(topic.queries) &&
         (existing.kind === "uncertain" || sourceEvidenceIsFresh(existing)) &&
         existing.topic.keyword === topic.keyword &&
         Date.now() - Date.parse(existing.asOf) <
@@ -312,7 +352,20 @@ export function createApp(engine = new Engine()) {
   app.get("/api/jobs/:id", (q, r) => {
     const job = jobs.get(String(q.params.id));
     return job
-      ? r.json(job)
+      ? r.json({
+          ...job,
+          queuePosition:
+            job.state === "queued"
+              ? [...jobs.values()].filter(
+                  (j) =>
+                    j.state === "running" ||
+                    (j.state === "queued" &&
+                      (Number(!!j.refresh) < Number(!!job.refresh) ||
+                        (!!j.refresh === !!job.refresh &&
+                          j.created < job.created))),
+                ).length
+              : 0,
+        })
       : r.status(404).json({
           error: "Scan not found. It may have expired; check the topic page.",
         });
@@ -352,14 +405,14 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.5/ghtrends-radar-0.1.5.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.2.0/ghtrends-radar-0.2.0.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>
     r
       .type("application/xml")
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/docs", "/gaps", ...dashboardMarkets().map((m) => "/market/" + m.topic.slug)].map((path) => `<url><loc>${escape(baseURL(q) + path)}</loc></url>`).join("")}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/docs", "/gaps", ...dashboardMarkets().map((m) => "/market/" + m.topic.slug)].flatMap((path) => (["en", "zh"] as const).map((locale) => `<url><loc>${escape(localeUrl(baseURL(q) + path, locale))}</loc></url>`)).join("")}</urlset>`,
       ),
   );
   app.get("/robots.txt", (q, r) =>
@@ -375,7 +428,15 @@ export function createApp(engine = new Engine()) {
       const file = resolve(web, "index.html");
       if (!existsSync(file))
         return r.status(503).send("The interface is being built.");
-      r.set("Cache-Control", "no-cache");
+      const locale = localeFor(q);
+      r.set("Cache-Control", "private,no-cache");
+      r.vary("Accept-Language").vary("Cookie");
+      if (q.query.lang === "en" || q.query.lang === "zh")
+        r.cookie("ghtrends_lang", locale, {
+          maxAge: 365 * 86400000,
+          sameSite: "lax",
+          httpOnly: true,
+        });
       const path = q.path.replace(/\/+$/, "") || "/";
       if (path !== q.path)
         return r.redirect(308, path + q.url.slice(q.path.length));
@@ -398,7 +459,10 @@ export function createApp(engine = new Engine()) {
         if (path.slice(8) !== topic.slug)
           return r.redirect(
             308,
-            `/market/${topic.slug}${geo ? `?geo=${geo}` : ""}`,
+            localeUrl(
+              `/market/${topic.slug}${geo ? `?geo=${geo}` : ""}`,
+              locale,
+            ),
           );
         m = engine.store.market(topic.slug, geo);
       }
@@ -418,6 +482,7 @@ export function createApp(engine = new Engine()) {
       const markets = dashboardMarkets(geo);
       const html = renderDocument(readFileSync(file, "utf8"), {
         base: baseURL(q),
+        locale,
         path,
         geo,
         market: m,

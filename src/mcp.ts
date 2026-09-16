@@ -1,11 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { marketAssessment } from "./core/assessment.js";
 import { Engine } from "./core/engine.js";
 import { completeWeeklySeries } from "./core/evidence.js";
 export async function startMcp() {
   const engine = new Engine(),
-    server = new McpServer({ name: "ghtrends", version: "0.1.5" });
+    server = new McpServer({ name: "ghtrends", version: "0.2.0" });
   const result = (data: unknown) => ({
     content: [{ type: "text" as const, text: JSON.stringify(data) }],
   });
@@ -29,6 +30,7 @@ export async function startMcp() {
         const m = await engine.scan(topic, { geo, keyword });
         return {
           ...m,
+          assessment: marketAssessment(m),
           demand: {
             ...m.demand,
             points: completeWeeklySeries(m.demand, m.asOf).points.slice(-16),

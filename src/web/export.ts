@@ -1,7 +1,12 @@
 import type { Market } from "../core/types.js";
 import { marketCard } from "../core/card.js";
-export async function downloadCard(m: Market, url: string) {
-  const svg = marketCard(m, url);
+import type { Locale } from "../core/i18n.js";
+export async function downloadCard(
+  m: Market,
+  url: string,
+  locale: Locale = "en",
+) {
+  const svg = marketCard(m, url, locale);
   const source = URL.createObjectURL(
     new Blob([svg], { type: "image/svg+xml" }),
   );

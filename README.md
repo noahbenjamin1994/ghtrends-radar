@@ -2,6 +2,8 @@
 
 # ghtrends ↗
 
+**English · [简体中文](README.zh-CN.md)**
+
 ### Know where to build.
 
 **GitHub supply × Google search demand.**
@@ -23,9 +25,19 @@ Find growing categories, inspect the competition, and share the evidence.
 | Many projects | Fast | **Growth red ocean** — find a specific audience or advantage |
 | Many projects | Not fast | **Established red ocean** — identify a reason people would switch |
 | Few projects | Not fast | **Quiet waters** — validate whether it is early, niche or inactive |
-| Missing or weak evidence | Unknown | **Uncharted** — gather evidence before classifying |
+| Missing or weak evidence | Unknown | **Preliminary recommendation** — decide what to validate next; quadrant remains unconfirmed |
 
 Every result includes its source queries, dates, methodology version and limitations. Category and report pages include readable HTML evidence before JavaScript loads, and shared links show the specific report in their previews. Search interest measures attention, not paying customers. A quadrant is a research starting point, not a prediction of commercial success.
+
+## A useful answer when the data is thin
+
+A scan gives an evidence-based recommendation even when a reliable quadrant cannot be established. It separates known facts, an initial recommendation, and the next validation steps. Sparse search data is never turned into a confident “blue ocean” or “dead market” verdict.
+
+For example, `ai4s` resolves to **AI for Science**. GitHub searches `ai4science`, `ai-for-science`, and `ai4s` separately and deduplicates returned repositories. Incomplete unions report a lower bound. Google Trends measures the full field name. Existing abbreviation-only reports keep their original evidence and offer a one-click rescan.
+
+Scans show source progress and a preliminary result before optional project details finish. Interactive scans have priority over scheduled refreshes, and repository enrichment uses three bounded workers. Source rate limits can still increase latency. No LLM or search-model subscription is required.
+
+The website supports **English and Simplified Chinese**, including report text, Markdown and PNG exports. It follows the browser language on first visit; the header switch saves your preference and preserves the current page. Add `?lang=zh` or `?lang=en` to open a specific language.
 
 ## Try it in 60 seconds
 
@@ -42,7 +54,7 @@ npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.1.5/ghtrends-radar-0.1.5.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.2.0/ghtrends-radar-0.2.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -122,7 +134,7 @@ ghtrends scan --topic mcp-servers --trends-file demand.json --json
 
 ## How the method works
 
-**Supply:** GitHub topic search; non-fork, non-archived repositories with at least 5 stars and a push in the last 180 days. At least 50 qualifying repositories is the current dense-supply rule. Counts refer to a topic-defined category, not a census of every competing product. We use the search count and display up to 100 leaders; we do not claim to enumerate beyond GitHub's search result limit.
+**Supply:** GitHub topic search (known field aliases can combine several explicitly listed searches); non-fork, non-archived repositories with at least 5 stars and a push in the last 180 days. At least 50 qualifying repositories is the current dense-supply rule. Counts refer to a topic-defined category, not a census of every competing product. We use the search count and display up to 100 leaders; we do not claim to enumerate beyond GitHub's search result limit.
 
 **Demand:** two years of Google Trends data, measured alongside `github trending` in the same request. The last 8 complete weeks are compared with the preceding 8 using medians. Fast growth requires all of:
 
@@ -133,7 +145,7 @@ ghtrends scan --topic mcp-servers --trends-file demand.json --json
 5. At least 6 of 8 recent weeks above 112.5% of the prior median.
 6. No identified repeat of the previous year's seasonal level.
 
-Missing, stale, irregular, near-zero or failed evidence produces **Uncharted**. A weekly interval must have ended by both the collection time and the analysis time, even if the provider omitted its partial-week flag. Freshness uses the same valid complete weeks as the growth calculation; invalid rows cannot make old data fresh. Conflicting values for the same week prevent classification. A single spike cannot establish fast growth. The resampling band tests stability; it is not a calibrated probability. The 50-project threshold and opportunity-score weights are published heuristics that still require empirical calibration across categories.
+Missing, stale, irregular, near-zero or failed evidence keeps the machine-readable quadrant **uncertain** and produces an actionable **preliminary recommendation**. A weekly interval must have ended by both the collection time and the analysis time, even if the provider omitted its partial-week flag. Freshness uses the same valid complete weeks as the growth calculation; invalid rows cannot make old data fresh. Conflicting values for the same week prevent classification. A single spike cannot establish fast growth. The resampling band tests stability; it is not a calibrated probability. The 50-project threshold and opportunity-score weights are published heuristics that still require empirical calibration across categories.
 
 **Repository evidence:** official GitHub star-history calendar buckets, a bounded recent issue sample, human maintainer responses, and returned contributor commit counts. Calendar buckets are not rolling 24-hour net star changes. Contributor and issue sample limits appear beside the results. Open issues are leads for research, not proven market gaps.
 

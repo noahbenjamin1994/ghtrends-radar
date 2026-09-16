@@ -6,6 +6,7 @@ export interface Topic {
   name: string;
   keyword: string;
   query: string;
+  queries?: string[];
   description: string;
   color: string;
   aliases: string[];
@@ -63,6 +64,7 @@ export interface SupplyEvidence {
   total: number;
   complete: boolean;
   repositories: Repo[];
+  searches?: { query: string; url: string; total: number; complete: boolean }[];
   error?: string;
 }
 export interface DemandMetrics {

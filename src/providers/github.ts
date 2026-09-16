@@ -23,7 +23,7 @@ export class GitHub {
       headers: {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2026-03-10",
-        "User-Agent": "ghtrends/0.1.5",
+        "User-Agent": "ghtrends/0.2.0",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       signal: AbortSignal.timeout(25000),
@@ -180,48 +180,87 @@ export class GitHub {
     this.store.saveRepo(repo);
     return repo;
   }
-  async supply(topic: Topic): Promise<SupplyEvidence> {
+  async supply(
+    topic: Topic,
+    onBase?: (supply: SupplyEvidence) => void,
+  ): Promise<SupplyEvidence> {
     const since = new Date(Date.now() - POLICY.activeDays * 86400000)
       .toISOString()
       .slice(0, 10);
-    const query = `${topic.query} fork:false archived:false stars:>=${POLICY.minStars} pushed:>=${since}`;
+    const queries = (topic.queries || [topic.query]).map(
+      (q) =>
+        `${q} fork:false archived:false stars:>=${POLICY.minStars} pushed:>=${since}`,
+    );
     const result: SupplyEvidence = {
-      query,
-      sourceUrl: `https://github.com/search?q=${encodeURIComponent(query)}&type=repositories`,
+      query: queries.join("; "),
+      sourceUrl: `https://github.com/search?q=${encodeURIComponent(queries[0]!)}&type=repositories`,
       fetchedAt: stamp(),
       total: 0,
       complete: false,
       repositories: [],
+      searches: [],
     };
     try {
-      const data = await this.get<{
-        total_count: number;
-        incomplete_results: boolean;
-        items: any[];
-      }>(
-        `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=100`,
-        21600000,
-      );
-      result.complete = !data.incomplete_results;
-      result.total = data.incomplete_results
-        ? data.items.length
-        : data.total_count;
-      result.repositories = data.items
-        .filter((r) => !r.private && !r.archived && !r.fork)
-        .map((r) => this.base(r));
-      // Fetch historical series only for the displayed leaders, respecting a bounded request budget.
-      for (let i = 0; i < Math.min(10, result.repositories.length); i++) {
-        try {
-          result.repositories[i] = await this.repo(
-            result.repositories[i]!.name,
-            false,
-          );
-        } catch (e) {
-          result.repositories[i]!.errors.push((e as Error).message);
+      const unique = new Map<string, Repo>();
+      let allEnumerated = true;
+      for (const query of queries) {
+        const data = await this.get<{
+          total_count: number;
+          incomplete_results: boolean;
+          items: any[];
+        }>(
+          `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=100`,
+          21600000,
+        );
+        result.searches!.push({
+          query,
+          url: `https://github.com/search?q=${encodeURIComponent(query)}&type=repositories`,
+          total: data.total_count,
+          complete: !data.incomplete_results,
+        });
+        for (const r of data.items)
+          if (!r.private && !r.archived && !r.fork)
+            unique.set(r.full_name, this.base(r));
+        allEnumerated &&=
+          !data.incomplete_results && data.total_count <= data.items.length;
+        if (queries.length === 1) {
+          result.total = data.incomplete_results
+            ? unique.size
+            : data.total_count;
+          result.complete = !data.incomplete_results;
         }
       }
+      result.repositories = [...unique.values()].sort(
+        (a, b) => b.stars - a.stars,
+      );
+      if (queries.length > 1) {
+        result.total = unique.size;
+        result.complete = allEnumerated;
+      }
+      onBase?.(structuredClone(result));
+      // Three bounded workers avoid serial head-of-line delay without flooding GitHub.
+      let cursor = 0;
+      await Promise.all(
+        Array.from(
+          { length: Math.min(3, result.repositories.length) },
+          async () => {
+            while (cursor < Math.min(10, result.repositories.length)) {
+              const index = cursor++;
+              try {
+                result.repositories[index] = await this.repo(
+                  result.repositories[index]!.name,
+                  false,
+                );
+              } catch (e) {
+                result.repositories[index]!.errors.push((e as Error).message);
+              }
+            }
+          },
+        ),
+      );
     } catch (e) {
       result.error = (e as Error).message;
+      onBase?.(structuredClone(result));
     }
     return result;
   }

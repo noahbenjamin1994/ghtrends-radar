@@ -1,3 +1,4 @@
+import { t, locale } from "./i18n.js";
 import React, { useId, useState } from "react";
 import {
   ArrowUpRight,
@@ -11,11 +12,11 @@ import {
 } from "lucide-react";
 import type { Market, MarketKind, Repo } from "../core/types.js";
 export const kindLabels: Record<MarketKind, string> = {
-  blue: "Early blue ocean",
-  expanding: "Growth red ocean",
-  contested: "Established red ocean",
-  quiet: "Quiet waters",
-  uncertain: "Uncharted",
+  blue: t("Early blue ocean"),
+  expanding: t("Growth red ocean"),
+  contested: t("Established red ocean"),
+  quiet: t("Quiet waters"),
+  uncertain: t("Needs validation"),
 };
 export const kindColors: Record<MarketKind, string> = {
   blue: "#bcf85e",
@@ -27,7 +28,7 @@ export const kindColors: Record<MarketKind, string> = {
 export const number = (n: number | null | undefined) =>
   n == null
     ? "—"
-    : Intl.NumberFormat("en", {
+    : Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en", {
         notation: n >= 10000 ? "compact" : "standard",
         maximumFractionDigits: 1,
       }).format(n);
@@ -94,7 +95,7 @@ export function Sparkline({
   if (values.length < 2)
     return (
       <div className="no-series" style={{ height }}>
-        Awaiting history
+        {t("Awaiting history")}
       </div>
     );
   const min = domain?.[0] ?? Math.min(...values),
@@ -114,7 +115,7 @@ export function Sparkline({
       viewBox={`0 0 ${w} ${height}`}
       preserveAspectRatio="none"
       role="img"
-      aria-label="Historical trend"
+      aria-label={t("Historical trend")}
     >
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
@@ -165,7 +166,9 @@ export function Radar({
         viewBox="0 0 660 470"
         className="radar"
         role="img"
-        aria-label="Opportunity map: active repository supply from left to right, sustained search demand growth from bottom to top"
+        aria-label={t(
+          "Opportunity map: active repository supply from left to right, sustained search demand growth from bottom to top",
+        )}
       >
         <defs>
           <radialGradient id="radarGlow" cx="0.18" cy="0.18" r=".8">
@@ -199,28 +202,28 @@ export function Radar({
         />
         <g className="radar-label">
           <text x="64" y="56" fill="#bcf85e">
-            EARLY BLUE
+            {t("EARLY BLUE")}
           </text>
           <text x="64" y="75" className="radar-sub">
-            Room to build
+            {t("Room to build")}
           </text>
           <text x="600" y="56" textAnchor="end" fill="#ffbb7b">
-            GROWTH RED
+            {t("GROWTH RED")}
           </text>
           <text x="600" y="75" textAnchor="end" className="radar-sub">
-            A rising, crowded field
+            {t("A rising, crowded field")}
           </text>
           <text x="64" y="383" fill="#a1abb0">
-            QUIET WATERS
+            {t("QUIET WATERS")}
           </text>
           <text x="64" y="402" className="radar-sub">
-            Validate the need
+            {t("Validate the need")}
           </text>
           <text x="600" y="383" textAnchor="end" fill="#e99c9a">
-            ESTABLISHED RED
+            {t("ESTABLISHED RED")}
           </text>
           <text x="600" y="402" textAnchor="end" className="radar-sub">
-            Find your difference
+            {t("Find your difference")}
           </text>
         </g>
         <text
@@ -228,17 +231,17 @@ export function Radar({
           textAnchor="middle"
           className="axis-label"
         >
-          SUSTAINED SEARCH GROWTH →
+          {t("SUSTAINED SEARCH GROWTH →")}
         </text>
         <text x="334" y="451" textAnchor="middle" className="axis-label">
-          ACTIVE PROJECT SUPPLY →
+          {t("ACTIVE PROJECT SUPPLY →")}
         </text>
         {positions.map(({ m, x, y }, i) => (
           <g
             key={m.id}
             role="button"
             tabIndex={0}
-            aria-label={`${m.topic.name}: ${m.headline}`}
+            aria-label={`${t(m.topic.name)}: ${m.headline}`}
             className={`radar-point ${hover === m.id ? "is-hovered" : ""}`}
             onMouseEnter={() => setHover(m.id)}
             onMouseLeave={() => setHover(null)}
@@ -279,8 +282,9 @@ export function Radar({
               />
             )}
             <title>
-              {m.topic.name}: {m.supply.total} active projects ·{" "}
-              {pct(m.metrics.growth)} search growth
+              {t(m.topic.name)}: {m.supply.total}
+              {t("active projects ·")} {pct(m.metrics.growth)}
+              {t("search growth")}
             </title>
           </g>
         ))}
@@ -304,7 +308,7 @@ export function Radar({
                 fill="#edf4e9"
                 fontSize="12"
               >
-                {m.topic.name}
+                {t(m.topic.name)}
               </text>
               <text
                 x={Math.min(x - 69, 451)}
@@ -312,7 +316,10 @@ export function Radar({
                 fill="#9eac98"
                 fontSize="9"
               >
-                {m.supply.total} projects · {pct(m.metrics.growth)} search
+                {m.supply.total}
+                {t("projects ·")}
+                {pct(m.metrics.growth)}
+                {t("search")}
               </text>
             </g>
           ))}
@@ -325,7 +332,7 @@ export function Radar({
               fill="#c4cec3"
               fontSize="17"
             >
-              Your next opportunity starts with evidence.
+              {t("Your next opportunity starts with evidence.")}
             </text>
             <text
               x="334"
@@ -334,7 +341,7 @@ export function Radar({
               fill="#89958b"
               fontSize="13"
             >
-              Scan a topic to place it on the radar.
+              {t("Scan a topic to place it on the radar.")}
             </text>
           </g>
         )}
@@ -350,17 +357,19 @@ export function Radar({
             onClick={() => onSelect(m)}
           >
             <i style={{ background: m.topic.color }} />
-            {m.topic.name}
+            {t(m.topic.name)}
           </button>
         ))}
       </div>
       <div className="radar-foot">
         <span>
           <i className="live-dot" />
-          {plotted.length} mapped categories
+          {plotted.length}
+          {t("mapped categories")}
         </span>
         <span>
-          Click a signal to explore <ArrowUpRight size={13} />
+          {t("Click a signal to explore")}
+          <ArrowUpRight size={13} />
         </span>
       </div>
     </div>
@@ -368,7 +377,7 @@ export function Radar({
 }
 export function CopyButton({
   value,
-  label = "Copy",
+  label = t("Copy"),
   className = "button subtle",
 }: {
   value: string;
@@ -385,12 +394,12 @@ export function CopyButton({
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         } catch {
-          window.prompt("Copy this link:", value);
+          window.prompt(t("Copy this link:"), value);
         }
       }}
     >
       {copied ? <Check size={15} /> : <Copy size={15} />}{" "}
-      {copied ? "Copied" : label}
+      {copied ? t("Copied") : label}
     </button>
   );
 }
@@ -413,24 +422,26 @@ export function RepoRow({
         </span>
         <span>
           <strong>{repo.name}</strong>
-          <small>{repo.description || "No description provided."}</small>
+          <small>{repo.description || t("No description provided.")}</small>
         </span>
       </button>
       <div className="repo-stats">
         <span>
           {number(repo.stars)}
-          <small>stars</small>
+          <small>{t("stars")}</small>
         </span>
         <span className="positive">
           {repo.growth7d !== null ? "+" + number(repo.growth7d) : "—"}
-          <small>this week</small>
+          <small>{t("this week")}</small>
         </span>
       </div>
       <button
         className={`icon-button ${watched ? "selected" : ""}`}
         onClick={onWatch}
-        title={watched ? "Remove from watchlist" : "Add to watchlist"}
-        aria-label={watched ? "Remove from watchlist" : "Add to watchlist"}
+        title={watched ? t("Remove from watchlist") : t("Add to watchlist")}
+        aria-label={
+          watched ? t("Remove from watchlist") : t("Add to watchlist")
+        }
       >
         {watched ? <CheckCircle2 size={19} /> : <Plus size={19} />}
       </button>
@@ -439,7 +450,7 @@ export function RepoRow({
         href={repo.url}
         target="_blank"
         rel="noreferrer"
-        aria-label={`Open ${repo.name} on GitHub`}
+        aria-label={t("Open {repo} on GitHub", { repo: repo.name })}
       >
         <ArrowUpRight size={19} />
       </a>
@@ -464,7 +475,11 @@ export function Empty({
     </div>
   );
 }
-export function Loading({ text = "Reading the signals…" }: { text?: string }) {
+export function Loading({
+  text = t("Reading the signals…"),
+}: {
+  text?: string;
+}) {
   return (
     <div className="loading-state">
       <span className="spinner" />
@@ -495,20 +510,20 @@ export function ComparisonChart({ repos }: { repos: Repo[] }) {
   if (dates.length < 2)
     return (
       <Empty
-        title="History is still loading"
-        description="The comparison needs at least two daily observations."
+        title={t("History is still loading")}
+        description={t("The comparison needs at least two daily observations.")}
       />
     );
   return (
     <section className="panel shared-chart">
       <div className="panel-title">
-        <h3>Daily star momentum</h3>
-        <span className="footnote">30 days · shared vertical scale</span>
+        <h3>{t("Daily star momentum")}</h3>
+        <span className="footnote">{t("30 days · shared vertical scale")}</span>
       </div>
       <svg
         viewBox="0 0 900 250"
         role="img"
-        aria-label="Repository daily new stars on a shared scale"
+        aria-label={t("Repository daily new stars on a shared scale")}
       >
         {[0, 0.5, 1].map((f) => (
           <g key={f}>
