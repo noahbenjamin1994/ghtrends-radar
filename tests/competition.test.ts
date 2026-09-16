@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { competitionPressure } from "../src/core/assessment.js";
 import { assessCompetition, repoRelevance } from "../src/core/competition.js";
 import { analyze, demandMetrics } from "../src/core/analyze.js";
 import { resolveTopic } from "../src/core/topics.js";
@@ -64,6 +65,22 @@ const series = (values: number[]): DemandEvidence => ({
   })),
 });
 const up = series(Array.from({ length: 104 }, (_, i) => (i >= 96 ? 40 : 20)));
+
+test("display rounding preserves competition bounds", () => {
+  const c = assessCompetition(topic, supply([repo(1)]), asOf);
+  assert.equal(
+    competitionPressure({
+      competition: { ...c, score: 99.8, upper: 100, enumerated: false },
+    }),
+    "≥99",
+  );
+  assert.equal(
+    competitionPressure({
+      competition: { ...c, score: 0.98, upper: 3.13, enumerated: true },
+    }),
+    "0–4",
+  );
+});
 
 test("a few established alternatives can form a red ocean; resources never inflate pressure", () => {
   const mature = [1, 2, 3].map((i) =>

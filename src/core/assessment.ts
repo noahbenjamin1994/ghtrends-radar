@@ -233,8 +233,8 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
 export function competitionPressure(m: Pick<Market, "competition">): string {
   const c = m.competition;
   if (!c || !c.sampled) return "—";
-  if (!c.enumerated) return "≥" + Math.round(c.score);
-  if (c.upper - c.score >= 1)
-    return `${Math.round(c.score)}–${Math.round(c.upper)}`;
+  if (!c.enumerated) return "≥" + Math.floor(c.score);
+  if (c.upper - c.score > 0.001)
+    return `${Math.floor(c.score)}–${Math.ceil(c.upper)}`;
   return String(Math.round(c.score));
 }
