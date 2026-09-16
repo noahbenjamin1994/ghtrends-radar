@@ -1,0 +1,175 @@
+import React, { useEffect, useState } from "react";
+import {
+  ArrowUpRight,
+  Trash2,
+  LockKeyhole,
+  Globe2,
+  LogOut,
+} from "lucide-react";
+import { api } from "./api.js";
+import { t, localUrl } from "./i18n.js";
+import type { MarketKind } from "../core/types.js";
+import { Loading, Empty } from "./components.js";
+export interface Account {
+  hosted: boolean;
+  authAvailable: boolean;
+  aiAvailable: boolean;
+  user: { name: string } | null;
+  csrf: string;
+  dailyLimit: number;
+  used: number;
+}
+export function SignInGate({ account }: { account: Account | null }) {
+  return (
+    <Empty
+      title={t("Your research, saved for you")}
+      description={t(
+        "Browse public reports without an account. Sign in to run AI-assisted scans and keep your history and watchlist across devices.",
+      )}
+      action={
+        account?.authAvailable ? (
+          <a
+            className="button"
+            href={
+              "/auth/login?returnTo=" + encodeURIComponent(localUrl("/history"))
+            }
+          >
+            {t("Sign in with Logto")} <ArrowUpRight size={16} />
+          </a>
+        ) : (
+          <p>{t("Sign-in is not configured on this server.")}</p>
+        )
+      }
+    />
+  );
+}
+export function HistoryView({
+  account,
+  navigate,
+}: {
+  account: Account | null;
+  navigate: (s: string) => void;
+}) {
+  const [rows, setRows] = useState<
+      {
+        id: string;
+        input: string;
+        created: string;
+        topic: string;
+        keyword: string;
+        geo: string;
+        headline: string;
+        kind: MarketKind;
+        public: boolean;
+      }[]
+    >([]),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState("");
+  const load = () =>
+    api<typeof rows>("/api/history")
+      .then(setRows)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  useEffect(() => {
+    if (account?.user) void load();
+    else setLoading(false);
+  }, [account?.user?.name]);
+  if (!account) return <Loading />;
+  if (!account.user) return <SignInGate account={account} />;
+  return (
+    <div className="history-page">
+      <div className="eyebrow">{t("YOUR RESEARCH")}</div>
+      <div className="history-heading">
+        <div>
+          <h1>
+            {t("Pick up where you left off")}
+            <span className="lime">.</span>
+          </h1>
+          <p>
+            {t(
+              "Completed scans are saved automatically. New personal reports stay private until you share them.",
+            )}
+          </p>
+        </div>
+        {account.hosted && (
+          <div className="account-summary">
+            <strong>{account.user.name}</strong>
+            <span>
+              {t("{used} / {limit} scans used today", {
+                used: account.used,
+                limit: account.dailyLimit,
+              })}
+            </span>
+            <button
+              className="text-link"
+              onClick={() =>
+                void api("/auth/logout", { method: "POST" })
+                  .then(() => location.assign(localUrl("/")))
+                  .catch((e) => setError(e.message))
+              }
+            >
+              <LogOut size={14} />
+              {t("Sign out")}
+            </button>
+          </div>
+        )}
+      </div>
+      {error && (
+        <p role="alert" className="error-banner">
+          {t(error)}
+        </p>
+      )}
+      {loading ? (
+        <Loading />
+      ) : rows.length ? (
+        <div className="history-list">
+          {rows.map((row) => (
+            <article key={row.id} className="history-row">
+              <button onClick={() => navigate("/report/" + row.id)}>
+                <div className="history-row-top">
+                  <span>
+                    {row.public ? (
+                      <Globe2 size={14} />
+                    ) : (
+                      <LockKeyhole size={14} />
+                    )}{" "}
+                    {t(row.public ? "Shared" : "Private")}
+                  </span>
+                  <time>{new Date(row.created).toLocaleString()}</time>
+                </div>
+                <h3>{row.input}</h3>
+                <p>{t(row.headline)}</p>
+                <small>
+                  {row.keyword} · {row.geo || t("Worldwide")}
+                </small>
+              </button>
+              <button
+                className="icon-button"
+                aria-label={t("Remove from history")}
+                onClick={() =>
+                  void api("/api/history/" + row.id, { method: "DELETE" })
+                    .then(load)
+                    .catch((e) => setError(e.message))
+                }
+              >
+                <Trash2 size={16} />
+              </button>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <Empty
+          title={t("Your next scan will be here")}
+          description={t(
+            "Search a category in your own words. We will organize the queries and save the evidence here.",
+          )}
+          action={
+            <button className="button" onClick={() => navigate("/")}>
+              {t("Start a scan")} <ArrowUpRight size={16} />
+            </button>
+          }
+        />
+      )}
+    </div>
+  );
+}

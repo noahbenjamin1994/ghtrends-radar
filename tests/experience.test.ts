@@ -161,7 +161,7 @@ test("PNG exports keep language-specific caches and rendered exports can revalid
     assert.match(md.headers.get("cache-control") || "", /must-revalidate/);
     assert.match(await md.text(), /接下来怎么做/);
     const json = await fetch(`${base}/api/reports/${m.id}`);
-    assert.match(json.headers.get("cache-control") || "", /immutable/);
+    assert.match(json.headers.get("cache-control") || "", /must-revalidate/);
   } finally {
     await new Promise<void>((r) => server.close(() => r()));
     await engine.close();

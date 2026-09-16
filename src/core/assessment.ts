@@ -7,7 +7,9 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
     text(value, locale, vars);
   const resolved = resolveTopic(m.topic.slug);
   const changed =
-    resolved.keyword.toLowerCase() !== m.demand.keyword.toLowerCase();
+    !m.topic.plan &&
+    resolved.keyword.toLowerCase() !== m.demand.keyword.toLowerCase() &&
+    resolved.aliases.length > 0;
   const scientific = resolved.slug === "ai-for-science";
   const fresh = (stamp: string) => {
     const age = Date.parse(m.asOf) - Date.parse(stamp);
@@ -55,7 +57,12 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
   let title = t(m.headline),
     summary = t(m.strategy);
   if (provisional) {
-    if (changed) {
+    if (m.metrics.trend === "mixed") {
+      title = t("Mixed search signals");
+      summary = t(
+        "The time windows or related search terms disagree. Narrow the use case and compare the original curves before making a market claim.",
+      );
+    } else if (changed) {
       title = t("Research the field, not just its abbreviation");
       summary = t(
         "Use the recognized field name, then validate a specific workflow. The current keyword sample cannot establish the field’s demand or competition.",

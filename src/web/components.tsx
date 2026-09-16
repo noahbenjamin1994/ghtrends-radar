@@ -12,10 +12,10 @@ import {
 } from "lucide-react";
 import type { Market, MarketKind, Repo } from "../core/types.js";
 export const kindLabels: Record<MarketKind, string> = {
-  blue: t("Early blue ocean"),
-  expanding: t("Growth red ocean"),
-  contested: t("Established red ocean"),
-  quiet: t("Quiet waters"),
+  blue: t("Rising · limited supply"),
+  expanding: t("Rising · established supply"),
+  contested: t("Established supply"),
+  quiet: t("Limited observed supply"),
   uncertain: t("Needs validation"),
 };
 export const kindColors: Record<MarketKind, string> = {
@@ -157,7 +157,10 @@ export function Radar({
       ? 355 + Math.min(1, Math.log10(Math.max(count / 50, 1)) / 3) * 215
       : 290 - Math.min(1, (50 - count) / 50) * 185;
     const strength = Math.min(1, Math.abs(m.metrics.growth ?? 0) / 2);
-    const y = m.metrics.fast ? 215 - strength * 130 : 285 + strength * 130;
+    const y =
+      m.metrics.trend === "rising"
+        ? 215 - strength * 130
+        : 285 + strength * 130;
     return { m, x, y: y + ((i % 3) - 1) * 13 };
   });
   return (
@@ -202,25 +205,25 @@ export function Radar({
         />
         <g className="radar-label">
           <text x="64" y="56" fill="#bcf85e">
-            {t("EARLY BLUE")}
+            {t("RISING / LIMITED SUPPLY")}
           </text>
           <text x="64" y="75" className="radar-sub">
             {t("Room to build")}
           </text>
           <text x="600" y="56" textAnchor="end" fill="#ffbb7b">
-            {t("GROWTH RED")}
+            {t("RISING / ESTABLISHED SUPPLY")}
           </text>
           <text x="600" y="75" textAnchor="end" className="radar-sub">
-            {t("A rising, crowded field")}
+            {t("Search rising; compare alternatives")}
           </text>
           <text x="64" y="383" fill="#a1abb0">
-            {t("QUIET WATERS")}
+            {t("LIMITED SUPPLY")}
           </text>
           <text x="64" y="402" className="radar-sub">
             {t("Validate the need")}
           </text>
           <text x="600" y="383" textAnchor="end" fill="#e99c9a">
-            {t("ESTABLISHED RED")}
+            {t("ESTABLISHED SUPPLY")}
           </text>
           <text x="600" y="402" textAnchor="end" className="radar-sub">
             {t("Find your difference")}
@@ -231,7 +234,7 @@ export function Radar({
           textAnchor="middle"
           className="axis-label"
         >
-          {t("SUSTAINED SEARCH GROWTH →")}
+          {t("SEARCH INTEREST CHANGE →")}
         </text>
         <text x="334" y="451" textAnchor="middle" className="axis-label">
           {t("ACTIVE PROJECT SUPPLY →")}

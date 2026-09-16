@@ -6,13 +6,25 @@ const ORIGIN = "https://trends.google.com";
 export function parseGoogleJson(text: string): any {
   return JSON.parse(text.replace(/^\)\]\}',?\s*/, ""));
 }
-export function parseTimeline(data: any): InterestPoint[] {
+export function parseTimeline(data: any, index = 0): InterestPoint[] {
   return (data.default?.timelineData || [])
-    .filter((p: any) => Array.isArray(p.value) && p.value.length)
+    .filter(
+      (p: any) =>
+        Array.isArray(p.value) &&
+        p.value.length > index &&
+        p.hasData?.[index] !== false &&
+        typeof p.value[index] === "number" &&
+        Number.isFinite(p.value[index]) &&
+        p.value[index] >= 0 &&
+        p.value[index] <= 100 &&
+        Number.isFinite(Number(p.time)) &&
+        Math.abs(Number(p.time)) < 8640000000000,
+    )
     .map((p: any) => ({
       date: new Date(Number(p.time) * 1000).toISOString(),
-      value: Number(p.value[0]),
-      anchor: p.value.length > 1 ? Number(p.value[1]) : undefined,
+      value: Number(p.value[index]),
+      anchor:
+        index === 0 && p.value.length > 1 ? Number(p.value[1]) : undefined,
       partial: p.isPartial === true || p.isPartial === "true",
     }));
 }
@@ -79,9 +91,11 @@ export class Trends {
     keyword: string,
     geo = "",
     onTimeline?: (evidence: DemandEvidence) => void,
+    synonyms: string[] = [],
   ): Promise<DemandEvidence> {
     validateGeo(geo);
-    const key = `trends:v1:${keyword}:${geo}`;
+    const terms = [...new Set([keyword, ...synonyms])].slice(0, 3);
+    const key = `trends:v2:${JSON.stringify(terms)}:${geo}`;
     const cached = this.store.get<DemandEvidence>(key);
     if (cached) {
       onTimeline?.(cached);
@@ -91,7 +105,7 @@ export class Trends {
       start = new Date(end);
     start.setUTCFullYear(start.getUTCFullYear() - 2);
     const time = `${start.toISOString().slice(0, 10)} ${end.toISOString().slice(0, 10)}`;
-    const sourceUrl = `${ORIGIN}/trends/explore?date=${encodeURIComponent(time)}&geo=${geo}&q=${encodeURIComponent(keyword + ",github trending")}`;
+    const sourceUrl = `${ORIGIN}/trends/explore?date=${encodeURIComponent(time)}&geo=${geo}&q=${encodeURIComponent(terms.join(","))}`;
     const result: DemandEvidence = {
       keyword,
       geo,
@@ -106,7 +120,7 @@ export class Trends {
         await this.read("/trends/explore", {}, true);
       } catch {}
       const req = {
-        comparisonItem: [keyword, "github trending"].map((keyword) => ({
+        comparisonItem: terms.map((keyword) => ({
           keyword,
           geo,
           time,
@@ -130,7 +144,33 @@ export class Trends {
         req: JSON.stringify(timeseries.request),
         token: timeseries.token,
       });
-      result.points = parseTimeline(timeline);
+      if (timeseries.request?.resolution !== "WEEK")
+        throw new Error("Google Trends did not return weekly observations.");
+      const returned =
+        timeseries.request.comparisonItem?.map(
+          (item: any) => item.complexKeywordsRestriction?.keyword?.[0]?.value,
+        ) || [];
+      const readSeries = (term: string) => {
+        const index = returned.findIndex(
+          (value: string) => value?.toLowerCase() === term.toLowerCase(),
+        );
+        if (index < 0)
+          throw new Error(
+            "Google Trends returned a different query than requested.",
+          );
+        return {
+          keyword: term,
+          geo,
+          fetchedAt: result.fetchedAt,
+          sourceUrl,
+          points: parseTimeline(timeline, index).map(({ anchor, ...p }) => p),
+          related: [],
+          resolution: "WEEK",
+          seriesIndex: index,
+        };
+      };
+      Object.assign(result, readSeries(keyword));
+      result.alternatives = terms.slice(1).map(readSeries);
       onTimeline?.(structuredClone(result));
       const related = explore.widgets?.find(
         (w: any) => w.id === "RELATED_QUERIES" || w.id === "RELATED_QUERIES_0",

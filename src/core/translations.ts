@@ -1,4 +1,121 @@
 export const zh: Record<string, string> = {
+  "Sign in to open your private reports": "登录后查看自己的私有报告",
+  "Search rising; compare alternatives": "搜索上升，比较现有方案",
+  "The AI query plan could not be validated. Please refine the input.":
+    "暂时无法确认查询词，请把研究方向写得更具体后重试。",
+  "The AI response was incomplete. Please try again.":
+    "AI 返回内容不完整，请重试。",
+  "The AI response could not be validated. Please try again.":
+    "AI 返回内容未通过校验，请重试。",
+  "Relative search interest": "相对搜索热度",
+  "Sign-in is not configured on this server.": "此服务器尚未配置登录。",
+  "Your research history · ghtrends": "我的研究历史 · ghtrends",
+  "Supply counts active repositories matching the displayed GitHub topic and phrase queries; unmatched and closed-source competitors are outside this coverage.":
+    "供给统计覆盖展示的 GitHub 主题与短语所匹配的活跃仓库；未匹配到的项目及闭源产品不在覆盖范围内。",
+  "Rising · limited supply": "搜索上升 · 供给较少",
+  "Rising · established supply": "搜索上升 · 供给已有规模",
+  "Established supply": "供给已有规模",
+  "Limited observed supply": "已观察供给较少",
+  "RISING / LIMITED SUPPLY": "搜索上升 / 供给较少",
+  "RISING / ESTABLISHED SUPPLY": "搜索上升 / 供给已有规模",
+  "LIMITED SUPPLY": "已观察供给较少",
+  "ESTABLISHED SUPPLY": "供给已有规模",
+  "SEARCH INTEREST CHANGE →": "搜索关注度变化 →",
+  "Search rising · limited observed supply": "搜索上升 · 已观察供给较少",
+  "Search rising · established supply": "搜索上升 · 供给已有规模",
+  "Search falling · established supply": "搜索下降 · 供给已有规模",
+  "Search stable · established supply": "搜索平稳 · 供给已有规模",
+  "Search falling · limited observed supply": "搜索下降 · 已观察供给较少",
+  "Search stable · limited observed supply": "搜索平稳 · 已观察供给较少",
+  "Mixed search signals": "搜索信号存在分歧",
+  "trend.rising": "上升",
+  "trend.falling": "下降",
+  "trend.stable": "平稳",
+  "trend.mixed": "信号分歧",
+  "trend.unknown": "尚未确认",
+  "Stable or falling": "平稳或下降",
+  "Search direction": "搜索方向",
+  "Search interest change": "搜索关注度变化",
+  "Year-over-year search change": "搜索关注度同比",
+  "4-week change": "4 周变化",
+  "13-week change": "13 周变化",
+  "Short and longer search windows do not agree, or seasonality may explain the rise. A single market label would overstate the evidence.":
+    "短期与较长周期的搜索变化不一致，或上涨可能来自季节性，暂不合并为单一赛道判断。",
+  "Related search terms move in opposite directions. The primary query is shown unchanged; do not treat one synonym as the whole category.":
+    "相关搜索词出现相反方向。主关键词的数据保留原样，单个同义词不能代表整个领域。",
+  "Repository density and search attention are separate observations. Neither proves commercial competition or demand.":
+    "仓库密度与搜索关注度是两项独立观察，无法直接证明商业竞争或客户需求。",
+  "Many active repositories match this scope. Check the search direction, alternatives and specific user problems before choosing an entry point.":
+    "当前范围内已有较多活跃项目。结合搜索方向、现有工具和具体用户问题，选择切入点。",
+  "The time windows or related search terms disagree. Narrow the use case and compare the original curves before making a market claim.":
+    "不同时间窗口或相关搜索词的方向不一致。先缩小使用场景，核对原始曲线，再判断机会。",
+  "My research": "我的研究",
+  "My account": "我的账户",
+  "Sign in": "登录",
+  "Sign out": "退出登录",
+  "Sign in with Logto": "登录并保存研究",
+  "YOUR RESEARCH": "我的研究",
+  "Your research, saved for you": "查过的内容，随时接着看",
+  "Browse public reports without an account. Sign in to run AI-assisted scans and keep your history and watchlist across devices.":
+    "公开报告无需登录。登录后可使用 AI 辅助扫描，并跨设备保存历史记录和关注列表。",
+  "Pick up where you left off": "接着上次的研究",
+  "Completed scans are saved automatically. New personal reports stay private until you share them.":
+    "扫描完成后自动保存。个人新报告默认私有，由你决定是否分享。",
+  "{used} / {limit} scans used today": "今日已使用 {used} / {limit} 次扫描",
+  Shared: "已公开",
+  Private: "私有",
+  "Remove from history": "从历史中移除",
+  "Your next scan will be here": "下一次扫描，会保存在这里",
+  "Search a category in your own words. We will organize the queries and save the evidence here.":
+    "用自己的话输入想研究的方向，我们会整理查询词，并在这里保存证据。",
+  "Start a scan": "开始研究",
+  "Understanding your research question": "正在理解研究方向",
+  "Writing a short evidence-based brief": "正在撰写简短研究报告",
+  "Public reports are free to browse. Sign in for AI-assisted scans and saved history.":
+    "公开报告免登录浏览；登录后可使用 AI 扫描并保存研究。",
+  "Self-hosted: your keys, your data. Scans are saved on this server.":
+    "自托管模式：使用自己的 Key，数据和扫描记录保存在本机服务。",
+  "Copy public link": "复制公开链接",
+  "Make public to share": "公开这份报告",
+  "Save to my research": "保存到我的研究",
+  Saved: "已保存",
+  "This report is public. Anyone with the link can read it.":
+    "这份报告已公开，获得链接的人都能阅读。",
+  "Private report. Only you can read this result.": "私有报告，仅你可以阅读。",
+  "Stop sharing": "停止公开",
+  "How we understood your search": "查询词是如何整理的",
+  "You can edit the demand keyword and scan again.":
+    "可修改搜索关键词后重新扫描。",
+  "Research brief": "简短研究报告",
+  "AI interpretation of the evidence below. Verify the sources before acting.":
+    "AI 根据下方证据生成的解释；采取行动前请核对来源。",
+  "The AI brief is unavailable. Verified source evidence is still shown.":
+    "AI 简报暂时不可用，已采集的来源证据仍可查看。",
+  "Sign in to scan and save your research.": "请登录后扫描并保存研究。",
+  "Please reload the page and try again.": "请刷新页面后重试。",
+  "Your daily scan allowance is used. Saved reports remain available.":
+    "今日扫描额度已用完，已保存的报告仍可阅读。",
+  "The watchlist holds up to 50 repositories.": "最多可关注 50 个仓库。",
+  "The server restarted. Please run this scan again.":
+    "服务刚刚重启，请重新运行这次扫描。",
+  "Choose the meaning you want to research.": "请选择你想研究的含义。",
+  "Enter a topic between 1 and 300 characters.":
+    "请输入 1 至 300 个字符的研究方向。",
+  "Save a project from any category or add a repository above. Your watchlist is saved on this server.":
+    "可从赛道中收藏项目，或在上方添加仓库。关注列表保存在服务器。",
+  "Read supply and search direction separately": "分别看供给规模与搜索方向",
+  "We compare the last 8 complete weeks with the previous 8, alongside 4-week and 13-week changes. Rising or falling requires a 10% change, a resampling band on the same side of zero, and no opposing short or longer trend. Conflicting windows and opposite-moving synonyms are marked mixed.":
+    "比较最近 8 个完整周与前 8 周，同时检查 4 周和 13 周变化。判断上升或下降需达到 10% 变化、重采样区间在零值同侧，且短期与较长周期没有反向变化。窗口冲突或同义词反向时标为信号分歧。",
+  "The primary phrase and up to two same-intent variants are collected in the same region and time range. Each curve is shown separately. We never add normalized indices or choose the fastest-growing synonym.":
+    "主关键词及最多两个同义表达在相同地区与时间范围内采集，各自显示曲线。归一化指数不相加，也不以增速最高的同义词替代主关键词。",
+  "GitHub searches use relevant topics and specific repository-name or description phrases. Results are deduplicated and require at least five stars, a push within 180 days, and no forks or archived projects.":
+    "GitHub 搜索覆盖相关主题，以及仓库名称或描述中的具体短语。结果去重，要求至少 5 Star、180 天内有推送，排除 fork 与归档项目。",
+  "Reports preserve their collected evidence. New hosted scans are private and saved to your account; you choose whether to share them. Self-hosted data and credentials stay on your server.":
+    "报告保留采集时的证据。托管版个人新扫描默认私有并保存到账户，可自主选择公开；自托管的数据与凭据留在自己的服务器。",
+  "Related search terms": "相关搜索词",
+  "Primary query": "主关键词",
+  "Measured separately; normalized indices are not added.":
+    "分别测量，归一化指数不相加。",
   "ghtrends home": "ghtrends 首页",
   "Main navigation": "主导航",
   "Star on GitHub": "去 GitHub 点 Star",

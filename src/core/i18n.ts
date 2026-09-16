@@ -8,13 +8,28 @@ export function text(
   vars: Record<string, string | number> = {},
 ): string {
   const key = value.replace(/\s+/g, " ").trim();
-  let result = locale === "zh" ? (zh[key] ?? translateEvidence(key)) : value;
+  const english: Record<string, string> = {
+    "trend.rising": "Rising",
+    "trend.falling": "Falling",
+    "trend.stable": "Stable",
+    "trend.mixed": "Mixed signals",
+    "trend.unknown": "Unconfirmed",
+  };
+  let result =
+    locale === "zh"
+      ? (zh[key] ?? translateEvidence(key))
+      : (english[key] ?? value);
   for (const [name, replacement] of Object.entries(vars))
     result = result.replaceAll(`{${name}}`, String(replacement));
   return result;
 }
 function translateEvidence(value: string): string {
   const patterns: [RegExp, (...groups: string[]) => string][] = [
+    [
+      /^Four-week search change: (-?\d+)%; thirteen-week change: (-?\d+)%\. These windows check the direction of the eight-week comparison\.$/,
+      (a, b) =>
+        `4 周搜索变化：${a}%；13 周变化：${b}%。这两个周期用于核对 8 周比较的方向。`,
+    ],
     [
       /^Median weekly search interest (rose|fell) (\d+)% across two consecutive eight-week windows\.$/,
       (direction, amount) =>

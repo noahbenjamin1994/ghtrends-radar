@@ -40,6 +40,31 @@ export function marketMarkdown(
     "",
     a.summary,
     "",
+    ...(m.brief
+      ? [
+          `## ${t("Research brief")}`,
+          "",
+          m.brief[locale].summary,
+          "",
+          ...m.brief[locale].nextSteps.map((s) => "- " + s),
+          "",
+          t(
+            "AI interpretation of the evidence below. Verify the sources before acting.",
+          ),
+          "",
+        ]
+      : []),
+    ...(m.topic.plan
+      ? [
+          `## ${t("How we understood your search")}`,
+          "",
+          m.topic.plan.explanation[locale],
+          "",
+          `- Google Trends: ${m.topic.plan.trends.join(" · ")}`,
+          `- GitHub: ${(m.topic.queries || [m.topic.query]).join(" · ")}`,
+          "",
+        ]
+      : []),
     ...(a.level === "provisional"
       ? [
           `## ${t("What we know")}`,

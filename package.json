@@ -1,6 +1,6 @@
 {
   "name": "ghtrends-radar",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Find open-source opportunities with GitHub supply and Google search demand. CLI, MCP and a beautiful opportunity radar.",
   "type": "module",
   "license": "MIT",
@@ -33,6 +33,7 @@
     "commander": "^14.0.0",
     "express": "^5.1.0",
     "lucide-react": "^0.577.0",
+    "openid-client": "^6.8.8",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sharp": "^0.35.4",

@@ -10,6 +10,25 @@ export interface Topic {
   description: string;
   color: string;
   aliases: string[];
+  plan?: QueryPlan;
+}
+export interface QueryPlan {
+  input: string;
+  model: string;
+  version: string;
+  intent: string;
+  trends: string[];
+  githubTopics: string[];
+  githubTerms: string[];
+  explanation: { en: string; zh: string };
+  ambiguity?: { en: string; zh: string };
+}
+export interface Brief {
+  model: string;
+  generatedAt: string;
+  en: { summary: string; nextSteps: string[] };
+  zh: { summary: string; nextSteps: string[] };
+  sources: { label: string; url: string }[];
 }
 export interface InterestPoint {
   date: string;
@@ -31,6 +50,9 @@ export interface DemandEvidence {
   }[];
   error?: string;
   collectionError?: string;
+  resolution?: string;
+  seriesIndex?: number;
+  alternatives?: Omit<DemandEvidence, "alternatives">[];
 }
 export interface Repo {
   name: string;
@@ -82,6 +104,10 @@ export interface DemandMetrics {
   fast: boolean | null;
   seasonal: boolean;
   regularWeekly: boolean;
+  shortGrowth?: number | null;
+  quarterGrowth?: number | null;
+  trend?: "rising" | "falling" | "stable" | "mixed" | "unknown";
+  recentNonzeroShare?: number;
 }
 export interface Gap {
   title: string;
@@ -113,6 +139,8 @@ export interface Market {
   concentration: number | null;
   gaps: Gap[];
   score: number | null;
+  brief?: Brief;
+  aiError?: string;
 }
 export interface MarketSummary extends Omit<
   Market,

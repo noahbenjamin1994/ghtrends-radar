@@ -6,7 +6,7 @@ import { Engine } from "./core/engine.js";
 import { completeWeeklySeries } from "./core/evidence.js";
 export async function startMcp() {
   const engine = new Engine(),
-    server = new McpServer({ name: "ghtrends", version: "0.2.0" });
+    server = new McpServer({ name: "ghtrends", version: "0.3.0" });
   const result = (data: unknown) => ({
     content: [{ type: "text" as const, text: JSON.stringify(data) }],
   });
@@ -15,19 +15,30 @@ export async function startMcp() {
       .then(result)
       .catch((e) => ({
         isError: true,
-        content: [{ type: "text" as const, text: (e as Error).message }],
+        content: [
+          {
+            type: "text" as const,
+            text: e.choices
+              ? JSON.stringify({
+                  error: e.message,
+                  choices: e.choices,
+                  clarification: e.clarification,
+                })
+              : (e as Error).message,
+          },
+        ],
       }));
   server.tool(
     "ghtrends_scan",
     "Classify open-source supply and Google search demand. Includes evidence, scope and uncertainty; not a revenue forecast.",
     {
-      topic: z.string().min(1).max(80),
+      topic: z.string().min(1).max(300),
       geo: z.string().max(2).optional(),
       keyword: z.string().max(100).optional(),
     },
     ({ topic, geo, keyword }) =>
       wrap(async () => {
-        const m = await engine.scan(topic, { geo, keyword });
+        const m = await engine.scan(topic, { geo, keyword, owner: "local" });
         return {
           ...m,
           assessment: marketAssessment(m),

@@ -1303,6 +1303,8 @@ footer small {
   gap: 15px;
 }
 .gap-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
   display: block;
   padding: 20px;
   background: #1c2816;
@@ -2410,7 +2412,7 @@ footer small {
     height: 29px;
   }
   .gap-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .gap-card {
     padding: 19px;
@@ -2821,4 +2823,235 @@ html:lang(zh) .radar-label text {
   .header-end {
     gap: 5px;
   }
+}
+
+/* Personal research stays within the existing editorial interface. */
+.account-button {
+  border: 1px solid var(--border, #344031);
+  border-radius: 7px;
+  padding: 8px 11px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.scan-access-note,
+.report-privacy {
+  color: var(--muted, #a0ad9b);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  margin: 14px 0;
+}
+.report-privacy {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.history-page {
+  max-width: 1050px;
+  margin: 30px auto 80px;
+}
+.history-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
+  align-items: start;
+  margin-bottom: 28px;
+}
+.history-heading h1 {
+  font-size: clamp(2.3rem, 5vw, 4.6rem);
+  line-height: 1.1;
+  margin: 14px 0;
+}
+.history-heading p {
+  max-width: 640px;
+  color: var(--muted, #a0ad9b);
+  line-height: 1.7;
+}
+.account-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  white-space: nowrap;
+  padding: 20px 0;
+  font-size: 0.85rem;
+}
+.account-summary span {
+  color: var(--muted, #a0ad9b);
+}
+.history-list {
+  border-top: 1px solid #344031;
+}
+.history-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #344031;
+  gap: 20px;
+  padding: 23px 2px;
+}
+.history-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+.history-row h3 {
+  font-size: 1.25rem;
+  line-height: 1.4;
+  margin: 12px 0 8px;
+  overflow-wrap: anywhere;
+}
+.history-row p,
+.history-row small {
+  color: var(--muted, #a0ad9b);
+}
+.history-row-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  color: var(--muted, #a0ad9b);
+  font-size: 0.73rem;
+}
+.history-row-top span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+.query-plan {
+  margin-bottom: 20px;
+  overflow-wrap: anywhere;
+}
+.query-plan summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.query-plan p {
+  color: var(--muted, #a0ad9b);
+  line-height: 1.65;
+  margin: 12px 0;
+}
+.query-plan small,
+.ai-brief > small {
+  color: var(--muted, #a0ad9b);
+  font-size: 0.72rem;
+}
+.ai-brief {
+  margin: 22px 0;
+  border-left: 3px solid #bcf85e;
+}
+.ai-brief p {
+  font-size: 1rem;
+  line-height: 1.8;
+  max-width: 900px;
+}
+.ai-brief li {
+  padding: 6px 0;
+  color: var(--muted, #a0ad9b);
+  line-height: 1.6;
+}
+.ai-brief .source-chips {
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.ai-brief .source-chips a {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #bcf85e;
+  font-size: 0.75rem;
+}
+.search-direction {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: center;
+  padding: 18px 0;
+  font-size: 0.86rem;
+}
+.search-direction span {
+  color: var(--muted, #a0ad9b);
+}
+.synonym-series {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+}
+.synonym-series article {
+  padding: 18px;
+  background: #141c13;
+  border-radius: 8px;
+  min-width: 0;
+}
+.synonym-series strong {
+  display: block;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+  margin: 0 0 12px;
+}
+.synonym-series small {
+  display: block;
+  color: var(--muted, #a0ad9b);
+}
+@media (max-width: 1150px) {
+  .site-header nav {
+    gap: 1px;
+  }
+  .site-header nav button {
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: 0.74rem;
+  }
+  .github-label {
+    display: none;
+  }
+  .github-short {
+    display: inline;
+  }
+}
+@media (max-width: 700px) {
+  .history-heading {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .account-summary {
+    padding: 0;
+  }
+  .history-row-top {
+    flex-wrap: wrap;
+  }
+  .synonym-series {
+    grid-template-columns: 1fr;
+  }
+  .account-button {
+    font-size: 0.72rem;
+    padding: 7px 8px;
+  }
+  .search-direction {
+    gap: 12px;
+  }
+  .report-privacy {
+    font-size: 0.74rem;
+  }
+  .ai-brief p {
+    font-size: 0.92rem;
+  }
+}
+@media (max-width: 380px) {
+  .account-button {
+    padding: 7px 5px;
+  }
+  .header-end .github-button {
+    display: none;
+  }
+}
+
+.synonym-series .sparkline {
+  display: block;
+  width: 100%;
+  height: 110px;
+  margin: 12px 0 8px;
 }

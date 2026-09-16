@@ -1,25 +1,30 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Store } from "./store.js";
 import { GitHub } from "../providers/github.js";
 import { Trends } from "../providers/trends.js";
+import { Research } from "../providers/research.js";
 import { resolveTopic, validateGeo, validateRepo, TOPICS } from "./topics.js";
 import { importDemand } from "./import.js";
 import { analyze, ALGORITHM_VERSION } from "./analyze.js";
 import { sourceEvidenceIsFresh, completeWeeklySeries } from "./evidence.js";
-import type { Market, DemandEvidence, SupplyEvidence } from "./types.js";
+import type { Market, DemandEvidence, SupplyEvidence, Topic } from "./types.js";
 export interface ScanProgress {
-  stage: "sources" | "github" | "demand" | "details";
+  stage: "interpreting" | "sources" | "github" | "demand" | "details" | "brief";
   supplyCount?: number;
   weeklyPoints?: number;
   preview?: Market;
+  topic?: Topic;
 }
 export class Engine {
   github: GitHub;
   trends: Trends;
+  research: Research;
   constructor(public store = new Store()) {
     this.github = new GitHub(store);
     this.trends = new Trends(store);
+    this.research = new Research(store);
     const seed = fileURLToPath(
       new URL("../../web-dist/seed.json", import.meta.url),
     );
@@ -32,12 +37,12 @@ export class Engine {
         store.saveMarket(current);
         if (Date.now() - Date.parse(m.demand.fetchedAt) < 86400000)
           store.set(
-            `trends:v1:${m.topic.keyword}:${m.geo}`,
+            `trends:v2:${JSON.stringify([m.topic.keyword])}:${m.geo}`,
             m.demand,
             86400000 - (Date.now() - Date.parse(m.demand.fetchedAt)),
           );
       }
-    for (const m of store.markets())
+    for (const m of store.markets("", true))
       if (
         m.version !== ALGORITHM_VERSION ||
         (m.kind !== "uncertain" &&
@@ -53,14 +58,26 @@ export class Engine {
       refresh?: boolean;
       demand?: DemandEvidence;
       onProgress?: (progress: ScanProgress) => void;
+      ai?: boolean;
+      owner?: string;
+      private?: boolean;
     } = {},
   ): Promise<Market> {
-    const topic = resolveTopic(input, options.keyword),
+    const ai = options.ai !== false && this.research.enabled && !options.demand;
+    if (ai) options.onProgress?.({ stage: "interpreting" });
+    const topic = ai
+        ? await this.research.plan(
+            input,
+            options.keyword,
+            validateGeo(options.geo ?? ""),
+          )
+        : resolveTopic(input, options.keyword),
       geo = validateGeo(options.geo ?? "");
     const existing = this.store.market(topic.slug, geo, topic.keyword);
     if (
       !options.refresh &&
       !options.demand &&
+      !options.private &&
       existing &&
       existing.version === ALGORITHM_VERSION &&
       existing.topic.query === topic.query &&
@@ -70,8 +87,11 @@ export class Engine {
       existing.topic.keyword === topic.keyword &&
       Date.now() - Date.parse(existing.asOf) <
         (existing.kind === "uncertain" ? 300000 : 86400000)
-    )
+    ) {
+      if (options.owner)
+        this.store.addHistory(options.owner, existing.id, input);
       return existing;
+    }
     let initialDemand: DemandEvidence | undefined,
       initialSupply: SupplyEvidence | undefined;
     const preview = () => {
@@ -90,7 +110,7 @@ export class Engine {
       });
       preview();
     };
-    options.onProgress?.({ stage: "sources" });
+    options.onProgress?.({ stage: "sources", topic });
     const [demand, supply] = await Promise.all([
       options.demand
         ? Promise.resolve(
@@ -99,7 +119,12 @@ export class Engine {
             onDemand(data);
             return data;
           })
-        : this.trends.demand(topic.keyword, geo, onDemand),
+        : this.trends.demand(
+            topic.keyword,
+            geo,
+            onDemand,
+            topic.plan?.trends.slice(1),
+          ),
       this.github.supply(topic, (data) => {
         initialSupply = data;
         options.onProgress?.({ stage: "github", supplyCount: data.total });
@@ -108,7 +133,7 @@ export class Engine {
     ]);
     if (options.demand)
       this.store.set(
-        `trends:v1:${topic.keyword}:${geo}`,
+        `trends:v2:${JSON.stringify([topic.keyword])}:${geo}`,
         demand,
         Math.max(0, 86400000 - (Date.now() - Date.parse(demand.fetchedAt))),
       );
@@ -118,7 +143,22 @@ export class Engine {
     });
     const gaps = await this.github.gaps(supply.repositories);
     const market = analyze(topic, demand, supply, gaps);
-    this.store.saveMarket(market);
+    if (ai) {
+      options.onProgress?.({ stage: "brief", preview: market });
+      try {
+        market.brief = await this.research.brief(market);
+      } catch {
+        market.aiError =
+          "The AI brief is unavailable. Verified source evidence is still shown.";
+      }
+    }
+    if (options.private && options.owner)
+      market.id = createHash("sha256")
+        .update(options.owner + ":" + market.id)
+        .digest("hex")
+        .slice(0, 16);
+    this.store.saveMarket(market, !options.private, options.owner);
+    if (options.owner) this.store.addHistory(options.owner, market.id, input);
     return market;
   }
   async compare(names: string[]) {

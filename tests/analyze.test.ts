@@ -58,13 +58,14 @@ test("one viral search spike cannot manufacture a blue ocean", () =>
 test("annual seasonal rebound is not a breakout", () => {
   const m = analyze(TOPICS[0]!, demand("seasonal"), supply(10), [], asOf);
   assert.equal(m.metrics.seasonal, true);
-  assert.equal(m.kind, "quiet");
+  assert.equal(m.kind, "uncertain");
+  assert.equal(m.metrics.trend, "mixed");
   const boundary = demand("seasonal");
   for (const p of boundary.points) if (p.value === 40) p.value = 25;
   const exact = analyze(TOPICS[0]!, boundary, supply(10), [], asOf);
   assert.equal(exact.metrics.growth, 0.25);
   assert.equal(exact.metrics.seasonal, true);
-  assert.equal(exact.kind, "quiet");
+  assert.equal(exact.kind, "uncertain");
 });
 test("zero search values mean insufficient evidence, never a dead market", () => {
   const m = analyze(TOPICS[0]!, demand("zero"), supply(0), [], asOf);
@@ -136,13 +137,10 @@ test("an unfinished week without a partial flag cannot complete a breakout", () 
   const before = analyze(TOPICS[0]!, d, supply(12), [], asOf);
   d.points.push({ date: "2026-09-13T00:00:00Z", value: 40 });
   const after = analyze(TOPICS[0]!, d, supply(12), [], asOf);
-  assert.equal(before.kind, "quiet");
+  assert.equal(before.metrics.fast, false);
   assert.equal(after.kind, before.kind);
   assert.deepEqual(after.metrics, before.metrics);
-  assert.match(
-    after.reasons.join(" "),
-    /Only 5 of the last eight complete weeks/,
-  );
+  assert.equal(after.metrics.persistence, 5 / 8);
 });
 
 test("invalid fresh rows cannot revive stale historical growth", () => {
@@ -196,4 +194,51 @@ test("missing reference values are not interpreted as zero search interest", () 
   assert.equal(m.metrics.anchorRatio, null);
   assert.equal(m.metrics.points, 104);
   assert.equal(m.kind, "blue");
+});
+
+test("moderate growth, stable interest and falling interest have distinct conclusions", () => {
+  const up = demand();
+  up.points.slice(-8).forEach((p) => (p.value = 24));
+  const rising = analyze(TOPICS[0]!, up, supply(150), [], asOf);
+  assert.equal(rising.metrics.fast, false);
+  assert.equal(rising.metrics.trend, "rising");
+  assert.equal(rising.kind, "expanding");
+  const flat = analyze(TOPICS[0]!, demand(), supply(150), [], asOf);
+  assert.equal(flat.metrics.trend, "stable");
+  assert.match(flat.headline, /stable/);
+  const down = demand();
+  down.points.slice(-8).forEach((p) => (p.value = 15));
+  const falling = analyze(TOPICS[0]!, down, supply(150), [], asOf);
+  assert.equal(falling.metrics.trend, "falling");
+  assert.match(falling.headline, /falling/);
+  assert.ok(
+    !/red ocean/i.test(
+      [rising.headline, flat.headline, falling.headline].join(" "),
+    ),
+  );
+});
+
+test("recent evidence, window disagreement and synonyms cannot be cherry-picked", () => {
+  const fresh = demand("growing");
+  fresh.points.slice(0, -26).forEach((p) => (p.value = 0));
+  assert.equal(
+    analyze(TOPICS[0]!, fresh, supply(10), [], asOf).metrics.trend,
+    "rising",
+  );
+  const conflict = demand("growing");
+  conflict.points.slice(-4).forEach((p) => (p.value = 10));
+  assert.equal(
+    analyze(TOPICS[0]!, conflict, supply(10), [], asOf).metrics.trend,
+    "mixed",
+  );
+  const up = demand("growing"),
+    down = demand();
+  down.keyword = "genuine synonym";
+  down.points.slice(-8).forEach((p) => (p.value = 10));
+  up.alternatives = [down];
+  const m = analyze(TOPICS[0]!, up, supply(10), [], asOf);
+  assert.equal(m.metrics.growth, 1);
+  assert.equal(m.metrics.trend, "mixed");
+  assert.equal(m.score, null);
+  assert.match(m.limitations.join(" "), /opposite directions/);
 });

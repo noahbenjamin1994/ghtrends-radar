@@ -11,7 +11,7 @@ const program = new Command()
   .description(
     "GitHub supply × Google search demand. Find your next open-source opportunity.",
   )
-  .version("0.2.0");
+  .version("0.3.0");
 const withEngine = (fn: (engine: Engine) => Promise<void>) => async () => {
   const e = new Engine();
   try {
@@ -54,6 +54,7 @@ program
         ? (JSON.parse(readFileSync(o.trendsFile, "utf8")) as DemandEvidence)
         : undefined;
       const m = await e.scan(o.topic, {
+        owner: "local",
         geo: o.geo,
         keyword: o.keyword,
         refresh: o.refresh,
@@ -134,7 +135,7 @@ program
       throw new Error("Format must be md or json.");
     const e = new Engine();
     try {
-      const m = await e.scan(o.topic, { geo: o.geo });
+      const m = await e.scan(o.topic, { geo: o.geo, owner: "local" });
       o.format === "json" ? json(m) : console.log(marketMarkdown(m));
     } finally {
       await e.close();
