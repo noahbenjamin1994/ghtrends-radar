@@ -1,6 +1,6 @@
 {
   "name": "ghtrends-radar",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Find open-source opportunities with GitHub supply and Google search demand. CLI, MCP and a beautiful opportunity radar.",
   "type": "module",
   "license": "MIT",
@@ -27,7 +27,6 @@
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",
-    "@fontsource/barlow-condensed": "^5.3.0",
     "@fontsource/dm-mono": "^5.3.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "commander": "^14.0.0",

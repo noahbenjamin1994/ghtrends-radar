@@ -94,7 +94,7 @@ export function renderDocument(
     const sources = m.supply.searches?.length
       ? m.supply.searches
       : [{ url: m.supply.sourceUrl, query: m.supply.query }];
-    content = `<p class="eyebrow">${e("CATEGORY INTELLIGENCE /")} ${e(m.geo || "WORLDWIDE")}</p><h1>${e(m.topic.name)}<span class="lime">.</span></h1><p>${e(m.topic.description)}</p>
+    content = `<p class="eyebrow">${e("CATEGORY INTELLIGENCE /")} ${e(m.geo || "WORLDWIDE")}</p><h1>${e(m.topic.name)}</h1><p>${e(m.topic.description)}</p>
       <section><p>${e(assessment.level === "provisional" ? "Preliminary recommendation" : "Measured classification")}</p><h2>${escapeHtml(assessment.title)}</h2><p>${escapeHtml(assessment.summary)}</p><p>${e("Report dated")} <time datetime="${escapeHtml(m.asOf)}">${escapeHtml(m.asOf.slice(0, 10))}</time> · ${e("Method")} ${escapeHtml(m.version)} · ${e(m.confidence)} ${e("evidence confidence")}</p>
       ${list(assessment.facts)}${m.kind === "uncertain" ? `<p>${e("Quadrant not yet established")}</p><h3>${e("What to do next")}</h3>${list(assessment.nextSteps)}` : ""}
       <dl><dt>${e("Matching active GitHub projects")}</dt><dd>${m.supply.error ? "—" : (m.supply.complete ? "" : "≥") + number(m.supply.total)}</dd><dt>${e("Search-interest growth")}</dt><dd>${growth(m)} · ${e("Last 8 complete weeks vs previous 8")}</dd><dt>${e("Search term and region")}</dt><dd>${escapeHtml(m.demand.keyword)} · ${e(m.geo || "Worldwide")}</dd><dt>${e("Complete weekly observations")}</dt><dd>${m.metrics.points}</dd></dl></section>
@@ -113,7 +113,7 @@ export function renderDocument(
   } else if (status === 404) {
     content = `<h1>${e("Page not found.")}</h1><p>${e("This report or page is unavailable.")} ${link("/", "Explore the radar")}</p>`;
   } else if (path === "/") {
-    content = `<p class="eyebrow">${e("GITHUB SUPPLY × GOOGLE SEARCH DEMAND")}</p><h1>${e("Know where to build")}<span class="lime">.</span></h1><p>${e("Explore active open-source supply and sustained search growth. Every category links to its evidence, dates and limitations.")}</p>${table()}<p>${e("Search growth compares the last eight complete weeks with the previous eight. Counts can overlap; GitHub topic labels do not cover every competitor.")}</p>`;
+    content = `<p class="eyebrow">${e("GITHUB SUPPLY × GOOGLE SEARCH DEMAND")}</p><h1>${e("Know where to build")}</h1><p>${e("Explore active open-source supply and sustained search growth. Every category links to its evidence, dates and limitations.")}</p>${table()}<p>${e("Search growth compares the last eight complete weeks with the previous eight. Counts can overlap; GitHub topic labels do not cover every competitor.")}</p>`;
   } else if (path === "/start") {
     content = `<h1>${e("Research in your own workflow")}</h1><p>${e("Use the hosted website, or run the same open-source engine with your own keys.")}</p><h2>${e("Hosted website")}</h2><p>${e("Read public reports freely. Sign in for private scans, saved reports and projects across devices.")}</p><h2>CLI / MCP</h2><p>${e("CLI, MCP and local Web share your SQLite workspace. Configure your GitHub key and an optional DeepSeek key. Hosted account history is separate.")}</p><pre>npm install -g https://ghtrends.dev/radar/ghtrends.tgz\nghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>${link(SOURCE, "Source and setup instructions")}</p>`;
   } else if (path === "/docs") {

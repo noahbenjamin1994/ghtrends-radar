@@ -153,10 +153,7 @@ export function AdminView({ account }: { account: Account | null }) {
       </div>
       <div className="admin-heading">
         <div>
-          <h1>
-            {l("Keep the radar running", "运行与消耗")}
-            <span className="lime">.</span>
-          </h1>
+          <h1>{l("Keep the radar running", "运行与消耗")}</h1>
           <p>
             {l(
               "Scans, source health and recorded AI usage.",

@@ -47,6 +47,7 @@ import {
   pct,
   kindLabels,
   kindColors,
+  topicColor,
 } from "./components.js";
 import { downloadCard } from "./export.js";
 import { marketAssessment } from "../core/assessment.js";
@@ -455,10 +456,7 @@ export function App() {
                   <span className="live-dot" />
                   {t("THE OPEN-SOURCE OPPORTUNITY RADAR")}
                 </div>
-                <h1>
-                  {t("Research your next idea")}
-                  <span className="lime">.</span>
-                </h1>
+                <h1>{t("Research your next idea")}</h1>
               </div>
               <div className="heading-aside">
                 <p>
@@ -517,6 +515,8 @@ export function App() {
                     <ArrowUpRight size={15} />
                   </button>
                 </form>
+              </div>
+              <div className="search-options">
                 <label className="select-field">
                   <Globe2 size={15} />
                   <select
@@ -541,24 +541,26 @@ export function App() {
                   </select>
                   <ChevronDown size={13} />
                 </label>
+                <details className="keyword-options">
+                  <summary>
+                    {t("Choose a different Google search term")}
+                  </summary>
+                  <label>
+                    {t("Demand keyword")}
+                    <input
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      maxLength={100}
+                      placeholder={t("Optional — e.g. AI agent memory")}
+                    />
+                  </label>
+                  <p>
+                    {t(
+                      "Keep the GitHub topic above; use this field to measure a more familiar phrase people search for.",
+                    )}
+                  </p>
+                </details>
               </div>
-              <details className="keyword-options">
-                <summary>{t("Choose a different Google search term")}</summary>
-                <label>
-                  {t("Demand keyword")}
-                  <input
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    maxLength={100}
-                    placeholder={t("Optional — e.g. AI agent memory")}
-                  />
-                </label>
-                <p>
-                  {t(
-                    "Keep the GitHub topic above; use this field to measure a more familiar phrase people search for.",
-                  )}
-                </p>
-              </details>
               <p className="scan-access-note">
                 {t(
                   account?.hosted
@@ -586,7 +588,7 @@ export function App() {
                   <div className="section-kicker">{t("PUBLIC RESEARCH")}</div>
                   <h2>
                     {t("Your next starting point")}
-                    <span className="lime">↗</span>
+                    <span className="accent-ink">↗</span>
                   </h2>
                 </div>
                 <span className="updated">
@@ -654,7 +656,7 @@ export function App() {
                       onClick={() => navigate("/market/" + m.topic.slug)}
                       style={
                         {
-                          "--accent": m.topic.color,
+                          "--accent": topicColor(m.topic.slug),
                           "--delay": `${i * 45}ms`,
                         } as React.CSSProperties
                       }
@@ -677,7 +679,7 @@ export function App() {
                         values={completeWeeklySeries(m.demand, m.asOf)
                           .points.slice(-26)
                           .map((p) => p.value)}
-                        color={m.topic.color}
+                        color={topicColor(m.topic.slug)}
                         height={49}
                         fill
                       />
@@ -1134,10 +1136,7 @@ function MarketView({
             {t("CATEGORY INTELLIGENCE /")}
             {m.geo || t("WORLDWIDE")}
           </div>
-          <h1>
-            {t(m.topic.name)}
-            <span className="lime">.</span>
-          </h1>
+          <h1>{t(m.topic.name)}</h1>
           <p>{t(m.topic.description)}</p>
         </div>
         <div className="detail-actions">
@@ -1452,7 +1451,7 @@ function MarketView({
             </div>
             <Sparkline
               values={demandPoints.map((p) => p.value)}
-              color={m.topic.color}
+              color={topicColor(m.topic.slug)}
               height={180}
               fill
               domain={[0, 100]}
@@ -1508,7 +1507,7 @@ function MarketView({
                   values={completeWeeklySeries(d, m.asOf).points.map(
                     (p) => p.value,
                   )}
-                  color={i === 0 ? m.topic.color : "#aab1c5"}
+                  color={i === 0 ? topicColor(m.topic.slug) : "#8963b0"}
                   height={110}
                   domain={[0, 100]}
                 />
@@ -1894,10 +1893,7 @@ function CompareView({
   return (
     <div className="detail-page">
       <div className="eyebrow">{t("SIDE BY SIDE")}</div>
-      <h1>
-        {t("Compare the contenders")}
-        <span className="lime">.</span>
-      </h1>
+      <h1>{t("Compare the contenders")}</h1>
       <p className="page-intro">
         {t(
           "A shared view of growth, activity and maintenance. Choose what deserves a closer look.",
@@ -2048,10 +2044,7 @@ function WatchView({
   return (
     <div className="detail-page">
       <div className="eyebrow">{t("YOUR RESEARCH")}</div>
-      <h2>
-        {t("Saved projects")}
-        <span className="lime">.</span>
-      </h2>
+      <h2>{t("Saved projects")}</h2>
       <p className="page-intro">
         {t(
           "Projects saved in your workspace. Data refreshes when you open this list; alerts are not enabled.",
@@ -2154,7 +2147,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.6.0/ghtrends-radar-0.6.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.7.0/ghtrends-radar-0.7.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}
@@ -2203,10 +2196,7 @@ function Docs() {
   return (
     <div className="docs-page">
       <div className="eyebrow">{t("OPEN DATA. OPEN METHOD.")}</div>
-      <h1>
-        {t("A signal you can inspect")}
-        <span className="lime">.</span>
-      </h1>
+      <h1>{t("A signal you can inspect")}</h1>
       <p className="page-intro">
         {t(
           "ghtrends puts two independent questions together: how much active open-source supply exists, and whether search demand is growing.",
@@ -2367,10 +2357,7 @@ function GapView() {
   return (
     <div className="detail-page">
       <div className="eyebrow">{t("LISTEN BEFORE YOU BUILD")}</div>
-      <h1>
-        {t("Find the friction")}
-        <span className="lime">.</span>
-      </h1>
+      <h1>{t("Find the friction")}</h1>
       <p className="page-intro">
         {t(
           "Open issues people care enough to react to. Follow the source, understand the workflow, and validate the need.",

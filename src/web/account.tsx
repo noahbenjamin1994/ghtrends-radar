@@ -101,10 +101,7 @@ export function HistoryView({
       <div className="eyebrow">{t("YOUR RESEARCH")}</div>
       <div className="history-heading">
         <div>
-          <h1>
-            {t("Pick up where you left off")}
-            <span className="lime">.</span>
-          </h1>
+          <h1>{t("Pick up where you left off")}</h1>
           <p>
             {t(
               "Completed scans are saved automatically. New personal reports stay private until you share them.",

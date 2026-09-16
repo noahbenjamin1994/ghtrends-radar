@@ -19,11 +19,11 @@ export const kindLabels: Record<MarketKind, string> = {
   uncertain: t("Needs validation"),
 };
 export const kindColors: Record<MarketKind, string> = {
-  blue: "#bcf85e",
-  expanding: "#ffbb7b",
-  contested: "#e99c9a",
-  quiet: "#a1abb0",
-  uncertain: "#77817b",
+  blue: "#18846b",
+  expanding: "#3768af",
+  contested: "#a36a3c",
+  quiet: "#666666",
+  uncertain: "#777777",
 };
 export const number = (n: number | null | undefined) =>
   n == null
@@ -34,6 +34,22 @@ export const number = (n: number | null | undefined) =>
       }).format(n);
 export const pct = (n: number | null) =>
   n === null ? "—" : `${n >= 0 ? "+" : ""}${(n * 100).toFixed(0)}%`;
+// Stable colors for visual identity; report data keeps its original values.
+export function topicColor(slug: string) {
+  const palette = [
+    "#3d70b5",
+    "#18846b",
+    "#8b5baf",
+    "#b57237",
+    "#318793",
+    "#b65a83",
+  ];
+  const hash = Array.from(slug).reduce(
+    (n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0,
+    0,
+  );
+  return palette[hash % palette.length];
+}
 export function Logo() {
   return (
     <span className="brand">
@@ -80,7 +96,7 @@ export function Growth({ value }: { value: number | null }) {
 }
 export function Sparkline({
   values,
-  color = "#bcf85e",
+  color = "#18846b",
   height = 48,
   fill = false,
   domain,
@@ -175,8 +191,8 @@ export function Radar({
       >
         <defs>
           <radialGradient id="radarGlow" cx="0.18" cy="0.18" r=".8">
-            <stop stopColor="#bdf665" stopOpacity=".12" />
-            <stop offset="1" stopColor="#bdf665" stopOpacity="0" />
+            <stop stopColor="#68b7a0" stopOpacity=".12" />
+            <stop offset="1" stopColor="#68b7a0" stopOpacity="0" />
           </radialGradient>
           <pattern
             id="radarGrid"
@@ -184,10 +200,10 @@ export function Radar({
             height="34"
             patternUnits="userSpaceOnUse"
           >
-            <circle cx="1" cy="1" r=".7" fill="#ffffff" opacity=".14" />
+            <circle cx="1" cy="1" r=".7" fill="#657080" opacity=".18" />
           </pattern>
         </defs>
-        <rect x="44" y="24" width="580" height="397" rx="12" fill="#121713" />
+        <rect x="44" y="24" width="580" height="397" rx="12" fill="#f5f6f7" />
         <rect
           x="44"
           y="24"
@@ -199,30 +215,30 @@ export function Radar({
         <rect x="44" y="24" width="580" height="397" fill="url(#radarGrid)" />
         <path
           d="M334 24V421M44 247H624"
-          stroke="#5c6a60"
+          stroke="#c5cacf"
           strokeWidth="1"
           strokeDasharray="4 6"
         />
         <g className="radar-label">
-          <text x="64" y="56" fill="#bcf85e">
+          <text x="64" y="56" fill="#18846b">
             {t("RISING / LIMITED SUPPLY")}
           </text>
           <text x="64" y="75" className="radar-sub">
             {t("Room to build")}
           </text>
-          <text x="600" y="56" textAnchor="end" fill="#ffbb7b">
+          <text x="600" y="56" textAnchor="end" fill="#3768af">
             {t("RISING / ESTABLISHED SUPPLY")}
           </text>
           <text x="600" y="75" textAnchor="end" className="radar-sub">
             {t("Search rising; compare alternatives")}
           </text>
-          <text x="64" y="383" fill="#a1abb0">
+          <text x="64" y="383" fill="#666666">
             {t("LIMITED SUPPLY")}
           </text>
           <text x="64" y="402" className="radar-sub">
             {t("Validate the need")}
           </text>
-          <text x="600" y="383" textAnchor="end" fill="#e99c9a">
+          <text x="600" y="383" textAnchor="end" fill="#a36a3c">
             {t("ESTABLISHED SUPPLY")}
           </text>
           <text x="600" y="402" textAnchor="end" className="radar-sub">
@@ -262,15 +278,15 @@ export function Radar({
               cx={x}
               cy={y}
               r="16"
-              fill={m.topic.color}
+              fill={topicColor(m.topic.slug)}
               opacity={hover === m.id ? ".18" : ".045"}
             />
             <circle
               cx={x}
               cy={y}
               r={hover === m.id ? 8 : 5}
-              fill={m.topic.color}
-              stroke="#141b15"
+              fill={topicColor(m.topic.slug)}
+              stroke="#ffffff"
               strokeWidth="2"
             />
             {hover === m.id && (
@@ -280,7 +296,7 @@ export function Radar({
                 cy={y}
                 r="13"
                 fill="none"
-                stroke={m.topic.color}
+                stroke={topicColor(m.topic.slug)}
                 opacity=".5"
               />
             )}
@@ -301,14 +317,14 @@ export function Radar({
                 width="175"
                 height="43"
                 rx="6"
-                fill="#0d130e"
-                stroke={m.topic.color}
+                fill="#ffffff"
+                stroke={topicColor(m.topic.slug)}
                 strokeOpacity=".6"
               />
               <text
                 x={Math.min(x - 69, 451)}
                 y={y - 48}
-                fill="#edf4e9"
+                fill="#242424"
                 fontSize="12"
               >
                 {t(m.topic.name)}
@@ -316,7 +332,7 @@ export function Radar({
               <text
                 x={Math.min(x - 69, 451)}
                 y={y - 33}
-                fill="#9eac98"
+                fill="#666666"
                 fontSize="9"
               >
                 {m.supply.total}
@@ -332,7 +348,7 @@ export function Radar({
               x="334"
               y="203"
               textAnchor="middle"
-              fill="#c4cec3"
+              fill="#444444"
               fontSize="17"
             >
               {t("Your next opportunity starts with evidence.")}
@@ -341,7 +357,7 @@ export function Radar({
               x="334"
               y="227"
               textAnchor="middle"
-              fill="#89958b"
+              fill="#777777"
               fontSize="13"
             >
               {t("Scan a topic to place it on the radar.")}
@@ -359,7 +375,7 @@ export function Radar({
             onBlur={() => setHover(null)}
             onClick={() => onSelect(m)}
           >
-            <i style={{ background: m.topic.color }} />
+            <i style={{ background: topicColor(m.topic.slug) }} />
             {t(m.topic.name)}
           </button>
         ))}
@@ -506,12 +522,12 @@ export function Loading({
 }
 export function ComparisonChart({ repos }: { repos: Repo[] }) {
   const colors = [
-    "#bcf85e",
-    "#79c9ff",
-    "#cdadff",
-    "#ffbc8b",
-    "#69d9c3",
-    "#f19eba",
+    "#18846b",
+    "#3d70b5",
+    "#8b5baf",
+    "#b57237",
+    "#318793",
+    "#b65a83",
   ];
   const dates = [
     ...new Set(repos.flatMap((r) => r.starHistory.map((p) => p.date))),
@@ -549,14 +565,14 @@ export function ComparisonChart({ repos }: { repos: Repo[] }) {
               x2="880"
               y1={210 - f * 180}
               y2={210 - f * 180}
-              stroke="#34402e"
+              stroke="#e6e6e6"
               strokeDasharray="3 5"
             />
             <text
               x="34"
               y={214 - f * 180}
               textAnchor="end"
-              fill="#94a68b"
+              fill="#707070"
               fontSize="11"
             >
               {Math.round(maximum * f)}
@@ -591,10 +607,10 @@ export function ComparisonChart({ repos }: { repos: Repo[] }) {
             </path>
           );
         })}
-        <text x="44" y="240" fill="#94a68b" fontSize="11">
+        <text x="44" y="240" fill="#707070" fontSize="11">
           {dates[0]}
         </text>
-        <text x="880" y="240" textAnchor="end" fill="#94a68b" fontSize="11">
+        <text x="880" y="240" textAnchor="end" fill="#707070" fontSize="11">
           {dates.at(-1)}
         </text>
       </svg>
