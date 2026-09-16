@@ -96,6 +96,12 @@ export const zh: Record<string, string> = {
   "Your research history · ghtrends": "我的研究历史 · ghtrends",
   "Supply counts active repositories matching the displayed GitHub topic and phrase queries; unmatched and closed-source competitors are outside this coverage.":
     "供给统计覆盖展示的 GitHub 主题与短语所匹配的活跃仓库；未匹配到的项目及闭源产品不在覆盖范围内。",
+  "Blue ocean": "蓝海",
+  "Growing red ocean": "增长红海",
+  "Red ocean": "红海",
+  "Quiet ocean": "静海",
+  "Ocean labels summarize search direction and observed open-source supply. They are research signals, not verified measures of commercial competition. A quiet ocean may still be a valuable niche.":
+    "海域名称概括搜索方向与已观察到的开源供给，是研究信号，不是对真实商业竞争的定论。静海仍可能是有价值的小众市场。",
   "Rising · limited supply": "搜索上升 · 供给较少",
   "Rising · established supply": "搜索上升 · 供给已有规模",
   "Established supply": "供给已有规模",
@@ -381,7 +387,7 @@ export const zh: Record<string, string> = {
   "Identify a reason people would switch.": "找到用户愿意迁移的理由。",
   "Check if the market is early, niche or inactive.":
     "验证是早期、小众还是缺乏活力。",
-  "“Uncharted” means the evidence is missing, stale or too weak. Zero search values can be rounded or below Google’s reporting threshold; they never establish that demand does not exist.":
+  "“Needs validation” means the evidence is missing, stale or too weak. Zero search values can be rounded or below Google’s reporting threshold; they never establish that demand does not exist.":
     "数据缺失、过旧或过弱时，报告会给出初步行动建议，并保留象限未定状态。搜索值为零可能源于取整或低于 Google 报告门槛，不能据此认定需求不存在。",
   "01 / DEMAND": "01 / 需求",
   "Look past the spike.": "看持续增长，不只看峰值。",

@@ -2147,7 +2147,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.7.0/ghtrends-radar-0.7.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.7.1/ghtrends-radar-0.7.1.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}
@@ -2250,7 +2250,12 @@ function Docs() {
         </table>
         <p>
           {t(
-            "“Uncharted” means the evidence is missing, stale or too weak. Zero search values can be rounded or below Google’s reporting threshold; they never establish that demand does not exist.",
+            "Ocean labels summarize search direction and observed open-source supply. They are research signals, not verified measures of commercial competition. A quiet ocean may still be a valuable niche.",
+          )}
+        </p>
+        <p>
+          {t(
+            "“Needs validation” means the evidence is missing, stale or too weak. Zero search values can be rounded or below Google’s reporting threshold; they never establish that demand does not exist.",
           )}
         </p>
       </section>

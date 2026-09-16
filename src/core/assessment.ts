@@ -1,6 +1,6 @@
 import type { Market } from "./types.js";
 import { resolveTopic } from "./topics.js";
-import { text, type Locale } from "./i18n.js";
+import { text, MARKET_LABELS, type Locale } from "./i18n.js";
 
 export function marketAssessment(m: Market, locale: Locale = "en") {
   const t = (value: string, vars: Record<string, string | number> = {}) =>
@@ -120,6 +120,7 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
         ),
       ];
   return {
+    landscape: t(MARKET_LABELS[m.kind]),
     level: provisional ? ("provisional" as const) : ("measured" as const),
     title,
     summary,

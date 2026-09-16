@@ -19,12 +19,15 @@ Find growing categories, inspect the competition, and share the evidence.
 
 ## What does it tell you?
 
-| Search direction | Active open-source supply | Interpretation |
-|---|---|---|
-| Rising | Few matching projects | Investigate a specific underserved use case |
-| Rising | Established supply | Compare workflows, audiences and switching costs |
-| Stable / falling | Any | State the measured direction; do not infer a commercial “red ocean” |
-| Conflicting / insufficient | Any | Explain the known facts and the next validation step |
+| Landscape | Search direction | Matching active projects | Starting strategy |
+|---|---|---|---|
+| Blue ocean | Rising | Fewer than 50 | Validate an underserved use case |
+| Growing red ocean | Rising | At least 50 | Find a specific audience or advantage |
+| Red ocean | Stable / falling | At least 50 | Identify a reason users would switch |
+| Quiet ocean | Stable / falling | Fewer than 50 | Check whether it is early, niche or inactive |
+| Needs validation | Conflicting / insufficient evidence | Any | Inspect known facts and validate the missing evidence |
+
+Ocean names summarize the observed search and open-source signals; they do not establish commercial competition. A quiet ocean can still be a valuable niche.
 
 Every result includes its source queries, dates, methodology version and limitations. Category and report pages include readable HTML evidence before JavaScript loads, and shared links show the specific report in their previews. Search interest measures attention, not paying customers. A quadrant is a research starting point, not a prediction of commercial success.
 
@@ -53,7 +56,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.7.0/ghtrends-radar-0.7.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.7.1/ghtrends-radar-0.7.1.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json

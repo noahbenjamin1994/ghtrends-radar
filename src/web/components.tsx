@@ -1,4 +1,5 @@
 import { t, locale } from "./i18n.js";
+import { MARKET_LABELS } from "../core/i18n.js";
 import React, { useId, useState } from "react";
 import {
   ArrowUpRight,
@@ -12,16 +13,16 @@ import {
 } from "lucide-react";
 import type { Market, MarketKind, Repo } from "../core/types.js";
 export const kindLabels: Record<MarketKind, string> = {
-  blue: t("Rising · limited supply"),
-  expanding: t("Rising · established supply"),
-  contested: t("Established supply"),
-  quiet: t("Limited observed supply"),
-  uncertain: t("Needs validation"),
+  blue: t(MARKET_LABELS.blue),
+  expanding: t(MARKET_LABELS.expanding),
+  contested: t(MARKET_LABELS.contested),
+  quiet: t(MARKET_LABELS.quiet),
+  uncertain: t(MARKET_LABELS.uncertain),
 };
 export const kindColors: Record<MarketKind, string> = {
-  blue: "#18846b",
-  expanding: "#3768af",
-  contested: "#a36a3c",
+  blue: "#3768af",
+  expanding: "#a36a3c",
+  contested: "#a3544b",
   quiet: "#666666",
   uncertain: "#777777",
 };
@@ -220,26 +221,26 @@ export function Radar({
           strokeDasharray="4 6"
         />
         <g className="radar-label">
-          <text x="64" y="56" fill="#18846b">
-            {t("RISING / LIMITED SUPPLY")}
+          <text x="64" y="56" fill={kindColors.blue}>
+            {kindLabels.blue}
           </text>
           <text x="64" y="75" className="radar-sub">
             {t("Room to build")}
           </text>
-          <text x="600" y="56" textAnchor="end" fill="#3768af">
-            {t("RISING / ESTABLISHED SUPPLY")}
+          <text x="600" y="56" textAnchor="end" fill={kindColors.expanding}>
+            {kindLabels.expanding}
           </text>
           <text x="600" y="75" textAnchor="end" className="radar-sub">
             {t("Search rising; compare alternatives")}
           </text>
           <text x="64" y="383" fill="#666666">
-            {t("LIMITED SUPPLY")}
+            {kindLabels.quiet}
           </text>
           <text x="64" y="402" className="radar-sub">
             {t("Validate the need")}
           </text>
-          <text x="600" y="383" textAnchor="end" fill="#a36a3c">
-            {t("ESTABLISHED SUPPLY")}
+          <text x="600" y="383" textAnchor="end" fill={kindColors.contested}>
+            {kindLabels.contested}
           </text>
           <text x="600" y="402" textAnchor="end" className="radar-sub">
             {t("Find your difference")}

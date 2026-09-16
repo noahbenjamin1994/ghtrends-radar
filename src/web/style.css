@@ -4247,3 +4247,17 @@ footer small {
     width: auto;
   }
 }
+
+/* Ocean names use restrained, corresponding status colors. */
+.pill.blue {
+  background: #eaf0fc;
+  color: #325c9b;
+}
+.pill.expanding {
+  background: #faf0e6;
+  color: #915b2f;
+}
+.pill.contested {
+  background: #f8ecea;
+  color: #9b4d45;
+}

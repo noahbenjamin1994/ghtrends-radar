@@ -38,6 +38,8 @@ export function marketMarkdown(
     "",
     `**${t(a.level === "provisional" ? "Preliminary recommendation" : "Measured classification")}**`,
     "",
+    `${t("Landscape")}: **${a.landscape}**`,
+    "",
     a.summary,
     "",
     ...(m.brief

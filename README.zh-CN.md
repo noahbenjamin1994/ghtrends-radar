@@ -19,12 +19,15 @@
 
 ## 它能告诉你什么？
 
-| 搜索方向 | 活跃开源供给 | 结论 |
-|---|---|---|
-| 上升 | 匹配项目少 | 验证具体、尚未被充分服务的场景 |
-| 上升 | 已有一定规模 | 比较工作流、受众与迁移成本 |
-| 平稳 / 下降 | 任意 | 明确实际搜索变化，不直接推断商业“红海” |
-| 分歧 / 证据不足 | 任意 | 说明已知事实，以及下一步该验证什么 |
+| 海域 | 搜索方向 | 匹配的活跃项目 | 起步策略 |
+|---|---|---|---|
+| 蓝海 | 上升 | 少于 50 个 | 验证尚未被充分服务的使用场景 |
+| 增长红海 | 上升 | 至少 50 个 | 找到具体受众或独特优势 |
+| 红海 | 平稳 / 下降 | 至少 50 个 | 找到用户愿意迁移的理由 |
+| 静海 | 平稳 / 下降 | 少于 50 个 | 验证是早期、小众还是缺乏活力 |
+| 待验证 | 信号分歧 / 证据不足 | 任意 | 检查已知事实，补充缺失证据 |
+
+海域名称概括已观察到的搜索和开源信号，不代表已经证实真实商业竞争；静海仍可能是有价值的小众市场。
 
 每份报告包含来源查询、采集日期、方法版本和适用范围。分类页与报告页在 JavaScript 加载前就包含可读证据正文。搜索关注度不能直接代表付费客户，象限分类用于决定下一步研究方向，不预测商业成功。
 
@@ -57,7 +60,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.7.0/ghtrends-radar-0.7.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.7.1/ghtrends-radar-0.7.1.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json

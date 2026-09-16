@@ -2,6 +2,13 @@ import { zh } from "./translations.js";
 import type { Market } from "./types.js";
 
 export type Locale = "en" | "zh";
+export const MARKET_LABELS: Record<Market["kind"], string> = {
+  blue: "Blue ocean",
+  expanding: "Growing red ocean",
+  contested: "Red ocean",
+  quiet: "Quiet ocean",
+  uncertain: "Needs validation",
+};
 export function text(
   value: string,
   locale: Locale = "en",

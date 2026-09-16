@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { writeFileSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { marketAssessment } from "./core/assessment.js";
 import { Engine } from "./core/engine.js";
 import { marketMarkdown, compareMarkdown } from "./core/report.js";
 import { validateRepo } from "./core/topics.js";
@@ -11,7 +12,7 @@ const program = new Command()
   .description(
     "GitHub supply × Google search demand. Find your next open-source opportunity.",
   )
-  .version("0.7.0");
+  .version("0.7.1");
 const withEngine = (fn: (engine: Engine) => Promise<void>) => async () => {
   const e = new Engine();
   try {
@@ -22,7 +23,9 @@ const withEngine = (fn: (engine: Engine) => Promise<void>) => async () => {
 };
 const json = (x: unknown) => console.log(JSON.stringify(x, null, 2));
 const summary = (m: Market) => {
-  console.log(`\n${m.topic.name} · ${m.headline}\n${m.strategy}\n`);
+  console.log(
+    `\n${m.topic.name} · ${marketAssessment(m).landscape} · ${m.headline}\n${m.strategy}\n`,
+  );
   console.table({
     supply: { value: m.supply.total },
     searchGrowth: {
