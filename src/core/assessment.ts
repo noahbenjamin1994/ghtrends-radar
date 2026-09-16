@@ -31,7 +31,7 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
   if (supplyKnown)
     facts.push(
       t("{count} active projects match the published GitHub search scope.", {
-        count: m.supply.total,
+        count: m.supply.complete ? m.supply.total : "≥" + m.supply.total,
       }),
     );
   if (!m.demand.error && fresh(m.demand.fetchedAt) && m.metrics.points)

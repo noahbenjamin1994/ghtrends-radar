@@ -23,6 +23,7 @@ interface Job {
   id: string;
   state: "queued" | "running" | "complete" | "failed";
   topic: string;
+  input?: string;
   geo: string;
   keyword?: string;
   refresh?: boolean;
@@ -340,6 +341,7 @@ export function createApp(engine = new Engine()) {
         id: randomUUID(),
         state: "queued",
         topic: topic.slug,
+        input: q.body.topic,
         geo,
         keyword: topic.keyword,
         created: Date.now(),

@@ -108,6 +108,12 @@ test("Chinese reports, metadata and exports agree while preserving identity and 
   const card = marketCard(m, "https://radar.ghtrends.dev/report/" + m.id, "zh");
   assert.match(card, /尚未确认/);
   assert.ok(!card.includes("-17%"));
+  m.supply.complete = false;
+  assert.ok(marketAssessment(m, "zh").facts.some((f) => f.includes("≥11")));
+  assert.match(
+    marketCard(m, "https://radar.ghtrends.dev/report/" + m.id, "zh"),
+    /≥11/,
+  );
   assert.equal(
     localeUrl("/compare?repos=a%2Fb%2Cc%2Fd", "zh"),
     "/compare?repos=a%2Fb%2Cc%2Fd&lang=zh",

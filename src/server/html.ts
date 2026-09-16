@@ -52,7 +52,7 @@ export function renderDocument(
   const marketPath = (market: Market) =>
     `/market/${market.topic.slug}${market.geo ? `?geo=${market.geo}` : ""}`;
   const table = () =>
-    `<div class="snapshot-table"><table><caption>${e("Measured open-source categories")}</caption><thead><tr>${["Category", "Landscape", "Active projects", "Search growth"].map((s) => `<th scope="col">${e(s)}</th>`).join("")}</tr></thead><tbody>${markets.map((market) => `<tr><th scope="row">${link(marketPath(market), market.topic.name)}</th><td>${e(marketAssessment(market, locale).title)}</td><td>${number(market.supply.total)}</td><td>${growth(market)}</td></tr>`).join("")}</tbody></table></div>`;
+    `<div class="snapshot-table"><table><caption>${e("Measured open-source categories")}</caption><thead><tr>${["Category", "Landscape", "Active projects", "Search growth"].map((s) => `<th scope="col">${e(s)}</th>`).join("")}</tr></thead><tbody>${markets.map((market) => `<tr><th scope="row">${link(marketPath(market), market.topic.name)}</th><td>${e(marketAssessment(market, locale).title)}</td><td>${market.supply.error ? "—" : (market.supply.complete ? "" : "≥") + number(market.supply.total)}</td><td>${growth(market)}</td></tr>`).join("")}</tbody></table></div>`;
   const assessment = m ? marketAssessment(m, locale) : null;
   const titles: Record<string, string> = {
     "/": "ghtrends — Know where to build",
@@ -68,7 +68,7 @@ export function renderDocument(
         ? `${t(m.topic.name)}: ${assessment!.title} · ghtrends`
         : t(titles[path] || "Repository intelligence · ghtrends");
   const description = m
-    ? `${assessment!.title}. ${t("{count} active projects match the published GitHub search scope.", { count: m.supply.total })} ${t("Evidence dated {date}.", { date: m.asOf.slice(0, 10) })}`
+    ? `${assessment!.title}. ${t("{count} active projects match the published GitHub search scope.", { count: m.supply.complete ? m.supply.total : "≥" + m.supply.total })} ${t("Evidence dated {date}.", { date: m.asOf.slice(0, 10) })}`
     : t(
         "GitHub supply × Google search demand. Explore category evidence, compare repositories, and use the open-source CLI and MCP server.",
       );
@@ -89,7 +89,7 @@ export function renderDocument(
     content = `<p class="eyebrow">${e("CATEGORY INTELLIGENCE /")} ${e(m.geo || "WORLDWIDE")}</p><h1>${e(m.topic.name)}<span class="lime">.</span></h1><p>${e(m.topic.description)}</p>
       <section><p>${e(assessment.level === "provisional" ? "Preliminary recommendation" : "Measured classification")}</p><h2>${escapeHtml(assessment.title)}</h2><p>${escapeHtml(assessment.summary)}</p><p>${e("Report dated")} <time datetime="${escapeHtml(m.asOf)}">${escapeHtml(m.asOf.slice(0, 10))}</time> · ${e("Method")} ${escapeHtml(m.version)} · ${e(m.confidence)} ${e("evidence confidence")}</p>
       ${list(assessment.facts)}${m.kind === "uncertain" ? `<p>${e("Quadrant not yet established")}</p><h3>${e("What to do next")}</h3>${list(assessment.nextSteps)}` : ""}
-      <dl><dt>${e("Matching active GitHub projects")}</dt><dd>${number(m.supply.total)}</dd><dt>${e("Search-interest growth")}</dt><dd>${growth(m)} · ${e("Last 8 complete weeks vs previous 8")}</dd><dt>${e("Search term and region")}</dt><dd>${escapeHtml(m.demand.keyword)} · ${e(m.geo || "Worldwide")}</dd><dt>${e("Complete weekly observations")}</dt><dd>${m.metrics.points}</dd></dl></section>
+      <dl><dt>${e("Matching active GitHub projects")}</dt><dd>${m.supply.error ? "—" : (m.supply.complete ? "" : "≥") + number(m.supply.total)}</dd><dt>${e("Search-interest growth")}</dt><dd>${growth(m)} · ${e("Last 8 complete weeks vs previous 8")}</dd><dt>${e("Search term and region")}</dt><dd>${escapeHtml(m.demand.keyword)} · ${e(m.geo || "Worldwide")}</dd><dt>${e("Complete weekly observations")}</dt><dd>${m.metrics.points}</dd></dl></section>
       <section><h2>${e("Why this classification")}</h2>${list(m.reasons)}</section>
       <section><h2>${e("Source evidence")}</h2>${sources.map((s) => `<p>${link(s.url, "GitHub repository search")} · <code>${escapeHtml(s.query)}</code></p>`).join("")}<p>${e("Collected")} ${escapeHtml(m.supply.fetchedAt)}</p><p>${link(m.demand.sourceUrl, "Google Trends search interest")} · ${e("Collected")} ${escapeHtml(m.demand.fetchedAt)}</p></section>
       <section><h2>${e("Leading repositories")}</h2><div class="snapshot-table"><table><thead><tr>${["Repository", "Stars", "Description"].map((s) => `<th scope="col">${e(s)}</th>`).join("")}</tr></thead><tbody>${m.supply.repositories

@@ -82,6 +82,8 @@ export function App() {
       id: string;
       state: string;
       topic: string;
+      input?: string;
+      keyword?: string;
       created?: number;
       queuePosition?: number;
       progress?: ScanProgress;
@@ -308,7 +310,8 @@ export function App() {
             rel="noreferrer"
           >
             <Star size={15} />
-            {t("Star on GitHub")}
+            <span className="github-label">{t("Star on GitHub")}</span>
+            <span className="github-short">Star</span>
             <ArrowUpRight size={14} />
           </a>
           <button
@@ -474,7 +477,15 @@ export function App() {
                   <Globe2 size={15} />
                   <select
                     value={geo}
-                    onChange={(e) => setGeo(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setGeo(value);
+                      const url = new URL(location.href);
+                      if (value) url.searchParams.set("geo", value);
+                      else url.searchParams.delete("geo");
+                      history.replaceState({}, "", url.pathname + url.search);
+                      setPath(url.pathname + url.search);
+                    }}
                     aria-label={t("Search-demand region")}
                   >
                     <option value="">{t("Worldwide")}</option>
@@ -589,7 +600,12 @@ export function App() {
                         </div>
                         <div>
                           <small>{t("Active projects")}</small>
-                          <strong>{number(m.supply.total)}</strong>
+                          <strong>
+                            {m.supply.error
+                              ? "—"
+                              : (m.supply.complete ? "" : "≥") +
+                                number(m.supply.total)}
+                          </strong>
                         </div>
                         <div>
                           <small>{t("Evidence")}</small>
@@ -765,11 +781,9 @@ export function App() {
                     {t(
                       "Interpreting “{input}” as {name}; search term: “{keyword}”.",
                       {
-                        input: job!.topic,
+                        input: job!.input || job!.topic,
                         name: t(scanTopic.name),
-                        keyword:
-                          job?.progress?.preview?.demand.keyword ||
-                          scanTopic.keyword,
+                        keyword: job?.keyword || scanTopic.keyword,
                       },
                     )}
                   </p>
@@ -1012,7 +1026,11 @@ function MarketView({
         </div>
         <div>
           <span>{t("Active project supply")}</span>
-          <strong>{number(m.supply.total)}</strong>
+          <strong>
+            {m.supply.error
+              ? "—"
+              : (m.supply.complete ? "" : "≥") + number(m.supply.total)}
+          </strong>
           <small>{t("≥5 stars · pushed within 180 days")}</small>
         </div>
         <div>
