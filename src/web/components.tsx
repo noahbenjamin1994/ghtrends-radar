@@ -68,11 +68,11 @@ export function Logo() {
     </span>
   );
 }
-export function Pill({ kind }: { kind: MarketKind }) {
+export function Pill({ kind, label }: { kind: MarketKind; label?: string }) {
   return (
     <span className={`pill ${kind}`}>
       <i />
-      {kindLabels[kind]}
+      {label || kindLabels[kind]}
     </span>
   );
 }

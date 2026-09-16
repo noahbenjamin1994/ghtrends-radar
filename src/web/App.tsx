@@ -754,7 +754,10 @@ export function App() {
                           {m.topic.name.slice(0, 1)}
                           <sup>↗</sup>
                         </span>
-                        <Pill kind={m.kind} />
+                        <Pill
+                          kind={m.kind}
+                          label={marketAssessment(m, locale).landscape}
+                        />
                       </div>
                       <h3>
                         {t(m.topic.name)}
@@ -1381,13 +1384,17 @@ function MarketView({
           <Radio size={30} />
         </div>
         <div>
-          <Pill kind={m.kind} />
+          <Pill kind={m.kind} label={assessment.landscape} />
           <h2>{assessment.title}</h2>
           <p>{assessment.summary}</p>
           {assessment.level === "provisional" && (
             <small className="verdict-qualification">
               {t("Preliminary recommendation")} ·{" "}
-              {t("Quadrant not yet established")}
+              {t(
+                m.topic.scope === "field"
+                  ? "Choose one software workflow to compare."
+                  : "Quadrant not yet established",
+              )}
             </small>
           )}
         </div>

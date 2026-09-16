@@ -1,4 +1,5 @@
 export const zh: Record<string, string> = {
+  "Choose one software workflow to compare.": "选择具体软件工作流继续比较。",
   "Original search filters shown below.": "原始筛选条件见下方来源。",
   "Further categories and qualified search signals appear in the list.":
     "更多类别与待核对的搜索信号见下方列表。",
