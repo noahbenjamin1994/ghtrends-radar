@@ -44,7 +44,7 @@ test("429 stops synonym requests immediately and the cooldown survives a new col
     let requests = 0;
     mock
       .get("https://trends.google.com")
-      .intercept({ path: "/trends/explore" })
+      .intercept({ path: "/trends/?geo=US" })
       .reply(() => {
         requests++;
         return {
@@ -80,7 +80,7 @@ test("HTTP-date cooldown keeps a dated successful snapshot and fresh cached quer
     const until = new Date(Date.now() + 180000).toUTCString();
     mock
       .get("https://trends.google.com")
-      .intercept({ path: "/trends/explore" })
+      .intercept({ path: "/trends/?geo=US" })
       .reply(429, "limited", { headers: { "retry-after": until } });
     const previous = {
       ...structuredClone(seed.demand),
@@ -112,28 +112,39 @@ test("concurrent identical queries share one successful collection", async () =>
   await fixture(async (_store, trends, mock) => {
     let timelines = 0;
     const pool = mock.get("https://trends.google.com");
-    pool.intercept({ path: "/trends/explore" }).reply(200, "page");
-    pool.intercept({ path: /^\/trends\/api\/explore/ }).reply(
-      200,
-      JSON.stringify({
-        widgets: [
-          {
-            id: "TIMESERIES",
-            token: "test",
-            request: {
-              resolution: "WEEK",
-              comparisonItem: [
-                {
-                  complexKeywordsRestriction: {
-                    keyword: [{ value: "cat translator" }],
+    pool
+      .intercept({ path: "/trends/?geo=US" })
+      .reply(200, "page", {
+        headers: {
+          "set-cookie": "NID=anonymous-test; Path=/; Secure; HttpOnly",
+        },
+      });
+    pool
+      .intercept({
+        path: /^\/trends\/api\/explore/,
+        headers: { cookie: "NID=anonymous-test" },
+      })
+      .reply(
+        200,
+        JSON.stringify({
+          widgets: [
+            {
+              id: "TIMESERIES",
+              token: "test",
+              request: {
+                resolution: "WEEK",
+                comparisonItem: [
+                  {
+                    complexKeywordsRestriction: {
+                      keyword: [{ value: "cat translator" }],
+                    },
                   },
-                },
-              ],
+                ],
+              },
             },
-          },
-        ],
-      }),
-    );
+          ],
+        }),
+      );
     pool
       .intercept({ path: /^\/trends\/api\/widgetdata\/multiline/ })
       .reply(() => {
@@ -164,7 +175,7 @@ test("concurrent identical queries share one successful collection", async () =>
 test("server errors get one bounded retry; the next scan uses the successful cache", async () => {
   await fixture(async (_store, trends, mock) => {
     const pool = mock.get("https://trends.google.com");
-    pool.intercept({ path: "/trends/explore" }).reply(200, "page");
+    pool.intercept({ path: "/trends/?geo=US" }).reply(200, "page");
     pool.intercept({ path: /^\/trends\/api\/explore/ }).reply(503, "retry");
     pool.intercept({ path: /^\/trends\/api\/explore/ }).reply(
       200,
@@ -341,4 +352,15 @@ test("source-only empty scans return evidence actions directly and save the repo
     await engine.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("a failed anonymous session bootstrap stops before protected API requests", async () => {
+  await fixture(async (_store, trends, mock) => {
+    const pool = mock.get("https://trends.google.com");
+    pool.intercept({ path: "/trends/?geo=US" }).reply(503, "retry").times(2);
+    const d = await trends.demand("cat translator");
+    assert.match(d.error!, /503/);
+    assert.equal(d.retryAt, undefined);
+    mock.assertNoPendingInterceptors();
+  });
 });

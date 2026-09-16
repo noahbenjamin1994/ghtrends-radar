@@ -36,6 +36,7 @@ export class Trends {
   private queue = Promise.resolve();
   private nextRequestAt = 0;
   private warmup?: Promise<void>;
+  private warmupExpiresAt = 0;
   private inFlight = new Map<string, Promise<DemandEvidence>>();
   private readonly cooldownKey = "trends:cooldown:v1";
   private readonly interval = Math.max(
@@ -129,7 +130,12 @@ export class Trends {
             "User-Agent":
               "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9",
-            "X-Requested-With": "XMLHttpRequest",
+            Accept: path.includes("/api/")
+              ? "application/json, text/plain, */*"
+              : "text/html,application/xhtml+xml",
+            ...(path.includes("/api/")
+              ? { "X-Requested-With": "XMLHttpRequest" }
+              : {}),
             Referer: ORIGIN + "/trends/explore",
             ...(this.cookie ? { Cookie: this.cookie } : {}),
           },
@@ -304,13 +310,19 @@ export class Trends {
     try {
       const until = this.cooldown();
       if (until > Date.now()) throw this.cooldownError(until);
-      if (!this.warmup)
-        this.warmup = this.read("/trends/explore", {}, true).then(() => {});
+      if (!this.warmup || Date.now() >= this.warmupExpiresAt) {
+        // The homepage establishes Google's anonymous NID session. Starting at
+        // /explore can return 429 even on a healthy residential proxy. Refresh
+        // periodically as sticky proxy sessions expire; use only server cookies.
+        this.cookie = "";
+        this.warmupExpiresAt = Date.now() + 10 * 60000;
+        this.warmup = this.read("/trends/", { geo: "US" }).then(() => {});
+      }
       try {
         await this.warmup;
       } catch (error) {
         this.warmup = undefined;
-        if ((error as any).retryAt) throw error;
+        throw error;
       }
       const req = {
         comparisonItem: terms.map((keyword) => ({
