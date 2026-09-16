@@ -143,6 +143,8 @@ ghtrends scan --topic mcp-servers --trends-file demand.json --json
 
 **One codebase.** Self-hosting needs no login provider and no external database. Hosted mode requires sign-in for resource-consuming research and stores user/report ownership, history, watchlists, sessions and daily usage in SQLite. Single instance with a persistent data volume; back up with SQLite's backup API or while stopped, rather than copying a live WAL database file alone.
 
+**Upgrade/rollback:** back up SQLite before upgrading. Versions before 0.3 do not enforce private-report ownership; never run them against a database containing private reports. Restore the pre-upgrade backup before such a rollback, and preserve the newer database separately.
+
 Optional self-hosted AI configuration (server environment only):
 
 ```sh
