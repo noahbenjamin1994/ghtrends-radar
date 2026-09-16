@@ -9,13 +9,13 @@
 **GitHub supply × Google search demand.**
 Find growing categories, inspect the competition, and share the evidence.
 
-[Open the radar](https://radar.ghtrends.dev) · [Methodology](https://radar.ghtrends.dev/docs) · [Report a bug](https://github.com/noahbenjamin1994/ghtrends-radar/issues)
+[Open the radar](https://ghtrends.dev/radar) · [Methodology](https://ghtrends.dev/radar/docs) · [Report a bug](https://github.com/noahbenjamin1994/ghtrends-radar/issues)
 
 </div>
 
 [![Build checks](https://github.com/noahbenjamin1994/ghtrends-radar/actions/workflows/check.yml/badge.svg)](https://github.com/noahbenjamin1994/ghtrends-radar/actions/workflows/check.yml)
 
-[![The live ghtrends opportunity radar](.github/assets/radar-preview.png)](https://radar.ghtrends.dev)
+[![The live ghtrends opportunity radar](.github/assets/radar-preview.png)](https://ghtrends.dev/radar)
 
 ## What does it tell you?
 
@@ -40,20 +40,20 @@ The website supports **English and Simplified Chinese**, including report text, 
 
 ## Try it in 60 seconds
 
-**No installation:** [radar.ghtrends.dev](https://radar.ghtrends.dev). Browse public reports without signing in.
+**No installation:** [ghtrends.dev/radar/](https://ghtrends.dev/radar). Browse public reports without signing in.
 
 **CLI, local UI and MCP:** Node.js 22.13 or newer.
 
 Launch without a global installation:
 
 ```sh
-npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
+npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 ```
 
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.5.0/ghtrends-radar-0.5.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.6.0/ghtrends-radar-0.6.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -154,6 +154,8 @@ ghtrends ui
 ```
 
 The model proposes one primary Trends phrase, up to two genuine synonyms, and bounded GitHub topic/phrase queries. Ambiguous acronyms request clarification. It then summarizes **collected evidence** in English and Chinese; it does not calculate or override metrics. Queries go to DeepSeek, Google and GitHub as needed. Do not enter secrets. A failed brief leaves the source report usable.
+
+`PUBLIC_URL` may include a directory, for example `https://example.com/radar`. The same build supports both directory hosting and a local root URL. Forward that prefix unchanged to the server and configure the matching Logto callback.
 
 For a public hosted instance configure `GHTRENDS_HOSTED=1`, HTTPS `PUBLIC_URL`, `LOGTO_ENDPOINT`, `LOGTO_APP_ID`, `LOGTO_APP_SECRET` and optionally `GHTRENDS_DAILY_SCANS` (default 10). Create a Traditional Logto application with `${PUBLIC_URL}/auth/callback` as its redirect. Keep GitHub/DeepSeek credentials in server secrets, never `VITE_*` or browser storage. OIDC uses PKCE, nonce/state and signed-token validation; the browser gets an HttpOnly, Secure session cookie. Personal mutations also require CSRF validation.
 

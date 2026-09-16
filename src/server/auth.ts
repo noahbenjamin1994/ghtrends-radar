@@ -1,3 +1,4 @@
+import { appPath, basePathFromUrl } from "../core/paths.js";
 import type { Express, Request, Response } from "express";
 import { createHash, randomBytes } from "node:crypto";
 import * as oidc from "openid-client";
@@ -13,14 +14,18 @@ const random = () => randomBytes(32).toString("base64url");
 export function sessionKey(token: string) {
   return "session:" + digest(token);
 }
-export function safeReturnPath(value: unknown) {
+export function safeReturnPath(value: unknown, basePath = "") {
   return typeof value === "string" &&
     value.startsWith("/") &&
     !value.startsWith("//") &&
     !/[\\\r\n]/.test(value) &&
-    value.length < 2000
+    value.length < 2000 &&
+    (!basePath ||
+      value === basePath ||
+      value.startsWith(basePath + "/") ||
+      value.startsWith(basePath + "?"))
     ? value
-    : "/history";
+    : appPath("/history", basePath);
 }
 export function installAuth(app: Express, store: Store) {
   const hosted = process.env.GHTRENDS_HOSTED === "1";
@@ -29,9 +34,13 @@ export function installAuth(app: Express, store: Store) {
   const secret =
     process.env.LOGTO_APP_SECRET || process.env.GHTRENDS_LOGTO_APP_SECRET;
   const enabled = !!(endpoint && appId && secret);
-  const base = process.env.PUBLIC_URL
+  const basePath = process.env.PUBLIC_URL
+    ? basePathFromUrl(process.env.PUBLIC_URL)
+    : "";
+  const origin = process.env.PUBLIC_URL
     ? new URL(process.env.PUBLIC_URL).origin
     : "";
+  const base = origin + basePath;
   if (hosted && (!base || !base.startsWith("https://")))
     throw new Error("Hosted mode requires an HTTPS PUBLIC_URL.");
   const cookieName = hosted ? "__Host-ghtrends_session" : "ghtrends_session";
@@ -86,7 +95,7 @@ export function installAuth(app: Express, store: Store) {
     if (hosted || enabled) {
       const origin = q.get("origin");
       if (
-        (origin && origin !== base) ||
+        (origin && origin !== new URL(base).origin) ||
         q.get("X-CSRF-Token") !== identity.csrf
       )
         throw Object.assign(
@@ -121,7 +130,7 @@ export function installAuth(app: Express, store: Store) {
       .status(status)
       .type("html")
       .send(
-        `<!doctype html><html lang="en"><meta name="viewport" content="width=device-width"><title>ghtrends sign-in</title><body><h1>Sign-in could not finish</h1><p>${message}</p><p><a href="/">Return to ghtrends</a></p></body></html>`,
+        `<!doctype html><html lang="en"><meta name="viewport" content="width=device-width"><title>ghtrends sign-in</title><body><h1>Sign-in could not finish</h1><p>${message}</p><p><a href="${appPath("/", basePath)}">Return to ghtrends</a></p></body></html>`,
       );
   app.get("/auth/login", async (q, r) => {
     if (!enabled)
@@ -134,7 +143,12 @@ export function installAuth(app: Express, store: Store) {
         token = random();
       store.set(
         "login:" + digest(token),
-        { verifier, state, nonce, returnTo: safeReturnPath(q.query.returnTo) },
+        {
+          verifier,
+          state,
+          nonce,
+          returnTo: safeReturnPath(q.query.returnTo, basePath),
+        },
         10 * 60000,
       );
       r.cookie(transactionName, token, { ...cookie, maxAge: 10 * 60000 });

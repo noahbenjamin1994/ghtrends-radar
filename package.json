@@ -1,6 +1,6 @@
 {
   "name": "ghtrends-radar",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Find open-source opportunities with GitHub supply and Google search demand. CLI, MCP and a beautiful opportunity radar.",
   "type": "module",
   "license": "MIT",
@@ -55,7 +55,7 @@
     "type": "git",
     "url": "git+https://github.com/noahbenjamin1994/ghtrends-radar.git"
   },
-  "homepage": "https://radar.ghtrends.dev",
+  "homepage": "https://ghtrends.dev/radar",
   "bugs": {
     "url": "https://github.com/noahbenjamin1994/ghtrends-radar/issues"
   }

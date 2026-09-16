@@ -7,7 +7,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { api } from "./api.js";
-import { t, localUrl } from "./i18n.js";
+import { t, localUrl, loginUrl } from "./i18n.js";
 import type { MarketKind } from "../core/types.js";
 import { Loading, Empty } from "./components.js";
 export interface Account {
@@ -43,12 +43,7 @@ export function SignInGate({
       )}
       action={
         account?.authAvailable ? (
-          <a
-            className="button"
-            href={
-              "/auth/login?returnTo=" + encodeURIComponent(localUrl(returnTo))
-            }
-          >
+          <a className="button" href={loginUrl(returnTo)}>
             {t("Sign in with Logto")} <ArrowUpRight size={16} />
           </a>
         ) : (

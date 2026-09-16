@@ -1,3 +1,4 @@
+import { appPath, basePathFromUrl } from "../core/paths.js";
 import { selectGapSignals } from "../core/gaps.js";
 import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
 import { marketAssessment } from "../core/assessment.js";
@@ -29,6 +30,7 @@ export function renderDocument(
 ) {
   const { base, path, geo, market: m, markets, status } = options,
     locale = options.locale || "en";
+  const basePath = basePathFromUrl(base);
   const t = (v: string, vars: Record<string, string | number> = {}) =>
     text(v, locale, vars);
   const e = (v: string) => escapeHtml(t(v));
@@ -42,7 +44,9 @@ export function renderDocument(
     try {
       const parsed = new URL(url, base);
       if (!["https:", "http:"].includes(parsed.protocol)) return e(label);
-      const target = url.startsWith("/") ? localeUrl(url, locale) : url;
+      const target = url.startsWith("/")
+        ? localeUrl(appPath(url, basePath), locale)
+        : url;
       return `<a href="${escapeHtml(target)}">${e(label)}</a>`;
     } catch {
       return e(label);
@@ -111,11 +115,11 @@ export function renderDocument(
   } else if (path === "/") {
     content = `<p class="eyebrow">${e("GITHUB SUPPLY × GOOGLE SEARCH DEMAND")}</p><h1>${e("Know where to build")}<span class="lime">.</span></h1><p>${e("Explore active open-source supply and sustained search growth. Every category links to its evidence, dates and limitations.")}</p>${table()}<p>${e("Search growth compares the last eight complete weeks with the previous eight. Counts can overlap; GitHub topic labels do not cover every competitor.")}</p>`;
   } else if (path === "/start") {
-    content = `<h1>${e("Research in your own workflow")}</h1><p>${e("Use the hosted website, or run the same open-source engine with your own keys.")}</p><h2>${e("Hosted website")}</h2><p>${e("Read public reports freely. Sign in for private scans, saved reports and projects across devices.")}</p><h2>CLI / MCP</h2><p>${e("CLI, MCP and local Web share your SQLite workspace. Configure your GitHub key and an optional DeepSeek key. Hosted account history is separate.")}</p><pre>npm install -g https://radar.ghtrends.dev/ghtrends.tgz\nghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>${link(SOURCE, "Source and setup instructions")}</p>`;
+    content = `<h1>${e("Research in your own workflow")}</h1><p>${e("Use the hosted website, or run the same open-source engine with your own keys.")}</p><h2>${e("Hosted website")}</h2><p>${e("Read public reports freely. Sign in for private scans, saved reports and projects across devices.")}</p><h2>CLI / MCP</h2><p>${e("CLI, MCP and local Web share your SQLite workspace. Configure your GitHub key and an optional DeepSeek key. Hosted account history is separate.")}</p><pre>npm install -g https://ghtrends.dev/radar/ghtrends.tgz\nghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>${link(SOURCE, "Source and setup instructions")}</p>`;
   } else if (path === "/docs") {
     content = `<h1>${e("Read the signals.")}</h1><section><h2>${e("The four landscapes")}</h2>${list(["Rising · limited supply", "Rising · established supply", "Established supply", "Limited observed supply"])}<p>${e("Partial evidence")}: ${e("This recommendation uses the evidence already available. It is not an LLM-generated forecast.")}</p></section>
       <section><h2>${e("Method")} ${ALGORITHM_VERSION}</h2><p>${e("GitHub searches use relevant topics and specific repository-name or description phrases. Results are deduplicated and require at least five stars, a push within 180 days, and no forks or archived projects.")}</p><p>${e("Counts are deduplicated across topic searches; incomplete searches show a lower bound.")}</p><p>${e("We compare the last 8 complete weeks with the previous 8, alongside 4-week and 13-week changes. Rising or falling requires a 10% change, a resampling band on the same side of zero, and no opposing short or longer trend. Conflicting windows and opposite-moving synonyms are marked mixed.")}</p><p>${e(`At least ${POLICY.minWeeks} complete weekly observations are required.`)}</p><p>${e("A weekly observation is usable only after that week ended at collection time. Invalid rows cannot refresh old evidence, and conflicting values for the same week prevent classification.")}</p><p>${link("https://support.google.com/trends/answer/4365533", "How Google Trends works")}</p></section>
-      <section><h2>CLI / MCP</h2><p>${e("Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.")}</p><pre>npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui</pre><pre>ghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>ghtrends_scan · ghtrends_repo · ghtrends_compare · ghtrends_watch_list</p>${link(SOURCE, "Full installation and configuration instructions")}</section>`;
+      <section><h2>CLI / MCP</h2><p>${e("Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.")}</p><pre>npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui</pre><pre>ghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>ghtrends_scan · ghtrends_repo · ghtrends_compare · ghtrends_watch_list</p>${link(SOURCE, "Full installation and configuration instructions")}</section>`;
   } else if (path === "/gaps") {
     const gaps = selectGapSignals([
       ...new Map(
@@ -149,6 +153,14 @@ export function renderDocument(
     isPartOf: { "@type": "WebSite", name: "ghtrends", url: base },
   };
   return template
+    .replace(
+      /((?:src|href)=["'])(?:\.\/|\/(?!\/))/g,
+      (_match, start: string) => `${start}${basePath}/`,
+    )
+    .replace(
+      "</head>",
+      `<meta name="ghtrends-base-path" content="${basePath}"></head>`,
+    )
     .replace(
       /<html\b[^>]*>/i,
       `<html lang="${locale === "zh" ? "zh-CN" : "en"}">`,

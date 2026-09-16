@@ -1,4 +1,5 @@
 import type { EngagementEvent } from "../core/engagement.js";
+import { appUrl } from "./paths.js";
 let enabled = false;
 export function enableEngagement(value: boolean) {
   enabled = value;
@@ -11,7 +12,7 @@ export function track(event: EngagementEvent, onceKey?: string) {
       if (sessionStorage.getItem(key)) return;
       sessionStorage.setItem(key, "1");
     }
-    void fetch("/api/events", {
+    void fetch(appUrl("/api/events"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ event }),

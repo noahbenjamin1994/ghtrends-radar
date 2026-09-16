@@ -4,7 +4,7 @@ import { AdminView } from "./admin.js";
 import { ALGORITHM_VERSION } from "../core/version.js";
 import { api, setCsrf } from "./api.js";
 import { HistoryView, SignInGate, type Account } from "./account.js";
-import { t, locale, localUrl, switchLanguage } from "./i18n.js";
+import { t, locale, localUrl, loginUrl, switchLanguage } from "./i18n.js";
 import React, { useEffect, useState } from "react";
 import {
   ArrowUpRight,
@@ -53,9 +53,10 @@ import { marketAssessment } from "../core/assessment.js";
 import { resolveTopic } from "../core/topics.js";
 import type { ScanProgress } from "../core/engine.js";
 import { completeWeeklySeries } from "../core/evidence.js";
+import { appUrl, routeUrl, currentRoute } from "./paths.js";
 const SOURCE = "https://github.com/noahbenjamin1994/ghtrends-radar";
 export function App() {
-  const [path, setPath] = useState(location.pathname + location.search),
+  const [path, setPath] = useState(currentRoute()),
     [markets, setMarkets] = useState<Market[]>([]),
     [topics, setTopics] = useState<Topic[]>([]),
     [loading, setLoading] = useState(true),
@@ -137,13 +138,13 @@ export function App() {
         : input;
     const url = localUrl(destination);
     history.pushState({}, "", url);
-    setPath(url);
+    setPath(routeUrl(url));
     setMobileMenu(false);
     window.scrollTo({ top: 0, behavior: "instant" });
   };
   useEffect(() => {
     const pop = () => {
-      setPath(location.pathname + location.search);
+      setPath(currentRoute());
       setGeo(new URLSearchParams(location.search).get("geo") || "");
     };
     window.addEventListener("popstate", pop);
@@ -176,9 +177,7 @@ export function App() {
     return () => clearInterval(timer);
   }, [geo]);
   const signIn = (returnTo = path) => {
-    location.assign(
-      "/auth/login?returnTo=" + encodeURIComponent(localUrl(returnTo)),
-    );
+    location.assign(loginUrl(returnTo));
   };
   const toggleWatch = (name: string) => {
     if (!account?.user) {
@@ -529,7 +528,7 @@ export function App() {
                       if (value) url.searchParams.set("geo", value);
                       else url.searchParams.delete("geo");
                       history.replaceState({}, "", url.pathname + url.search);
-                      setPath(url.pathname + url.search);
+                      setPath(routeUrl(url.pathname) + url.search);
                     }}
                     aria-label={t("Search-demand region")}
                   >
@@ -1082,12 +1081,7 @@ function MarketView({
         description={t(error)}
         action={
           path.startsWith("/report/") && account?.hosted && !account.user ? (
-            <a
-              className="button"
-              href={
-                "/auth/login?returnTo=" + encodeURIComponent(localUrl(path))
-              }
-            >
+            <a className="button" href={loginUrl(path)}>
               {t("Sign in to open your private reports")}
             </a>
           ) : (
@@ -1217,7 +1211,7 @@ function MarketView({
                 {t("Save image")}
               </button>
               <a
-                href={`/api/reports/${m.id}`}
+                href={appUrl(`/api/reports/${m.id}`)}
                 download={`ghtrends-${m.topic.slug}.json`}
                 onClick={() => track("export_json")}
               >
@@ -1659,7 +1653,11 @@ function MarketView({
             <Info size={18} />
             {t("Know the boundaries")}
           </h3>
-          <a href={`/api/reports/${m.id}`} target="_blank" rel="noreferrer">
+          <a
+            href={appUrl(`/api/reports/${m.id}`)}
+            target="_blank"
+            rel="noreferrer"
+          >
             {t("Download evidence JSON")}
             <ExternalLink size={13} />
           </a>
@@ -2156,9 +2154,9 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.5.0/ghtrends-radar-0.5.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.6.0/ghtrends-radar-0.6.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
-            value="npm install -g https://radar.ghtrends.dev/ghtrends.tgz"
+            value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}
             onCopied={() => track("install_copy")}
           />

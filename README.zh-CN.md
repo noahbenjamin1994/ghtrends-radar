@@ -9,13 +9,13 @@
 **GitHub 供给 × Google 搜索需求。**
 发现增长中的赛道，了解竞争，分享有依据的判断。
 
-[打开机会雷达](https://radar.ghtrends.dev/?lang=zh) · [判断方法](https://radar.ghtrends.dev/docs?lang=zh) · [反馈问题](https://github.com/noahbenjamin1994/ghtrends-radar/issues)
+[打开机会雷达](https://ghtrends.dev/radar/?lang=zh) · [判断方法](https://ghtrends.dev/radar/docs?lang=zh) · [反馈问题](https://github.com/noahbenjamin1994/ghtrends-radar/issues)
 
 </div>
 
 [![构建检查](https://github.com/noahbenjamin1994/ghtrends-radar/actions/workflows/check.yml/badge.svg)](https://github.com/noahbenjamin1994/ghtrends-radar/actions/workflows/check.yml)
 
-[![ghtrends 机会雷达预览](.github/assets/radar-preview.png)](https://radar.ghtrends.dev/?lang=zh)
+[![ghtrends 机会雷达预览](.github/assets/radar-preview.png)](https://ghtrends.dev/radar/?lang=zh)
 
 ## 它能告诉你什么？
 
@@ -42,7 +42,7 @@
 
 ## 60 秒开始使用
 
-**直接打开网站：** [radar.ghtrends.dev](https://radar.ghtrends.dev/?lang=zh)，公开报告无需注册即可浏览。
+**直接打开网站：** [ghtrends.dev/radar/](https://ghtrends.dev/radar/?lang=zh)，公开报告无需注册即可浏览。
 
 网站支持中英文，包括报告解释、Markdown 和 PNG 导出。首次访问跟随浏览器语言；右上角可切换并保存偏好，切换时保留当前页面。链接添加 `?lang=zh` 或 `?lang=en` 可指定语言。
 
@@ -51,13 +51,13 @@
 无需全局安装：
 
 ```sh
-npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
+npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 ```
 
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.5.0/ghtrends-radar-0.5.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.6.0/ghtrends-radar-0.6.0.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
@@ -160,6 +160,8 @@ ghtrends ui
 ```
 
 模型生成一个 Trends 主词、最多两个同义表达，以及受约束的 GitHub 主题与短语。歧义缩写会要求选择含义；采集完成后，根据**实际证据**生成中英文简报，不计算或改写指标。必要的查询会发送给 DeepSeek、Google、GitHub，请勿输入秘密。简报失败时，已采集的报告仍可阅读。
+
+`PUBLIC_URL` 支持子目录，例如 `https://example.com/radar`；同一安装包也支持本地根路径。反向代理需原样转发此前缀，并配置对应的 Logto 回调地址。
 
 公开托管部署配置 `GHTRENDS_HOSTED=1`、HTTPS `PUBLIC_URL`、`LOGTO_ENDPOINT`、`LOGTO_APP_ID`、`LOGTO_APP_SECRET`，可通过 `GHTRENDS_DAILY_SCANS` 修改每日额度（默认 10）。Logto 选择 Traditional 应用，回调地址为 `${PUBLIC_URL}/auth/callback`。GitHub 与 DeepSeek 密钥放服务器 Secret，不能放入 `VITE_*` 或浏览器存储。登录使用 PKCE、nonce/state、签名令牌校验；浏览器只获得 HttpOnly、Secure 会话 Cookie，个人数据写入另做 CSRF 校验。
 

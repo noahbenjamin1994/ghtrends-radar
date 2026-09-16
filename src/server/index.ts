@@ -1,3 +1,4 @@
+import { appPath, basePathFromUrl } from "../core/paths.js";
 import { ENGAGEMENT_EVENTS, type EngagementEvent } from "../core/engagement.js";
 import { selectGapSignals } from "../core/gaps.js";
 import express from "express";
@@ -40,6 +41,9 @@ interface Job {
   clarification?: { en: string; zh: string };
 }
 export function createApp(engine = new Engine()) {
+  const basePath = process.env.PUBLIC_URL
+    ? basePathFromUrl(process.env.PUBLIC_URL)
+    : "";
   const app = express();
   app.disable("x-powered-by");
   if (process.env.TRUST_PROXY)
@@ -77,7 +81,7 @@ export function createApp(engine = new Engine()) {
     requestLocale(q.query.lang, q.get("cookie"), q.get("accept-language"));
   const baseURL = (q: express.Request) =>
     new URL(process.env.PUBLIC_URL || `${q.protocol}://${q.get("host")}`)
-      .origin;
+      .origin + basePath;
   const escape = (s: string) =>
     s.replace(
       /[&<>"']/g,
@@ -244,7 +248,8 @@ export function createApp(engine = new Engine()) {
   const eventLimits = new Map<string, { count: number; until: number }>();
   app.post("/api/events", (q, r) => {
     if (!engagementEnabled) return r.sendStatus(204);
-    if (q.get("origin") !== baseURL(q)) return r.sendStatus(403);
+    if (q.get("origin") !== new URL(baseURL(q)).origin)
+      return r.sendStatus(403);
     if (!ENGAGEMENT_EVENTS.includes(q.body?.event)) return r.sendStatus(400);
     const now = Date.now();
     for (const [key, value] of eventLimits)
@@ -695,7 +700,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.5.0/ghtrends-radar-0.5.0.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.6.0/ghtrends-radar-0.6.0.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>
@@ -709,7 +714,7 @@ export function createApp(engine = new Engine()) {
     r
       .type("text/plain")
       .send(
-        `User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${baseURL(q)}/sitemap.xml\n`,
+        `User-agent: *\nAllow: /\nDisallow: ${basePath}/api/\nSitemap: ${baseURL(q)}/sitemap.xml\n`,
       ),
   );
   app.get(
@@ -726,10 +731,14 @@ export function createApp(engine = new Engine()) {
           maxAge: 365 * 86400000,
           sameSite: "lax",
           httpOnly: true,
+          path: basePath || "/",
         });
       const path = q.path.replace(/\/+$/, "") || "/";
       if (path !== q.path)
-        return r.redirect(308, path + q.url.slice(q.path.length));
+        return r.redirect(
+          308,
+          appPath(path, basePath) + q.url.slice(q.path.length),
+        );
       const isReport = /^\/report\/[a-f0-9]{16}$/.test(path),
         isMarket = /^\/market\/[^/]+$/.test(path),
         geo =
@@ -751,7 +760,10 @@ export function createApp(engine = new Engine()) {
           return r.redirect(
             308,
             localeUrl(
-              `/market/${topic.slug}${geo ? `?geo=${geo}` : ""}`,
+              appPath(
+                `/market/${topic.slug}${geo ? `?geo=${geo}` : ""}`,
+                basePath,
+              ),
               locale,
             ),
           );
@@ -822,7 +834,18 @@ export function createApp(engine = new Engine()) {
       ).json({ error: error.message });
     },
   );
-  return app;
+  if (!basePath) return app;
+  const root = express();
+  root.disable("x-powered-by");
+  // Canonicalize the mount itself; descendants retain their existing URL policy.
+  root.use((q, r, next) => {
+    if (q.path === basePath)
+      return r.redirect(308, basePath + "/" + q.url.slice(q.path.length));
+    next();
+  });
+  root.use(basePath, app);
+  root.locals.stopCollector = app.locals.stopCollector;
+  return root;
 }
 export async function startServer(
   port = Number(process.env.PORT || 3721),
