@@ -139,6 +139,19 @@ test("AI plans are bounded, validated, cached, and distinguish ambiguous inputs"
     const brief = await research.brief(m);
     assert.equal(brief.model, "deepseek-flash");
     assert.equal(brief.sources[0]?.url, m.demand.sourceUrl);
+    result = {
+      en: { summary: "There is no demand.", nextSteps: ["Do not build."] },
+      zh: { summary: "没有需求。", nextSteps: ["不要开发。"] },
+    };
+    await assert.rejects(research.brief(m), /Review the collected evidence/);
+    result = {
+      en: {
+        summary: "Refresh after retryAt.",
+        nextSteps: ["Open the source."],
+      },
+      zh: { summary: "按页面提示时间刷新。", nextSteps: ["打开来源。"] },
+    };
+    await assert.rejects(research.brief(m), /Review the collected evidence/);
     result = { en: { summary: "fabricated" } };
     await assert.rejects(research.brief(m), /could not be validated/);
   } finally {
@@ -254,7 +267,7 @@ test("synonyms use separate normalization and choose usable coverage, never the 
     assert.equal(result.keyword, "usable");
     assert.equal(result.requestedKeyword, "weak");
     assert.equal(result.alternatives?.length, 2);
-    assert.match(result.selectionReason!, /never growth direction/);
+    assert.match(result.selectionReason!, /planned order/);
     const original = await trends.demand("usable", "", undefined, ["rising"]);
     assert.equal(original.keyword, "usable");
     assert.equal(original.requestedKeyword, undefined);

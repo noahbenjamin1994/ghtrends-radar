@@ -56,7 +56,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.8.0/ghtrends-radar-0.8.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.9.0/ghtrends-radar-0.9.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -122,8 +122,10 @@ The App installation token refreshes automatically. Only public repositories are
 - The release includes dated public starter snapshots so the local radar is useful on first launch. They retain their source dates; snapshots older than 14 days are reclassified as insufficient evidence until refreshed.
 - SQLite defaults to `~/.ghtrends`; override with `GHTRENDS_DATA_DIR`.
 - Hosted history and watchlists are saved by account in SQLite; self-hosted CLI, MCP and Web share the local workspace. Completed scans appear in My research.
-- `GOOGLE_TRENDS_PROXY` optionally configures an HTTP proxy for the public Trends collector.
-- Google Trends web endpoints are unofficial and may rate-limit requests or change. Failed collection is shown explicitly. A previous successful snapshot keeps its original timestamp; stale or insufficient evidence cannot produce a fresh classification.
+- `GOOGLE_TRENDS_PROXY` optionally configures a stable HTTP proxy for the public Trends collector. Keep the exit region consistent for comparable collection.
+- Google Trends collection shares a paced queue (1.5 seconds between requests; `GHTRENDS_TRENDS_INTERVAL_MS` configures 1–10 seconds), and concurrent identical queries share a request. HTTP 429/403 pauses collection until `Retry-After` or a default 15-minute recovery window. Cooldown survives restarts, successful cached queries stay available, and a prior successful snapshot keeps its original date. The report displays the next refresh time.
+- Google Trends web endpoints may rate-limit requests or change. Temporary connection/5xx errors get one bounded retry. Classification requires fresh, usable weekly evidence. Collection state and measured zero values have separate meanings; baseline claims require observed weekly data.
+- Product copy and AI briefs use affirmative facts, current status and specific next actions. Saved narrative text is checked at display time; source evidence retains its original record.
 - New signed-in hosted scans are private by default. Explicitly publish a report to share it; stop sharing to revoke future access. Someone who already downloaded a public report may keep their copy. Older anonymous reports remain public and cannot be assigned to an account automatically; save any accessible report to My research.
 
 For reproducible imports:
@@ -184,7 +186,7 @@ AI usage recording begins at upgrade: earlier consumption is **unknown**. Missin
 
 Known categories use their published query scope directly, without a model call. Compound requirements use intersecting GitHub topics. For incomplete unions, the lower bound is the larger of the deduplicated sample and any complete individual search count.
 
-**Search interest (method 1.3.0):** two years of Google Trends data. Compare the median of the last 8 complete weeks with the previous 8; check 4-week and 13-week comparisons as well. Each term is independently normalized in the same region/time range, preventing a popular synonym from rounding a niche one to zero in a comparison. If the primary has unusable evidence, select the first usable same-intent variant in the planned order and show the reason. We never sum indices or select by growth direction.
+**Search interest (method 1.3.1):** two years of Google Trends data. Compare the median of the last 8 complete weeks with the previous 8; check 4-week and 13-week comparisons as well. Each term is independently normalized in the same region/time range, preventing a popular synonym from rounding a niche one to zero in a comparison. If the primary has unusable evidence, select the first usable same-intent variant in the planned order and show the reason. We never sum indices or select by growth direction.
 
 - For percentage-based direction, require the most recent 26 weeks to be consecutive and complete (older gaps do not invalidate this window), at least 60% nonzero values in the most recent 26 weeks, and a prior median of at least 3.
 - Rising/falling requires at least ±10% eight-week change, a resampling band entirely on the same side of zero, and no opposing short or longer change of more than 10%.

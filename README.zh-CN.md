@@ -60,7 +60,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.8.0/ghtrends-radar-0.8.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.9.0/ghtrends-radar-0.9.0.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
@@ -128,8 +128,10 @@ App 安装令牌会自动续签。只返回公开仓库，不要把凭据提交�
 - 发布包附带有日期的公开初始快照，首次启动即可浏览。快照保留来源日期，超过 14 天的证据会降级，刷新后重新判断。
 - SQLite 默认放在 `~/.ghtrends`，可用 `GHTRENDS_DATA_DIR` 覆盖。
 - 托管版历史和关注列表按账户存入 SQLite，跨设备可用；自托管 CLI、MCP 与网页共用本地工作区，完成的扫描显示在“我的研究”。
-- `GOOGLE_TRENDS_PROXY` 可选，用于配置 Trends 采集的 HTTP 代理。
-- Google Trends 网页端点并非官方稳定 API，可能限流或变更。采集失败会明确呈现；复用历史快照时保留原日期。
+- `GOOGLE_TRENDS_PROXY` 可选，用于配置稳定的 HTTP 代理出口。固定出口地区有利于保持采集可比性。
+- Trends 采集共用限速队列，请求间隔默认 1.5 秒（`GHTRENDS_TRENDS_INTERVAL_MS` 可设为 1–10 秒）；同时发起的相同查询共享一次采集。HTTP 429/403 按 `Retry-After` 或默认 15 分钟进入冷却，重启后继续遵守恢复时间。有效缓存保持可用，历史成功快照保留原日期，页面展示可刷新时间。
+- Google Trends 网页端点可能限流或调整。临时连接与 5xx 错误最多重试一次；分类依据新鲜、完整的周证据。采集状态与实测零值分别处理，基线判断来自实际周观测。
+- 产品文案与 AI 简报使用已知事实、当前状态和具体行动的正向表达。历史简报在展示时检查措辞，来源记录保留原始内容。
 - 登录后的新报告默认私有，主动公开后才可分享；停止公开会撤回后续访问，已下载的副本无法收回。旧匿名报告仍公开，无法自动认领；可在报告页手动保存到“我的研究”。
 
 支持可复现的数据导入：
@@ -190,7 +192,7 @@ export GHTRENDS_ADMIN_USER_IDS=your_logto_user_id,another_logto_user_id
 
 已收录赛道直接使用固定检索范围，无需模型改写；组合要求使用 GitHub 标签交集。多查询未完整枚举时，下限取去重样本数量与各完整查询总数中的较大值。
 
-**搜索关注度（方法 1.3.0）：** 获取两年 Google Trends 数据。比较最近 8 个完整周与前 8 周的中位数，同时核对 4 周和 13 周变化。主词与同义词在同一地区、时间范围内独立归一化采集，避免热门词将小众词压成零。主词证据不足时，按原定顺序选择第一个可用同义词，并说明原因；不相加指数，也不按涨跌挑词。
+**搜索关注度（方法 1.3.1）：** 获取两年 Google Trends 数据。比较最近 8 个完整周与前 8 周的中位数，同时核对 4 周和 13 周变化。主词与同义词在同一地区、时间范围内独立归一化采集，避免热门词将小众词压成零。主词证据不足时，按原定顺序选择第一个可用同义词，并说明原因；不相加指数，也不按涨跌挑词。
 
 - 按百分比判断趋势时，要求最近 26 周连续、完整；更早的缺口不影响近期判断。最近 26 周至少 60% 非零，前期中位数至少为 3。
 - 上升 / 下降：8 周变化至少 ±10%，重采样区间全部位于零的同侧，短期和较长周期没有超过 10% 的反向变化。

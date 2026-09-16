@@ -1263,7 +1263,7 @@ function MarketView({
           <summary>
             {t("How we understood your search")}: {m.topic.plan.input}
           </summary>
-          <p>{m.topic.plan.explanation[locale]}</p>
+          <p>{assessment.queryExplanation}</p>
           <div>
             <strong>Google Trends</strong>
             <p>{m.topic.plan.trends.join(" · ")}</p>
@@ -1323,15 +1323,15 @@ function MarketView({
           </div>
           <div>
             <h4>{t("What to do next")}</h4>
-            {m.brief && <p>{m.brief[locale].summary}</p>}
+            {assessment.narrative.kind === "ai" && (
+              <p>{assessment.narrative.summary}</p>
+            )}
             <ol>
-              {(m.brief?.[locale].nextSteps || assessment.nextSteps)
-                .slice(0, 3)
-                .map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
+              {assessment.narrative.nextSteps.slice(0, 3).map((step) => (
+                <li key={step}>{step}</li>
+              ))}
             </ol>
-            {m.brief && (
+            {assessment.narrative.kind === "ai" && (
               <small>
                 {t(
                   "AI interpretation of the evidence below. Verify the sources before acting.",
@@ -1371,6 +1371,18 @@ function MarketView({
         )}
       </section>
       {m.aiError && <p className="muted">{t(m.aiError)}</p>}
+      {m.demand.retryAt && (
+        <p className="admin-note">
+          {t("Google Trends refresh window")}:{" "}
+          {new Date(m.demand.retryAt).toLocaleString(
+            locale === "zh" ? "zh-CN" : "en",
+          )}
+          {" · "}
+          {m.demand.points.length
+            ? t("Using the dated source snapshot")
+            : t("Source collection is pending; refresh after this time")}
+        </p>
+      )}
       {m.demand.selectionReason && (
         <p className="admin-note">
           {t(m.demand.selectionReason)} ({m.demand.requestedKeyword} →{" "}
@@ -1687,7 +1699,7 @@ function MarketView({
           </a>
         </div>
         <ul>
-          {m.limitations.map((l) => (
+          {assessment.scopeNotes.map((l) => (
             <li key={l}>{t(l)}</li>
           ))}
         </ul>
@@ -1823,7 +1835,7 @@ function RepoView({
             <dt>{t("Primary language")}</dt>
             <dd>{r.language || t("Not specified")}</dd>
             <dt>{t("Archived")}</dt>
-            <dd>{r.archived ? t("Yes") : t("No")}</dd>
+            <dd>{r.archived ? t("Archived") : t("Active")}</dd>
             <dt>{t("Forks")}</dt>
             <dd>{number(r.forks)}</dd>
           </dl>
@@ -2172,7 +2184,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.8.0/ghtrends-radar-0.8.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.9.0/ghtrends-radar-0.9.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}

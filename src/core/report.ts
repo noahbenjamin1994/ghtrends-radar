@@ -41,6 +41,9 @@ export function marketMarkdown(
     `${t("Landscape")}: **${a.landscape}**`,
     `${t("Measured search term")}: ${cell(m.demand.keyword)}`,
     a.demandNote,
+    ...(m.demand.retryAt
+      ? [`${t("Google Trends refresh window")}: ${m.demand.retryAt}`]
+      : []),
     "",
     a.summary,
     "",
@@ -48,12 +51,14 @@ export function marketMarkdown(
       ? [
           `## ${t("Research brief")}`,
           "",
-          m.brief[locale].summary,
+          a.narrative.summary,
           "",
-          ...m.brief[locale].nextSteps.map((s) => "- " + s),
+          ...a.narrative.nextSteps.map((s) => "- " + s),
           "",
           t(
-            "AI interpretation of the evidence below. Verify the sources before acting.",
+            a.narrative.kind === "ai"
+              ? "AI interpretation of the evidence below. Verify the sources before acting."
+              : "This recommendation follows the collected source evidence.",
           ),
           "",
         ]
@@ -62,7 +67,7 @@ export function marketMarkdown(
       ? [
           `## ${t("How we understood your search")}`,
           "",
-          m.topic.plan.explanation[locale],
+          a.queryExplanation || "",
           "",
           `- Google Trends: ${m.topic.plan.trends.join(" · ")}`,
           `- GitHub: ${(m.topic.queries || [m.topic.query]).join(" · ")}`,
@@ -113,7 +118,7 @@ export function marketMarkdown(
     "",
     `## ${t("Scope and limitations")}`,
     "",
-    ...m.limitations.map((x) => `- ${t(x)}`),
+    ...a.scopeNotes.map((x) => `- ${t(x)}`),
     "",
     baseUrl
       ? `[${t("View this snapshot")}](${localeUrl(baseUrl + "/report/" + m.id, locale)}) · [ghtrends](https://github.com/noahbenjamin1994/ghtrends-radar)`

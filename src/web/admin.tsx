@@ -206,8 +206,8 @@ export function AdminView({ account }: { account: Account | null }) {
           <p className="admin-note">
             {l("Recording began", "记录开始于")} {date(data.recordedSince)}.{" "}
             {l(
-              "Earlier spending is unknown. Operational logs are kept for",
-              "更早的消耗未知。运行日志保留",
+              "Spending totals begin on this date. Operational logs are kept for",
+              "消耗统计从此日期开始。运行日志保留",
             )}{" "}
             {data.retentionDays}{" "}
             {l(
@@ -225,8 +225,8 @@ export function AdminView({ account }: { account: Account | null }) {
                 "行为按 UTC 自然日汇总，用户扫描使用上方的滚动时间范围。",
               )}{" "}
               {l(
-                "Actions are not unique people or GitHub stars. These counters store no search text or visitor identifiers.",
-                "以下为行为次数，不是独立用户数或实际 GitHub Star；这些计数不保存搜索内容或访客标识。",
+                "These counters track actions. Individual users and GitHub stars are separate metrics. Stored fields contain daily event totals.",
+                "以下统计行为次数，独立用户与 GitHub Star 分别衡量；存储字段仅包含每日事件汇总。",
               )}
             </p>
             <div className="admin-table-wrap">
@@ -277,7 +277,7 @@ export function AdminView({ account }: { account: Account | null }) {
                     <td>
                       {l(
                         "Completed user scans (excludes scheduled refreshes)",
-                        "用户完成的扫描（不含定时刷新）",
+                        "用户完成的扫描（定时刷新单列）",
                       )}
                     </td>
                     <td>
@@ -327,8 +327,8 @@ export function AdminView({ account }: { account: Account | null }) {
               </strong>
               <small>
                 {l(
-                  "USD · priced requests only; not an invoice",
-                  "USD · 仅计已知价格的请求，并非账单",
+                  "USD · estimates for priced requests",
+                  "USD · 按已配置单价估算，实际费用以服务商账单为准",
                 )}
               </small>
             </div>
@@ -375,8 +375,8 @@ export function AdminView({ account }: { account: Account | null }) {
             {!data.providers.length && (
               <p>
                 {l(
-                  "No calls recorded in this period.",
-                  "此时间段还没有调用记录。",
+                  "Calls will appear here as they are recorded.",
+                  "采集到的调用记录会显示在这里。",
                 )}
               </p>
             )}
@@ -393,8 +393,8 @@ export function AdminView({ account }: { account: Account | null }) {
             <h2>{l("AI consumption", "AI 消耗")}</h2>
             <p className="footnote">
               {l(
-                "Token counts come from provider responses. Unknown usage and unpriced calls are listed separately; a failed request may still be billed. Cached input tokens are part of input tokens.",
-                "Token 来自服务商响应。未知用量与未估价调用单独列出；失败请求也可能产生费用。命中缓存的输入 token 已包含在输入总量内。",
+                "Token counts come from provider responses. Usage awaiting confirmation and calls awaiting pricing are listed separately; requests in every status may incur charges. Cached input tokens are part of input tokens.",
+                "Token 来自服务商响应。待补充用量与待估价调用单列；各状态请求均可能产生费用。缓存命中的输入 token 已包含在输入总量内。",
               )}
             </p>
             <div className="admin-table">
@@ -407,7 +407,7 @@ export function AdminView({ account }: { account: Account | null }) {
                       l("Input / output", "输入 / 输出"),
                       l("Cached input", "缓存输入"),
                       l("Estimated USD", "估算 USD"),
-                      l("Unknown usage / price", "用量未知 / 未估价"),
+                      l("Usage / price pending", "用量待补充 / 待估价"),
                     ].map((x) => (
                       <th key={x}>{x}</th>
                     ))}
@@ -443,8 +443,8 @@ export function AdminView({ account }: { account: Account | null }) {
             {!data.models.length && (
               <p>
                 {l(
-                  "No AI calls recorded in this period.",
-                  "此时间段还没有 AI 调用记录。",
+                  "AI calls will appear here as they are recorded.",
+                  "采集到的 AI 调用记录会显示在这里。",
                 )}
               </p>
             )}
@@ -517,7 +517,7 @@ export function AdminView({ account }: { account: Account | null }) {
             </div>
             {!data.runs.length && (
               <p>
-                {l("No scans match these filters.", "没有符合筛选条件的扫描。")}
+                {l("Choose another filter to explore recorded scans.", "调整筛选条件，查看已记录的扫描。")}
               </p>
             )}
             <div className="admin-pagination">
@@ -627,14 +627,14 @@ export function AdminView({ account }: { account: Account | null }) {
             </dl>
             <p>
               {l(
-                "Set GHTRENDS_ADMIN_USER_IDS on the server to a comma-separated list of immutable Logto user IDs, then restart. This page cannot grant privileges. No credentials are returned to the browser.",
-                "服务器通过 GHTRENDS_ADMIN_USER_IDS 配置管理员，填写以逗号分隔的 Logto 固定用户 ID，修改后重启。此页不能自行授予权限，也不会返回密钥。",
+                "Configure GHTRENDS_ADMIN_USER_IDS on the server with fixed Logto user IDs, separated by commas, then restart. The server controls privileges and stores credentials.",
+                "通过服务器的 GHTRENDS_ADMIN_USER_IDS 配置管理员，填写以逗号分隔的 Logto 固定用户 ID，修改后重启。权限和密钥由服务器管理。",
               )}
             </p>
             <p>
               {l(
-                "Cost rates: GHTRENDS_LLM_PRICING_JSON. Estimates are saved per request; later rate changes do not rewrite history.",
-                "费用单价：GHTRENDS_LLM_PRICING_JSON。每次请求保存当时估价，修改单价不会重算历史。",
+                "Cost rates: GHTRENDS_LLM_PRICING_JSON. Each request preserves its estimate using the rate at that time.",
+                "费用单价：GHTRENDS_LLM_PRICING_JSON。每次请求按当时单价保存估价，历史记录保留原值。",
               )}
             </p>
           </section>

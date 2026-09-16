@@ -137,7 +137,7 @@ export class Engine {
     });
     const gaps = await this.github.gaps(supply.repositories);
     const market = analyze(topic, demand, supply, gaps);
-    if (ai) {
+    if (ai && (market.metrics.points > 0 || market.supply.total > 0)) {
       options.onProgress?.({ stage: "brief", preview: market });
       try {
         market.brief = await this.research.brief(market);

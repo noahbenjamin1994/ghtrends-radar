@@ -310,7 +310,12 @@ export function analyze(
     limitations.push(
       "The repository search is incomplete. Displayed supply is not a census.",
     );
-  if (metrics.baseline < POLICY.minBaseline && !metrics.emerging)
+  if (
+    !demand.error &&
+    metrics.regularWeekly &&
+    metrics.baseline < POLICY.minBaseline &&
+    !metrics.emerging
+  )
     limitations.push(
       "Search baseline is too close to zero for a stable growth estimate. Low volume does not prove no demand.",
     );
@@ -323,6 +328,8 @@ export function analyze(
       "The time series must contain consecutive weekly observations; missing, conflicting or differently spaced observations cannot be classified.",
     );
   if (
+    !demand.error &&
+    metrics.regularWeekly &&
     !metrics.emerging &&
     (metrics.recentNonzeroShare ?? metrics.nonzeroShare) < POLICY.minNonzero
   )

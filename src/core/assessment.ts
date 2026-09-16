@@ -1,6 +1,7 @@
 import type { Market } from "./types.js";
 import { completeWeeklySeries } from "./evidence.js";
 import { resolveTopic } from "./topics.js";
+import { hasNegativeWording } from "./i18n.js";
 import { text, MARKET_LABELS, type Locale } from "./i18n.js";
 
 export function marketAssessment(m: Market, locale: Locale = "en") {
@@ -103,29 +104,41 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
       "Recent search attention has improved from a lower base. It has not recovered last year’s level; a seasonal explanation is unproven.",
     );
   }
-  const nextSteps = scientific
+  const nextSteps = m.demand.error
     ? [
+        t("Open Google Trends to review this keyword and region."),
         t(
-          "Pick one workflow, such as materials screening, molecule design or experiment planning, and identify its users.",
+          m.demand.retryAt
+            ? "Refresh after the displayed recovery time."
+            : "Refresh the search history using a familiar same-intent phrase.",
         ),
         t(
-          "Compare active tools for that workflow and ask users which task still takes too much time.",
-        ),
-        t(
-          "Validate willingness to try a concrete solution before building a general AI for Science platform.",
+          "Ask potential users how they solve this problem today and compare specific alternatives.",
         ),
       ]
-    : [
-        t(
-          "Inspect the leading projects and their unresolved issues to identify a specific user problem.",
-        ),
-        t(
-          "Ask potential users how they solve that problem today and what would make them switch.",
-        ),
-        t(
-          "Repeat the scan with a familiar search phrase and compare the evidence before committing.",
-        ),
-      ];
+    : scientific
+      ? [
+          t(
+            "Pick one workflow, such as materials screening, molecule design or experiment planning, and identify its users.",
+          ),
+          t(
+            "Compare active tools for that workflow and ask users which task still takes too much time.",
+          ),
+          t(
+            "Validate willingness to try a concrete solution before building a general AI for Science platform.",
+          ),
+        ]
+      : [
+          t(
+            "Inspect the leading projects and their unresolved issues to identify a specific user problem.",
+          ),
+          t(
+            "Ask potential users how they solve that problem today and what would make them switch.",
+          ),
+          t(
+            "Repeat the scan with a familiar search phrase and compare the evidence before committing.",
+          ),
+        ];
   const latestWeek = completeWeeklySeries(m.demand, m.asOf).points.at(-1);
   const demandNote = t(
     m.demand.error
@@ -150,6 +163,26 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
     summary,
     facts,
     nextSteps,
+    scopeNotes: m.limitations.filter((line) =>
+      m.demand.error || !m.metrics.regularWeekly
+        ? !/Search baseline is too close|Too many observations are rounded/.test(
+            line,
+          )
+        : true,
+    ),
+    narrative:
+      m.brief &&
+      [m.brief[locale].summary, ...m.brief[locale].nextSteps].every(
+        (v) => !hasNegativeWording(v),
+      )
+        ? { ...m.brief[locale], kind: "ai" as const }
+        : { summary, nextSteps, kind: "evidence" as const },
+    queryExplanation:
+      m.topic.plan && !hasNegativeWording(m.topic.plan.explanation[locale])
+        ? m.topic.plan.explanation[locale]
+        : t(
+            "The displayed phrases follow this research scope. Review the source links for the exact queries.",
+          ),
     ...(provisional && suggested
       ? { suggestedScan: { topic: resolved.slug, keyword: suggested } }
       : {}),

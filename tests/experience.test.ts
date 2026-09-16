@@ -93,7 +93,7 @@ test("Chinese reports, metadata and exports agree while preserving identity and 
   });
   assert.match(html, /<html lang="zh-CN">/);
   assert.match(html, /初步建议/);
-  assert.match(html, /先按完整领域重查/);
+  assert.match(html, /使用完整领域名称研究/);
   assert.ok(!html.includes("<img src=x"));
   assert.match(
     html,
@@ -106,7 +106,7 @@ test("Chinese reports, metadata and exports agree while preserving identity and 
   assert.match(html, /初步建议/);
   assert.match(marketMarkdown(m, undefined, "zh"), /## 接下来怎么做/);
   const card = marketCard(m, "https://radar.ghtrends.dev/report/" + m.id, "zh");
-  assert.match(card, /尚未确认/);
+  assert.match(card, /待补充/);
   assert.ok(!card.includes("-17%"));
   m.supply.complete = false;
   assert.ok(marketAssessment(m, "zh").facts.some((f) => f.includes("≥11")));
@@ -295,9 +295,9 @@ test("a running scan exposes received evidence before details finish and languag
 test("missing history and source failures explain the actual evidence gap", () => {
   const m = abbreviationReport();
   m.demand.error = "Google Trends returned 429";
-  assert.match(marketAssessment(m, "zh").demandNote, /采集失败/);
+  assert.match(marketAssessment(m, "zh").demandNote, /等待刷新/);
   delete m.demand.error;
   m.demand.fetchedAt = m.asOf;
   m.metrics.regularWeekly = false;
-  assert.match(marketAssessment(m, "zh").demandNote, /缺失或不完整/);
+  assert.match(marketAssessment(m, "zh").demandNote, /补充近期完整周数据/);
 });

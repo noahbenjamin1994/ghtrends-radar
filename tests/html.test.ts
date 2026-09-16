@@ -85,7 +85,7 @@ test("the initial homepage links to every curated category and missing pages can
     path: "/missing",
     status: 404,
   });
-  assert.match(missing, /<h1>Page not found/);
+  assert.match(missing, /<h1>Return to the research homepage/);
   assert.match(missing, /name="robots" content="noindex,follow"/);
 });
 

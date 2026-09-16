@@ -51,6 +51,7 @@ export interface DemandEvidence {
   }[];
   error?: string;
   collectionError?: string;
+  retryAt?: string;
   resolution?: string;
   seriesIndex?: number;
   normalization?: "independent";

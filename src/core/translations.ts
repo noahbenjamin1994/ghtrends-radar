@@ -1,24 +1,57 @@
 export const zh: Record<string, string> = {
+  "Open Google Trends to review this keyword and region.":
+    "打开 Google Trends，核对关键词与地区。",
+  "Refresh after the displayed recovery time.":
+    "到页面提示的恢复时间后，重新扫描。",
+  "Refresh the search history using a familiar same-intent phrase.":
+    "使用同一含义的常用词组，刷新搜索趋势。",
+  "Ask potential users how they solve this problem today and compare specific alternatives.":
+    "了解潜在用户当前的解决方法，比较具体替代方案。",
+  "The displayed phrases follow this research scope. Review the source links for the exact queries.":
+    "展示的关键词围绕当前研究范围整理，可通过来源链接核对完整查询。",
+  "This recommendation follows the collected source evidence.":
+    "建议依据已采集的来源证据整理。",
+  "Google Trends refresh window": "Google Trends 可刷新时间",
+  "Using the dated source snapshot": "当前使用标注日期的历史快照",
+  "Source collection is pending; refresh after this time":
+    "来源正在等待采集，可在此时间后刷新",
+  "Google Trends is cooling down. Refresh after the scheduled time or open the source.":
+    "Google Trends 正在冷却，可在计划时间后刷新，或打开来源查看。",
+  "Google Trends connection is being refreshed. Open the source or retry shortly.":
+    "Google Trends 连接等待刷新，可打开来源查看或稍后重试。",
+  "Google Trends weekly history is pending. Open the source to review coverage.":
+    "Google Trends 周历史待补充，可打开来源查看覆盖情况。",
+  "Google Trends returned a different time resolution. Choose a weekly export.":
+    "Google Trends 返回了其他时间粒度，请选用按周导出的数据。",
+  "Google Trends returned a different query. Refresh the selected keyword.":
+    "Google Trends 返回了其他查询，请刷新所选关键词。",
+  "Google Trends coverage for this keyword is pending. Try a familiar same-intent phrase.":
+    "该关键词的 Trends 覆盖待补充，可试试常用同义表达。",
+  "Showing the first same-intent variant with usable coverage, in the planned order.":
+    "按预定顺序展示首个覆盖充分的同义词。",
+  "Review the collected evidence and recommended next steps.":
+    "请查看已采集的证据与下一步建议。",
+  Active: "活跃",
+
   "A low-base rise is reported without a percentage when the prior median is below 3, at least six of the last eight weekly indices reach 10, and the last-four-week median retains at least 80% of the first four. It remains a low-confidence early signal; sparse or isolated spikes stay unconfirmed.":
-    "当前期中位数低于 3、最近 8 周至少 6 周指数达到 10，且后 4 周中位数仍达到前 4 周的 80% 时，显示“低基线上升”，不计算增长百分比。这只是低置信度的早期信号；稀疏数据或单次尖峰仍为待验证。",
+    "当前期中位数低于 3、最近 8 周至少 6 周指数达到 10，且后 4 周中位数达到前 4 周的 80% 时，显示“低基线上升”。该标签保留低证据置信度；稀疏观测和单次尖峰继续收集证据。",
   "Known categories retain their published query scope. Compound requirements use intersecting GitHub topics. For incomplete unions, the lower bound is the larger of the deduplicated sample and any complete individual search count.":
-    "已识别赛道保留公开检索范围，组合要求使用 GitHub 标签交集。多查询未完整枚举时，下限取去重样本数量与各完整查询总数中的较大值。",
+    "已识别赛道保留公开范围，组合要求采用标签交集。部分枚举的并集，以下限展示去重样本与完整查询总数中的较大值。",
 
   "Search rising from a small baseline": "搜索从低基线持续上升",
   "Search interest has stayed above a near-zero baseline in at least six of eight weeks. This is an early signal, so no percentage growth is reported. Check the matching projects and validate a specific use case.":
-    "最近 8 周中至少 6 周的搜索关注度持续高于接近零的基线。这是早期信号，因此不计算增长百分比。请结合匹配项目，验证具体使用场景。",
+    "最近 8 周至少 6 周的搜索关注度持续高于接近零的基线，以“低基线上升”展示早期信号。结合匹配项目，验证具体场景。",
   "Search interest is newly sustained above a near-zero baseline in at least six of the last eight weeks. A percentage would be misleading.":
-    "最近 8 周中至少 6 周出现持续搜索信号，此前基线接近零，因此不显示容易误导的增长百分比。",
+    "最近 8 周至少 6 周出现持续搜索信号。此前基线接近零，当前采用“低基线上升”标签。",
   "This is an early search signal. Its small historical baseline cannot establish sustained market demand.":
-    "这是早期搜索信号，较小的历史基线尚不足以确认持续市场需求。",
-  "Search history could not be collected": "搜索历史暂时采集失败",
+    "这是早期搜索信号，下一步延长观察周期并向用户验证需求。",
+  "Search history could not be collected": "搜索历史等待刷新",
   "Search history is out of date": "搜索历史已过期，需要刷新",
-  "Recent weekly history is missing or incomplete": "近期每周历史缺失或不完整",
+  "Recent weekly history is missing or incomplete": "补充近期完整周数据",
   "Small baseline; percentage growth is not yet reliable":
-    "从低基线上升，暂不计算增长百分比",
-  "The comparison baseline is too small": "对比基线过小，增长百分比不可靠",
-  "Too many weekly values are reported as zero":
-    "过多周数据被报告为零，无法稳定估算",
+    "低基线上升，百分比待基线充实后计算",
+  "The comparison baseline is too small": "继续积累比较基线",
+  "Too many weekly values are reported as zero": "零值较多，建议补充常用同义词",
   "Low-base rise": "低基线上升",
   "Measured search term": "实际测量的搜索词",
   "GitHub search scope": "GitHub 检索范围",
@@ -30,7 +63,7 @@ export const zh: Record<string, string> = {
   "Research a direction": "研究一个方向",
   "Research your next idea": "研究你的下一个想法",
   "Search interest. Active projects. Unresolved workflows.":
-    "搜索趋势、活跃项目、未解决的使用问题。",
+    "搜索趋势、活跃项目、真实使用问题。",
   "A short report with sources and a next step.":
     "用一份附有来源的简报，确定下一步。",
   "Read a public example": "先看一份公开报告",
@@ -42,7 +75,7 @@ export const zh: Record<string, string> = {
   "Saved projects": "收藏项目",
   Reports: "研究报告",
   "Projects saved in your workspace. Data refreshes when you open this list; alerts are not enabled.":
-    "项目保存在当前工作区，打开列表时刷新数据；目前不发送异动提醒。",
+    "项目保存在当前工作区，打开列表即可刷新数据。",
   "Loading saved projects…": "正在读取收藏项目…",
   "Save a repository": "收藏仓库",
   "Save project": "收藏项目",
@@ -66,11 +99,11 @@ export const zh: Record<string, string> = {
   "Sign in to compare the selected repositories. Your selection will be kept.":
     "登录后对比所选仓库，已选择的项目会保留。",
   "Browse public reports without an account. Sign in to scan and save reports and projects across devices.":
-    "公开报告无需登录。登录后可扫描，并跨设备保存报告和收藏项目。",
+    "公开报告自由浏览；登录后可扫描，并跨设备保存报告和项目。",
   "Save a project from any category or add a repository above. Your saved projects are stored on this server.":
     "从报告中收藏项目，或在上方输入仓库。项目清单保存在当前服务中。",
   "Use it to decide where to investigate next. Validate real workflows with people, inspect existing alternatives and account for commercial products. Search measurements do not predict revenue, investment outcomes or GitHub stars.":
-    "用这些判断确定下一步研究方向，向真实用户验证工作流，并比较现有开源及商业产品。搜索指标不能预测收入、投资回报或 GitHub Star。",
+    "用这些线索确定下一步研究方向，向用户验证工作流，并比较开源与商业方案。收入和产品采用情况可通过实际使用与交易测量。",
   Account: "账户",
   "Operations · ghtrends": "运行管理 · ghtrends",
   Admin: "管理",
@@ -83,49 +116,49 @@ export const zh: Record<string, string> = {
   "This saved report uses method {old}. Current method: {current}. Run a new scan to update the evidence; the original snapshot stays unchanged.":
     "这份已保存报告使用算法 {old}，当前算法为 {current}。重新扫描可获取新证据，原快照保留。",
   "The planned primary term lacks usable evidence. The first usable same-intent variant is shown; selection uses data coverage, never growth direction.":
-    "原定主词缺少可用证据，当前展示第一个证据可用的同义词；选择依据是数据完整度，不是涨跌方向。",
+    "按预定顺序展示首个覆盖充分的同义词。",
   "The same eight-week period last year could not be compared.":
-    "无法比较去年对应的 8 周数据。",
+    "补充去年同期的 8 周数据后，可加入同比比较。",
   "Short and longer search windows or related terms do not agree. A single market label would overstate the evidence.":
-    "短期、较长周期或相关词的信号不一致，用单一市场标签会夸大证据。",
+    "时间窗口或相关词呈现分歧，建议分别核对曲线，并细化使用场景。",
   "Search attention is cooling recently but remains above the same period last year. A pullback is not a long-term decline.":
-    "近期搜索关注度回落，但仍高于去年同期；短期回调不等于长期衰退。",
+    "近期搜索关注度回落，水平仍高于去年同期。两个时间尺度可共同参考。",
   "Search attention is recovering recently but remains below the same period last year. This does not establish seasonality.":
-    "近期搜索关注度回升，但仍低于去年同期；这不足以证明季节性。",
+    "近期搜索关注度从较低基期回升。延长观察周期，可进一步识别重复模式。",
   "Cooling recently, still above last year": "近期回调，仍高于去年同期",
   "Recovering recently, still below last year": "近期回升，仍低于去年同期",
   "The recent search pullback coexists with a higher level than last year. Compare concrete use cases; neither window measures customer demand.":
-    "搜索近期回调，但水平仍高于去年同期。应比较具体使用场景；两个窗口都不直接衡量客户需求。",
+    "近期搜索关注度回调，水平仍高于去年同期。结合用户访谈与产品使用情况，进一步验证需求。",
   "Recent search attention has improved from a lower base. It has not recovered last year’s level; a seasonal explanation is unproven.":
-    "搜索关注度从较低基期回升，但尚未恢复去年同期水平；季节性解释尚未得到验证。",
+    "搜索关注度从较低基期回升，当前水平低于去年同期。延长观察周期，可进一步识别重复模式。",
   "Search attention is rising and many repositories match this query. Check which projects solve the same user problem before drawing a competition conclusion.":
     "搜索关注度上升，且许多仓库匹配此检索范围。判断竞争前，先核实哪些项目解决同一个用户问题。",
   "Two-week block resampling tests sensitivity to individual observations. The year-over-year window adds long-term context; it cannot prove seasonality. These diagnostics are not probabilities of business success.":
-    "双周分块重采样检查结果对个别观测的敏感度。同比提供长期背景，不能直接证明季节性；这些诊断不是商业成功概率。",
+    "双周分块重采样检查个别观测的影响，同比数据提供长期背景。重复模式与商业结果分别通过后续观察验证。",
   "The primary phrase and up to two same-intent variants are collected independently for the same region and time range. If the primary lacks usable evidence, the first usable variant is selected by data coverage. We never add normalized indices or select by growth direction.":
-    "主词和最多两个同义词在相同地区、日期范围内独立采集。主词证据不足时，按数据完整度选择第一个可用同义词，不相加归一化指数，也不按涨跌挑词。",
+    "主词和最多两个同义词在相同地区与时间范围内独立采集，各自展示曲线，并按预定顺序和可用覆盖选择展示词。",
   "Search matches can include libraries, integrations and resource lists. A topic tag does not prove a project is a direct competitor.":
-    "搜索结果可能包含依赖库、集成项目和资料合集；命中主题标签不代表它就是直接竞品。",
+    "匹配结果包括依赖库、集成项目和资料合集。核对项目服务的用户与工作流，可识别直接替代方案。",
 
   "Sign in to open your private reports": "登录后查看自己的私有报告",
   "Search rising; compare alternatives": "搜索上升，比较现有方案",
   "The AI query plan could not be validated. Please refine the input.":
-    "暂时无法确认查询词，请把研究方向写得更具体后重试。",
+    "请细化研究方向后重试。",
   "The AI response was incomplete. Please try again.":
-    "AI 返回内容不完整，请重试。",
+    "请重试以获取完整的 AI 回复。",
   "The AI response could not be validated. Please try again.":
-    "AI 返回内容未通过校验，请重试。",
+    "请重试以获取通过校验的 AI 回复。",
   "Relative search interest": "相对搜索热度",
-  "Sign-in is not configured on this server.": "此服务器尚未配置登录。",
+  "Sign-in is not configured on this server.": "请联系运营者完成登录配置。",
   "Your research history · ghtrends": "我的研究历史 · ghtrends",
   "Supply counts active repositories matching the displayed GitHub topic and phrase queries; unmatched and closed-source competitors are outside this coverage.":
-    "供给统计覆盖展示的 GitHub 主题与短语所匹配的活跃仓库；未匹配到的项目及闭源产品不在覆盖范围内。",
+    "供给统计覆盖当前 GitHub 查询匹配的活跃仓库。进一步的竞争研究可结合其他仓库与商业产品。",
   "Blue ocean": "蓝海",
   "Growing red ocean": "增长红海",
   "Red ocean": "红海",
   "Quiet ocean": "静海",
   "Ocean labels summarize search direction and observed open-source supply. They are research signals, not verified measures of commercial competition. A quiet ocean may still be a valuable niche.":
-    "海域名称概括搜索方向与已观察到的开源供给，是研究信号，不是对真实商业竞争的定论。静海仍可能是有价值的小众市场。",
+    "海域标签概括搜索方向与已观察到的开源供给，可用来安排研究，再通过用户与产品验证商业竞争。静海也可能包含有价值的小众场景。",
   "Rising · limited supply": "搜索上升 · 供给较少",
   "Rising · established supply": "搜索上升 · 供给已有规模",
   "Established supply": "供给已有规模",
@@ -146,7 +179,7 @@ export const zh: Record<string, string> = {
   "trend.falling": "下降",
   "trend.stable": "平稳",
   "trend.mixed": "信号分歧",
-  "trend.unknown": "尚未确认",
+  "trend.unknown": "待补充",
   "Stable or falling": "平稳或下降",
   "Search direction": "搜索方向",
   "Search interest change": "搜索关注度变化",
@@ -154,15 +187,15 @@ export const zh: Record<string, string> = {
   "4-week change": "4 周变化",
   "13-week change": "13 周变化",
   "Short and longer search windows do not agree, or seasonality may explain the rise. A single market label would overstate the evidence.":
-    "短期与较长周期的搜索变化不一致，或上涨可能来自季节性，暂不合并为单一赛道判断。",
+    "各时间窗口呈现分歧。建议核对曲线，并补充更长周期的数据。",
   "Related search terms move in opposite directions. The primary query is shown unchanged; do not treat one synonym as the whole category.":
-    "相关搜索词出现相反方向。主关键词的数据保留原样，单个同义词不能代表整个领域。",
+    "相关搜索词呈现相反方向，建议将主词与同义词曲线结合阅读。",
   "Repository density and search attention are separate observations. Neither proves commercial competition or demand.":
-    "仓库密度与搜索关注度是两项独立观察，无法直接证明商业竞争或客户需求。",
+    "仓库密度与搜索关注度提供互补线索。结合用户与产品证据，可进一步判断竞争与需求。",
   "Many active repositories match this scope. Check the search direction, alternatives and specific user problems before choosing an entry point.":
     "当前范围内已有较多活跃项目。结合搜索方向、现有工具和具体用户问题，选择切入点。",
   "The time windows or related search terms disagree. Narrow the use case and compare the original curves before making a market claim.":
-    "不同时间窗口或相关搜索词的方向不一致。先缩小使用场景，核对原始曲线，再判断机会。",
+    "时间窗口或相关词呈现分歧。先细化使用场景，再核对原始曲线。",
   "My research": "我的研究",
   "My account": "我的账户",
   "Sign in": "登录",
@@ -171,7 +204,7 @@ export const zh: Record<string, string> = {
   "YOUR RESEARCH": "我的研究",
   "Your research, saved for you": "查过的内容，随时接着看",
   "Browse public reports without an account. Sign in to run AI-assisted scans and keep your history and watchlist across devices.":
-    "公开报告无需登录。登录后可使用 AI 辅助扫描，并跨设备保存历史记录和关注列表。",
+    "公开报告自由浏览。登录后可使用 AI 辅助扫描，并跨设备保存研究。",
   "Pick up where you left off": "接着上次的研究",
   "Completed scans are saved automatically. New personal reports stay private until you share them.":
     "扫描完成后自动保存。个人新报告默认私有，由你决定是否分享。",
@@ -204,7 +237,7 @@ export const zh: Record<string, string> = {
   "AI interpretation of the evidence below. Verify the sources before acting.":
     "AI 根据下方证据生成的解释；采取行动前请核对来源。",
   "The AI brief is unavailable. Verified source evidence is still shown.":
-    "AI 简报暂时不可用，已采集的来源证据仍可查看。",
+    "请先查看已采集的来源证据与下一步建议。",
   "Sign in to scan and save your research.": "请登录后扫描并保存研究。",
   "Please reload the page and try again.": "请刷新页面后重试。",
   "Your daily scan allowance is used. Saved reports remain available.":
@@ -214,7 +247,7 @@ export const zh: Record<string, string> = {
     "服务刚刚重启，请重新运行这次扫描。",
   "Curated search scope": "固定检索范围",
   "Could not identify a research topic. Try a specific tool category or describe the problem.":
-    "暂时无法识别这个主题，请输入具体的工具类别，或描述想解决的问题。",
+    "请输入具体工具类别，或描述想研究的问题。",
   "Choose the meaning you want to research.": "请选择你想研究的含义。",
   "Enter a topic between 1 and 300 characters.":
     "请输入 1 至 300 个字符的研究方向。",
@@ -222,17 +255,17 @@ export const zh: Record<string, string> = {
     "可从赛道中收藏项目，或在上方添加仓库。关注列表保存在服务器。",
   "Read supply and search direction separately": "分别看供给规模与搜索方向",
   "We compare the last 8 complete weeks with the previous 8, alongside 4-week and 13-week changes. Rising or falling requires a 10% change, a resampling band on the same side of zero, and no opposing short or longer trend. Conflicting windows and opposite-moving synonyms are marked mixed.":
-    "比较最近 8 个完整周与前 8 周，同时检查 4 周和 13 周变化。判断上升或下降需达到 10% 变化、重采样区间在零值同侧，且短期与较长周期没有反向变化。窗口冲突或同义词反向时标为信号分歧。",
+    "比较最近 8 个完整周与前 8 周，同时核对 4 周和 13 周变化。变化达到 10%、重采样区间位于零值同侧、各窗口方向相符时，形成方向判断。窗口分歧单独标注。",
   "The primary phrase and up to two same-intent variants are collected in the same region and time range. Each curve is shown separately. We never add normalized indices or choose the fastest-growing synonym.":
-    "主关键词及最多两个同义表达在相同地区与时间范围内采集，各自显示曲线。归一化指数不相加，也不以增速最高的同义词替代主关键词。",
+    "主词及最多两个同义表达采用相同地区与时间范围，各自归一化并分别展示，选择遵循预定顺序。",
   "GitHub searches use relevant topics and specific repository-name or description phrases. Results are deduplicated and require at least five stars, a push within 180 days, and no forks or archived projects.":
-    "GitHub 搜索覆盖相关主题，以及仓库名称或描述中的具体短语。结果去重，要求至少 5 Star、180 天内有推送，排除 fork 与归档项目。",
+    "GitHub 搜索匹配相关主题，以及名称或描述中的具体短语。结果去重后，保留原创、活跃、至少 5 Star 且 180 天内有推送的仓库。",
   "Reports preserve their collected evidence. New hosted scans are private and saved to your account; you choose whether to share them. Self-hosted data and credentials stay on your server.":
     "报告保留采集时的证据。托管版个人新扫描默认私有并保存到账户，可自主选择公开；自托管的数据与凭据留在自己的服务器。",
   "Related search terms": "相关搜索词",
   "Primary query": "主关键词",
   "Measured separately; normalized indices are not added.":
-    "分别测量，归一化指数不相加。",
+    "各关键词分别测量并展示归一化曲线。",
   "ghtrends home": "ghtrends 首页",
   "Main navigation": "主导航",
   "Star on GitHub": "去 GitHub 点 Star",
@@ -242,7 +275,7 @@ export const zh: Record<string, string> = {
   "Know where": "看清机会",
   "to build": "再开始做",
   "Spot growing demand.": "发现增长中的需求。",
-  "Find the gaps in open source.": "找到开源生态尚未满足的需要。",
+  "Find the gaps in open source.": "发现下一个有用的开源工具。",
   "01 / THE BIG PICTURE": "01 / 看清全局",
   "Follow the": "找到你的",
   "opportunity.": "下一个机会。",
@@ -276,7 +309,7 @@ export const zh: Record<string, string> = {
   "Active projects": "活跃项目",
   Evidence: "证据强度",
   "Explore the evidence": "查看判断依据",
-  "No matching signals": "没有匹配的结果",
+  "No matching signals": "试试其他搜索词",
   "Try another topic or clear the category filter.":
     "换一个主题，或清除赛道筛选。",
   "Clear filters": "清除筛选",
@@ -286,8 +319,8 @@ export const zh: Record<string, string> = {
   "The same evidence. In your terminal or your AI agent.":
     "在终端和 AI 智能体中，使用同一份证据。",
   "* Category counts can overlap. Search interest is a demand signal, not a measure of paying customers. All classifications include their evidence and limitations.":
-    "* 赛道之间可能包含相同项目。搜索热度只能反映需求线索，无法衡量付费客户数。每个判断均附有证据与适用范围。",
-  "This page has drifted off the map": "这个页面不在地图上",
+    "* 赛道之间可能包含相同项目。搜索热度衡量关注度，付费需求可通过用户访谈与交易验证。每个判断均附有证据与适用范围。",
+  "This page has drifted off the map": "回到你的研究",
   "Return to the radar to find a category or project.":
     "返回雷达，查找赛道或项目。",
   "Back to radar": "返回雷达",
@@ -296,7 +329,8 @@ export const zh: Record<string, string> = {
   "Source code": "源代码",
   "Daily discoveries": "每日发现",
   Methodology: "判断方法",
-  "Not affiliated with GitHub, Inc.": "与 GitHub, Inc. 无隶属关系。",
+  "Not affiliated with GitHub, Inc.":
+    "独立开源项目。GitHub 为 GitHub, Inc. 的商标。",
   "Scan needs attention": "扫描遇到问题",
   "Dismiss scan error": "关闭错误提示",
   "Checking GitHub supply and Google search demand. You can keep exploring.":
@@ -318,31 +352,31 @@ export const zh: Record<string, string> = {
   "Relative search interest for “": "搜索热度：“",
   "complete observations": "个完整周",
   "Original values are relative Google Trends indices on a 0–100 scale, not search counts.":
-    "原始数值为 Google Trends 的 0–100 相对指数，不是搜索次数。",
+    "原始数值采用 Google Trends 的 0–100 相对指数。",
   "Behind the classification": "判断依据",
   "Read the full method": "阅读完整方法",
   "The projects shaping this space": "赛道中的主要项目",
   "Leading repositories by stars within the selected topic.":
     "按所选主题内的 Star 数排序。",
   "View search": "查看原始搜索",
-  "No matching projects returned": "未返回匹配项目",
+  "No matching projects returned": "探索相近搜索词",
   "A narrow topic or unavailable source can leave this view empty. Check the evidence notes below.":
-    "主题过窄或数据源暂时不可用都可能导致空结果，请查看下方证据说明。",
+    "查看下方检索范围与采集状态，再调整关键词或刷新来源。",
   "Compare the leading projects": "对比主要项目",
   "Star windows follow GitHub’s calendar buckets.":
     "Star 统计遵循 GitHub 的自然日期窗口。",
   "Listen to what’s missing": "听听用户还缺什么",
   "Open issues with community reactions. These are leads to investigate, not proven product opportunities.":
-    "这些未关闭的 Issue 获得了社区回应，可作为进一步研究的线索。",
+    "开放的 Issue 获得了社区回应，可作为进一步研究的线索。",
   signals: "条线索",
   "No issue signals were returned for this scan. This does not establish the absence of unmet demand.":
-    "本次未找到符合条件的 Issue，不能据此认定没有未满足的需求。",
+    "当前 Issue 筛选命中 0 条。可继续查看相近项目与用户讨论，寻找更多线索。",
   "Know the boundaries": "适用范围与限制",
   "Download evidence JSON": "下载证据 JSON",
   "Put this finding where others can discover it.": "让更多人发现这份研究。",
   "Share a permanent snapshot of the evidence.": "分享证据的固定快照链接。",
   "Copy README card": "复制 README 卡片",
-  "Repository unavailable": "仓库数据暂不可用",
+  "Repository unavailable": "刷新仓库数据",
   "Reading repository history and maintenance signals…":
     "正在读取仓库历史和维护情况…",
   "REPOSITORY INTELLIGENCE": "仓库情报",
@@ -353,7 +387,7 @@ export const zh: Record<string, string> = {
   "Daily new stars": "每日新增 Star",
   d: "天",
   "GitHub calendar-bucket counts; not rolling 24-hour net growth. Each chart is scaled to its visible range.":
-    "采用 GitHub 自然日期分桶数据，不代表滚动 24 小时净增长。纵轴按当前可见数据缩放。",
+    "按 GitHub 自然日期分桶展示 Star 新增量，纵轴按当前可见范围缩放。",
   "Maintenance in context": "项目维护情况",
   "Last push": "最近提交",
   "Repository created": "创建日期",
@@ -363,11 +397,11 @@ export const zh: Record<string, string> = {
   "The people behind the project": "项目背后的贡献者",
   "Maintainer response median": "维护者回复中位数",
   "Issues sampled": "Issue 样本数",
-  "No maintainer response found": "未找到维护者回复",
+  "No maintainer response found": "等待维护者回复",
   "Contributors returned": "返回的贡献者数",
   "Top contributor commit share": "头部贡献者提交占比",
   "Recent issue sample; bots and self-replies excluded. Unanswered issues are reported separately. Contributor share reflects returned commit counts.":
-    "基于近期 Issue 样本，排除机器人和自我回复，单独列出未回复项。贡献者占比按返回的提交次数计算。",
+    "近期 Issue 样本统计人工维护者回复，并单列等待回复的条目。贡献者占比按返回的提交次数计算。",
   "Data notes": "数据说明",
   "Explore on GitHub": "在 GitHub 查看",
   "SIDE BY SIDE": "并排看清差异",
@@ -396,7 +430,7 @@ export const zh: Record<string, string> = {
   "Refreshing your watchlist…": "正在刷新关注清单…",
   "Make room for your next discovery": "留一个位置，给下一次发现",
   "Save a project from any category or add a repository above. No account required.":
-    "从赛道中关注项目，或直接在上方添加仓库，无需注册。",
+    "在本地工作区，从赛道收藏项目，或在上方添加仓库。",
   "Explore the radar": "探索雷达",
   "OPEN DATA. OPEN METHOD.": "数据公开，方法透明。",
   "A signal you can inspect": "每个判断，都有依据",
@@ -407,47 +441,47 @@ export const zh: Record<string, string> = {
   "Starting strategy": "起步建议",
   "Under 50 projects": "少于 50 个项目",
   Fast: "快速",
-  "Validate an underserved use case.": "验证尚未被充分服务的使用场景。",
+  "Validate an underserved use case.": "验证具体用户需要。",
   "50+ projects": "至少 50 个项目",
   "Find a specific audience or advantage.": "找到具体受众或独特优势。",
-  "Not fast": "未达到快速增长标准",
+  "Not fast": "低于快速增长门槛",
   "Identify a reason people would switch.": "找到用户愿意迁移的理由。",
   "Check if the market is early, niche or inactive.":
     "验证是早期、小众还是缺乏活力。",
   "“Needs validation” means the evidence is missing, stale or too weak. Zero search values can be rounded or below Google’s reporting threshold; they never establish that demand does not exist.":
-    "数据缺失、过旧或过弱时，报告会给出初步行动建议，并保留象限未定状态。搜索值为零可能源于取整或低于 Google 报告门槛，不能据此认定需求不存在。",
+    "“待验证”表示继续采集或刷新证据。零值可能来自取整或 Google 报告门槛，用户需要可通过直接访谈验证。",
   "01 / DEMAND": "01 / 需求",
-  "Look past the spike.": "看持续增长，不只看峰值。",
+  "Look past the spike.": "观察持续增长。",
   "We compare median search interest across the last eight complete weeks and the previous eight. Fast growth requires at least 25% growth, positive growth in the lower resampling band, and at least six recent weeks above the prior baseline.":
     "比较最近 8 个完整周与此前 8 周的搜索热度中位数。快速增长需同时满足：增长至少 25%、重采样区间下界为正、近期至少 6 周高于原基线。",
   "A weekly observation is usable only after that week ended at collection time. Invalid rows cannot refresh old evidence, and conflicting values for the same week prevent classification.":
-    "采集时已结束的完整周才能用于计算。无效数据不能让旧证据变新，同一周出现冲突值时不作象限判断。",
+    "按记录日期使用已结束的完整周。连续且一致的周观测用于分类，其余情况通过刷新补充证据。",
   "Two-week block resampling tests sensitivity to individual observations. A year-over-year comparison checks recurring seasonal rebounds. These diagnostics are not probabilities of business success.":
-    "以两周为一组重采样，检查结论是否过度依赖个别观测；同比用于检查季节性反弹。这些检验不代表商业成功概率。",
+    "双周分块重采样检查个别观测的影响，同比提供长期背景，商业结果通过实际使用与交易验证。",
   "Search terms are measured alongside a shared “github trending” reference in the same region and time range. Google Trends is normalized, sampled search attention, not absolute demand.":
-    "关键词与共同参考词 github trending 在相同地区和时间范围内测量。Google Trends 是归一化的搜索关注度抽样，无法直接衡量绝对需求。",
+    "关键词采用相同地区和时间范围，Google Trends 提供归一化的搜索关注度抽样。",
   "How Google Trends works": "Google Trends 数据说明",
   "02 / SUPPLY": "02 / 供给",
   "Count active alternatives.": "看看有哪些活跃替代方案。",
   "A matching repository must carry the selected GitHub topic, have at least five stars, have been pushed to in the last 180 days, and be neither a fork nor archived.":
-    "匹配仓库须带有所选 GitHub 主题、至少 5 Star、180 天内有提交，且未归档、不是 Fork。",
+    "匹配仓库带有所选主题、至少 5 Star、180 天内有提交，并处于原创、活跃状态。",
   "Fifty qualifying repositories is the published dense-supply threshold. This is a transparent operational rule, not a universal economic law. Topic labels are imperfect; untagged projects and commercial competitors are outside this sample.":
-    "当前以 50 个符合条件的仓库作为供给密集门槛。这是公开的操作规则，仍需实证校准。主题标签无法覆盖所有项目，无标签项目及商业竞品不在样本内。",
+    "当前检索范围以 50 个符合条件的仓库作为密集门槛。更广泛的研究可结合其他标签下的项目与商业替代方案。",
   "Repository charts use GitHub’s official star-history calendar buckets. Issue-response times cover a recent sample, separating unanswered issues. All raw evidence is exportable.":
-    "仓库图表采用 GitHub 官方 Star 历史自然日期分桶；回复时间基于近期 Issue 样本，未回复项单独列出。原始证据均可导出。",
+    "仓库图表采用官方 Star 历史自然日期分桶；Issue 样本区分已回复与待回复条目，原始证据支持导出。",
   "Inspect the algorithm": "查看算法源码",
   "Your terminal. Your agent.": "在终端和智能体中使用。",
   "Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.":
-    "需要 Node.js 22.13 或更新版本。公开查询可在 GitHub 未认证额度内直接使用；较大扫描请配置自己的 Token 或 GitHub App。",
+    "使用 Node.js 22.13 或更新版本。公开查询使用 GitHub 游客额度，较大扫描可配置 Token 或 GitHub App。",
   "Connect an MCP client": "连接 MCP 客户端",
   "Tools:": "工具：",
   ". Results include data sources, time windows, confidence and limitations.":
     "。结果包含数据来源、时间窗口、置信度与限制。",
   "How to use a classification": "如何使用这些判断",
   "Use it to decide where to investigate next. Validate real workflows with people, inspect existing alternatives and account for commercial products. The opportunity score ranks the measured signals; it does not predict revenue, investment outcomes or GitHub stars.":
-    "用它决定下一步研究哪里，再向真实用户验证工作流、考察现有替代方案和商业产品。机会分数只对已测量信号排序，不预测收入、投资回报或 GitHub Star。",
+    "用这些线索选择下一步研究方向，向用户验证工作流，并比较开源与商业方案。产品采用与收入可通过实际使用测量。",
   "Reports are immutable snapshots. A fresh scan can produce a different classification while the original evidence stays available at its permanent link.":
-    "报告保存为不可变快照。重新扫描可能产生不同判断，旧证据仍可通过原链接查看。",
+    "报告以固定链接保留当时快照。重新扫描可获取新证据与更新后的判断。",
   "LISTEN BEFORE YOU BUILD": "先听需求，再动手做",
   "Find the friction": "找到真正的使用阻力",
   "Open issues people care enough to react to. Follow the source, understand the workflow, and validate the need.":
@@ -457,11 +491,11 @@ export const zh: Record<string, string> = {
     "搜索 alternative、frustrated、how to…",
   "signals · sorted by reactions · sampled from leading projects in scanned categories":
     "条线索 · 按回应数排序 · 来自已扫描赛道的主要项目",
-  "No matching issue signals": "没有匹配的 Issue 线索",
+  "No matching issue signals": "探索更多 Issue 线索",
   "Try a broader keyword. An empty result does not prove that demand is absent.":
-    "试试范围更广的关键词；空结果不能证明需求不存在。",
+    "试试更常见的同义词，并直接验证用户工作流。",
   "Issue labels are keyword-based suggestions. Reactions do not establish a market, and issue text may be incomplete. Always read the original discussion.":
-    "Issue 分类基于关键词。回应数不能证明市场成立，摘要也可能缺少上下文，请阅读原始讨论。",
+    "Issue 标签提供基于关键词的研究线索。阅读原始讨论，并验证具体用户问题。",
   "Awaiting history": "等待历史数据",
   "Historical trend": "历史趋势",
   "Opportunity map: active repository supply from left to right, sustained search demand growth from bottom to top":
@@ -511,26 +545,26 @@ export const zh: Record<string, string> = {
   Copied: "已复制",
   "Copy this link:": "复制此链接：",
   "Reading the signals…": "正在读取信号…",
-  "No description provided.": "暂无简介。",
+  "No description provided.": "查看仓库详情。",
   "Remove from watchlist": "取消关注",
   "Add to watchlist": "添加关注",
   Watching: "已关注",
-  "Not specified": "未注明",
+  "Not specified": "查看来源",
   Yes: "是",
-  No: "否",
-  Unavailable: "暂无数据",
-  "No history": "暂无历史",
+  No: "关闭",
+  Unavailable: "待补充",
+  "No history": "开始记录研究",
   "Ready for your first scan": "开始你的首次扫描",
-  "This report is unavailable": "这份报告暂不可用",
-  "This category is waiting for its first scan": "这个赛道尚未扫描",
+  "This report is unavailable": "打开已保存报告，或开始新扫描",
+  "This category is waiting for its first scan": "开始这个赛道的首次扫描",
   "Scan this category": "扫描这个赛道",
   "Your scan is queued": "扫描正在排队",
   "Reading the landscape": "正在分析赛道",
-  "Scan failed.": "扫描未完成。",
+  "Scan failed.": "请重试扫描。",
   "Enter two to six repositories in owner/repo format.":
     "请输入 2–6 个仓库，格式为 owner/repo。",
   "Use owner/repo format.": "请使用 owner/repo 格式。",
-  "The request could not be completed.": "请求未完成，请重试。",
+  "The request could not be completed.": "请重试本次请求。",
   all: "全部",
   "feature request": "功能请求",
   alternative: "替代方案",
@@ -562,22 +596,21 @@ export const zh: Record<string, string> = {
     "将自定义 GitHub 主题与 Google 搜索热度交叉分析。",
   "Models and tools for scientific discovery.": "面向科学发现的模型与工具。",
   "Investigate an underserved use case. Validate the problem with users, then move quickly on a focused product.":
-    "寻找尚未被充分服务的场景，向用户验证问题后，快速做出聚焦的产品。",
+    "探索具体用户需要，验证问题后，做出聚焦且有用的产品。",
   "Demand is growing alongside competition. Look for a specific audience, workflow or cost advantage.":
     "需求与竞争同步增长。寻找具体受众、工作流或成本优势。",
-  "Research the field, not just its abbreviation":
-    "先按完整领域重查，再决定切入点",
+  "Research the field, not just its abbreviation": "使用完整领域名称研究",
   "Use the recognized field name, then validate a specific workflow. The current keyword sample cannot establish the field’s demand or competition.":
-    "建议按完整领域名称重新扫描，再验证一个具体工作流。目前的缩写样本不足以代表整个领域的需求或竞争。",
+    "按完整领域名称扫描，并验证具体工作流。更充分的样本可补充需求与替代方案的背景。",
   "Start with a specific competitive advantage": "先找到一个具体的竞争优势",
   "Active alternatives already exist at scale. Validate a reason for users to switch before committing; search data has not confirmed sustained demand growth.":
-    "当前范围内已有较多活跃替代方案。先验证用户为什么愿意迁移；搜索数据尚未确认需求持续增长。",
+    "当前范围内已有较多活跃替代方案。建议访谈现有用户，识别具体迁移动机。",
   "Validate a focused use case first": "先验证一个具体使用场景",
   "There are active projects in this search scope. Start with their users and unresolved workflows; the available search data does not justify a broad market bet.":
-    "当前搜索范围内已有活跃项目。建议从它们的用户和未解决的工作流入手；现有搜索数据不足以支持大范围投入。",
-  "Test the problem before building": "先确认问题值得解决，再动手做",
+    "当前活跃项目提供了研究起点。可从用户和开放的 Issue 入手，验证一个具体工作流。",
+  "Test the problem before building": "从具体使用场景开始验证",
   "The available sources cannot establish both competition and demand. Start with user problems and concrete alternatives; an empty search is not proof of an open market.":
-    "现有来源尚不能同时判断竞争和需求。先核实用户问题与具体替代方案；空结果不能证明赛道空白。",
+    "从具体用户问题出发，比较现有解决方式。补齐搜索历史后，可进一步定位赛道。",
   "{count} active projects match the published GitHub search scope.":
     "在公开的 GitHub 检索范围内，匹配到 {count} 个活跃项目。",
   "The keyword “{keyword}” has {weeks} complete weeks; {zero}% are reported as zero.":
@@ -591,7 +624,7 @@ export const zh: Record<string, string> = {
   "Validate willingness to try a concrete solution before building a general AI for Science platform.":
     "先验证用户是否愿意试用一个具体方案，再考虑通用 AI for Science 平台。",
   "Inspect the leading projects and their unresolved issues to identify a specific user problem.":
-    "查看主要项目及未解决的 Issue，找出一个具体用户问题。",
+    "查看主要项目与开放的 Issue，找出具体用户问题。",
   "Ask potential users how they solve that problem today and what would make them switch.":
     "询问潜在用户现在怎样解决问题，以及什么改进能让他们换用新方案。",
   "Repeat the scan with a familiar search phrase and compare the evidence before committing.":
@@ -601,9 +634,9 @@ export const zh: Record<string, string> = {
   "Your next move": "建议下一步",
   "What we know": "目前已知",
   "What to do next": "接下来怎么做",
-  "Quadrant not yet established": "象限尚未确认",
+  "Quadrant not yet established": "继续补充定位依据",
   "This recommendation uses the evidence already available. It is not an LLM-generated forecast.":
-    "建议根据已有证据生成，未使用 LLM 预测。",
+    "建议依据已采集的来源证据整理。",
   "Rescan with “{keyword}”": "用“{keyword}”重新扫描",
   "Why this wording?": "为什么这样命名？",
   "Field context": "领域背景",
@@ -625,42 +658,42 @@ export const zh: Record<string, string> = {
   "{hours} hours": "{hours} 小时",
   "Open {repo} on GitHub": "在 GitHub 打开 {repo}",
   "A crowded category without sustained search growth. Enter only with a concrete switching advantage.":
-    "项目较密集，搜索需求未达到持续快速增长标准。切入前需要验证具体的用户迁移优势。",
+    "当前供给已有规模，建议验证具体用户迁移理由。",
   "A small category without sustained search growth. Check external demand before investing; it may be early, niche or inactive.":
-    "当前项目较少，搜索需求未达到持续快速增长标准。投入前先验证外部需求，可能处于早期、小众或低活跃状态。",
+    "当前观察到的供给较少，可继续验证其发展阶段与具体场景价值。",
   "Gather stronger evidence or refine the demand keyword. The available data does not support a reliable quadrant.":
-    "需要补充证据或调整需求关键词，当前数据不足以可靠确定象限。",
+    "调整搜索词或刷新来源，逐步补全赛道判断。",
   "Google Trends measures relative search attention, not customers, revenue or willingness to pay.":
-    "Google Trends 衡量相对搜索关注度，不能直接代表客户数、收入或付费意愿。",
+    "Google Trends 衡量相对搜索关注度。客户、收入和付费意愿可通过直接研究验证。",
   "Supply counts active repositories carrying the selected GitHub topic; unlabeled and closed-source competitors are outside this coverage.":
-    "供给统计覆盖所选 GitHub 主题下的活跃仓库，不包含未标注主题的项目或闭源竞品。",
+    "供给覆盖所选 GitHub 主题下的活跃仓库，更广泛的研究可结合其他仓库与商业产品。",
   "The repository search is incomplete. Displayed supply is not a census.":
-    "仓库检索不完整，显示的项目数量不代表全部供给。",
+    "当前检索返回部分样本，显示数量为已知下限。",
   "Search baseline is too close to zero for a stable growth estimate. Low volume does not prove no demand.":
-    "搜索基线过于接近零，无法稳定估算增速。低搜索量不能证明没有需求。",
+    "实测基线接近零。延长观察周期，并结合用户访谈，可进一步判断需求。",
   "The time series must contain consecutive weekly observations; missing, conflicting or differently spaced observations cannot be classified.":
-    "时间序列必须由连续完整周构成；缺失、冲突或间隔不同的数据不能用于象限分类。",
+    "分类依据连续且一致的完整周观测。刷新时间序列可补全这些证据。",
   "Too many observations are rounded to zero. Try a broader demand keyword.":
     "过多观测值被取整为零，建议使用覆盖面更广的需求关键词。",
   "Evidence is stale or missing. Refresh before relying on a market classification.":
-    "证据过旧或缺失，请刷新后再参考赛道分类。",
+    "刷新来源以获取当前分类依据。",
   "Year-over-year seasonality could not be checked.":
-    "当前数据无法检查同比季节性。",
+    "补充去年同期数据，以观察重复模式。",
   "Recent search growth repeats last year’s level and is treated as seasonal, not a new breakout.":
-    "近期搜索增幅重复了去年同期水平，因此按季节性变化处理。",
+    "近期搜索增幅接近去年同期水平，延长观察周期可进一步识别重复模式。",
   "The lower resampling bound does not establish positive growth.":
-    "重采样区间下界未能支持正增长。",
+    "重采样区间跨越零值，继续积累观测可明确方向。",
   "ghtrends puts two independent questions together: how much active open-source supply exists, and whether search demand is growing.":
     "ghtrends 把两个独立问题放在一起：活跃开源供给有多少，搜索需求是否正在增长。",
   "Google Trends returned no observations for this keyword.":
-    "Google Trends 未返回该关键词的观测数据。",
+    "该关键词的 Trends 覆盖待补充，可试试常用同义表达。",
   "Partial evidence": "部分证据",
   "GitHub search scopes": "GitHub 检索范围",
   "Counts are deduplicated across topic searches; incomplete searches show a lower bound.":
-    "多个主题的返回项目已去重；检索不完整时，数量表示已找到的下限。",
+    "数量汇总去重后的搜索结果，部分结果以下限展示。",
   "Measured open-source categories": "已测量的开源赛道",
   Category: "赛道",
-  "Page not found · ghtrends": "页面不存在 · ghtrends",
+  "Page not found · ghtrends": "返回研究 · ghtrends",
   "Evidence dated {date}.": "证据日期：{date}。",
   "GitHub supply × Google search demand. Explore category evidence, compare repositories, and use the open-source CLI and MCP server.":
     "GitHub 供给 × Google 搜索需求。探索赛道证据、对比仓库，也可通过开源 CLI 和 MCP 服务使用。",
@@ -676,20 +709,20 @@ export const zh: Record<string, string> = {
   "Leading repositories": "主要仓库",
   "Limits of this result": "结果的适用范围",
   "Search interest measures attention, not paying customers. Classification thresholds are published heuristics and still require empirical calibration.":
-    "搜索热度反映关注度，不能代表付费客户。分类门槛为公开的启发式规则，仍需实证校准。",
+    "搜索热度衡量关注度，客户需求通过用户研究验证；分类门槛为公开经验规则，并持续接受实证校准。",
   "Use and share the evidence": "使用与分享证据",
-  "Page not found.": "页面不存在。",
-  "This report or page is unavailable.": "这份报告或页面暂不可用。",
+  "Page not found.": "返回研究首页。",
+  "This report or page is unavailable.": "打开已保存报告，或从研究首页继续。",
   "GITHUB SUPPLY × GOOGLE SEARCH DEMAND": "GITHUB 供给 × GOOGLE 搜索需求",
   "Know where to build": "看清机会，再开始做",
   "Explore active open-source supply and sustained search growth. Every category links to its evidence, dates and limitations.":
     "探索活跃开源供给与持续搜索增速。每个赛道都附有证据、日期与适用范围。",
   "Search growth compares the last eight complete weeks with the previous eight. Counts can overlap; GitHub topic labels do not cover every competitor.":
-    "搜索增速对比最近 8 个完整周与此前 8 周。赛道项目可能重叠，GitHub 主题标签无法覆盖所有竞品。",
+    "搜索增速比较最近 8 个完整周与此前 8 周。赛道间可能包含相同项目，可结合更广泛的竞品研究补充背景。",
   "Read the signals.": "读懂机会信号。",
   "Enable JavaScript for repository search, interactive comparisons and your browser-local watchlist.":
     "启用 JavaScript 后可搜索仓库、交互对比并使用浏览器关注清单。",
-  "Not established": "尚未确认",
+  "Not established": "待补充",
   "Search growth · 8 weeks vs prior 8": "搜索增速 · 最近 8 周对比此前 8 周",
   "Search demand": "搜索需求",
   "Open demand signals": "开放需求线索",
@@ -720,16 +753,15 @@ export const zh: Record<string, string> = {
   "7-day stars": "近 7 天 Star",
   "30-day stars": "近 30 天 Star",
   "Preliminary recommendation · quadrant not yet established":
-    "初步建议 · 象限尚未确认",
+    "下一步建议 · 持续补充证据",
   "Search attention is a demand signal, not proven market demand.":
-    "搜索关注度是需求线索，实际市场需求仍需验证。",
+    "搜索关注度提供线索，可进一步向用户验证。",
   "Needs validation": "待验证",
-  "Search volume is too weak for a stable estimate":
-    "搜索量过弱，暂不能稳定估算增速",
+  "Search volume is too weak for a stable estimate": "补充常用同义搜索词",
   "Enter a topic between 1 and 80 characters.": "请输入 1–80 个字符的主题。",
   "Use an English GitHub topic or a known category.":
     "请输入英文 GitHub 主题，或已支持的中文赛道名。",
-  "Invalid demand keyword.": "需求关键词无效。",
+  "Invalid demand keyword.": "请输入有效的需求关键词。",
   "Use a public repository in owner/repo format.":
     "请使用 owner/repo 格式的公开仓库。",
   "Region must be a two-letter country code or empty for worldwide.":
@@ -738,10 +770,222 @@ export const zh: Record<string, string> = {
     "已达到本小时扫描上限。可先浏览已有报告，或一小时后重试。",
   "The scan queue is full. Please try again shortly.":
     "扫描队列已满，请稍后重试。",
-  "This topic has not been scanned yet.": "这个主题尚未扫描。",
-  "Report not found.": "未找到报告。",
+  "This topic has not been scanned yet.": "开始扫描这个主题。",
+  "Report not found.": "打开已保存报告，或开始新扫描。",
   "GitHub rate limit reached. Cached results remain available.":
     "已达到 GitHub 请求上限，仍可查看缓存结果。",
   "GitHub access denied. Check your token or App permissions.":
     "GitHub 拒绝访问，请检查 Token 或 App 权限。",
+};
+
+// Stable legacy keys also serve previously saved report snapshots.
+export const en: Record<string, string> = {
+  "Test the problem before building": "Start with a specific use case",
+  No: "Off",
+  Unavailable: "Pending",
+  "A low-base rise is reported without a percentage when the prior median is below 3, at least six of the last eight weekly indices reach 10, and the last-four-week median retains at least 80% of the first four. It remains a low-confidence early signal; sparse or isolated spikes stay unconfirmed.":
+    "A low-base rise uses a qualitative label when the prior median is below 3, at least six of eight weeks reach 10, and the latest four-week median retains 80% of the preceding four. Evidence confidence stays low; sparse observations and isolated spikes await further validation.",
+  "Known categories retain their published query scope. Compound requirements use intersecting GitHub topics. For incomplete unions, the lower bound is the larger of the deduplicated sample and any complete individual search count.":
+    "Known categories keep their published scope. Compound requirements use topic intersections. Partially enumerated unions show the larger of the deduplicated sample and each complete query count as a lower bound.",
+  "Search interest has stayed above a near-zero baseline in at least six of eight weeks. This is an early signal, so no percentage growth is reported. Check the matching projects and validate a specific use case.":
+    "Search interest stayed above a near-zero baseline in at least six of eight weeks. This early signal uses a qualitative label. Review matching projects and validate a specific use case.",
+  "Search interest is newly sustained above a near-zero baseline in at least six of the last eight weeks. A percentage would be misleading.":
+    "Search interest stayed above a near-zero baseline in at least six of eight weeks. A qualitative label captures this early signal.",
+  "This is an early search signal. Its small historical baseline cannot establish sustained market demand.":
+    "This early search signal benefits from a longer history and direct user validation.",
+  "Search history could not be collected": "Search history refresh pending",
+  "Recent weekly history is missing or incomplete":
+    "Complete the recent weekly history",
+  "Small baseline; percentage growth is not yet reliable":
+    "Low-base signal; percentage awaits a stronger baseline",
+  "The comparison baseline is too small":
+    "Build a stronger comparison baseline",
+  "Too many weekly values are reported as zero":
+    "Weekly zeros call for a broader same-intent phrase",
+  "Search interest. Active projects. Unresolved workflows.":
+    "Search interest. Active projects. Real user problems.",
+  "Projects saved in your workspace. Data refreshes when you open this list; alerts are not enabled.":
+    "Projects stay in your workspace. Open this list to refresh their data.",
+  "Browse public reports without an account. Sign in to scan and save reports and projects across devices.":
+    "Browse public reports freely. Sign in to scan and save reports and projects across devices.",
+  "Use it to decide where to investigate next. Validate real workflows with people, inspect existing alternatives and account for commercial products. Search measurements do not predict revenue, investment outcomes or GitHub stars.":
+    "Use these signals to choose your next research step. Validate real workflows with users and compare open-source and commercial alternatives. Revenue and adoption deserve direct measurement.",
+  "The planned primary term lacks usable evidence. The first usable same-intent variant is shown; selection uses data coverage, never growth direction.":
+    "Showing the first same-intent variant with usable coverage, in the planned order.",
+  "The same eight-week period last year could not be compared.":
+    "Add the corresponding eight-week period from last year for comparison.",
+  "Short and longer search windows or related terms do not agree. A single market label would overstate the evidence.":
+    "The time windows or related terms show mixed signals. Compare each curve and refine the use case.",
+  "Search attention is cooling recently but remains above the same period last year. A pullback is not a long-term decline.":
+    "Recent search attention is cooling while staying above last year's level. Both horizons provide context.",
+  "Search attention is recovering recently but remains below the same period last year. This does not establish seasonality.":
+    "Recent search attention is recovering from a lower base. A longer history can clarify recurring patterns.",
+  "The recent search pullback coexists with a higher level than last year. Compare concrete use cases; neither window measures customer demand.":
+    "Recent search attention is cooling while staying above last year's level. Use interviews and product usage to assess customer demand.",
+  "Recent search attention has improved from a lower base. It has not recovered last year’s level; a seasonal explanation is unproven.":
+    "Recent search attention is recovering from a lower base and remains below last year's level. A longer history can clarify recurring patterns.",
+  "Two-week block resampling tests sensitivity to individual observations. The year-over-year window adds long-term context; it cannot prove seasonality. These diagnostics are not probabilities of business success.":
+    "Two-week block resampling checks sensitivity to individual observations. Year-over-year data adds context; recurring patterns and business outcomes need their own validation.",
+  "The primary phrase and up to two same-intent variants are collected independently for the same region and time range. If the primary lacks usable evidence, the first usable variant is selected by data coverage. We never add normalized indices or select by growth direction.":
+    "The primary phrase and up to two same-intent variants use separate curves for the same region and time range. Selection follows the planned order and usable coverage.",
+  "Search matches can include libraries, integrations and resource lists. A topic tag does not prove a project is a direct competitor.":
+    "Search matches include libraries, integrations and resource lists. Check each project's users and workflow to identify direct alternatives.",
+  "The AI query plan could not be validated. Please refine the input.":
+    "Refine the research topic and try again.",
+  "The AI response was incomplete. Please try again.":
+    "Please retry to receive the complete AI response.",
+  "The AI response could not be validated. Please try again.":
+    "Please retry to receive a validated AI response.",
+  "Sign-in is not configured on this server.":
+    "Ask the operator to complete sign-in setup.",
+  "Supply counts active repositories matching the displayed GitHub topic and phrase queries; unmatched and closed-source competitors are outside this coverage.":
+    "Supply covers active repositories matching the displayed GitHub queries. Broader competition research can include other repositories and commercial products.",
+  "Ocean labels summarize search direction and observed open-source supply. They are research signals, not verified measures of commercial competition. A quiet ocean may still be a valuable niche.":
+    "Ocean labels summarize search direction and observed open-source supply. Use them to guide research, then validate commercial competition directly. Quiet oceans can hold valuable niches.",
+  "trend.unknown": "Pending",
+  "Short and longer search windows do not agree, or seasonality may explain the rise. A single market label would overstate the evidence.":
+    "The time windows show mixed signals. Compare the curves and gather a longer history to clarify the pattern.",
+  "Related search terms move in opposite directions. The primary query is shown unchanged; do not treat one synonym as the whole category.":
+    "Related search terms move in opposite directions. Read the primary and variant curves together.",
+  "Repository density and search attention are separate observations. Neither proves commercial competition or demand.":
+    "Repository density and search attention provide complementary research signals. Assess competition and demand through user and product evidence.",
+  "The time windows or related search terms disagree. Narrow the use case and compare the original curves before making a market claim.":
+    "The time windows or related terms show mixed signals. Refine the use case and compare the original curves.",
+  "Browse public reports without an account. Sign in to run AI-assisted scans and keep your history and watchlist across devices.":
+    "Browse public reports freely. Sign in for AI-assisted scans and saved research across devices.",
+  "The AI brief is unavailable. Verified source evidence is still shown.":
+    "Read the collected source evidence and next steps below.",
+  "Could not identify a research topic. Try a specific tool category or describe the problem.":
+    "Enter a specific tool category or describe the problem to research.",
+  "We compare the last 8 complete weeks with the previous 8, alongside 4-week and 13-week changes. Rising or falling requires a 10% change, a resampling band on the same side of zero, and no opposing short or longer trend. Conflicting windows and opposite-moving synonyms are marked mixed.":
+    "We compare the last 8 complete weeks with the previous 8, alongside 4-week and 13-week changes. A 10% change, a resampling band on the same side of zero, and aligned time windows support a direction. Divergent windows receive a mixed label.",
+  "The primary phrase and up to two same-intent variants are collected in the same region and time range. Each curve is shown separately. We never add normalized indices or choose the fastest-growing synonym.":
+    "The primary phrase and up to two same-intent variants use the same region and time range. Each independently normalized curve is displayed separately; selection follows the planned order.",
+  "GitHub searches use relevant topics and specific repository-name or description phrases. Results are deduplicated and require at least five stars, a push within 180 days, and no forks or archived projects.":
+    "GitHub searches match relevant topics and specific name or description phrases. Deduplicated results include original, active repositories with at least five stars and a push within 180 days.",
+  "Measured separately; normalized indices are not added.":
+    "Each term has its own normalized curve.",
+  "Find the gaps in open source.": "Find the next useful open-source tool.",
+  "No matching signals": "Try another search phrase",
+  "* Category counts can overlap. Search interest is a demand signal, not a measure of paying customers. All classifications include their evidence and limitations.":
+    "* Categories can share projects. Search interest measures attention; paying demand can be explored through user interviews and transactions. Every classification includes its evidence and scope.",
+  "This page has drifted off the map": "Return to your research",
+  "Not affiliated with GitHub, Inc.":
+    "An independent open-source project. GitHub is a trademark of GitHub, Inc.",
+  "Original values are relative Google Trends indices on a 0–100 scale, not search counts.":
+    "Original values are relative Google Trends indices on a 0–100 scale.",
+  "No matching projects returned": "Explore nearby search phrases",
+  "A narrow topic or unavailable source can leave this view empty. Check the evidence notes below.":
+    "Review the search scope and collection status below, then refine the phrase or refresh the sources.",
+  "Open issues with community reactions. These are leads to investigate, not proven product opportunities.":
+    "Open issues with community reactions provide leads for further research.",
+  "No issue signals were returned for this scan. This does not establish the absence of unmet demand.":
+    "The current issue filter matched zero results. Explore nearby projects and user discussions for more leads.",
+  "Repository unavailable": "Refresh repository data",
+  "GitHub calendar-bucket counts; not rolling 24-hour net growth. Each chart is scaled to its visible range.":
+    "GitHub calendar-date buckets track star additions. Each chart uses its visible range.",
+  "No maintainer response found": "Awaiting a maintainer response",
+  "Recent issue sample; bots and self-replies excluded. Unanswered issues are reported separately. Contributor share reflects returned commit counts.":
+    "Recent issue samples include human maintainer responses and a separate pending-response count. Contributor share uses returned commit counts.",
+  "Save a project from any category or add a repository above. No account required.":
+    "Save a project from any category or add a repository above in your local workspace.",
+  "Validate an underserved use case.": "Validate a focused user need.",
+  "Not fast": "Below the breakout threshold",
+  "“Needs validation” means the evidence is missing, stale or too weak. Zero search values can be rounded or below Google’s reporting threshold; they never establish that demand does not exist.":
+    "“Needs validation” keeps research open while evidence is gathered or refreshed. Zero indices can reflect rounding or Google's reporting threshold. Validate user needs directly.",
+  "Look past the spike.": "Look for sustained growth.",
+  "A weekly observation is usable only after that week ended at collection time. Invalid rows cannot refresh old evidence, and conflicting values for the same week prevent classification.":
+    "Use completed weeks collected at their recorded dates. Consecutive, consistent weekly observations support classification; other coverage calls for a refresh.",
+  "Two-week block resampling tests sensitivity to individual observations. A year-over-year comparison checks recurring seasonal rebounds. These diagnostics are not probabilities of business success.":
+    "Two-week block resampling checks sensitivity to individual observations. Year-over-year data adds context; business outcomes deserve direct validation.",
+  "Search terms are measured alongside a shared “github trending” reference in the same region and time range. Google Trends is normalized, sampled search attention, not absolute demand.":
+    "Search terms use the same region and time range. Google Trends provides normalized samples of search attention.",
+  "A matching repository must carry the selected GitHub topic, have at least five stars, have been pushed to in the last 180 days, and be neither a fork nor archived.":
+    "Matching repositories carry the selected topic, have at least five stars and a push within 180 days, and are active original projects.",
+  "Fifty qualifying repositories is the published dense-supply threshold. This is a transparent operational rule, not a universal economic law. Topic labels are imperfect; untagged projects and commercial competitors are outside this sample.":
+    "Fifty qualifying repositories is the current density threshold for this search scope. Broader research can include other tagged projects and commercial alternatives.",
+  "Repository charts use GitHub’s official star-history calendar buckets. Issue-response times cover a recent sample, separating unanswered issues. All raw evidence is exportable.":
+    "Repository charts use official star-history calendar buckets. Issue-response samples distinguish replied and pending threads. Source evidence is exportable.",
+  "Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.":
+    "Use Node.js 22.13 or newer. Public queries use GitHub's guest quota; configure a token or GitHub App for larger scans.",
+  "Use it to decide where to investigate next. Validate real workflows with people, inspect existing alternatives and account for commercial products. The opportunity score ranks the measured signals; it does not predict revenue, investment outcomes or GitHub stars.":
+    "Use these signals to choose your next research step. Validate real workflows with users and compare open-source and commercial alternatives. Measure adoption and revenue through actual usage.",
+  "Reports are immutable snapshots. A fresh scan can produce a different classification while the original evidence stays available at its permanent link.":
+    "Reports preserve dated snapshots at permanent links. Fresh scans add new evidence and updated classifications.",
+  "No matching issue signals": "Explore more issue leads",
+  "Try a broader keyword. An empty result does not prove that demand is absent.":
+    "Try a broader same-intent keyword and validate the user workflow directly.",
+  "Issue labels are keyword-based suggestions. Reactions do not establish a market, and issue text may be incomplete. Always read the original discussion.":
+    "Issue labels provide keyword-based research leads. Read the original discussion and validate the user problem.",
+  "No description provided.": "View the repository for details.",
+  "Not specified": "See source",
+  "No history": "Start your research history",
+  "This report is unavailable": "Open a saved report or start a new scan",
+  "This category is waiting for its first scan":
+    "Start the first scan for this category",
+  "Scan failed.": "Please retry the scan.",
+  "The request could not be completed.": "Please retry this request.",
+  "Investigate an underserved use case. Validate the problem with users, then move quickly on a focused product.":
+    "Explore a focused user need. Validate the problem, then build a small, useful product.",
+  "Research the field, not just its abbreviation":
+    "Use the recognized field name",
+  "Use the recognized field name, then validate a specific workflow. The current keyword sample cannot establish the field’s demand or competition.":
+    "Use the recognized field name and validate a specific workflow. A broader sample can add context about demand and alternatives.",
+  "Active alternatives already exist at scale. Validate a reason for users to switch before committing; search data has not confirmed sustained demand growth.":
+    "Active alternatives already exist at scale. Interview their users and identify a concrete reason to switch.",
+  "There are active projects in this search scope. Start with their users and unresolved workflows; the available search data does not justify a broad market bet.":
+    "Active projects provide a starting point. Explore their users and open issues, then validate a focused workflow.",
+  "The available sources cannot establish both competition and demand. Start with user problems and concrete alternatives; an empty search is not proof of an open market.":
+    "Start with a specific user problem and compare existing solutions. Complete the search history to place this idea on the map.",
+  "Inspect the leading projects and their unresolved issues to identify a specific user problem.":
+    "Inspect leading projects and open issues to identify a specific user problem.",
+  "Quadrant not yet established": "Gathering evidence for placement",
+  "This recommendation uses the evidence already available. It is not an LLM-generated forecast.":
+    "This recommendation follows the collected source evidence.",
+  "A crowded category without sustained search growth. Enter only with a concrete switching advantage.":
+    "This category has established supply. Validate a concrete reason for users to switch.",
+  "A small category without sustained search growth. Check external demand before investing; it may be early, niche or inactive.":
+    "Observed supply is limited. Explore whether this is an early field, a valuable niche or a mature use case.",
+  "Gather stronger evidence or refine the demand keyword. The available data does not support a reliable quadrant.":
+    "Refine the search phrase or refresh the sources to complete the category assessment.",
+  "Google Trends measures relative search attention, not customers, revenue or willingness to pay.":
+    "Google Trends measures relative search attention. Assess customers, revenue and willingness to pay through direct research.",
+  "Supply counts active repositories carrying the selected GitHub topic; unlabeled and closed-source competitors are outside this coverage.":
+    "Supply covers active repositories carrying the selected GitHub topic. Broader research can include other repositories and commercial products.",
+  "The repository search is incomplete. Displayed supply is not a census.":
+    "This search returned a partial sample. The displayed count is a lower bound.",
+  "Search baseline is too close to zero for a stable growth estimate. Low volume does not prove no demand.":
+    "The measured baseline is close to zero. A longer observation window and user interviews can clarify demand.",
+  "The time series must contain consecutive weekly observations; missing, conflicting or differently spaced observations cannot be classified.":
+    "Consecutive, consistent complete weeks support classification. Refresh the series to complete this evidence.",
+  "Evidence is stale or missing. Refresh before relying on a market classification.":
+    "Refresh the sources to obtain current classification evidence.",
+  "Year-over-year seasonality could not be checked.":
+    "Add last year's matching period to explore recurring patterns.",
+  "Recent search growth repeats last year’s level and is treated as seasonal, not a new breakout.":
+    "Recent search growth is near last year's level. A longer history can clarify recurring patterns.",
+  "The lower resampling bound does not establish positive growth.":
+    "The resampling range spans zero. Gather more observations to clarify the direction.",
+  "Google Trends returned no observations for this keyword.":
+    "Google Trends coverage for this keyword is pending. Try a familiar same-intent phrase.",
+  "Counts are deduplicated across topic searches; incomplete searches show a lower bound.":
+    "Counts combine deduplicated search results. Partial results display a lower bound.",
+  "Page not found · ghtrends": "Return to research · ghtrends",
+  "Search interest measures attention, not paying customers. Classification thresholds are published heuristics and still require empirical calibration.":
+    "Search interest measures attention. Customer demand needs user research; classification thresholds are published heuristics subject to empirical calibration.",
+  "Page not found.": "Return to the research homepage.",
+  "This report or page is unavailable.":
+    "Open a saved report or start from the research homepage.",
+  "Search growth compares the last eight complete weeks with the previous eight. Counts can overlap; GitHub topic labels do not cover every competitor.":
+    "Search growth compares the last eight complete weeks with the previous eight. Categories can share projects; broader competitor research adds context.",
+  "Not established": "Pending evidence",
+  "Preliminary recommendation · quadrant not yet established":
+    "Next steps · evidence collection continues",
+  "Search attention is a demand signal, not proven market demand.":
+    "Search attention provides leads for direct user validation.",
+  "Search volume is too weak for a stable estimate":
+    "Add a familiar same-intent search phrase",
+  "Invalid demand keyword.": "Enter a valid demand keyword.",
+  "This topic has not been scanned yet.": "Start a scan for this topic.",
+  "Report not found.": "Open a saved report or start a fresh scan.",
 };

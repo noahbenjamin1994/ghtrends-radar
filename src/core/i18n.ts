@@ -1,4 +1,4 @@
-import { zh } from "./translations.js";
+import { zh, en } from "./translations.js";
 import type { Market } from "./types.js";
 
 export type Locale = "en" | "zh";
@@ -20,12 +20,12 @@ export function text(
     "trend.falling": "Falling",
     "trend.stable": "Stable",
     "trend.mixed": "Mixed signals",
-    "trend.unknown": "Unconfirmed",
+    "trend.unknown": "Pending",
   };
   let result =
     locale === "zh"
       ? (zh[key] ?? translateEvidence(key))
-      : (english[key] ?? value);
+      : (en[key] ?? english[key] ?? translateEvidenceEnglish(value));
   for (const [name, replacement] of Object.entries(vars))
     result = result.replaceAll(`{${name}}`, String(replacement));
   return result;
@@ -33,9 +33,14 @@ export function text(
 function translateEvidence(value: string): string {
   const patterns: [RegExp, (...groups: string[]) => string][] = [
     [
+      /^Google Trends (?:returned|refresh returned HTTP) (\d+).*$/,
+      (status) =>
+        `Google Trends 刷新状态：HTTP ${status}。可查看来源，或稍后刷新。`,
+    ],
+    [
       /^([≥\d,]+) matching active repositories; this is search coverage, not a count of direct competitors\.$/,
       (count) =>
-        `匹配到 ${count} 个活跃仓库；这是检索覆盖量，不是直接竞品数量。`,
+        `当前检索范围内匹配到 ${count} 个活跃仓库。可结合具体产品与用户场景继续研究。`,
     ],
     [
       /^Four-week search change: (-?\d+)%; thirteen-week change: (-?\d+)%\. These windows check the direction of the eight-week comparison\.$/,
@@ -72,10 +77,17 @@ function translateEvidence(value: string): string {
     ],
     [
       /^Showing the last successful search snapshot from (.+)\. Refresh failed: (.+)$/,
-      (date, error) => `当前使用 ${date} 的最近成功快照。刷新失败：${error}`,
+      (date, error) =>
+        `当前使用 ${date} 的最近成功快照。刷新状态：${text(error, "zh")}`,
     ],
-    [/^Search-demand collection: (.+)$/, (error) => `搜索需求采集：${error}`],
-    [/^GitHub collection: (.+)$/, (error) => `GitHub 采集：${error}`],
+    [
+      /^Search-demand collection: (.+)$/,
+      (error) => `搜索需求采集：${text(error, "zh")}`,
+    ],
+    [
+      /^GitHub collection: (.+)$/,
+      (error) => `GitHub 采集：${text(error, "zh")}`,
+    ],
   ];
   for (const [pattern, render] of patterns) {
     const match = value.match(pattern);
@@ -126,4 +138,34 @@ export function localizeMarket(m: Market, locale: Locale): Market {
     reasons: m.reasons.map(t),
     limitations: m.limitations.map(t),
   };
+}
+
+function translateEvidenceEnglish(value: string) {
+  const status = value.match(
+    /^Google Trends (?:returned|refresh returned HTTP) (\d+).*$/,
+  );
+  if (status)
+    return `Google Trends refresh status: HTTP ${status[1]}. Open the source or refresh shortly.`;
+  const collection = value.match(
+    /^(Search-demand collection|GitHub collection): (.+)$/,
+  );
+  if (collection) return `${collection[1]}: ${text(collection[2]!, "en")}`;
+  const count = value.match(
+    /^([≥\d,]+) matching active repositories; this is search coverage, not a count of direct competitors\.$/,
+  );
+  if (count)
+    return `${count[1]} active repositories match this search scope. Review their users and workflows to identify direct alternatives.`;
+  const previous = value.match(
+    /^Showing the last successful search snapshot from (.+)\. Refresh failed: (.+)$/,
+  );
+  if (previous)
+    return `Using the successful snapshot from ${previous[1]}. Refresh status: ${text(previous[2]!, "en")}`;
+  return value;
+}
+
+// Applied to product-authored prose; repository titles and quoted source material retain their wording.
+export function hasNegativeWording(value: string) {
+  return /不|不是|不能|并非|没有|无法|未|无|勿|\b(?:not|no|never|neither|cannot|can't|doesn't|don't|won't|isn't|aren't|without|unavailable|unknown|unconfirmed)\b/i.test(
+    value,
+  );
 }
