@@ -23,10 +23,15 @@ export const TOPICS: Topic[] = [
     name: "Browser agents",
     keyword: "browser agent",
     query: "topic:browser-agent",
-    queries: ["topic:browser-agent", '"browser agent" in:name,description'],
+    queries: [
+      "topic:browser-agent",
+      '"browser agent" in:name,description',
+      "topic:browser-automation topic:ai-agents",
+      "topic:browser-automation topic:ai-agent",
+    ],
     description: "Software that turns the web into an action space.",
     color: "#cdadff",
-    aliases: ["browser-automation", "browser automation"],
+    aliases: ["browser agent", "browser agents"],
   },
   {
     slug: "agent-memory",
@@ -80,6 +85,28 @@ export const TOPICS: Topic[] = [
 // These names resolve user input; they do not expand the curated daily dashboard.
 const KNOWN_TOPICS: Topic[] = [
   ...TOPICS,
+  {
+    slug: "vibe-coding",
+    name: "Vibe coding",
+    keyword: "vibe coding",
+    query: "topic:vibe-coding",
+    queries: ["topic:vibe-coding", '"vibe coding" in:name,description'],
+    description:
+      "Tools and workflows for building software through natural-language interaction.",
+    color: "#79c9ff",
+    aliases: ["vibe coding", "氛围编程"],
+  },
+  {
+    slug: "agent-skills",
+    name: "Agent skills",
+    keyword: "agent skills",
+    query: "topic:agent-skills",
+    queries: ["topic:agent-skills", '"agent skills" in:name,description'],
+    description:
+      "Reusable instructions and capabilities packaged for AI agents.",
+    color: "#cdadff",
+    aliases: ["agent skills", "智能体技能"],
+  },
   {
     slug: "ai-for-science",
     name: "AI for Science",

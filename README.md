@@ -56,7 +56,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.7.2/ghtrends-radar-0.7.2.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.8.0/ghtrends-radar-0.8.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -182,12 +182,15 @@ AI usage recording begins at upgrade: earlier consumption is **unknown**. Missin
 
 **Supply:** GitHub topic and repository-name/description phrase searches (each query is displayed); non-fork, non-archived repositories with at least 5 stars and a push in the last 180 days. At least 50 qualifying repositories is the current dense-supply rule. Counts refer to the displayed search scope, not a census of every competing product. We use the search count and display up to 100 leaders; we do not claim to enumerate beyond GitHub's search result limit.
 
-**Search interest (method 1.2.0):** two years of Google Trends data. Compare the median of the last 8 complete weeks with the previous 8; check 4-week and 13-week comparisons as well. Each term is independently normalized in the same region/time range, preventing a popular synonym from rounding a niche one to zero in a comparison. If the primary has unusable evidence, select the first usable same-intent variant in the planned order and show the reason. We never sum indices or select by growth direction.
+Known categories use their published query scope directly, without a model call. Compound requirements use intersecting GitHub topics. For incomplete unions, the lower bound is the larger of the deduplicated sample and any complete individual search count.
 
-- Require the most recent 26 weeks to be consecutive and complete (older gaps do not invalidate this window), at least 60% nonzero values in the most recent 26 weeks, and a prior median of at least 3.
+**Search interest (method 1.3.0):** two years of Google Trends data. Compare the median of the last 8 complete weeks with the previous 8; check 4-week and 13-week comparisons as well. Each term is independently normalized in the same region/time range, preventing a popular synonym from rounding a niche one to zero in a comparison. If the primary has unusable evidence, select the first usable same-intent variant in the planned order and show the reason. We never sum indices or select by growth direction.
+
+- For percentage-based direction, require the most recent 26 weeks to be consecutive and complete (older gaps do not invalidate this window), at least 60% nonzero values in the most recent 26 weeks, and a prior median of at least 3.
 - Rising/falling requires at least ±10% eight-week change, a resampling band entirely on the same side of zero, and no opposing short or longer change of more than 10%.
 - Stable requires less than 10% eight-week change and less than 20% four/thirteen-week change. Other usable cases or fresh, opposite-moving synonyms are **mixed**.
-- Missing, stale, irregular, near-zero or failed evidence stays **uncertain**. A week must have ended when collected; conflicting values prevent classification. The resampling band is a stability diagnostic, not a probability of success.
+- A low-base rise is reported without a percentage when the prior median is below 3, at least six of the last eight weekly indices reach 10, and the last-four-week median retains at least 80% of the first four. It remains a low-confidence early signal; sparse or isolated spikes stay unconfirmed.
+- Missing, stale, irregular, sparse or failed evidence stays **uncertain**. A week must have ended when collected; conflicting values prevent classification. The resampling band is a stability diagnostic, not a probability of success.
 
 The raw legacy `fast` field still describes a stricter 25% breakout diagnostic; the displayed direction and classification use `metrics.trend`. “50 repositories” is a published scope-dependent heuristic, **not proof of commercial competition**. Google search attention is **not customer demand growth**. Source dates, the actual terms and limits are shown alongside every result.
 

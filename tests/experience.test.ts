@@ -211,10 +211,10 @@ test("multi-topic supply is deduplicated, marks incomplete unions and exposes ba
   try {
     const supply = await github.supply(resolveTopic("ai4s"), (base) => {
       seenBase = true;
-      assert.equal(base.total, 12);
+      assert.equal(base.total, 150);
       assert.equal(base.complete, false);
     });
-    assert.equal(supply.total, 12);
+    assert.equal(supply.total, 150);
     assert.equal(supply.searches?.length, 3);
     assert.equal(supply.complete, false);
     assert.equal(maxActive, 3);
@@ -290,4 +290,14 @@ test("a running scan exposes received evidence before details finish and languag
     await engine.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("missing history and source failures explain the actual evidence gap", () => {
+  const m = abbreviationReport();
+  m.demand.error = "Google Trends returned 429";
+  assert.match(marketAssessment(m, "zh").demandNote, /采集失败/);
+  delete m.demand.error;
+  m.demand.fetchedAt = m.asOf;
+  m.metrics.regularWeekly = false;
+  assert.match(marketAssessment(m, "zh").demandNote, /缺失或不完整/);
 });

@@ -130,10 +130,11 @@ export class Trends {
       );
       const usable = (d: DemandEvidence) => {
         const now = new Date().toISOString(),
-          last = completeWeeklySeries(d, now).points.at(-1);
+          last = completeWeeklySeries(d, now).points.at(-1),
+          metrics = demandMetrics(d, now);
         return (
           !d.collectionError &&
-          demandMetrics(d, now).fast !== null &&
+          (metrics.fast !== null || metrics.emerging) &&
           [d.fetchedAt, last?.date].every(
             (s) =>
               s &&

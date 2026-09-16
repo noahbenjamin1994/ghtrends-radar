@@ -284,3 +284,56 @@ test("conflicting latest week cannot silently shift the comparison window", () =
   d.points.push({ ...d.points.at(-1)!, value: 0 });
   assert.equal(demandMetrics(d, asOf).trend, "unknown");
 });
+
+test("sustained emergence from zero is an early signal without invented percentage growth", () => {
+  const d = demand("zero");
+  d.points
+    .slice(-8)
+    .forEach((p, i) => (p.value = [0, 0, 25, 30, 35, 35, 40, 40][i]!));
+  const m = analyze(TOPICS[0]!, d, supply(12), [], asOf);
+  assert.equal(m.metrics.emerging, true);
+  assert.equal(m.metrics.growth, null);
+  assert.equal(m.metrics.fast, null);
+  assert.equal(m.metrics.trend, "rising");
+  assert.equal(m.kind, "blue");
+  assert.equal(m.confidence, "low");
+  assert.ok(
+    m.reasons.some((r) => r.includes("percentage would be misleading")),
+  );
+  const falling = structuredClone(d);
+  falling.points.slice(-4).forEach((p) => (p.value = 0));
+  assert.equal(
+    analyze(TOPICS[0]!, falling, supply(12), [], asOf).kind,
+    "uncertain",
+  );
+  const spike = demand("zero");
+  spike.points.at(-1)!.value = 100;
+  assert.equal(
+    analyze(TOPICS[0]!, spike, supply(12), [], asOf).kind,
+    "uncertain",
+  );
+});
+
+test("a trustworthy supply lower bound remains dense without enumerating every result", () => {
+  const s = supply(6000);
+  s.complete = false;
+  assert.equal(
+    analyze(TOPICS[0]!, demand("growing"), s, [], asOf).kind,
+    "expanding",
+  );
+  s.total = 12;
+  assert.equal(
+    analyze(TOPICS[0]!, demand("growing"), s, [], asOf).kind,
+    "uncertain",
+  );
+});
+
+test("short and year-on-year windows do not depend on the eight-week denominator", () => {
+  const d = demand();
+  d.points.slice(-16, -8).forEach((p) => (p.value = 0));
+  d.points.slice(-8).forEach((p) => (p.value = 40));
+  const m = demandMetrics(d, asOf);
+  assert.equal(m.growth, null);
+  assert.equal(m.yearOverYear, 1);
+  assert.equal(m.shortGrowth, 0);
+});

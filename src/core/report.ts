@@ -39,6 +39,8 @@ export function marketMarkdown(
     `**${t(a.level === "provisional" ? "Preliminary recommendation" : "Measured classification")}**`,
     "",
     `${t("Landscape")}: **${a.landscape}**`,
+    `${t("Measured search term")}: ${cell(m.demand.keyword)}`,
+    a.demandNote,
     "",
     a.summary,
     "",

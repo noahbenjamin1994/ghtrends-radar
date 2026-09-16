@@ -197,9 +197,13 @@ export function App() {
   const scan = async (input: string, demandKeyword?: string) => {
     if (!input.trim()) return;
     if (!account?.user) {
-      const existing = markets.find(
-        (m) => resolveTopic(input).slug === m.topic.slug,
-      );
+      let recognized: string | undefined;
+      try {
+        recognized = resolveTopic(input).slug;
+      } catch {
+        // Natural-language queries are resolved after sign-in.
+      }
+      const existing = markets.find((m) => recognized === m.topic.slug);
       if (existing && !demandKeyword && !keyword.trim()) {
         navigate("/market/" + existing.topic.slug);
         return;
@@ -422,15 +426,13 @@ export function App() {
             target="_blank"
             rel="noreferrer"
           >
-            <svg
-              width="21"
-              height="21"
-              viewBox="0 0 16 16"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 4.73c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
-            </svg>
+            {/* Official, unmodified asset: https://brand.github.com/foundations/logo */}
+            <img
+              src={appUrl("/github-mark.svg")}
+              width="22"
+              height="22"
+              alt=""
+            />
           </a>
           <button
             className="icon-button mobile-menu"
@@ -691,11 +693,17 @@ export function App() {
                             {t("Search direction")} ·{" "}
                             {t("trend." + (m.metrics.trend || "unknown"))}
                           </small>
-                          <Growth
-                            value={
-                              m.metrics.fast === null ? null : m.metrics.growth
-                            }
-                          />
+                          {m.metrics.emerging ? (
+                            <strong>{t("Low-base rise")}</strong>
+                          ) : (
+                            <Growth
+                              value={
+                                m.metrics.fast === null
+                                  ? null
+                                  : m.metrics.growth
+                              }
+                            />
+                          )}
                         </div>
                         <div>
                           <small>{t("Active projects")}</small>
@@ -1126,7 +1134,9 @@ function MarketView({
           </p>
           <button
             className="button secondary"
-            onClick={() => onScan(m.topic.plan?.input || m.topic.slug)}
+            onClick={() =>
+              onScan(m.topic.plan?.input || m.topic.slug, m.topic.keyword)
+            }
           >
             {t("Run an updated scan")}
           </button>
@@ -1261,8 +1271,10 @@ function MarketView({
             <p>{(m.topic.queries || [m.topic.query]).join(" · ")}</p>
           </div>
           <small>
-            {m.topic.plan.model} ·{" "}
-            {t("You can edit the demand keyword and scan again.")}
+            {m.topic.plan.model === "curated"
+              ? t("Curated search scope")
+              : m.topic.plan.model}{" "}
+            · {t("You can edit the demand keyword and scan again.")}
           </small>
         </details>
       )}
@@ -1365,6 +1377,17 @@ function MarketView({
           {m.demand.keyword})
         </p>
       )}
+      <div className="research-scope">
+        <span>
+          {t("Measured search term")}: <strong>{m.demand.keyword}</strong>
+        </span>
+        <span>
+          {t("GitHub search scope")}:{" "}
+          {(m.topic.queries || [m.topic.query]).map((q) => (
+            <code key={q}>{q}</code>
+          ))}
+        </span>
+      </div>
       <div className="search-direction">
         <strong>
           {t("Search direction")}:{" "}
@@ -1391,15 +1414,15 @@ function MarketView({
         <div>
           <span>{t("Search interest change")}</span>
           <strong>
-            <Growth value={m.metrics.fast === null ? null : m.metrics.growth} />
-          </strong>
-          <small>
-            {t(
-              m.metrics.fast === null
-                ? "Search volume is too weak for a stable estimate"
-                : "Last 8 complete weeks vs previous 8",
+            {m.metrics.emerging ? (
+              t("Low-base rise")
+            ) : (
+              <Growth
+                value={m.metrics.fast === null ? null : m.metrics.growth}
+              />
             )}
-          </small>
+          </strong>
+          <small>{assessment.demandNote}</small>
         </div>
         <div>
           <span>{t("Matching active projects")}</span>
@@ -2149,7 +2172,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.7.2/ghtrends-radar-0.7.2.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.8.0/ghtrends-radar-0.8.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}
@@ -2285,6 +2308,11 @@ function Docs() {
               "The primary phrase and up to two same-intent variants are collected independently for the same region and time range. If the primary lacks usable evidence, the first usable variant is selected by data coverage. We never add normalized indices or select by growth direction.",
             )}
           </p>
+          <p>
+            {t(
+              "A low-base rise is reported without a percentage when the prior median is below 3, at least six of the last eight weekly indices reach 10, and the last-four-week median retains at least 80% of the first four. It remains a low-confidence early signal; sparse or isolated spikes stay unconfirmed.",
+            )}
+          </p>
           <a
             className="text-link"
             href="https://support.google.com/trends/answer/4365533"
@@ -2298,6 +2326,11 @@ function Docs() {
         <section className="panel">
           <span className="section-kicker">{t("02 / SUPPLY")}</span>
           <h2>{t("Count active alternatives.")}</h2>
+          <p>
+            {t(
+              "Known categories retain their published query scope. Compound requirements use intersecting GitHub topics. For incomplete unions, the lower bound is the larger of the deduplicated sample and any complete individual search count.",
+            )}
+          </p>
           <p>
             {t(
               "GitHub searches use relevant topics and specific repository-name or description phrases. Results are deduplicated and require at least five stars, a push within 180 days, and no forks or archived projects.",

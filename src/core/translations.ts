@@ -1,4 +1,28 @@
 export const zh: Record<string, string> = {
+  "A low-base rise is reported without a percentage when the prior median is below 3, at least six of the last eight weekly indices reach 10, and the last-four-week median retains at least 80% of the first four. It remains a low-confidence early signal; sparse or isolated spikes stay unconfirmed.":
+    "当前期中位数低于 3、最近 8 周至少 6 周指数达到 10，且后 4 周中位数仍达到前 4 周的 80% 时，显示“低基线上升”，不计算增长百分比。这只是低置信度的早期信号；稀疏数据或单次尖峰仍为待验证。",
+  "Known categories retain their published query scope. Compound requirements use intersecting GitHub topics. For incomplete unions, the lower bound is the larger of the deduplicated sample and any complete individual search count.":
+    "已识别赛道保留公开检索范围，组合要求使用 GitHub 标签交集。多查询未完整枚举时，下限取去重样本数量与各完整查询总数中的较大值。",
+
+  "Search rising from a small baseline": "搜索从低基线持续上升",
+  "Search interest has stayed above a near-zero baseline in at least six of eight weeks. This is an early signal, so no percentage growth is reported. Check the matching projects and validate a specific use case.":
+    "最近 8 周中至少 6 周的搜索关注度持续高于接近零的基线。这是早期信号，因此不计算增长百分比。请结合匹配项目，验证具体使用场景。",
+  "Search interest is newly sustained above a near-zero baseline in at least six of the last eight weeks. A percentage would be misleading.":
+    "最近 8 周中至少 6 周出现持续搜索信号，此前基线接近零，因此不显示容易误导的增长百分比。",
+  "This is an early search signal. Its small historical baseline cannot establish sustained market demand.":
+    "这是早期搜索信号，较小的历史基线尚不足以确认持续市场需求。",
+  "Search history could not be collected": "搜索历史暂时采集失败",
+  "Search history is out of date": "搜索历史已过期，需要刷新",
+  "Recent weekly history is missing or incomplete": "近期每周历史缺失或不完整",
+  "Small baseline; percentage growth is not yet reliable":
+    "从低基线上升，暂不计算增长百分比",
+  "The comparison baseline is too small": "对比基线过小，增长百分比不可靠",
+  "Too many weekly values are reported as zero":
+    "过多周数据被报告为零，无法稳定估算",
+  "Low-base rise": "低基线上升",
+  "Measured search term": "实际测量的搜索词",
+  "GitHub search scope": "GitHub 检索范围",
+
   Explore: "探索",
   "PUBLIC RESEARCH": "公开研究",
   "CATEGORY MAP": "赛道全景",
@@ -188,6 +212,9 @@ export const zh: Record<string, string> = {
   "The watchlist holds up to 50 repositories.": "最多可关注 50 个仓库。",
   "The server restarted. Please run this scan again.":
     "服务刚刚重启，请重新运行这次扫描。",
+  "Curated search scope": "固定检索范围",
+  "Could not identify a research topic. Try a specific tool category or describe the problem.":
+    "暂时无法识别这个主题，请输入具体的工具类别，或描述想解决的问题。",
   "Choose the meaning you want to research.": "请选择你想研究的含义。",
   "Enter a topic between 1 and 300 characters.":
     "请输入 1 至 300 个字符的研究方向。",

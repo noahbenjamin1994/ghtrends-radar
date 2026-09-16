@@ -1,4 +1,5 @@
 import type { Market } from "./types.js";
+import { completeWeeklySeries } from "./evidence.js";
 import { resolveTopic } from "./topics.js";
 import { text, MARKET_LABELS, type Locale } from "./i18n.js";
 
@@ -84,6 +85,12 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
       );
     }
   }
+  if (!provisional && m.metrics.emerging) {
+    title = t("Search rising from a small baseline");
+    summary = t(
+      "Search interest has stayed above a near-zero baseline in at least six of eight weeks. This is an early signal, so no percentage growth is reported. Check the matching projects and validate a specific use case.",
+    );
+  }
   if (!provisional && m.metrics.horizon === "cooling-above-year") {
     title = t("Cooling recently, still above last year");
     summary = t(
@@ -119,7 +126,24 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
           "Repeat the scan with a familiar search phrase and compare the evidence before committing.",
         ),
       ];
+  const latestWeek = completeWeeklySeries(m.demand, m.asOf).points.at(-1);
+  const demandNote = t(
+    m.demand.error
+      ? "Search history could not be collected"
+      : !fresh(m.demand.fetchedAt) || (latestWeek && !fresh(latestWeek.date))
+        ? "Search history is out of date"
+        : !m.metrics.regularWeekly
+          ? "Recent weekly history is missing or incomplete"
+          : m.metrics.emerging
+            ? "Small baseline; percentage growth is not yet reliable"
+            : m.metrics.baseline < 3
+              ? "The comparison baseline is too small"
+              : m.metrics.fast === null
+                ? "Too many weekly values are reported as zero"
+                : "Last 8 complete weeks vs previous 8",
+  );
   return {
+    demandNote,
     landscape: t(MARKET_LABELS[m.kind]),
     level: provisional ? ("provisional" as const) : ("measured" as const),
     title,

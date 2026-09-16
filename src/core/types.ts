@@ -19,6 +19,7 @@ export interface QueryPlan {
   intent: string;
   trends: string[];
   githubTopics: string[];
+  githubTopicGroups?: string[][];
   githubTerms: string[];
   explanation: { en: string; zh: string };
   ambiguity?: { en: string; zh: string };
@@ -112,6 +113,7 @@ export interface DemandMetrics {
   quarterGrowth?: number | null;
   trend?: "rising" | "falling" | "stable" | "mixed" | "unknown";
   recentNonzeroShare?: number;
+  emerging?: boolean;
   horizon?:
     "cooling-above-year" | "rebounding-below-year" | "aligned" | "unavailable";
   windows?: {

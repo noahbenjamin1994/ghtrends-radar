@@ -12,7 +12,7 @@ const program = new Command()
   .description(
     "GitHub supply × Google search demand. Find your next open-source opportunity.",
   )
-  .version("0.7.2");
+  .version("0.8.0");
 const withEngine = (fn: (engine: Engine) => Promise<void>) => async () => {
   const e = new Engine();
   try {
@@ -30,7 +30,7 @@ const summary = (m: Market) => {
     supply: { value: m.supply.total },
     searchGrowth: {
       value:
-        m.metrics.growth === null
+        m.metrics.emerging ? "low-base rise (no reliable percentage)" : m.metrics.growth === null
           ? "insufficient data"
           : `${(m.metrics.growth * 100).toFixed(1)}%`,
     },

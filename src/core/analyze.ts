@@ -21,6 +21,9 @@ export const POLICY = {
   fastGrowth: 0.25,
   meaningfulGrowth: 0.1,
   minBaseline: 3,
+  emergingLevel: 10,
+  emergingWeeks: 6,
+  emergingRetention: 0.8,
   minNonzero: 0.6,
   staleDays: 14,
 };
@@ -91,13 +94,23 @@ export function demandMetrics(
             7,
         ) < 0.1,
     );
-  const usable =
+  const validHistory =
     values.length >= POLICY.minWeeks &&
     regularWeekly &&
     base.length === 8 &&
-    baseline >= POLICY.minBaseline &&
     !evidence.error &&
     (!evidence.resolution || evidence.resolution === "WEEK");
+  const usable = validHistory && baseline >= POLICY.minBaseline;
+  // A persistent new signal can rise from a near-zero baseline without a
+  // meaningful percentage. Six of eight weeks rules out an isolated spike.
+  const emerging =
+    validHistory &&
+    baseline < POLICY.minBaseline &&
+    current >= POLICY.emergingLevel &&
+    recent.filter((v) => v >= POLICY.emergingLevel).length >=
+      POLICY.emergingWeeks &&
+    median(recent.slice(-4)) >=
+      median(recent.slice(0, 4)) * POLICY.emergingRetention;
   const growth = usable ? current / baseline - 1 : null;
   const band = usable ? growthBand(recent, base) : [null, null];
   // Match dates, not array positions: old missing weeks must not shift YoY.
@@ -107,7 +120,9 @@ export function demandMetrics(
     .map((p) => byDate.get(Date.parse(p.date) - 52 * 7 * 86400000))
     .filter((v): v is number => v !== undefined);
   const yearOverYear =
-    usable && priorYear.length === 8 && median(priorYear) >= POLICY.minBaseline
+    validHistory &&
+    priorYear.length === 8 &&
+    median(priorYear) >= POLICY.minBaseline
       ? current / median(priorYear) - 1
       : null;
   const slopes: number[] = [];
@@ -123,7 +138,7 @@ export function demandMetrics(
   const change = (weeks: number) => {
     const a = values.slice(-weeks),
       b = values.slice(-2 * weeks, -weeks);
-    return usable && b.length === weeks && median(b) >= POLICY.minBaseline
+    return validHistory && b.length === weeks && median(b) >= POLICY.minBaseline
       ? median(a) / median(b) - 1
       : null;
   };
@@ -147,7 +162,7 @@ export function demandMetrics(
         persistence >= 0.75 &&
         !seasonal
       : null;
-  let trend: DemandMetrics["trend"] = "unknown";
+  let trend: DemandMetrics["trend"] = emerging ? "rising" : "unknown";
   if (fast !== null && growth !== null && quarterGrowth !== null) {
     if (
       growth >= POLICY.meaningfulGrowth &&
@@ -198,6 +213,7 @@ export function demandMetrics(
   };
   return {
     horizon,
+    emerging,
     windows: {
       short: windowDates(4),
       main: windowDates(8),
@@ -262,14 +278,14 @@ export function analyze(
     !supply.error &&
     Number.isFinite(supply.total) &&
     supply.total >= 0 &&
-    (supply.complete || supply.repositories.length >= POLICY.denseSupply);
+    (supply.complete || supply.total >= POLICY.denseSupply);
   const demandStale = stale(demand.fetchedAt),
     supplyStale = stale(supply.fetchedAt);
   const lastPoint = completeWeeklySeries(demand, asOf).points.at(-1);
   const seriesStale = !lastPoint || stale(lastPoint.date);
   const usable =
     supplyKnown &&
-    metrics.fast !== null &&
+    (metrics.fast !== null || metrics.emerging) &&
     !demandStale &&
     !supplyStale &&
     !seriesStale;
@@ -294,7 +310,7 @@ export function analyze(
     limitations.push(
       "The repository search is incomplete. Displayed supply is not a census.",
     );
-  if (metrics.baseline < POLICY.minBaseline)
+  if (metrics.baseline < POLICY.minBaseline && !metrics.emerging)
     limitations.push(
       "Search baseline is too close to zero for a stable growth estimate. Low volume does not prove no demand.",
     );
@@ -306,7 +322,10 @@ export function analyze(
     limitations.push(
       "The time series must contain consecutive weekly observations; missing, conflicting or differently spaced observations cannot be classified.",
     );
-  if ((metrics.recentNonzeroShare ?? metrics.nonzeroShare) < POLICY.minNonzero)
+  if (
+    !metrics.emerging &&
+    (metrics.recentNonzeroShare ?? metrics.nonzeroShare) < POLICY.minNonzero
+  )
     limitations.push(
       "Too many observations are rounded to zero. Try a broader demand keyword.",
     );
@@ -337,6 +356,14 @@ export function analyze(
     reasons.push(
       "Search attention is recovering recently but remains below the same period last year. This does not establish seasonality.",
     );
+  if (metrics.emerging) {
+    reasons.push(
+      "Search interest is newly sustained above a near-zero baseline in at least six of the last eight weeks. A percentage would be misleading.",
+    );
+    limitations.push(
+      "This is an early search signal. Its small historical baseline cannot establish sustained market demand.",
+    );
+  }
   if (metrics.growth !== null)
     reasons.push(
       `Median weekly search interest ${metrics.growth >= 0 ? "rose" : "fell"} ${Math.abs(metrics.growth * 100).toFixed(0)}% across two consecutive eight-week windows.`,
@@ -360,7 +387,8 @@ export function analyze(
       ? stars.slice(0, 3).reduce((a, b) => a + b, 0) / totalStars
       : null;
   // Coverage cannot validate query intent or measure customer demand.
-  const confidence = kind === "uncertain" ? "low" : "moderate";
+  const confidence =
+    kind === "uncertain" || metrics.emerging ? "low" : "moderate";
   const labels = {
     blue: "Search rising · limited observed supply",
     expanding: "Search rising · established supply",

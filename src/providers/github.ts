@@ -276,7 +276,14 @@ export class GitHub {
         (a, b) => b.stars - a.stars,
       );
       if (queries.length > 1) {
-        result.total = unique.size;
+        // A union contains at least as many repos as each complete query.
+        // First-page deduplication alone can undercount a 6,000-repo query as 100.
+        result.total = Math.max(
+          unique.size,
+          ...result.searches!
+            .filter((search) => search.complete)
+            .map((search) => search.total),
+        );
         result.complete = allEnumerated;
       }
       onBase?.(structuredClone(result));

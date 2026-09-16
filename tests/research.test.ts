@@ -36,12 +36,50 @@ test("AI plans are bounded, validated, cached, and distinguish ambiguous inputs"
     assert.deepEqual(p.queries, [
       "topic:ai4science",
       "topic:ai-for-science",
-      '"AI for Science" in:name,description',
+      "topic:ai4s",
     ]);
     assert.equal((await research.plan("ai4s")).plan?.input, "ai4s");
-    assert.equal(calls, 1);
+    assert.equal(calls, 0);
+    assert.equal(p.plan?.model, "curated");
+    assert.deepEqual(p.plan?.trends, ["AI for Science"]);
     const override = await research.plan("AI4S", "scientific machine learning");
     assert.equal(override.keyword, "scientific machine learning");
+    result = {
+      ...plan,
+      slug: "browser-automation",
+      trends: ["browser automation"],
+      githubTopics: ["browser-automation"],
+    };
+    const canonical = await research.plan("browser-agents");
+    assert.equal(canonical.slug, "browser-agents");
+    assert.equal(canonical.keyword, "browser agent");
+    assert.deepEqual(canonical.queries, [
+      "topic:browser-agent",
+      '"browser agent" in:name,description',
+      "topic:browser-automation topic:ai-agents",
+      "topic:browser-automation topic:ai-agent",
+    ]);
+    assert.deepEqual(canonical.plan?.trends, ["browser agent"]);
+    assert.equal(calls, 0);
+    result = {
+      ...plan,
+      slug: "password-managers",
+      githubTopics: ["self-hosted"],
+      githubTopicGroups: [["password-manager", "self-hosted"]],
+      githubTerms: ["self-hosted password manager"],
+    };
+    const compound = await research.plan("self hosted password manager");
+    assert.deepEqual(compound.queries, [
+      "topic:password-manager topic:self-hosted",
+      '"self-hosted password manager" in:name,description',
+    ]);
+    const overridden = await research.plan("custom input", "exact phrase");
+    assert.deepEqual(overridden.plan?.trends, ["exact phrase"]);
+    result = { unrecognized: true };
+    await assert.rejects(
+      research.plan("unrecognizable token"),
+      /Could not identify/,
+    );
     result = { ...plan, githubTopics: ["ai4s OR stars:0"] };
     await assert.rejects(
       research.plan("query injection"),
@@ -65,6 +103,24 @@ test("AI plans are bounded, validated, cached, and distinguish ambiguous inputs"
       research.plan("unclear acronym"),
       (e: any) => e.status === 422 && e.choices.length === 2,
     );
+    const { ambiguity, ...withoutQuestion } = result;
+    result = withoutQuestion;
+    await assert.rejects(
+      research.plan("harness engineering"),
+      (e: any) => e.status === 422 && e.choices.length === 3,
+    );
+    await assert.rejects(
+      research.plan("rsi"),
+      (e: any) => e.status === 422 && e.choices.length === 2,
+    );
+    const callsBeforeKnown = calls;
+    assert.deepEqual((await research.plan("vibe coding")).plan?.trends, [
+      "vibe coding",
+    ]);
+    assert.deepEqual((await research.plan("agent skills")).plan?.trends, [
+      "agent skills",
+    ]);
+    assert.equal(calls, callsBeforeKnown);
     result = { ...result, choices: [] };
     await assert.rejects(
       research.plan("empty ambiguity"),
