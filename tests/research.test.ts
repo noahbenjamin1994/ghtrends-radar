@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { Research } from "../src/providers/research.js";
 import { Trends, parseTimeline } from "../src/providers/trends.js";
 import { Store } from "../src/core/store.js";
+import { marketAssessment } from "../src/core/assessment.js";
 import type { Market } from "../src/core/types.js";
 
 test("repository reviews preserve individually valid evidence and reject conflicting or fabricated rows", async () => {
@@ -242,6 +243,23 @@ test("AI plans are bounded, validated, cached, and distinguish ambiguous inputs"
       zh: { summary: "按页面提示时间刷新。", nextSteps: ["打开来源。"] },
     };
     await assert.rejects(research.brief(m), /Review the collected evidence/);
+    result = {
+      en: {
+        summary: "Review the sources.",
+        nextSteps: ["Refresh at the time shown on this page."],
+      },
+      zh: { summary: "查看来源证据。", nextSteps: ["按页面提示的时间刷新。"] },
+    };
+    delete m.demand.retryAt;
+    m.demand.alternatives = [];
+    await assert.rejects(research.brief(m), /Review the collected evidence/);
+    m.brief = { ...result, model: "test", generatedAt: m.asOf, sources: [] };
+    assert.equal(marketAssessment(m).narrative.kind, "evidence");
+    m.demand.retryAt = new Date(Date.now() + 60000).toISOString();
+    assert.equal(
+      (await research.brief(m)).en.nextSteps[0],
+      result.en.nextSteps[0],
+    );
     result = { en: { summary: "fabricated" } };
     await assert.rejects(research.brief(m), /could not be validated/);
   } finally {

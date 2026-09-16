@@ -918,6 +918,16 @@ export const zh: Record<string, string> = {
 
 // Stable legacy keys also serve previously saved report snapshots.
 export const en: Record<string, string> = {
+  "basis.recent-windows": "Recent search windows",
+  "basis.sustained-quarter": "Sustained quarterly change",
+  "basis.seasonal-year": "Recurring annual pattern; same-period comparison",
+  "pressure.limited": "Limited observed competition",
+  "pressure.established": "Established alternatives",
+  "pressure.pending": "Competition coverage pending",
+  "role.direct": "Direct alternatives",
+  "role.adjacent": "Adjacent projects",
+  "role.resource": "Resources",
+  "role.unclear": "Awaiting review",
   "Test the problem before building": "Start with a specific use case",
   No: "Off",
   Unavailable: "Pending",

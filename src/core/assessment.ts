@@ -1,7 +1,7 @@
 import type { Market } from "./types.js";
 import { completeWeeklySeries } from "./evidence.js";
 import { resolveTopic } from "./topics.js";
-import { hasNegativeWording } from "./i18n.js";
+import { hasNegativeWording, hasRecoveryTimeReference } from "./i18n.js";
 import { text, MARKET_LABELS, type Locale } from "./i18n.js";
 
 export function marketAssessment(m: Market, locale: Locale = "en") {
@@ -29,6 +29,8 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
     fresh(latestWeek.date) &&
     (m.metrics.fast !== null || !!m.metrics.emerging);
   const provisional = m.kind === "uncertain";
+  const recoveryTime =
+    m.demand.retryAt || m.demand.alternatives?.some((d) => d.retryAt);
   const suggested = changed
     ? resolved.keyword
     : m.demand.related.find(
@@ -204,7 +206,9 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
     narrative:
       m.brief &&
       [m.brief[locale].summary, ...m.brief[locale].nextSteps].every(
-        (v) => !hasNegativeWording(v),
+        (v) =>
+          !hasNegativeWording(v) &&
+          (!!recoveryTime || !hasRecoveryTimeReference(v)),
       )
         ? { ...m.brief[locale], kind: "ai" as const }
         : { summary, nextSteps, kind: "evidence" as const },

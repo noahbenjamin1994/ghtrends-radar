@@ -2,6 +2,11 @@ import { zh, en } from "./translations.js";
 import type { Market } from "./types.js";
 
 export type Locale = "en" | "zh";
+export function hasRecoveryTimeReference(value: string) {
+  return /(?:time (?:shown|displayed)|(?:shown|displayed) (?:recovery )?time|页面提示.{0,4}时间|(?:显示|提示)的恢复时间)/i.test(
+    value,
+  );
+}
 export const MARKET_LABELS: Record<Market["kind"], string> = {
   blue: "Blue ocean",
   expanding: "Growing red ocean",

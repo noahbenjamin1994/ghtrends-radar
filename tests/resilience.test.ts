@@ -261,12 +261,15 @@ test("collection gaps stay pending instead of becoming measured zero baselines",
 
 test("product translations use affirmative prose in both languages", () => {
   for (const key of new Set([...Object.keys(zh), ...Object.keys(en)])) {
-    for (const locale of ["en", "zh"] as const)
+    for (const locale of ["en", "zh"] as const) {
+      if (/^(?:role|pressure|basis|trend)\./.test(key))
+        assert.notEqual(text(key, locale), key, `${locale}: ${key}`);
       assert.equal(
         hasNegativeWording(text(key, locale)),
         false,
         `${locale}: ${key}`,
       );
+    }
   }
 });
 
