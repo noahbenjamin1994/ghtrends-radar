@@ -19,7 +19,13 @@ export interface Account {
   dailyLimit: number;
   used: number;
 }
-export function SignInGate({ account }: { account: Account | null }) {
+export function SignInGate({
+  account,
+  returnTo = "/history",
+}: {
+  account: Account | null;
+  returnTo?: string;
+}) {
   return (
     <Empty
       title={t("Your research, saved for you")}
@@ -31,7 +37,7 @@ export function SignInGate({ account }: { account: Account | null }) {
           <a
             className="button"
             href={
-              "/auth/login?returnTo=" + encodeURIComponent(localUrl("/history"))
+              "/auth/login?returnTo=" + encodeURIComponent(localUrl(returnTo))
             }
           >
             {t("Sign in with Logto")} <ArrowUpRight size={16} />

@@ -130,7 +130,7 @@ export function AdminView({ account }: { account: Account | null }) {
     return () => clearInterval(timer);
   }, [account?.user?.isAdmin, days, page, state]);
   if (!account) return <Loading />;
-  if (!account.user) return <SignInGate account={account} />;
+  if (!account.user) return <SignInGate account={account} returnTo="/admin" />;
   if (!account.user.isAdmin)
     return (
       <Empty

@@ -1,4 +1,6 @@
 export const zh: Record<string, string> = {
+  Account: "账户",
+  "Operations · ghtrends": "运行管理 · ghtrends",
   Admin: "管理",
   "Recently updated": "最近更新",
   "Run an updated scan": "重新扫描",

@@ -57,7 +57,7 @@ npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.4.0/ghtrends-radar-0.4.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.4.1/ghtrends-radar-0.4.1.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
