@@ -17,7 +17,8 @@ export function completeWeeklySeries(evidence: DemandEvidence, asOf: string) {
   const cutoff = Math.min(Date.parse(asOf), Date.parse(evidence.fetchedAt));
   const weeks = new Map<number, InterestPoint>();
   const conflicts = new Set<number>();
-  if (!Number.isFinite(cutoff)) return { points: [], hasConflicts: false };
+  if (!Number.isFinite(cutoff))
+    return { points: [], hasConflicts: false, conflictDates: [] as number[] };
   for (const point of evidence.points) {
     const time = Date.parse(point.date);
     if (
@@ -59,5 +60,6 @@ export function completeWeeklySeries(evidence: DemandEvidence, asOf: string) {
       .sort(([a], [b]) => a - b)
       .map(([, point]) => point),
     hasConflicts: conflicts.size > 0,
+    conflictDates: [...conflicts],
   };
 }

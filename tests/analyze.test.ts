@@ -55,17 +55,13 @@ test("one viral search spike cannot manufacture a blue ocean", () =>
     analyze(TOPICS[0]!, demand("spike"), supply(10), [], asOf).kind,
     "quiet",
   ));
-test("annual seasonal rebound is not a breakout", () => {
+test("a rebound to last year's level does not prove seasonality", () => {
   const m = analyze(TOPICS[0]!, demand("seasonal"), supply(10), [], asOf);
-  assert.equal(m.metrics.seasonal, true);
-  assert.equal(m.kind, "uncertain");
-  assert.equal(m.metrics.trend, "mixed");
-  const boundary = demand("seasonal");
-  for (const p of boundary.points) if (p.value === 40) p.value = 25;
-  const exact = analyze(TOPICS[0]!, boundary, supply(10), [], asOf);
-  assert.equal(exact.metrics.growth, 0.25);
-  assert.equal(exact.metrics.seasonal, true);
-  assert.equal(exact.kind, "uncertain");
+  assert.equal(m.metrics.seasonal, false);
+  assert.equal(m.metrics.trend, "rising");
+  assert.equal(m.metrics.yearOverYear, 0);
+  assert.equal(m.confidence, "moderate");
+  assert.equal(m.score, null);
 });
 test("zero search values mean insufficient evidence, never a dead market", () => {
   const m = analyze(TOPICS[0]!, demand("zero"), supply(0), [], asOf);
@@ -117,7 +113,7 @@ test("repo and keyword boundaries reject unsafe input", () => {
 });
 test("daily or missing-week data cannot be mistaken for weekly demand", () => {
   const d = demand("growing");
-  d.points.splice(60, 1);
+  d.points.splice(95, 1);
   assert.equal(analyze(TOPICS[0]!, d, supply(10), [], asOf).kind, "uncertain");
   const daily = demand("growing");
   daily.points = daily.points.map((p, i) => ({
@@ -241,4 +237,50 @@ test("recent evidence, window disagreement and synonyms cannot be cherry-picked"
   assert.equal(m.metrics.trend, "mixed");
   assert.equal(m.score, null);
   assert.match(m.limitations.join(" "), /opposite directions/);
+});
+
+// These examples deliberately separate short-term attention from category growth.
+test("old missing weeks do not invalidate recent data or shift last year's window", () => {
+  const d = demand("growing");
+  const before = demandMetrics(d, asOf);
+  d.points.splice(70, 1);
+  const after = demandMetrics(d, asOf);
+  assert.equal(after.trend, "rising");
+  assert.equal(after.yearOverYear, before.yearOverYear);
+  d.points.splice(46, 1);
+  assert.equal(demandMetrics(d, asOf).yearOverYear, null);
+  assert.equal(demandMetrics(d, asOf).trend, "rising");
+});
+test("cooling above last year and recovery below last year preserve both horizons", () => {
+  const d = demand();
+  d.points.slice(-26).forEach((p) => (p.value = 80));
+  d.points.slice(-8).forEach((p) => (p.value = 40));
+  const cooling = demandMetrics(d, asOf);
+  assert.equal(cooling.trend, "falling");
+  assert.equal(cooling.growth, -0.5);
+  assert.equal(cooling.yearOverYear, 1);
+  assert.equal(cooling.horizon, "cooling-above-year");
+  const rebound = demand();
+  rebound.points.slice(44, 52).forEach((p) => (p.value = 80));
+  rebound.points.slice(-8).forEach((p) => (p.value = 40));
+  const recovering = demandMetrics(rebound, asOf);
+  assert.equal(recovering.trend, "rising");
+  assert.equal(recovering.horizon, "rebounding-below-year");
+  assert.equal(recovering.seasonal, false);
+});
+test("stale opposite synonyms cannot overturn current primary evidence", () => {
+  const d = demand("growing"),
+    alt = demand();
+  alt.points.slice(-8).forEach((p) => (p.value = 10));
+  alt.fetchedAt = "2026-07-01";
+  d.alternatives = [alt];
+  assert.equal(
+    analyze(TOPICS[0]!, d, supply(10), [], asOf).metrics.trend,
+    "rising",
+  );
+});
+test("conflicting latest week cannot silently shift the comparison window", () => {
+  const d = demand("growing");
+  d.points.push({ ...d.points.at(-1)!, value: 0 });
+  assert.equal(demandMetrics(d, asOf).trend, "unknown");
 });

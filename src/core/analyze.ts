@@ -9,7 +9,8 @@ import type {
   MarketKind,
   Gap,
 } from "./types.js";
-export const ALGORITHM_VERSION = "1.1.0";
+import { ALGORITHM_VERSION } from "./version.js";
+export { ALGORITHM_VERSION } from "./version.js";
 // Operational thresholds, published and configurable in code; not universal market laws.
 export const POLICY = {
   denseSupply: 50,
@@ -31,7 +32,6 @@ export const median = (a: number[]) => {
     : 0;
 };
 const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / (a.length || 1);
-const clamp = (n: number, a = 0, b = 1) => Math.max(a, Math.min(b, n));
 // Deterministic two-week block resampling retains local dependence. This band is
 // a stability diagnostic, not a calibrated probability of commercial success.
 function growthBand(recent: number[], base: number[]): [number, number] {
@@ -65,20 +65,30 @@ export function demandMetrics(
   evidence: DemandEvidence,
   asOf: string,
 ): DemandMetrics {
-  const { points, hasConflicts } = completeWeeklySeries(evidence, asOf);
+  const { points, conflictDates } = completeWeeklySeries(evidence, asOf);
+  const latest = points.at(-1);
+  const recentCoverage = points.filter(
+    (p) =>
+      latest &&
+      Date.parse(p.date) >= Date.parse(latest.date) - 25 * 7 * 86400000,
+  );
   const values = points.map((p) => p.value),
     recent = values.slice(-8),
     base = values.slice(-16, -8);
   const baseline = median(base),
     current = median(recent);
   const regularWeekly =
-    points.length > 1 &&
-    !hasConflicts &&
-    points.every(
+    recentCoverage.length === POLICY.minWeeks &&
+    !conflictDates.some(
+      (time) => latest && time >= Date.parse(latest.date) - 25 * 7 * 86400000,
+    ) &&
+    recentCoverage.every(
       (p, i) =>
         i === 0 ||
         Math.abs(
-          (Date.parse(p.date) - Date.parse(points[i - 1]!.date)) / 86400000 - 7,
+          (Date.parse(p.date) - Date.parse(recentCoverage[i - 1]!.date)) /
+            86400000 -
+            7,
         ) < 0.1,
     );
   const usable =
@@ -90,9 +100,14 @@ export function demandMetrics(
     (!evidence.resolution || evidence.resolution === "WEEK");
   const growth = usable ? current / baseline - 1 : null;
   const band = usable ? growthBand(recent, base) : [null, null];
-  const priorYear = values.slice(-60, -52);
+  // Match dates, not array positions: old missing weeks must not shift YoY.
+  const byDate = new Map(points.map((p) => [Date.parse(p.date), p.value]));
+  const priorYear = points
+    .slice(-8)
+    .map((p) => byDate.get(Date.parse(p.date) - 52 * 7 * 86400000))
+    .filter((v): v is number => v !== undefined);
   const yearOverYear =
-    values.length >= 60 && median(priorYear) >= POLICY.minBaseline
+    usable && priorYear.length === 8 && median(priorYear) >= POLICY.minBaseline
       ? current / median(priorYear) - 1
       : null;
   const slopes: number[] = [];
@@ -117,11 +132,8 @@ export function demandMetrics(
   const persistence =
     recent.filter((v) => v > baseline * (1 + POLICY.fastGrowth / 2)).length /
     (recent.length || 1);
-  const seasonal =
-    growth !== null &&
-    growth >= POLICY.fastGrowth &&
-    yearOverYear !== null &&
-    yearOverYear <= 0.1;
+  // Two levels one year apart do not establish a recurring seasonal cycle.
+  const seasonal = false;
   const recentPoints = points.slice(-8),
     anchorMean =
       recentPoints.length === 8 &&
@@ -137,8 +149,7 @@ export function demandMetrics(
       : null;
   let trend: DemandMetrics["trend"] = "unknown";
   if (fast !== null && growth !== null && quarterGrowth !== null) {
-    if (seasonal) trend = "mixed";
-    else if (
+    if (
       growth >= POLICY.meaningfulGrowth &&
       (band[0] ?? 0) > 0 &&
       quarterGrowth >= -POLICY.meaningfulGrowth &&
@@ -160,7 +171,38 @@ export function demandMetrics(
       trend = "stable";
     else trend = "mixed";
   }
+  const horizon: DemandMetrics["horizon"] =
+    growth !== null && yearOverYear !== null
+      ? growth <= -POLICY.meaningfulGrowth &&
+        yearOverYear >= POLICY.meaningfulGrowth
+        ? "cooling-above-year"
+        : growth >= POLICY.meaningfulGrowth &&
+            yearOverYear <= -POLICY.meaningfulGrowth
+          ? "rebounding-below-year"
+          : "aligned"
+      : "unavailable";
+  const windowDates = (weeks: number) => {
+    if (!regularWeekly) return undefined;
+    const current = points.slice(-weeks),
+      previous = points.slice(-2 * weeks, -weeks);
+    return {
+      recentStart: current[0]!.date,
+      recentEnd: new Date(
+        Date.parse(current.at(-1)!.date) + 6 * 86400000,
+      ).toISOString(),
+      baselineStart: previous[0]!.date,
+      baselineEnd: new Date(
+        Date.parse(previous.at(-1)!.date) + 6 * 86400000,
+      ).toISOString(),
+    };
+  };
   return {
+    horizon,
+    windows: {
+      short: windowDates(4),
+      main: windowDates(8),
+      quarter: windowDates(13),
+    },
     recent: current,
     baseline,
     growth,
@@ -190,6 +232,16 @@ export function analyze(
 ): Market {
   const metrics = demandMetrics(demand, asOf);
   const alternateTrends = (demand.alternatives || [])
+    .filter((d) => {
+      const last = completeWeeklySeries(d, asOf).points.at(-1);
+      return [d.fetchedAt, last?.date].every(
+        (stamp) =>
+          stamp &&
+          Number.isFinite(Date.parse(stamp)) &&
+          Date.parse(stamp) <= Date.parse(asOf) + 60000 &&
+          Date.parse(asOf) - Date.parse(stamp) <= POLICY.staleDays * 86400000,
+      );
+    })
     .map((d) => demandMetrics(d, asOf).trend)
     .filter((t) => t && t !== "unknown");
   const opposing =
@@ -263,10 +315,12 @@ export function analyze(
       "Evidence is stale or missing. Refresh before relying on a market classification.",
     );
   if (metrics.yearOverYear === null)
-    limitations.push("Year-over-year seasonality could not be checked.");
+    limitations.push(
+      "The same eight-week period last year could not be compared.",
+    );
   if (metrics.trend === "mixed")
     limitations.push(
-      "Short and longer search windows do not agree, or seasonality may explain the rise. A single market label would overstate the evidence.",
+      "Short and longer search windows or related terms do not agree. A single market label would overstate the evidence.",
     );
   if (opposing)
     limitations.push(
@@ -275,16 +329,20 @@ export function analyze(
   limitations.push(
     "Repository density and search attention are separate observations. Neither proves commercial competition or demand.",
   );
-  if (metrics.seasonal)
+  if (metrics.horizon === "cooling-above-year")
     reasons.push(
-      "Recent search growth repeats last year’s level and is treated as seasonal, not a new breakout.",
+      "Search attention is cooling recently but remains above the same period last year. A pullback is not a long-term decline.",
+    );
+  if (metrics.horizon === "rebounding-below-year")
+    reasons.push(
+      "Search attention is recovering recently but remains below the same period last year. This does not establish seasonality.",
     );
   if (metrics.growth !== null)
     reasons.push(
       `Median weekly search interest ${metrics.growth >= 0 ? "rose" : "fell"} ${Math.abs(metrics.growth * 100).toFixed(0)}% across two consecutive eight-week windows.`,
     );
   reasons.push(
-    `${supply.total.toLocaleString("en-US")} matching active repositories; the published dense-supply threshold is ${POLICY.denseSupply}.`,
+    `${supply.complete ? "" : "≥"}${supply.total.toLocaleString("en-US")} matching active repositories; this is search coverage, not a count of direct competitors.`,
   );
   if (
     metrics.shortGrowth !== null &&
@@ -301,14 +359,8 @@ export function analyze(
     totalStars > 0
       ? stars.slice(0, 3).reduce((a, b) => a + b, 0) / totalStars
       : null;
-  const confidence =
-    kind === "uncertain"
-      ? "low"
-      : supply.complete &&
-          metrics.yearOverYear !== null &&
-          (metrics.recentNonzeroShare ?? metrics.nonzeroShare) > 0.85
-        ? "high"
-        : "moderate";
+  // Coverage cannot validate query intent or measure customer demand.
+  const confidence = kind === "uncertain" ? "low" : "moderate";
   const labels = {
     blue: "Search rising · limited observed supply",
     expanding: "Search rising · established supply",
@@ -328,7 +380,7 @@ export function analyze(
   const strategies = {
     blue: "Investigate an underserved use case. Validate the problem with users, then move quickly on a focused product.",
     expanding:
-      "Demand is growing alongside competition. Look for a specific audience, workflow or cost advantage.",
+      "Search attention is rising and many repositories match this query. Check which projects solve the same user problem before drawing a competition conclusion.",
     contested:
       "Many active repositories match this scope. Check the search direction, alternatives and specific user problems before choosing an entry point.",
     quiet:
@@ -336,16 +388,8 @@ export function analyze(
     uncertain:
       "Gather stronger evidence or refine the demand keyword. The available data does not support a reliable quadrant.",
   };
-  // A transparent ranking aid, not a prediction. Missing evidence never earns a score.
-  const score =
-    usable && kind !== "uncertain"
-      ? Math.round(
-          100 *
-            (0.55 * clamp((metrics.growth! + 0.25) / 1.25) +
-              0.3 / (1 + supply.total / POLICY.denseSupply) +
-              0.15 * metrics.persistence),
-        )
-      : null;
+  // No calibrated opportunity score: keyword scope changes counts and scale.
+  const score = null;
   const id = createHash("sha256")
     .update(
       JSON.stringify({
@@ -368,7 +412,12 @@ export function analyze(
     asOf,
     kind,
     confidence,
-    headline: labels[kind],
+    headline:
+      kind !== "uncertain" && metrics.horizon === "cooling-above-year"
+        ? "Cooling recently, still above last year"
+        : kind !== "uncertain" && metrics.horizon === "rebounding-below-year"
+          ? "Recovering recently, still below last year"
+          : labels[kind],
     strategy: strategies[kind],
     reasons,
     limitations,

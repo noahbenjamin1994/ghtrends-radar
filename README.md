@@ -53,7 +53,7 @@ npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.3.0/ghtrends-radar-0.3.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.4.0/ghtrends-radar-0.4.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -157,18 +157,34 @@ The model proposes one primary Trends phrase, up to two genuine synonyms, and bo
 
 For a public hosted instance configure `GHTRENDS_HOSTED=1`, HTTPS `PUBLIC_URL`, `LOGTO_ENDPOINT`, `LOGTO_APP_ID`, `LOGTO_APP_SECRET` and optionally `GHTRENDS_DAILY_SCANS` (default 10). Create a Traditional Logto application with `${PUBLIC_URL}/auth/callback` as its redirect. Keep GitHub/DeepSeek credentials in server secrets, never `VITE_*` or browser storage. OIDC uses PKCE, nonce/state and signed-token validation; the browser gets an HttpOnly, Secure session cookie. Personal mutations also require CSRF validation.
 
+## Administration
+
+`/admin` shows scan status, queue, source errors/latency, GitHub quota snapshots, accounts, and actual DeepSeek input/output/cache-token usage. Operational logs survive restarts; interrupted scans are marked interrupted. They retain 30 days by default (`GHTRENDS_LOG_RETENTION_DAYS`, 1–365). Saved reports have separate retention. No credential values, session tokens or private report bodies are returned by the admin API.
+
+```sh
+# Deployment-specific Logto user IDs, copied from the user's profile in Logto.
+# These are immutable sub IDs, not usernames, emails or display names.
+export GHTRENDS_ADMIN_USER_IDS=your_logto_user_id,another_logto_user_id
+```
+
+Restart after changing deployment configuration. There is no hosted administrator by default; the server checks the allowlist on every request. In local mode without Logto, the workspace owner has admin access—keep that unauthenticated server on loopback, or enable hosted authentication before publishing it.
+
+AI usage recording begins at upgrade: earlier consumption is **unknown**. Missing usage on failed responses also stays unknown. Optional `GHTRENDS_LLM_PRICING_JSON` maps each requested model to USD per million token rates: `{"your-model":{"input":0.3,"cachedInput":0.006,"output":1.2}}` (illustration only, verify your provider's current prices). An optional `offPeakMultiplier` follows DeepSeek's Monday–Friday 01:00–04:00 / 06:00–10:00 UTC peak schedule. Omit it for flat pricing. Per-call estimates are saved at request time, exclude unpriced calls, and are **not invoices**. [Provider pricing](https://api-docs.deepseek.com/quick_start/pricing/) and [usage fields](https://api-docs.deepseek.com/api/create-chat-completion/).
+
 ## How the method works
 
 **Supply:** GitHub topic and repository-name/description phrase searches (each query is displayed); non-fork, non-archived repositories with at least 5 stars and a push in the last 180 days. At least 50 qualifying repositories is the current dense-supply rule. Counts refer to the displayed search scope, not a census of every competing product. We use the search count and display up to 100 leaders; we do not claim to enumerate beyond GitHub's search result limit.
 
-**Search interest (method 1.1.0):** two years of Google Trends data. Compare the median of the last 8 complete weeks with the previous 8; check 4-week and 13-week comparisons as well. Terms are measured in the same region/time range and shown separately. We do not sum normalized indices or pick whichever synonym grows fastest.
+**Search interest (method 1.2.0):** two years of Google Trends data. Compare the median of the last 8 complete weeks with the previous 8; check 4-week and 13-week comparisons as well. Each term is independently normalized in the same region/time range, preventing a popular synonym from rounding a niche one to zero in a comparison. If the primary has unusable evidence, select the first usable same-intent variant in the planned order and show the reason. We never sum indices or select by growth direction.
 
-- Require 26 consecutive complete weeks, at least 60% nonzero values in the most recent 26 weeks, and a prior median of at least 3.
+- Require the most recent 26 weeks to be consecutive and complete (older gaps do not invalidate this window), at least 60% nonzero values in the most recent 26 weeks, and a prior median of at least 3.
 - Rising/falling requires at least ±10% eight-week change, a resampling band entirely on the same side of zero, and no opposing short or longer change of more than 10%.
-- Stable requires less than 10% eight-week change and less than 20% four/thirteen-week change. Other usable cases, a seasonal rebound, or opposite-moving synonyms are **mixed**.
+- Stable requires less than 10% eight-week change and less than 20% four/thirteen-week change. Other usable cases or fresh, opposite-moving synonyms are **mixed**.
 - Missing, stale, irregular, near-zero or failed evidence stays **uncertain**. A week must have ended when collected; conflicting values prevent classification. The resampling band is a stability diagnostic, not a probability of success.
 
 The raw legacy `fast` field still describes a stricter 25% breakout diagnostic; the displayed direction and classification use `metrics.trend`. “50 repositories” is a published scope-dependent heuristic, **not proof of commercial competition**. Google search attention is **not customer demand growth**. Source dates, the actual terms and limits are shown alongside every result.
+
+The same-period comparison uses timestamps 52 weeks apart, rather than row positions. A recent pullback above last year's level and a recovery below last year's level receive distinct context. Neither proves seasonality. The uncalibrated opportunity score has been removed (`score: null`); results sort by measured search change or update date. Confidence is capped at moderate because data coverage cannot establish intent match or customer demand. Older report links retain their snapshot and show an upgrade prompt.
 
 **Repository evidence:** official GitHub star-history calendar buckets, a bounded recent issue sample, human maintainer responses, and returned contributor commit counts. Calendar buckets are not rolling 24-hour net star changes. Contributor and issue sample limits appear beside the results. Open issues are leads for research, not proven market gaps.
 

@@ -26,6 +26,11 @@ export function text(
 function translateEvidence(value: string): string {
   const patterns: [RegExp, (...groups: string[]) => string][] = [
     [
+      /^([≥\d,]+) matching active repositories; this is search coverage, not a count of direct competitors\.$/,
+      (count) =>
+        `匹配到 ${count} 个活跃仓库；这是检索覆盖量，不是直接竞品数量。`,
+    ],
+    [
       /^Four-week search change: (-?\d+)%; thirteen-week change: (-?\d+)%\. These windows check the direction of the eight-week comparison\.$/,
       (a, b) =>
         `4 周搜索变化：${a}%；13 周变化：${b}%。这两个周期用于核对 8 周比较的方向。`,

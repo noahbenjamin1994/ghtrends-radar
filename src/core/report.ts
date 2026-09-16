@@ -77,6 +77,13 @@ export function marketMarkdown(
           "",
         ]
       : []),
+    ...(m.demand.selectionReason
+      ? [
+          t(m.demand.selectionReason),
+          `${m.demand.requestedKeyword} → ${m.demand.keyword}`,
+          "",
+        ]
+      : []),
     `## ${t("Evidence")}`,
     "",
     ...m.reasons.map((x) => `- ${t(x)}`),

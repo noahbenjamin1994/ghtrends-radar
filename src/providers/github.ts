@@ -1,3 +1,4 @@
+import type { ProviderCall } from "../core/operations.js";
 import { githubToken } from "./github-auth.js";
 import { Store } from "../core/store.js";
 import { POLICY, median } from "../core/analyze.js";
@@ -17,38 +18,71 @@ export class GitHub {
   constructor(private store: Store) {}
   async get<T>(path: string, ttl = 3600000): Promise<T> {
     const cached = this.store.get<T>("github:" + path);
-    if (cached) return cached;
-    const token = await githubToken();
-    const response = await fetch("https://api.github.com" + path, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2026-03-10",
-        "User-Agent": "ghtrends/0.3.0",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      signal: AbortSignal.timeout(25000),
-    });
-    if (!response.ok) {
-      const delay =
-        Number(response.headers.get("retry-after")) ||
-        Math.max(
-          0,
-          Number(response.headers.get("x-ratelimit-reset")) - Date.now() / 1000,
-        );
-      throw new ProviderError(
-        response.status === 429 ||
-          response.headers.get("x-ratelimit-remaining") === "0"
-          ? "GitHub rate limit reached. Cached results remain available."
-          : response.status === 403
-            ? "GitHub access denied. Check your token or App permissions."
-            : `GitHub returned ${response.status}.`,
-        [400, 404, 429].includes(response.status) ? response.status : 502,
-        delay,
-      );
+    const call: ProviderCall = {
+      provider: "github",
+      operation: path.startsWith("/search/") ? "search" : "repository",
+      started: new Date().toISOString(),
+      durationMs: 0,
+    };
+    if (cached) {
+      this.store.recordCall({ ...call, cached: true });
+      return cached;
     }
-    const data = (await response.json()) as T;
-    this.store.set("github:" + path, data, ttl);
-    return data;
+    const started = Date.now();
+    try {
+      const token = await githubToken();
+      const response = await fetch("https://api.github.com" + path, {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2026-03-10",
+          "User-Agent": "ghtrends/0.4.0",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        signal: AbortSignal.timeout(25000),
+      });
+      call.status = response.status;
+      call.rateBucket =
+        response.headers.get("x-ratelimit-resource") || undefined;
+      const remaining = response.headers.get("x-ratelimit-remaining"),
+        reset = response.headers.get("x-ratelimit-reset");
+      call.rateRemaining =
+        remaining !== null && Number.isFinite(Number(remaining))
+          ? Number(remaining)
+          : undefined;
+      call.rateReset =
+        reset !== null && Number.isFinite(Number(reset))
+          ? Number(reset)
+          : undefined;
+      if (!response.ok) {
+        call.error = `http_${response.status}`;
+        const delay =
+          Number(response.headers.get("retry-after")) ||
+          Math.max(
+            0,
+            Number(response.headers.get("x-ratelimit-reset")) -
+              Date.now() / 1000,
+          );
+        throw new ProviderError(
+          response.status === 429 ||
+            response.headers.get("x-ratelimit-remaining") === "0"
+            ? "GitHub rate limit reached. Cached results remain available."
+            : response.status === 403
+              ? "GitHub access denied. Check your token or App permissions."
+              : `GitHub returned ${response.status}.`,
+          [400, 404, 429].includes(response.status) ? response.status : 502,
+          delay,
+        );
+      }
+      const data = (await response.json()) as T;
+      this.store.set("github:" + path, data, ttl);
+      return data;
+    } catch (e) {
+      call.error ||= "network_error";
+      throw e;
+    } finally {
+      call.durationMs = Date.now() - started;
+      this.store.recordCall(call);
+    }
   }
   base(r: any): Repo {
     if (r.private)
@@ -218,9 +252,16 @@ export class GitHub {
           total: data.total_count,
           complete: !data.incomplete_results,
         });
-        for (const r of data.items)
-          if (!r.private && !r.archived && !r.fork)
-            unique.set(r.full_name, this.base(r));
+        for (const r of data.items) {
+          if (!r.private && !r.archived && !r.fork) {
+            const repo = unique.get(r.full_name) || this.base(r);
+            repo.matchedQueries = [
+              ...(repo.matchedQueries || []),
+              query.split(" fork:")[0]!,
+            ];
+            unique.set(r.full_name, repo);
+          }
+        }
         allEnumerated &&=
           !data.incomplete_results && data.total_count <= data.items.length;
         if (queries.length === 1) {
@@ -247,10 +288,10 @@ export class GitHub {
             while (cursor < Math.min(10, result.repositories.length)) {
               const index = cursor++;
               try {
-                result.repositories[index] = await this.repo(
-                  result.repositories[index]!.name,
-                  false,
-                );
+                result.repositories[index] = {
+                  ...(await this.repo(result.repositories[index]!.name, false)),
+                  matchedQueries: result.repositories[index]!.matchedQueries,
+                };
               } catch (e) {
                 result.repositories[index]!.errors.push((e as Error).message);
               }

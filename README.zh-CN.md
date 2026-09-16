@@ -57,7 +57,7 @@ npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.3.0/ghtrends-radar-0.3.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.4.0/ghtrends-radar-0.4.0.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
@@ -163,18 +163,34 @@ ghtrends ui
 
 公开托管部署配置 `GHTRENDS_HOSTED=1`、HTTPS `PUBLIC_URL`、`LOGTO_ENDPOINT`、`LOGTO_APP_ID`、`LOGTO_APP_SECRET`，可通过 `GHTRENDS_DAILY_SCANS` 修改每日额度（默认 10）。Logto 选择 Traditional 应用，回调地址为 `${PUBLIC_URL}/auth/callback`。GitHub 与 DeepSeek 密钥放服务器 Secret，不能放入 `VITE_*` 或浏览器存储。登录使用 PKCE、nonce/state、签名令牌校验；浏览器只获得 HttpOnly、Secure 会话 Cookie，个人数据写入另做 CSRF 校验。
 
+## 管理员
+
+`/admin` 查看扫描记录、排队情况、数据源错误及耗时、GitHub 额度快照、用户概况，以及 DeepSeek 实际输入、输出和缓存 token。记录持久化，重启未完成的扫描标为中断。运行日志默认保留 30 天，可通过 `GHTRENDS_LOG_RETENTION_DAYS` 配置 1–365 天；已保存报告单独保留。管理接口不返回密钥、会话令牌或私有报告正文。
+
+```sh
+# 从 Logto 用户详情复制固定用户 ID（sub），以逗号分隔。
+# 不能填用户名、邮箱或显示名，也不在代码里写死部署者账号。
+export GHTRENDS_ADMIN_USER_IDS=your_logto_user_id,another_logto_user_id
+```
+
+修改部署环境变量后重启。托管模式默认没有管理员，服务器每次请求检查白名单。本地未接 Logto 时，工作区所有者有管理权限；此时服务应只监听本机，需要公开访问则开启托管鉴权。
+
+消耗从升级接入记录时开始，此前消耗**未知**；失败响应未返回的用量也保持未知。可通过 `GHTRENDS_LLM_PRICING_JSON` 配置各模型的每百万 token 美元单价：`{"your-model":{"input":0.3,"cachedInput":0.006,"output":1.2}}`（仅示例，请核实当前价格）。可选 `offPeakMultiplier` 使用 DeepSeek 的 UTC 工作日 01:00–04:00 / 06:00–10:00 高峰规则；固定价格时不填。每次调用保存当时估价，不包含未知价格的请求，**不作为服务商账单**。[价格说明](https://api-docs.deepseek.com/quick_start/pricing/) · [用量字段](https://api-docs.deepseek.com/api/create-chat-completion/)。
+
 ## 判断方法
 
 **供给：** 查询相关 GitHub 主题，以及仓库名称或描述中的短语；逐项列出实际检索式。仓库须未归档、不是 Fork、至少 5 Star，且 180 天内有提交。目前以 50 个符合条件的项目作为供给密集门槛。单主题采用搜索返回的数量，展示最多 100 个主要项目；多主题对返回项目去重，未完整枚举时给出下限。它不是全市场竞品普查，不包含所有无标签或闭源产品。
 
-**搜索关注度（方法 1.1.0）：** 获取两年 Google Trends 数据。比较最近 8 个完整周与前 8 周的中位数，同时核对 4 周和 13 周变化。主词与同义词在同一地区、时间范围内采集，分别展示曲线，不相加归一化指数，也不选增速最高的词代替主词。
+**搜索关注度（方法 1.2.0）：** 获取两年 Google Trends 数据。比较最近 8 个完整周与前 8 周的中位数，同时核对 4 周和 13 周变化。主词与同义词在同一地区、时间范围内独立归一化采集，避免热门词将小众词压成零。主词证据不足时，按原定顺序选择第一个可用同义词，并说明原因；不相加指数，也不按涨跌挑词。
 
-- 至少 26 个连续完整周，最近 26 周至少 60% 非零，前期中位数至少为 3。
+- 最近 26 周连续、完整；更早的缺口不影响近期判断。最近 26 周至少 60% 非零，前期中位数至少为 3。
 - 上升 / 下降：8 周变化至少 ±10%，重采样区间全部位于零的同侧，短期和较长周期没有超过 10% 的反向变化。
-- 平稳：8 周变化不到 10%，4 周和 13 周变化均不到 20%。其他可用情况、季节性反弹或同义词反向，标为**信号分歧**。
+- 平稳：8 周变化不到 10%，4 周和 13 周变化均不到 20%。其他可用情况或近期可用同义词反向，标为**信号分歧**。
 - 证据缺失、过旧、不连续、接近零或采集失败时保留 `uncertain`。只使用采集时已结束的周；同周冲突值阻止分类。重采样检查稳定性，不代表成功概率。
 
 兼容字段 `fast` 仍表示更严格的 25% 突破诊断；页面方向与分类使用 `metrics.trend`。50 个仓库是依赖检索范围的经验门槛，**不能证明商业竞争激烈**；Google 搜索关注度**不等于客户需求增速**。每份报告展示原始词、来源日期及限制。
+
+同比按相隔 52 周的日期匹配，不按行号错位比较。报告区分“近期回调但高于去年”与“近期回升但低于去年”，不据此断言季节性。移除未经校准的机会分（`score: null`），按实测搜索变化或更新时间排序；证据等级最高为中等，数据完整不能证明词义匹配或客户需求。旧报告保留原快照，并提示重新扫描。
 
 **仓库证据：** 使用 GitHub 官方 Star 历史自然日期分桶、有限的近期 Issue 样本、人工维护者回复和返回的贡献者提交数。自然日期窗口不代表滚动 24 小时净增。页面会说明样本范围；开放 Issue 是研究线索，不等于已验证的市场缺口。
 

@@ -1,4 +1,38 @@
 export const zh: Record<string, string> = {
+  Admin: "管理",
+  "Recently updated": "最近更新",
+  "Run an updated scan": "重新扫描",
+  "Measured windows": "比较日期",
+  "recent / baseline": "近期 / 基期",
+  "Matched via": "匹配依据",
+  "Matching active projects": "匹配的活跃项目",
+  "This saved report uses method {old}. Current method: {current}. Run a new scan to update the evidence; the original snapshot stays unchanged.":
+    "这份已保存报告使用算法 {old}，当前算法为 {current}。重新扫描可获取新证据，原快照保留。",
+  "The planned primary term lacks usable evidence. The first usable same-intent variant is shown; selection uses data coverage, never growth direction.":
+    "原定主词缺少可用证据，当前展示第一个证据可用的同义词；选择依据是数据完整度，不是涨跌方向。",
+  "The same eight-week period last year could not be compared.":
+    "无法比较去年对应的 8 周数据。",
+  "Short and longer search windows or related terms do not agree. A single market label would overstate the evidence.":
+    "短期、较长周期或相关词的信号不一致，用单一市场标签会夸大证据。",
+  "Search attention is cooling recently but remains above the same period last year. A pullback is not a long-term decline.":
+    "近期搜索关注度回落，但仍高于去年同期；短期回调不等于长期衰退。",
+  "Search attention is recovering recently but remains below the same period last year. This does not establish seasonality.":
+    "近期搜索关注度回升，但仍低于去年同期；这不足以证明季节性。",
+  "Cooling recently, still above last year": "近期回调，仍高于去年同期",
+  "Recovering recently, still below last year": "近期回升，仍低于去年同期",
+  "The recent search pullback coexists with a higher level than last year. Compare concrete use cases; neither window measures customer demand.":
+    "搜索近期回调，但水平仍高于去年同期。应比较具体使用场景；两个窗口都不直接衡量客户需求。",
+  "Recent search attention has improved from a lower base. It has not recovered last year’s level; a seasonal explanation is unproven.":
+    "搜索关注度从较低基期回升，但尚未恢复去年同期水平；季节性解释尚未得到验证。",
+  "Search attention is rising and many repositories match this query. Check which projects solve the same user problem before drawing a competition conclusion.":
+    "搜索关注度上升，且许多仓库匹配此检索范围。判断竞争前，先核实哪些项目解决同一个用户问题。",
+  "Two-week block resampling tests sensitivity to individual observations. The year-over-year window adds long-term context; it cannot prove seasonality. These diagnostics are not probabilities of business success.":
+    "双周分块重采样检查结果对个别观测的敏感度。同比提供长期背景，不能直接证明季节性；这些诊断不是商业成功概率。",
+  "The primary phrase and up to two same-intent variants are collected independently for the same region and time range. If the primary lacks usable evidence, the first usable variant is selected by data coverage. We never add normalized indices or select by growth direction.":
+    "主词和最多两个同义词在相同地区、日期范围内独立采集。主词证据不足时，按数据完整度选择第一个可用同义词，不相加归一化指数，也不按涨跌挑词。",
+  "Search matches can include libraries, integrations and resource lists. A topic tag does not prove a project is a direct competitor.":
+    "搜索结果可能包含依赖库、集成项目和资料合集；命中主题标签不代表它就是直接竞品。",
+
   "Sign in to open your private reports": "登录后查看自己的私有报告",
   "Search rising; compare alternatives": "搜索上升，比较现有方案",
   "The AI query plan could not be validated. Please refine the input.":
@@ -426,7 +460,7 @@ export const zh: Record<string, string> = {
   "Vector databases": "向量数据库",
   "Voice agents": "语音智能体",
   "Retrieval / RAG": "检索增强 / RAG",
-  "AI for Science": "AI for Science / 科学智能",
+  "AI for Science": "科学智能",
   "The tools connecting AI agents to the real world.":
     "连接 AI 智能体与真实世界的工具。",
   "Agents that navigate, write and ship code.":

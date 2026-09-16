@@ -1,3 +1,6 @@
+import { completeWeeklySeries } from "../core/evidence.js";
+import { demandMetrics } from "../core/analyze.js";
+import type { ProviderCall } from "../core/operations.js";
 import { fetch as request, ProxyAgent } from "undici";
 import type { DemandEvidence, InterestPoint } from "../core/types.js";
 import { Store } from "../core/store.js";
@@ -43,48 +46,71 @@ export class Trends {
     const url = new URL(path, ORIGIN);
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     for (let attempt = 0; attempt < 2; attempt++) {
-      const r = await request(url, {
-        dispatcher: this.dispatcher,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
-          "Accept-Language": "en-US,en;q=0.9",
-          "X-Requested-With": "XMLHttpRequest",
-          Referer: ORIGIN + "/trends/explore",
-          ...(this.cookie ? { Cookie: this.cookie } : {}),
-        },
-        signal: AbortSignal.timeout(optional ? 7000 : 30000),
-      });
-      const cookies = new Map(
-        this.cookie
-          .split("; ")
-          .filter(Boolean)
-          .map((c) => [c.split("=")[0]!, c]),
-      );
-      for (const c of r.headers.getSetCookie()) {
-        const pair = c.split(";")[0]!;
-        cookies.set(pair.split("=")[0]!, pair);
-      }
-      this.cookie = [...cookies.values()].join("; ");
-      if (r.status === 429 && attempt === 0 && !optional) {
-        await r.body?.cancel();
-        const seconds = Math.max(
-          30,
-          Number(r.headers.get("retry-after")) || 30,
+      const started = Date.now();
+      const call: ProviderCall = {
+        provider: "trends",
+        operation: path.includes("multiline")
+          ? "timeline"
+          : path.includes("relatedsearches")
+            ? "related"
+            : path.includes("api/explore")
+              ? "explore"
+              : "warmup",
+        started: new Date(started).toISOString(),
+        durationMs: 0,
+      };
+      try {
+        const r = await request(url, {
+          dispatcher: this.dispatcher,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "X-Requested-With": "XMLHttpRequest",
+            Referer: ORIGIN + "/trends/explore",
+            ...(this.cookie ? { Cookie: this.cookie } : {}),
+          },
+          signal: AbortSignal.timeout(optional ? 7000 : 30000),
+        });
+        call.status = r.status;
+        if (!r.ok) call.error = `http_${r.status}`;
+        const cookies = new Map(
+          this.cookie
+            .split("; ")
+            .filter(Boolean)
+            .map((c) => [c.split("=")[0]!, c]),
         );
-        if (seconds > 60)
-          throw new Error(
-            `Google Trends requested a ${seconds}-second cooldown. Retry later.`,
+        for (const c of r.headers.getSetCookie()) {
+          const pair = c.split(";")[0]!;
+          cookies.set(pair.split("=")[0]!, pair);
+        }
+        this.cookie = [...cookies.values()].join("; ");
+        if (r.status === 429 && attempt === 0 && !optional) {
+          await r.body?.cancel();
+          const seconds = Math.max(
+            30,
+            Number(r.headers.get("retry-after")) || 30,
           );
-        await new Promise((r) => setTimeout(r, seconds * 1000));
-        continue;
+          if (seconds > 60)
+            throw new Error(
+              `Google Trends requested a ${seconds}-second cooldown. Retry later.`,
+            );
+          await new Promise((r) => setTimeout(r, seconds * 1000));
+          continue;
+        }
+        if (!r.ok)
+          throw new Error(
+            `Google Trends returned ${r.status}. Retry later or import an exported Trends file.`,
+          );
+        const text = await r.text();
+        return path.includes("/api/") ? parseGoogleJson(text) : null;
+      } catch (e) {
+        call.error ||= "network_error";
+        throw e;
+      } finally {
+        call.durationMs = Date.now() - started;
+        this.store.recordCall(call);
       }
-      if (!r.ok)
-        throw new Error(
-          `Google Trends returned ${r.status}. Retry later or import an exported Trends file.`,
-        );
-      const text = await r.text();
-      return path.includes("/api/") ? parseGoogleJson(text) : null;
     }
   }
   async demand(
@@ -95,9 +121,52 @@ export class Trends {
   ): Promise<DemandEvidence> {
     validateGeo(geo);
     const terms = [...new Set([keyword, ...synonyms])].slice(0, 3);
-    const key = `trends:v2:${JSON.stringify(terms)}:${geo}`;
+    if (terms.length > 1) {
+      // Independent normalization prevents a popular synonym rounding the primary to zero.
+      const evidence = await Promise.all(
+        terms.map((term, i) =>
+          this.demand(term, geo, i === 0 ? onTimeline : undefined),
+        ),
+      );
+      const usable = (d: DemandEvidence) => {
+        const now = new Date().toISOString(),
+          last = completeWeeklySeries(d, now).points.at(-1);
+        return (
+          !d.collectionError &&
+          demandMetrics(d, now).fast !== null &&
+          [d.fetchedAt, last?.date].every(
+            (s) =>
+              s &&
+              Date.parse(s) <= Date.now() + 60000 &&
+              Date.now() - Date.parse(s) < 14 * 86400000,
+          )
+        );
+      };
+      const selected = usable(evidence[0]!) ? 0 : evidence.findIndex(usable);
+      const index = Math.max(0, selected),
+        primary = evidence[index]!;
+      const result = {
+        ...primary,
+        alternatives: evidence.filter((_, i) => i !== index),
+      };
+      if (index !== 0) {
+        result.requestedKeyword = keyword;
+        result.selectionReason =
+          "The planned primary term lacks usable evidence. The first usable same-intent variant is shown; selection uses data coverage, never growth direction.";
+      }
+      onTimeline?.(result);
+      return result;
+    }
+    const key = `trends:v3:${JSON.stringify(terms)}:${geo}`;
     const cached = this.store.get<DemandEvidence>(key);
     if (cached) {
+      this.store.recordCall({
+        provider: "trends",
+        operation: "demand",
+        started: new Date().toISOString(),
+        durationMs: 0,
+        cached: true,
+      });
       onTimeline?.(cached);
       return cached;
     }
@@ -113,6 +182,7 @@ export class Trends {
       sourceUrl,
       points: [],
       related: [],
+      normalization: "independent",
     };
     try {
       // The HTML warmup is optional; Google may rate-limit it independently.

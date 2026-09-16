@@ -65,6 +65,22 @@ export function installAuth(app: Express, store: Store) {
       );
     return identity;
   };
+  const isAdmin = (identity: Identity | null) =>
+    !!identity &&
+    ((!hosted && !enabled && identity.id === "local") ||
+      (process.env.GHTRENDS_ADMIN_USER_IDS || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .includes(identity.id));
+  const requireAdmin = (q: Request) => {
+    const identity = requireUser(q);
+    if (!isAdmin(identity))
+      throw Object.assign(new Error("Administrator access required."), {
+        status: 403,
+      });
+    return identity;
+  };
   const protect = (q: Request) => {
     const identity = requireUser(q);
     if (hosted || enabled) {
@@ -205,5 +221,5 @@ export function installAuth(app: Express, store: Store) {
     r.clearCookie(cookieName, cookie);
     return r.set("Cache-Control", "no-store").json({ ok: true });
   });
-  return { hosted, enabled, user, requireUser, protect };
+  return { hosted, enabled, user, requireUser, protect, isAdmin, requireAdmin };
 }

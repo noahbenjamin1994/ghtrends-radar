@@ -1,3 +1,8 @@
+import {
+  estimatedCost,
+  tokenCount,
+  type ProviderCall,
+} from "../core/operations.js";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { demandMetrics } from "../core/analyze.js";
@@ -53,49 +58,82 @@ const paragraph = z.object({
   nextSteps: z.array(z.string().min(1).max(220)).min(1).max(3),
 });
 const briefSchema = z.object({ en: paragraph, zh: paragraph });
-export const QUERY_PLAN_VERSION = "3";
+export const QUERY_PLAN_VERSION = "4";
 export class Research {
   readonly model = process.env.DEEPSEEK_MODEL || "deepseek-flash";
   readonly enabled = !!process.env.DEEPSEEK_API_KEY;
   constructor(private store: Store) {}
-  async json(system: string, input: unknown, maxTokens = 1800) {
-    const root = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
-    if (new URL(root).protocol !== "https:")
-      throw new Error("The model endpoint must use HTTPS.");
-    const response = await fetch(
-      root.replace(/\/$/, "") + "/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: this.model,
-          thinking: { type: "disabled" },
-          response_format: { type: "json_object" },
-          max_tokens: maxTokens,
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: JSON.stringify(input) },
-          ],
-        }),
-        signal: AbortSignal.timeout(25000),
-      },
-    );
-    if (!response.ok)
-      throw new Error(
-        `AI research is temporarily unavailable (${response.status}).`,
-      );
-    const data = (await response.json()) as any;
-    if (data.choices?.[0]?.finish_reason !== "stop")
-      throw new Error("The AI response was incomplete. Please try again.");
+  async json(
+    system: string,
+    input: unknown,
+    maxTokens = 1800,
+    operation = "plan",
+  ) {
+    const started = Date.now();
+    const call: ProviderCall = {
+      provider: "deepseek",
+      operation,
+      started: new Date(started).toISOString(),
+      durationMs: 0,
+      model: this.model,
+    };
     try {
-      return JSON.parse(data.choices[0].message.content);
-    } catch {
-      throw new Error(
-        "The AI response could not be validated. Please try again.",
+      const root = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
+      if (new URL(root).protocol !== "https:")
+        throw new Error("The model endpoint must use HTTPS.");
+      const response = await fetch(
+        root.replace(/\/$/, "") + "/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: this.model,
+            thinking: { type: "disabled" },
+            response_format: { type: "json_object" },
+            max_tokens: maxTokens,
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: JSON.stringify(input) },
+            ],
+          }),
+          signal: AbortSignal.timeout(25000),
+        },
       );
+      call.status = response.status;
+      if (!response.ok) {
+        call.error = `http_${response.status}`;
+        throw new Error(
+          `AI research is temporarily unavailable (${response.status}).`,
+        );
+      }
+      const data = (await response.json()) as any;
+      call.model =
+        typeof data.model === "string" ? data.model.slice(0, 100) : this.model;
+      call.inputTokens = tokenCount(data.usage?.prompt_tokens);
+      call.outputTokens = tokenCount(data.usage?.completion_tokens);
+      call.cachedTokens = tokenCount(
+        data.usage?.prompt_cache_hit_tokens ??
+          data.usage?.prompt_tokens_details?.cached_tokens,
+      );
+      call.costUsd = estimatedCost(this.model, data.usage, call.started);
+      if (data.choices?.[0]?.finish_reason !== "stop")
+        throw new Error("The AI response was incomplete. Please try again.");
+      try {
+        return JSON.parse(data.choices[0].message.content);
+      } catch {
+        throw new Error(
+          "The AI response could not be validated. Please try again.",
+        );
+      }
+    } catch (e) {
+      call.error ||= call.status ? "invalid_response" : "network_error";
+      throw e;
+    } finally {
+      call.durationMs = Date.now() - started;
+      this.store.recordCall(call);
     }
   }
   async plan(input: string, keyword?: string, geo = ""): Promise<Topic> {
@@ -123,7 +161,18 @@ export class Research {
         )
         .digest("hex");
     const cached = this.store.get<Topic>(key);
-    if (cached) return cached;
+    if (cached) {
+      this.store.recordCall({
+        provider: "deepseek",
+        operation: "plan",
+        started: new Date().toISOString(),
+        durationMs: 0,
+        cached: true,
+        model: this.model,
+        costUsd: 0,
+      });
+      return cached;
+    }
     let known: Topic | undefined;
     try {
       known = resolveTopic(input, keyword);
@@ -214,7 +263,7 @@ Schema/example: {"slug":"ai-for-science","name":"AI for Science","intent":"Open-
       keyword: trends[0]!,
       query: queries[0]!,
       queries,
-      description: p.intent,
+      description: known?.aliases.length ? known.description : p.intent,
       color: known?.color || "#bcf85e",
       aliases: [],
       plan,
@@ -240,6 +289,17 @@ Schema/example: {"slug":"ai-for-science","name":"AI for Science","intent":"Open-
         asOf: m.asOf,
         search: {
           direction: m.metrics.trend,
+          horizon: m.metrics.horizon,
+          yearDirection:
+            m.metrics.yearOverYear === null
+              ? "unknown"
+              : m.metrics.yearOverYear > 0.1
+                ? "above-last-year"
+                : m.metrics.yearOverYear < -0.1
+                  ? "below-last-year"
+                  : "similar-to-last-year",
+          windows:
+            "direction = last 8 weeks vs prior 8; short = 4 vs 4; longer = 13 vs 13; year = same 8-week period 52 weeks earlier",
           usable: m.metrics.fast !== null,
           seasonal: m.metrics.seasonal,
           shortDirection:
@@ -279,6 +339,7 @@ Schema/example: {"slug":"ai-for-science","name":"AI for Science","intent":"Open-
         gaps: m.gaps.slice(0, 4).map((g) => ({ title: g.title, url: g.url })),
       },
       2000,
+      "brief",
     );
     const checked = briefSchema.safeParse(raw);
     if (!checked.success)

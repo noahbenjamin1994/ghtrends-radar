@@ -426,6 +426,11 @@ export function RepoRow({
         <span>
           <strong>{repo.name}</strong>
           <small>{repo.description || t("No description provided.")}</small>
+          {!!repo.matchedQueries?.length && (
+            <small className="repo-matches">
+              {t("Matched via")}: {repo.matchedQueries.join(" · ")}
+            </small>
+          )}
         </span>
       </button>
       <div className="repo-stats">

@@ -52,6 +52,9 @@ export interface DemandEvidence {
   collectionError?: string;
   resolution?: string;
   seriesIndex?: number;
+  normalization?: "independent";
+  requestedKeyword?: string;
+  selectionReason?: string;
   alternatives?: Omit<DemandEvidence, "alternatives">[];
 }
 export interface Repo {
@@ -78,6 +81,7 @@ export interface Repo {
   topContributorShare: number | null;
   fetchedAt: string;
   errors: string[];
+  matchedQueries?: string[];
 }
 export interface SupplyEvidence {
   query: string;
@@ -108,6 +112,19 @@ export interface DemandMetrics {
   quarterGrowth?: number | null;
   trend?: "rising" | "falling" | "stable" | "mixed" | "unknown";
   recentNonzeroShare?: number;
+  horizon?:
+    "cooling-above-year" | "rebounding-below-year" | "aligned" | "unavailable";
+  windows?: {
+    short?: DemandWindow;
+    main?: DemandWindow;
+    quarter?: DemandWindow;
+  };
+}
+export interface DemandWindow {
+  recentStart: string;
+  recentEnd: string;
+  baselineStart: string;
+  baselineEnd: string;
 }
 export interface Gap {
   title: string;

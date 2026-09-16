@@ -84,6 +84,18 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
       );
     }
   }
+  if (!provisional && m.metrics.horizon === "cooling-above-year") {
+    title = t("Cooling recently, still above last year");
+    summary = t(
+      "The recent search pullback coexists with a higher level than last year. Compare concrete use cases; neither window measures customer demand.",
+    );
+  }
+  if (!provisional && m.metrics.horizon === "rebounding-below-year") {
+    title = t("Recovering recently, still below last year");
+    summary = t(
+      "Recent search attention has improved from a lower base. It has not recovered last year’s level; a seasonal explanation is unproven.",
+    );
+  }
   const nextSteps = scientific
     ? [
         t(

@@ -160,3 +160,51 @@ test("Trends selects the returned keyword column and excludes missing observatio
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("synonyms use separate normalization and choose usable coverage, never the best growth", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-fallback-")),
+    store = new Store(dir),
+    trends = new Trends(store);
+  const now = new Date(),
+    end = Date.now() - 8 * 86400000;
+  const series = (keyword: string, base: number, recent: number) => ({
+    keyword,
+    geo: "",
+    sourceUrl: "https://trends.google.com",
+    fetchedAt: now.toISOString(),
+    related: [],
+    points: Array.from({ length: 104 }, (_, i) => ({
+      date: new Date(end - (103 - i) * 7 * 86400000).toISOString(),
+      value: i >= 96 ? recent : base,
+    })),
+    resolution: "WEEK",
+  });
+  // A weak primary, a falling usable synonym, and a faster-growing synonym.
+  for (const [keyword, base, recent] of [
+    ["weak", 0, 0],
+    ["usable", 30, 15],
+    ["rising", 20, 40],
+  ] as const)
+    store.set(
+      `trends:v3:${JSON.stringify([keyword])}:`,
+      series(keyword, base, recent),
+      60000,
+    );
+  try {
+    const result = await trends.demand("weak", "", undefined, [
+      "usable",
+      "rising",
+    ]);
+    assert.equal(result.keyword, "usable");
+    assert.equal(result.requestedKeyword, "weak");
+    assert.equal(result.alternatives?.length, 2);
+    assert.match(result.selectionReason!, /never growth direction/);
+    const original = await trends.demand("usable", "", undefined, ["rising"]);
+    assert.equal(original.keyword, "usable");
+    assert.equal(original.requestedKeyword, undefined);
+  } finally {
+    await trends.close();
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -14,7 +14,7 @@ export interface Account {
   hosted: boolean;
   authAvailable: boolean;
   aiAvailable: boolean;
-  user: { name: string } | null;
+  user: { name: string; isAdmin: boolean } | null;
   csrf: string;
   dailyLimit: number;
   used: number;

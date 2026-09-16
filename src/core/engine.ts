@@ -35,12 +35,6 @@ export class Engine {
             ? analyze(m.topic, m.demand, m.supply, m.gaps)
             : m;
         store.saveMarket(current);
-        if (Date.now() - Date.parse(m.demand.fetchedAt) < 86400000)
-          store.set(
-            `trends:v2:${JSON.stringify([m.topic.keyword])}:${m.geo}`,
-            m.demand,
-            86400000 - (Date.now() - Date.parse(m.demand.fetchedAt)),
-          );
       }
     for (const m of store.markets("", true))
       if (
@@ -133,7 +127,7 @@ export class Engine {
     ]);
     if (options.demand)
       this.store.set(
-        `trends:v2:${JSON.stringify([topic.keyword])}:${geo}`,
+        `trends:v3:${JSON.stringify([topic.keyword])}:${geo}`,
         demand,
         Math.max(0, 86400000 - (Date.now() - Date.parse(demand.fetchedAt))),
       );

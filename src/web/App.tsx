@@ -1,3 +1,5 @@
+import { AdminView } from "./admin.js";
+import { ALGORITHM_VERSION } from "../core/version.js";
 import { api, setCsrf } from "./api.js";
 import { HistoryView, SignInGate, type Account } from "./account.js";
 import { t, locale, localUrl, switchLanguage } from "./i18n.js";
@@ -70,7 +72,7 @@ export function App() {
     [geo, setGeo] = useState(
       new URLSearchParams(location.search).get("geo") || "",
     ),
-    [sort, setSort] = useState("opportunity"),
+    [sort, setSort] = useState("growth"),
     [filter, setFilter] = useState("all"),
     [watch, setWatch] = useState(readWatch),
     [mobileMenu, setMobileMenu] = useState(false);
@@ -286,17 +288,20 @@ export function App() {
     details: "Core evidence ready; adding project details",
   };
   const route = path.split("?")[0]!;
-  const active = route.startsWith("/history")
-    ? "history"
-    : route.startsWith("/compare")
-      ? "compare"
-      : route.startsWith("/watch")
-        ? "watch"
-        : route.startsWith("/docs")
-          ? "docs"
-          : route.startsWith("/gaps")
-            ? "gaps"
-            : "radar";
+  const active =
+    route === "/admin"
+      ? "admin"
+      : route.startsWith("/history")
+        ? "history"
+        : route.startsWith("/compare")
+          ? "compare"
+          : route.startsWith("/watch")
+            ? "watch"
+            : route.startsWith("/docs")
+              ? "docs"
+              : route.startsWith("/gaps")
+                ? "gaps"
+                : "radar";
   const shown = markets
     .filter(
       (m) =>
@@ -309,7 +314,7 @@ export function App() {
     .sort((a, b) =>
       sort === "growth"
         ? (b.metrics.growth ?? -Infinity) - (a.metrics.growth ?? -Infinity)
-        : (b.score ?? -1) - (a.score ?? -1),
+        : b.asOf.localeCompare(a.asOf),
     );
   const unscanned = topics.filter(
     (t) => !markets.some((m) => m.topic.slug === t.slug),
@@ -340,6 +345,9 @@ export function App() {
             ["history", "My research", BookOpen, "/history"],
             ["gaps", "Demand gaps", ScanLine, "/gaps"],
             ["docs", "How it works", BookOpen, "/docs"],
+            ...(account?.user?.isAdmin
+              ? [["admin", "Admin", ScanLine, "/admin"]]
+              : []),
           ].map(([key, label, Icon, href]) => {
             const I = Icon as typeof Radio;
             return (
@@ -363,7 +371,7 @@ export function App() {
               className="account-button"
               onClick={() => (account.user ? navigate("/history") : signIn())}
             >
-              {account.user ? t("My account") : t("Sign in")}
+              {account.user ? t("Account") : t("Sign in")}
             </button>
           )}
           <button
@@ -583,7 +591,7 @@ export function App() {
                     onChange={(e) => setSort(e.target.value)}
                     aria-label={t("Sort categories")}
                   >
-                    <option value="opportunity">{t("Opportunity")}</option>
+                    <option value="recent">{t("Recently updated")}</option>
                     <option value="growth">{t("Search growth")}</option>
                   </select>
                   <ChevronDown size={13} />
@@ -792,6 +800,8 @@ export function App() {
           ) : (
             <SignInGate account={account} />
           )
+        ) : route === "/admin" ? (
+          <AdminView account={account} />
         ) : route === "/history" ? (
           <HistoryView account={account} navigate={navigate} />
         ) : route === "/watch" ? (
@@ -1027,6 +1037,22 @@ function MarketView({
         <ArrowLeft size={16} />
         {t("Back to the radar")}
       </button>
+      {m.version !== ALGORITHM_VERSION && (
+        <div className="admin-note old-method">
+          <p>
+            {t(
+              "This saved report uses method {old}. Current method: {current}. Run a new scan to update the evidence; the original snapshot stays unchanged.",
+              { old: m.version, current: ALGORITHM_VERSION },
+            )}
+          </p>
+          <button
+            className="button secondary"
+            onClick={() => onScan(m.topic.plan?.input || m.topic.slug)}
+          >
+            {t("Run an updated scan")}
+          </button>
+        </div>
+      )}
       <div className="detail-heading">
         <div>
           <div className="eyebrow">
@@ -1256,6 +1282,12 @@ function MarketView({
         </section>
       )}
       {m.aiError && <p className="muted">{t(m.aiError)}</p>}
+      {m.demand.selectionReason && (
+        <p className="admin-note">
+          {t(m.demand.selectionReason)} ({m.demand.requestedKeyword} →{" "}
+          {m.demand.keyword})
+        </p>
+      )}
       <div className="search-direction">
         <strong>
           {t("Search direction")}:{" "}
@@ -1268,6 +1300,16 @@ function MarketView({
           {t("13-week change")}: {pct(m.metrics.quarterGrowth ?? null)}
         </span>
       </div>
+      {m.metrics.windows?.main && (
+        <p className="footnote">
+          {t("Measured windows")}:{" "}
+          {m.metrics.windows.main.recentStart.slice(0, 10)}–
+          {m.metrics.windows.main.recentEnd.slice(0, 10)} /{" "}
+          {m.metrics.windows.main.baselineStart.slice(0, 10)}–
+          {m.metrics.windows.main.baselineEnd.slice(0, 10)} (
+          {t("recent / baseline")})
+        </p>
+      )}
       <div className="metric-grid">
         <div>
           <span>{t("Search interest change")}</span>
@@ -1283,7 +1325,7 @@ function MarketView({
           </small>
         </div>
         <div>
-          <span>{t("Active project supply")}</span>
+          <span>{t("Matching active projects")}</span>
           <strong>
             {m.supply.error
               ? "—"
@@ -1411,6 +1453,11 @@ function MarketView({
             <ExternalLink size={13} />
           </a>
         </div>
+        <p className="footnote">
+          {t(
+            "Search matches can include libraries, integrations and resource lists. A topic tag does not prove a project is a direct competitor.",
+          )}
+        </p>
         {(m.supply.searches?.length || 0) > 1 && (
           <div className="search-scopes">
             <p>
@@ -2065,12 +2112,12 @@ function Docs() {
           </p>
           <p>
             {t(
-              "Two-week block resampling tests sensitivity to individual observations. A year-over-year comparison checks recurring seasonal rebounds. These diagnostics are not probabilities of business success.",
+              "Two-week block resampling tests sensitivity to individual observations. The year-over-year window adds long-term context; it cannot prove seasonality. These diagnostics are not probabilities of business success.",
             )}
           </p>
           <p>
             {t(
-              "The primary phrase and up to two same-intent variants are collected in the same region and time range. Each curve is shown separately. We never add normalized indices or choose the fastest-growing synonym.",
+              "The primary phrase and up to two same-intent variants are collected independently for the same region and time range. If the primary lacks usable evidence, the first usable variant is selected by data coverage. We never add normalized indices or select by growth direction.",
             )}
           </p>
           <a
@@ -2120,7 +2167,7 @@ function Docs() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.3.0/ghtrends-radar-0.3.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.4.0/ghtrends-radar-0.4.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton value="ghtrends scan --topic mcp-servers --json" />
         </div>
         <h3>{t("Connect an MCP client")}</h3>

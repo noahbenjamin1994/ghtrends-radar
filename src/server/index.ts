@@ -1,4 +1,5 @@
 import express from "express";
+import { operationContext } from "../core/operations.js";
 import sharp from "sharp";
 import { installAuth } from "./auth.js";
 import { marketCard } from "../core/card.js";
@@ -51,6 +52,7 @@ export function createApp(engine = new Engine()) {
     next();
   });
   const auth = installAuth(app, engine.store);
+  engine.store.interruptRuns();
   app.use("/api", (_q, r, next) => {
     r.set("Cache-Control", "no-store").vary("Cookie");
     next();
@@ -124,24 +126,39 @@ export function createApp(engine = new Engine()) {
           break;
         }
         job.state = "running";
+        engine.store.updateRun(job.id, "running");
         try {
-          job.market = await engine.scan(job.topic, {
-            geo: job.geo,
-            keyword: job.keyword,
-            refresh: job.refresh,
-            ai: job.refresh ? false : undefined,
-            owner: job.owner,
-            private: auth.hosted && !!job.owner,
-            onProgress: (progress) => {
-              job.progress = { ...job.progress, ...progress };
-              engine.store.set("job:" + job.id, job, 3600000);
-            },
-          });
+          job.market = await operationContext.run(
+            { runId: job.id, userId: job.owner },
+            () =>
+              engine.scan(job.topic, {
+                geo: job.geo,
+                keyword: job.keyword,
+                refresh: job.refresh,
+                ai: job.refresh ? false : undefined,
+                owner: job.owner,
+                private: auth.hosted && !!job.owner,
+                onProgress: (progress) => {
+                  job.progress = { ...job.progress, ...progress };
+                  engine.store.set("job:" + job.id, job, 3600000);
+                },
+              }),
+          );
           job.state = "complete";
+          engine.store.updateRun(job.id, "complete", {
+            reportId: job.market.id,
+            warnings: [
+              job.market.demand.error,
+              job.market.demand.collectionError,
+              job.market.supply.error,
+              job.market.aiError,
+            ].filter((x): x is string => !!x),
+          });
           delete job.progress?.preview;
         } catch (e) {
           job.error = (e as Error).message;
           job.state = "failed";
+          engine.store.updateRun(job.id, "failed", { error: job.error });
           job.choices = (e as any).choices;
           job.clarification = (e as any).clarification;
         }
@@ -160,6 +177,7 @@ export function createApp(engine = new Engine()) {
       Promise.resolve(handler(req, res)).catch(next);
   if (process.env.GHTRENDS_AUTO_COLLECT === "1") {
     const schedule = () => {
+      engine.store.pruneOperations();
       for (const [id, job] of jobs)
         if (
           Date.now() - job.created > 3600000 &&
@@ -171,6 +189,9 @@ export function createApp(engine = new Engine()) {
         if (
           m &&
           sourceEvidenceIsFresh(m) &&
+          m.demand.normalization === "independent" &&
+          m.topic.query === topic.query &&
+          JSON.stringify(m.topic.queries) === JSON.stringify(topic.queries) &&
           !m.demand.error &&
           !m.demand.collectionError &&
           !m.supply.error
@@ -195,6 +216,14 @@ export function createApp(engine = new Engine()) {
           created: Date.now(),
         };
         jobs.set(job.id, job);
+        engine.store.startRun({
+          id: job.id,
+          userId: job.owner,
+          input: job.topic,
+          geo: job.geo,
+          background: true,
+          created: new Date(job.created).toISOString(),
+        });
       }
       void processJobs();
     };
@@ -214,12 +243,62 @@ export function createApp(engine = new Engine()) {
       hosted: auth.hosted,
       authAvailable: auth.enabled,
       aiAvailable: engine.research.enabled,
-      user: user ? { name: user.name } : null,
+      user: user ? { name: user.name, isAdmin: auth.isAdmin(user) } : null,
       csrf: user?.csrf || "",
       dailyLimit,
       used: user ? engine.store.usage(user.id) : 0,
     });
   });
+  app.get(
+    "/api/admin",
+    safe((q, r) => {
+      auth.requireAdmin(q);
+      const days = Number(q.query.days || 7),
+        page = Number(q.query.page || 0),
+        state = String(q.query.state || "");
+      if (
+        ![1, 7, 30].includes(days) ||
+        !Number.isInteger(page) ||
+        page < 0 ||
+        page > 10000 ||
+        ![
+          "",
+          "queued",
+          "running",
+          "complete",
+          "failed",
+          "interrupted",
+        ].includes(state)
+      )
+        return r.status(400).json({ error: "Invalid admin filter." });
+      return r.json({
+        ...engine.store.adminOverview(days, page, state),
+        version: ALGORITHM_VERSION,
+        queue: [...jobs.values()]
+          .filter((j) => j.state === "queued" || j.state === "running")
+          .map((j) => ({
+            id: j.id,
+            input: j.input || j.topic,
+            state: j.state,
+            stage: j.progress?.stage,
+            background: !!j.refresh,
+            created: j.created,
+          })),
+        configuration: {
+          mode: auth.hosted ? "hosted" : "self-hosted",
+          auth: auth.enabled,
+          ai: engine.research.enabled,
+          model: engine.research.model,
+          dailyLimit,
+          adminUserIds: (process.env.GHTRENDS_ADMIN_USER_IDS || "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          pricingConfigured: !!process.env.GHTRENDS_LLM_PRICING_JSON,
+        },
+      });
+    }),
+  );
   app.get(
     "/api/history",
     safe((q, r) => {
@@ -515,6 +594,14 @@ export function createApp(engine = new Engine()) {
         created: Date.now(),
       };
       jobs.set(job.id, job);
+      engine.store.startRun({
+        id: job.id,
+        userId: job.owner,
+        input,
+        geo: job.geo,
+        background: false,
+        created: new Date(job.created).toISOString(),
+      });
       engine.store.set("job:" + job.id, job, 3600000);
       void processJobs();
       return r.status(202).json(job);
@@ -587,7 +674,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.3.0/ghtrends-radar-0.3.0.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.4.0/ghtrends-radar-0.4.0.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>
@@ -660,9 +747,15 @@ export function createApp(engine = new Engine()) {
         }
       }
       const known =
-        ["/", "/docs", "/gaps", "/compare", "/watch", "/history"].includes(
-          path,
-        ) || repository;
+        [
+          "/",
+          "/docs",
+          "/gaps",
+          "/compare",
+          "/watch",
+          "/history",
+          "/admin",
+        ].includes(path) || repository;
       const status = m || known ? 200 : 404;
       const markets = dashboardMarkets(geo);
       const html = renderDocument(readFileSync(file, "utf8"), {
@@ -676,7 +769,7 @@ export function createApp(engine = new Engine()) {
         noindex:
           repository ||
           !!(m && !engine.store.isPublic(m.id)) ||
-          ["/compare", "/watch", "/history"].includes(path) ||
+          ["/compare", "/watch", "/history", "/admin"].includes(path) ||
           (path === "/" && !markets.length),
       });
       return r.status(status).type("html").send(html);

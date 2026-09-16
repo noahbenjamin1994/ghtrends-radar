@@ -60,6 +60,7 @@ export function renderDocument(
     "/gaps": "Open-source feature requests and friction signals · ghtrends",
     "/compare": "Compare GitHub repositories · ghtrends",
     "/watch": "Your GitHub watchlist · ghtrends",
+    "/admin": "Operations · ghtrends",
     "/history": "Your research history · ghtrends",
   };
   const title =
