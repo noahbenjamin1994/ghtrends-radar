@@ -1,3 +1,4 @@
+import { selectGapSignals } from "../core/gaps.js";
 import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
 import { marketAssessment } from "../core/assessment.js";
 import { text, localeUrl, type Locale } from "../core/i18n.js";
@@ -57,6 +58,7 @@ export function renderDocument(
   const titles: Record<string, string> = {
     "/": "ghtrends — Know where to build",
     "/docs": "GitHub opportunity analysis: methodology, CLI and MCP · ghtrends",
+    "/start": "Use the open-source CLI and MCP server on GitHub",
     "/gaps": "Open-source feature requests and friction signals · ghtrends",
     "/compare": "Compare GitHub repositories · ghtrends",
     "/watch": "Your GitHub watchlist · ghtrends",
@@ -108,18 +110,18 @@ export function renderDocument(
     content = `<h1>${e("Page not found.")}</h1><p>${e("This report or page is unavailable.")} ${link("/", "Explore the radar")}</p>`;
   } else if (path === "/") {
     content = `<p class="eyebrow">${e("GITHUB SUPPLY × GOOGLE SEARCH DEMAND")}</p><h1>${e("Know where to build")}<span class="lime">.</span></h1><p>${e("Explore active open-source supply and sustained search growth. Every category links to its evidence, dates and limitations.")}</p>${table()}<p>${e("Search growth compares the last eight complete weeks with the previous eight. Counts can overlap; GitHub topic labels do not cover every competitor.")}</p>`;
+  } else if (path === "/start") {
+    content = `<h1>${e("Research in your own workflow")}</h1><p>${e("Use the hosted website, or run the same open-source engine with your own keys.")}</p><h2>${e("Hosted website")}</h2><p>${e("Read public reports freely. Sign in for private scans, saved reports and projects across devices.")}</p><h2>CLI / MCP</h2><p>${e("CLI, MCP and local Web share your SQLite workspace. Configure your GitHub key and an optional DeepSeek key. Hosted account history is separate.")}</p><pre>npm install -g https://radar.ghtrends.dev/ghtrends.tgz\nghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>${link(SOURCE, "Source and setup instructions")}</p>`;
   } else if (path === "/docs") {
     content = `<h1>${e("Read the signals.")}</h1><section><h2>${e("The four landscapes")}</h2>${list(["Rising · limited supply", "Rising · established supply", "Established supply", "Limited observed supply"])}<p>${e("Partial evidence")}: ${e("This recommendation uses the evidence already available. It is not an LLM-generated forecast.")}</p></section>
       <section><h2>${e("Method")} ${ALGORITHM_VERSION}</h2><p>${e("GitHub searches use relevant topics and specific repository-name or description phrases. Results are deduplicated and require at least five stars, a push within 180 days, and no forks or archived projects.")}</p><p>${e("Counts are deduplicated across topic searches; incomplete searches show a lower bound.")}</p><p>${e("We compare the last 8 complete weeks with the previous 8, alongside 4-week and 13-week changes. Rising or falling requires a 10% change, a resampling band on the same side of zero, and no opposing short or longer trend. Conflicting windows and opposite-moving synonyms are marked mixed.")}</p><p>${e(`At least ${POLICY.minWeeks} complete weekly observations are required.`)}</p><p>${e("A weekly observation is usable only after that week ended at collection time. Invalid rows cannot refresh old evidence, and conflicting values for the same week prevent classification.")}</p><p>${link("https://support.google.com/trends/answer/4365533", "How Google Trends works")}</p></section>
       <section><h2>CLI / MCP</h2><p>${e("Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.")}</p><pre>npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui</pre><pre>ghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>ghtrends_scan · ghtrends_repo · ghtrends_compare · ghtrends_watch_list</p>${link(SOURCE, "Full installation and configuration instructions")}</section>`;
   } else if (path === "/gaps") {
-    const gaps = [
+    const gaps = selectGapSignals([
       ...new Map(
         markets.flatMap((m) => m.gaps).map((g) => [g.url, g]),
       ).values(),
-    ]
-      .sort((a, b) => b.reactions - a.reactions)
-      .slice(0, 20);
+    ]).slice(0, 20);
     content = `<h1>${e("Find the friction")}</h1><p>${e("Open issues people care enough to react to. Follow the source, understand the workflow, and validate the need.")}</p><ul>${gaps.map((g) => `<li>${link(g.url, g.title)} — ${escapeHtml(g.repo)} · ↑ ${number(g.reactions)}</li>`).join("")}</ul>`;
   } else {
     content = `<h1>${e(titles[path]?.replace(" · ghtrends", "") || "Repository intelligence")}</h1><p>${e("Browse public reports without an account. Sign in to run AI-assisted scans and keep your history and watchlist across devices.")} ${link("/docs", "CLI / MCP")}</p>`;
@@ -127,7 +129,7 @@ export function renderDocument(
   const other = locale === "zh" ? "en" : "zh",
     switchUrl = new URL(identity);
   switchUrl.searchParams.set("lang", other);
-  content = `<div class="snapshot"><nav aria-label="${e("Main navigation")}">${link("/", "ghtrends ↗")} ${link("/gaps", "Demand gaps")} ${link("/docs", "Methodology")} ${link(SOURCE, "Star on GitHub")} <a href="${escapeHtml(switchUrl.pathname + switchUrl.search)}" lang="${other}">${other === "zh" ? "中文" : "English"}</a></nav><main>${content}</main><footer>${e("Built for the curious. Open for everyone.")} ${link(SOURCE, "MIT source code")}</footer></div>`;
+  content = `<div class="snapshot"><nav aria-label="${e("Main navigation")}">${link("/", "ghtrends ↗")} ${link("/start", "Use open source")} ${link("/docs", "Methodology")} ${link(SOURCE, "Star on GitHub")} <a href="${escapeHtml(switchUrl.pathname + switchUrl.search)}" lang="${other}">${other === "zh" ? "中文" : "English"}</a></nav><main>${content}</main><footer>${e("Built for the curious. Open for everyone.")} ${link(SOURCE, "MIT source code")}</footer></div>`;
   const schema = {
     "@context": "https://schema.org",
     "@type": "WebPage",

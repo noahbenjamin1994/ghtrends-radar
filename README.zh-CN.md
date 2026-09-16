@@ -57,7 +57,7 @@ npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.4.1/ghtrends-radar-0.4.1.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.5.0/ghtrends-radar-0.5.0.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
@@ -69,7 +69,7 @@ ghtrends compare facebook/react vuejs/core --format md
 
 ## 一套分析引擎，三种使用方式
 
-- **网页**：机会地图、赛道证据、仓库历史、竞品对比和持久化个人关注清单。可导出 PNG、Markdown、JSON，也可将固定报告卡片嵌入 README。
+- **网页**：首屏搜索与公开案例；“我的研究”集中保存报告和收藏项目。在报告中选择 2–6 个仓库进行对比，按需展开全景图与详细方法。收藏项目在打开列表时刷新，目前不发送提醒。支持分享报告及导出 PNG、Markdown、JSON。
 - **CLI**：扫描赛道、查看仓库、管理持久化关注清单、对比项目、生成报告。
 - **MCP**：让智能体直接使用结构化 GitHub 与搜索需求证据。
 
@@ -164,6 +164,8 @@ ghtrends ui
 公开托管部署配置 `GHTRENDS_HOSTED=1`、HTTPS `PUBLIC_URL`、`LOGTO_ENDPOINT`、`LOGTO_APP_ID`、`LOGTO_APP_SECRET`，可通过 `GHTRENDS_DAILY_SCANS` 修改每日额度（默认 10）。Logto 选择 Traditional 应用，回调地址为 `${PUBLIC_URL}/auth/callback`。GitHub 与 DeepSeek 密钥放服务器 Secret，不能放入 `VITE_*` 或浏览器存储。登录使用 PKCE、nonce/state、签名令牌校验；浏览器只获得 HttpOnly、Secure 会话 Cookie，个人数据写入另做 CSRF 校验。
 
 ## 管理员
+
+管理员入口位于账号菜单。“研究与传播”汇总报告阅读、分享、导出和开源入口点击，用户完成的扫描与后台定时刷新分开统计。行为次数不等于独立访客、安装量或实际 GitHub Star。这些计数不保存搜索内容和访客标识，尊重浏览器 Do Not Track，与运行日志使用同一保留期限；仅托管模式默认启用，可用 `GHTRENDS_ANALYTICS=0` 关闭。升级前没有采集的行为无法回补。
 
 `/admin` 查看扫描记录、排队情况、数据源错误及耗时、GitHub 额度快照、用户概况，以及 DeepSeek 实际输入、输出和缓存 token。记录持久化，重启未完成的扫描标为中断。运行日志默认保留 30 天，可通过 `GHTRENDS_LOG_RETENTION_DAYS` 配置 1–365 天；已保存报告单独保留。管理接口不返回密钥、会话令牌或私有报告正文。
 

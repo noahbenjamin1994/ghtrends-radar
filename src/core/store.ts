@@ -1,3 +1,4 @@
+import type { EngagementEvent } from "./engagement.js";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, chmodSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
@@ -35,6 +36,7 @@ export class Store {
       CREATE TABLE IF NOT EXISTS report_owners(report_id TEXT PRIMARY KEY,user_id TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS user_watch(user_id TEXT NOT NULL,repo TEXT NOT NULL,created TEXT NOT NULL,PRIMARY KEY(user_id,repo));
       CREATE TABLE IF NOT EXISTS usage_daily(user_id TEXT NOT NULL,day TEXT NOT NULL,count INTEGER NOT NULL,PRIMARY KEY(user_id,day));
+      CREATE TABLE IF NOT EXISTS engagement_daily(day TEXT NOT NULL,event TEXT NOT NULL,count INTEGER NOT NULL,PRIMARY KEY(day,event));
       CREATE TABLE IF NOT EXISTS operations_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS scan_runs(id TEXT PRIMARY KEY,user_id TEXT,input TEXT NOT NULL,geo TEXT NOT NULL,background INTEGER NOT NULL,created TEXT NOT NULL,started TEXT,finished TEXT,state TEXT NOT NULL,report_id TEXT,error TEXT,warnings TEXT);
       CREATE INDEX IF NOT EXISTS scan_runs_created ON scan_runs(created DESC);
@@ -46,6 +48,11 @@ export class Store {
     `);
     this.db
       .prepare("INSERT OR IGNORE INTO operations_meta VALUES('since',?)")
+      .run(new Date().toISOString());
+    this.db
+      .prepare(
+        "INSERT OR IGNORE INTO operations_meta VALUES('engagement_since',?)",
+      )
       .run(new Date().toISOString());
     this.pruneOperations();
   }
@@ -63,6 +70,9 @@ export class Store {
     const before = new Date(
       Date.now() - this.retentionDays * 86400000,
     ).toISOString();
+    this.db
+      .prepare("DELETE FROM engagement_daily WHERE day<?")
+      .run(before.slice(0, 10));
     this.db.prepare("DELETE FROM provider_calls WHERE started<?").run(before);
     this.db
       .prepare(
@@ -72,6 +82,18 @@ export class Store {
     this.db
       .prepare("DELETE FROM cache WHERE expires<? AND key NOT LIKE 'trends:%'")
       .run(Date.now() - 86400000);
+  }
+  recordEvent(event: EngagementEvent) {
+    this.db
+      .prepare(
+        "INSERT INTO engagement_daily VALUES(?,?,1) ON CONFLICT(day,event) DO UPDATE SET count=count+1",
+      )
+      .run(new Date().toISOString().slice(0, 10), event);
+  }
+  hasHistory(user: string, id: string) {
+    return !!this.db
+      .prepare("SELECT 1 FROM user_reports WHERE user_id=? AND report_id=?")
+      .get(user, id);
   }
   recordCall(c: ProviderCall) {
     if (Date.now() - this.lastPruned > 3600000) this.pruneOperations();
@@ -145,6 +167,9 @@ export class Store {
   adminOverview(days: number, page: number, state: string) {
     if (Date.now() - this.lastPruned > 3600000) this.pruneOperations();
     const since = new Date(Date.now() - days * 86400000).toISOString();
+    const engagementDay = new Date(Date.now() - (days - 1) * 86400000)
+      .toISOString()
+      .slice(0, 10);
     const filter = "r.created>=? AND (?='' OR r.state=?)";
     return {
       recordedSince: (
@@ -152,6 +177,25 @@ export class Store {
           .prepare("SELECT value FROM operations_meta WHERE key='since'")
           .get() as { value: string }
       ).value,
+      engagement: {
+        since: (
+          this.db
+            .prepare(
+              "SELECT value FROM operations_meta WHERE key='engagement_since'",
+            )
+            .get() as { value: string }
+        ).value,
+        events: this.db
+          .prepare(
+            "SELECT event,SUM(count) AS count FROM engagement_daily WHERE day>=? GROUP BY event",
+          )
+          .all(engagementDay),
+        scans: this.db
+          .prepare(
+            "SELECT state,COUNT(*) AS count FROM scan_runs WHERE background=0 AND created>=? GROUP BY state",
+          )
+          .all(since),
+      },
       retentionDays: this.retentionDays,
       days,
       page,

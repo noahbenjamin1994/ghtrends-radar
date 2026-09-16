@@ -1,3 +1,5 @@
+import { ENGAGEMENT_EVENTS, type EngagementEvent } from "../core/engagement.js";
+import { selectGapSignals } from "../core/gaps.js";
 import express from "express";
 import { operationContext } from "../core/operations.js";
 import sharp from "sharp";
@@ -237,9 +239,27 @@ export function createApp(engine = new Engine()) {
       clearInterval(timer);
     };
   }
+  const engagementEnabled =
+    auth.hosted && process.env.GHTRENDS_ANALYTICS !== "0";
+  const eventLimits = new Map<string, { count: number; until: number }>();
+  app.post("/api/events", (q, r) => {
+    if (!engagementEnabled) return r.sendStatus(204);
+    if (q.get("origin") !== baseURL(q)) return r.sendStatus(403);
+    if (!ENGAGEMENT_EVENTS.includes(q.body?.event)) return r.sendStatus(400);
+    const now = Date.now();
+    for (const [key, value] of eventLimits)
+      if (value.until < now) eventLimits.delete(key);
+    const ip = clientIP(q);
+    const limit = eventLimits.get(ip) || { count: 0, until: now + 60000 };
+    if (++limit.count > 60) return r.sendStatus(429);
+    eventLimits.set(ip, limit);
+    engine.store.recordEvent(q.body.event as EngagementEvent);
+    return r.sendStatus(204);
+  });
   app.get("/api/account", (q, r) => {
     const user = auth.user(q);
     r.set("Cache-Control", "no-store").json({
+      engagementEnabled,
       hosted: auth.hosted,
       authAvailable: auth.enabled,
       aiAvailable: engine.research.enabled,
@@ -390,6 +410,7 @@ export function createApp(engine = new Engine()) {
       return r.set("Cache-Control", "no-store").json({
         public: engine.store.isPublic(id),
         owned: !!user && engine.store.ownsReport(user.id, id),
+        saved: !!user && engine.store.hasHistory(user.id, id),
       });
     }),
   );
@@ -414,7 +435,7 @@ export function createApp(engine = new Engine()) {
     for (const m of dashboardMarkets())
       for (const gap of m.gaps) unique.set(gap.url, gap);
     r.set("Cache-Control", "public,max-age=300").json(
-      [...unique.values()].sort((a, b) => b.reactions - a.reactions),
+      selectGapSignals([...unique.values()]),
     );
   });
   app.get(
@@ -674,14 +695,14 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.4.1/ghtrends-radar-0.4.1.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.5.0/ghtrends-radar-0.5.0.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>
     r
       .type("application/xml")
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/docs", "/gaps", ...dashboardMarkets().map((m) => "/market/" + m.topic.slug)].flatMap((path) => (["en", "zh"] as const).map((locale) => `<url><loc>${escape(localeUrl(baseURL(q) + path, locale))}</loc></url>`)).join("")}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/start", "/docs", "/gaps", ...dashboardMarkets().map((m) => "/market/" + m.topic.slug)].flatMap((path) => (["en", "zh"] as const).map((locale) => `<url><loc>${escape(localeUrl(baseURL(q) + path, locale))}</loc></url>`)).join("")}</urlset>`,
       ),
   );
   app.get("/robots.txt", (q, r) =>
@@ -750,6 +771,7 @@ export function createApp(engine = new Engine()) {
         [
           "/",
           "/docs",
+          "/start",
           "/gaps",
           "/compare",
           "/watch",

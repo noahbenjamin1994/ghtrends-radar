@@ -53,7 +53,7 @@ npx --yes --package=https://radar.ghtrends.dev/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.4.1/ghtrends-radar-0.4.1.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.5.0/ghtrends-radar-0.5.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -65,7 +65,7 @@ The release package is **ghtrends-radar**; the executable is **ghtrends**. The e
 
 ## One engine, three ways to use it
 
-- **Web:** interactive opportunity map, category evidence, repository history, comparisons and persistent personal watchlists. Export PNG, Markdown or JSON. Embed a permanent report card in a README.
+- **Web:** search first, read public examples, and save reports and projects in **My research**. Select two to six repositories inside a report to compare them. The category map and detailed method are optional views. Saved projects refresh when opened; they do not send alerts. Share a report or export PNG, Markdown or JSON.
 - **CLI:** scan a category, inspect a repository, maintain a persistent watchlist, compare repositories and generate a report.
 - **MCP:** give your agent structured GitHub and search-demand evidence without leaving its workflow.
 
@@ -158,6 +158,8 @@ The model proposes one primary Trends phrase, up to two genuine synonyms, and bo
 For a public hosted instance configure `GHTRENDS_HOSTED=1`, HTTPS `PUBLIC_URL`, `LOGTO_ENDPOINT`, `LOGTO_APP_ID`, `LOGTO_APP_SECRET` and optionally `GHTRENDS_DAILY_SCANS` (default 10). Create a Traditional Logto application with `${PUBLIC_URL}/auth/callback` as its redirect. Keep GitHub/DeepSeek credentials in server secrets, never `VITE_*` or browser storage. OIDC uses PKCE, nonce/state and signed-token validation; the browser gets an HttpOnly, Secure session cookie. Personal mutations also require CSRF validation.
 
 ## Administration
+
+The account menu contains the administrator entry. Anonymous daily counters show report reads, shares, exports and open-source entry clicks; completed user scans exclude scheduled collection. These are action counts, not unique visitors, installations or GitHub stars. Counters contain no query text or visitor identifiers, respect browser Do Not Track, share the operational retention period, and can be disabled with `GHTRENDS_ANALYTICS=0`. They are enabled only in hosted mode. Historical activity before this upgrade is unavailable.
 
 `/admin` shows scan status, queue, source errors/latency, GitHub quota snapshots, accounts, and actual DeepSeek input/output/cache-token usage. Operational logs survive restarts; interrupted scans are marked interrupted. They retain 30 days by default (`GHTRENDS_LOG_RETENTION_DAYS`, 1–365). Saved reports have separate retention. No credential values, session tokens or private report bodies are returned by the admin API.
 

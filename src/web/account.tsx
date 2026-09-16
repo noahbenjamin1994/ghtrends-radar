@@ -12,6 +12,7 @@ import type { MarketKind } from "../core/types.js";
 import { Loading, Empty } from "./components.js";
 export interface Account {
   hosted: boolean;
+  engagementEnabled: boolean;
   authAvailable: boolean;
   aiAvailable: boolean;
   user: { name: string; isAdmin: boolean } | null;
@@ -22,15 +23,23 @@ export interface Account {
 export function SignInGate({
   account,
   returnTo = "/history",
+  purpose,
 }: {
   account: Account | null;
   returnTo?: string;
+  purpose?: "compare";
 }) {
   return (
     <Empty
-      title={t("Your research, saved for you")}
+      title={t(
+        purpose === "compare"
+          ? "Continue your project comparison"
+          : "Your research, saved for you",
+      )}
       description={t(
-        "Browse public reports without an account. Sign in to run AI-assisted scans and keep your history and watchlist across devices.",
+        purpose === "compare"
+          ? "Sign in to compare the selected repositories. Your selection will be kept."
+          : "Browse public reports without an account. Sign in to scan and save reports and projects across devices.",
       )}
       action={
         account?.authAvailable ? (
@@ -52,9 +61,13 @@ export function SignInGate({
 export function HistoryView({
   account,
   navigate,
+  tab = "reports",
+  children,
 }: {
   account: Account | null;
   navigate: (s: string) => void;
+  tab?: "reports" | "projects";
+  children?: React.ReactNode;
 }) {
   const [rows, setRows] = useState<
       {
@@ -81,7 +94,13 @@ export function HistoryView({
     else setLoading(false);
   }, [account?.user?.name]);
   if (!account) return <Loading />;
-  if (!account.user) return <SignInGate account={account} />;
+  if (!account.user)
+    return (
+      <SignInGate
+        account={account}
+        returnTo={tab === "projects" ? "/history?tab=projects" : "/history"}
+      />
+    );
   return (
     <div className="history-page">
       <div className="eyebrow">{t("YOUR RESEARCH")}</div>
@@ -106,26 +125,31 @@ export function HistoryView({
                 limit: account.dailyLimit,
               })}
             </span>
-            <button
-              className="text-link"
-              onClick={() =>
-                void api("/auth/logout", { method: "POST" })
-                  .then(() => location.assign(localUrl("/")))
-                  .catch((e) => setError(e.message))
-              }
-            >
-              <LogOut size={14} />
-              {t("Sign out")}
-            </button>
           </div>
         )}
       </div>
+      <nav className="research-tabs" aria-label={t("My research")}>
+        <button
+          aria-current={tab === "reports" ? "page" : undefined}
+          onClick={() => navigate("/history")}
+        >
+          {t("Reports")}
+        </button>
+        <button
+          aria-current={tab === "projects" ? "page" : undefined}
+          onClick={() => navigate("/history?tab=projects")}
+        >
+          {t("Saved projects")}
+        </button>
+      </nav>
       {error && (
         <p role="alert" className="error-banner">
           {t(error)}
         </p>
       )}
-      {loading ? (
+      {tab === "projects" ? (
+        children
+      ) : loading ? (
         <Loading />
       ) : rows.length ? (
         <div className="history-list">

@@ -18,6 +18,11 @@ const labels: Record<string, string> = {
   interrupted: l("Interrupted", "重启中断"),
 };
 interface AdminData {
+  engagement: {
+    since: string;
+    events: { event: string; count: number }[];
+    scans: { state: string; count: number }[];
+  };
   recordedSince: string;
   retentionDays: number;
   version: string;
@@ -213,6 +218,83 @@ export function AdminView({ account }: { account: Account | null }) {
               "天；已保存的报告单独保留。",
             )}
           </p>
+          <section className="panel">
+            <h2>{l("Research and sharing", "研究与传播")}</h2>
+            <p>
+              {l("Aggregate actions since", "汇总行为记录开始于")}{" "}
+              {date(data.engagement.since)}.{" "}
+              {l(
+                "Actions are grouped by UTC calendar day; user scans use the rolling period above.",
+                "行为按 UTC 自然日汇总，用户扫描使用上方的滚动时间范围。",
+              )}{" "}
+              {l(
+                "Actions are not unique people or GitHub stars. These counters store no search text or visitor identifiers.",
+                "以下为行为次数，不是独立用户数或实际 GitHub Star；这些计数不保存搜索内容或访客标识。",
+              )}
+            </p>
+            <div className="admin-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{l("Action", "行为")}</th>
+                    <th>{l("Count", "次数")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ["report_view", "Report reads", "报告阅读"],
+                    ["share_copy", "Report link copies", "报告链接复制"],
+                    ["share_publish", "Reports made public", "报告公开"],
+                    ["export_png", "PNG exports", "图片导出"],
+                    [
+                      "export_md",
+                      "Markdown download clicks",
+                      "Markdown 下载点击",
+                    ],
+                    ["export_json", "JSON download clicks", "JSON 下载点击"],
+                    [
+                      "opensource_view",
+                      "Open-source setup views",
+                      "开源使用页面浏览",
+                    ],
+                    [
+                      "github_click",
+                      "Source repository clicks",
+                      "源码仓库点击",
+                    ],
+                    ["install_copy", "Install commands copied", "安装命令复制"],
+                    ["project_save", "Projects saved", "项目收藏"],
+                    ["report_save", "Reports saved manually", "手动保存报告"],
+                  ].map(([key, en, zh]) => (
+                    <tr key={key}>
+                      <td>{l(en!, zh!)}</td>
+                      <td>
+                        {n(
+                          data.engagement.events.find((e) => e.event === key)
+                            ?.count || 0,
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td>
+                      {l(
+                        "Completed user scans (excludes scheduled refreshes)",
+                        "用户完成的扫描（不含定时刷新）",
+                      )}
+                    </td>
+                    <td>
+                      {n(
+                        data.engagement.scans.find(
+                          (r) => r.state === "complete",
+                        )?.count || 0,
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
           <div className="metric-grid admin-metrics">
             <div>
               <span>{l("Registered here", "本站登录用户")}</span>

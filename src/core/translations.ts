@@ -1,4 +1,52 @@
 export const zh: Record<string, string> = {
+  Explore: "探索",
+  "PUBLIC RESEARCH": "公开研究",
+  "CATEGORY MAP": "赛道全景",
+  "Use open source": "开源使用",
+  "Research a direction": "研究一个方向",
+  "Research your next idea": "研究你的下一个想法",
+  "Search interest. Active projects. Unresolved workflows.":
+    "搜索趋势、活跃项目、未解决的使用问题。",
+  "A short report with sources and a next step.":
+    "用一份附有来源的简报，确定下一步。",
+  "Read a public example": "先看一份公开报告",
+  "View the category map": "展开赛道全景图",
+  "Public examples · updated source evidence": "公开案例 · 定期更新来源证据",
+  Export: "导出",
+  "Evidence and next step": "依据与下一步",
+  "Method and detailed evidence": "方法与详细依据",
+  "Saved projects": "收藏项目",
+  Reports: "研究报告",
+  "Projects saved in your workspace. Data refreshes when you open this list; alerts are not enabled.":
+    "项目保存在当前工作区，打开列表时刷新数据；目前不发送异动提醒。",
+  "Loading saved projects…": "正在读取收藏项目…",
+  "Save a repository": "收藏仓库",
+  "Save project": "收藏项目",
+  "Remove saved project": "取消收藏",
+  "Saved project": "已收藏",
+  "Local workspace": "本地工作区",
+  "Compare selected projects": "对比所选项目",
+  "Select {repo} to compare": "选择 {repo} 进行对比",
+  "Copy installation command": "复制安装命令",
+  "Research in your own workflow": "在你的工作流里研究",
+  "Use the hosted website, or run the same open-source engine with your own keys.":
+    "使用托管网站，或配置自己的 Key 运行同一套开源引擎。",
+  "Hosted website": "托管网站",
+  "Your own workspace": "自己的工作区",
+  "Read public reports freely. Sign in for private scans, saved reports and projects across devices.":
+    "公开报告免登录阅读。登录后可进行私有扫描，并跨设备保存报告和项目。",
+  "CLI, MCP and local Web share your SQLite workspace. Configure your GitHub key and an optional DeepSeek key. Hosted account history is separate.":
+    "CLI、MCP 和本地网页共用 SQLite 工作区。配置自己的 GitHub Key，可选配置 DeepSeek Key。托管网站的账号历史与本地工作区独立。",
+  "Source and setup instructions": "源代码与配置说明",
+  "Continue your project comparison": "继续对比所选项目",
+  "Sign in to compare the selected repositories. Your selection will be kept.":
+    "登录后对比所选仓库，已选择的项目会保留。",
+  "Browse public reports without an account. Sign in to scan and save reports and projects across devices.":
+    "公开报告无需登录。登录后可扫描，并跨设备保存报告和收藏项目。",
+  "Save a project from any category or add a repository above. Your saved projects are stored on this server.":
+    "从报告中收藏项目，或在上方输入仓库。项目清单保存在当前服务中。",
+  "Use it to decide where to investigate next. Validate real workflows with people, inspect existing alternatives and account for commercial products. Search measurements do not predict revenue, investment outcomes or GitHub stars.":
+    "用这些判断确定下一步研究方向，向真实用户验证工作流，并比较现有开源及商业产品。搜索指标不能预测收入、投资回报或 GitHub Star。",
   Account: "账户",
   "Operations · ghtrends": "运行管理 · ghtrends",
   Admin: "管理",

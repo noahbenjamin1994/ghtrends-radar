@@ -11,7 +11,7 @@ const program = new Command()
   .description(
     "GitHub supply × Google search demand. Find your next open-source opportunity.",
   )
-  .version("0.4.1");
+  .version("0.5.0");
 const withEngine = (fn: (engine: Engine) => Promise<void>) => async () => {
   const e = new Engine();
   try {

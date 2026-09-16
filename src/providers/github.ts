@@ -1,3 +1,4 @@
+import { selectGapSignals } from "../core/gaps.js";
 import type { ProviderCall } from "../core/operations.js";
 import { githubToken } from "./github-auth.js";
 import { Store } from "../core/store.js";
@@ -317,31 +318,33 @@ export class GitHub {
         `/search/issues?q=${encodeURIComponent(query)}&sort=reactions&order=desc&per_page=30`,
         21600000,
       );
-      return data.items.map((i) => {
-        const body = String(i.body || "").slice(0, 10000),
-          text = (i.title + " " + body).toLowerCase();
-        const label: Gap["label"] = /alternative|replacement|instead of/.test(
-          text,
-        )
-          ? "alternative"
-          : /feature|support|request|enhancement/.test(text)
-            ? "feature-request"
-            : "friction";
-        return {
-          title: i.title,
-          url: i.html_url,
-          repo: i.repository_url.split("/").slice(-2).join("/"),
-          reactions: i.reactions?.total_count || 0,
-          createdAt: i.created_at,
-          updatedAt: i.updated_at,
-          state: i.state,
-          label,
-          excerpt: body
-            .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-            .replace(/[#*_`]/g, "")
-            .slice(0, 260),
-        };
-      });
+      return selectGapSignals(
+        data.items.map((i) => {
+          const body = String(i.body || "").slice(0, 10000),
+            text = (i.title + " " + body).toLowerCase();
+          const label: Gap["label"] = /alternative|replacement|instead of/.test(
+            text,
+          )
+            ? "alternative"
+            : /feature|support|request|enhancement/.test(text)
+              ? "feature-request"
+              : "friction";
+          return {
+            title: i.title,
+            url: i.html_url,
+            repo: i.repository_url.split("/").slice(-2).join("/"),
+            reactions: i.reactions?.total_count || 0,
+            createdAt: i.created_at,
+            updatedAt: i.updated_at,
+            state: i.state,
+            label,
+            excerpt: body
+              .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+              .replace(/[#*_`]/g, "")
+              .slice(0, 260),
+          };
+        }),
+      );
     } catch {
       return [];
     }

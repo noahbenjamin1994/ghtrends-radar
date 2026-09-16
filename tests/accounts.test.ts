@@ -98,6 +98,15 @@ test("hosted accounts isolate history, watchlists, jobs and every private report
       !JSON.stringify(await (await get("/api/markets")).json()).includes(m.id),
     );
     assert.equal((await (await get("/api/history", alice)).json()).length, 1);
+    assert.equal(
+      (await (await get(`/api/reports/${m.id}/access`, alice)).json()).saved,
+      true,
+    );
+    assert.equal(
+      (await (await get(`/api/reports/${publicCopy.id}/access`, alice)).json())
+        .saved,
+      false,
+    );
     assert.equal((await (await get("/api/history", bob)).json()).length, 0);
     assert.equal(
       (await post("/api/watch", { repo: "facebook/react", added: true }, alice))

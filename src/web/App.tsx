@@ -1,3 +1,5 @@
+import { selectGapSignals } from "../core/gaps.js";
+import { enableEngagement, track } from "./engagement.js";
 import { AdminView } from "./admin.js";
 import { ALGORITHM_VERSION } from "../core/version.js";
 import { api, setCsrf } from "./api.js";
@@ -27,6 +29,7 @@ import {
   Activity,
   Info,
   Menu,
+  UserRound,
 } from "lucide-react";
 import type { Market, Repo, Topic, Gap } from "../core/types.js";
 import {
@@ -51,30 +54,22 @@ import { resolveTopic } from "../core/topics.js";
 import type { ScanProgress } from "../core/engine.js";
 import { completeWeeklySeries } from "../core/evidence.js";
 const SOURCE = "https://github.com/noahbenjamin1994/ghtrends-radar";
-function readWatch(): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem("ghtrends:watch") || "[]");
-    return Array.isArray(v)
-      ? v.filter((x) => typeof x === "string").slice(0, 50)
-      : [];
-  } catch {
-    return [];
-  }
-}
 export function App() {
   const [path, setPath] = useState(location.pathname + location.search),
     [markets, setMarkets] = useState<Market[]>([]),
     [topics, setTopics] = useState<Topic[]>([]),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
-    [query, setQuery] = useState(""),
+    [query, setQuery] = useState(
+      new URLSearchParams(location.search).get("q")?.slice(0, 300) || "",
+    ),
     [keyword, setKeyword] = useState(""),
     [geo, setGeo] = useState(
       new URLSearchParams(location.search).get("geo") || "",
     ),
     [sort, setSort] = useState("growth"),
     [filter, setFilter] = useState("all"),
-    [watch, setWatch] = useState(readWatch),
+    [watch, setWatch] = useState<string[]>([]),
     [mobileMenu, setMobileMenu] = useState(false);
   const [account, setAccount] = useState<Account | null>(null);
   const [choices, setChoices] = useState<{ label: string; query: string }[]>(
@@ -83,6 +78,7 @@ export function App() {
   const loadAccount = () =>
     api<Account>("/api/account").then((a) => {
       setCsrf(a.csrf);
+      enableEngagement(a.engagementEnabled);
       setAccount(a);
       return a;
     });
@@ -194,12 +190,22 @@ export function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ repo: name, added: !watch.includes(name) }),
     })
-      .then(setWatch)
+      .then((rows) => {
+        setWatch(rows);
+        if (rows.includes(name)) track("project_save");
+      })
       .catch((e) => setError(e.message));
   };
   const scan = async (input: string, demandKeyword?: string) => {
     if (!input.trim()) return;
     if (!account?.user) {
+      const existing = markets.find(
+        (m) => resolveTopic(input).slug === m.topic.slug,
+      );
+      if (existing && !demandKeyword && !keyword.trim()) {
+        navigate("/market/" + existing.topic.slug);
+        return;
+      }
       sessionStorage.setItem(
         "ghtrends:draft",
         JSON.stringify({ input, keyword: demandKeyword || keyword, geo }),
@@ -288,6 +294,9 @@ export function App() {
     details: "Core evidence ready; adding project details",
   };
   const route = path.split("?")[0]!;
+  useEffect(() => {
+    if (account && route === "/start") track("opensource_view", "start");
+  }, [route, account]);
   const active =
     route === "/admin"
       ? "admin"
@@ -296,21 +305,16 @@ export function App() {
         : route.startsWith("/compare")
           ? "compare"
           : route.startsWith("/watch")
-            ? "watch"
+            ? "history"
             : route.startsWith("/docs")
               ? "docs"
-              : route.startsWith("/gaps")
-                ? "gaps"
-                : "radar";
+              : route.startsWith("/start")
+                ? "start"
+                : route.startsWith("/gaps")
+                  ? "gaps"
+                  : "radar";
   const shown = markets
-    .filter(
-      (m) =>
-        (filter === "all" || m.kind === filter) &&
-        (!query ||
-          `${m.topic.name} ${t(m.topic.name)}`
-            .toLowerCase()
-            .includes(query.toLowerCase())),
-    )
+    .filter((m) => filter === "all" || m.kind === filter)
     .sort((a, b) =>
       sort === "growth"
         ? (b.metrics.growth ?? -Infinity) - (a.metrics.growth ?? -Infinity)
@@ -339,15 +343,11 @@ export function App() {
           aria-label={t("Main navigation")}
         >
           {[
-            ["radar", "Radar", Radio, "/"],
-            ["compare", "Compare", GitCompareArrows, "/compare"],
-            ["watch", "Watchlist", Bookmark, "/watch"],
-            ["history", "My research", BookOpen, "/history"],
-            ["gaps", "Demand gaps", ScanLine, "/gaps"],
-            ["docs", "How it works", BookOpen, "/docs"],
-            ...(account?.user?.isAdmin
-              ? [["admin", "Admin", ScanLine, "/admin"]]
+            ["radar", "Explore", Radio, "/"],
+            ...(account?.user
+              ? [["history", "My research", BookOpen, "/history"]]
               : []),
+            ["start", "Use open source", Terminal, "/start"],
           ].map(([key, label, Icon, href]) => {
             const I = Icon as typeof Radio;
             return (
@@ -366,13 +366,51 @@ export function App() {
           })}
         </nav>
         <div className="header-end">
-          {account?.hosted && (
-            <button
-              className="account-button"
-              onClick={() => (account.user ? navigate("/history") : signIn())}
-            >
-              {account.user ? t("Account") : t("Sign in")}
-            </button>
+          {account?.user ? (
+            <details className="account-menu">
+              <summary aria-label={t("Account")}>
+                <UserRound className="account-symbol" size={16} />
+                <span>{t("Account")}</span>
+                <ChevronDown className="account-chevron" size={14} />
+              </summary>
+              <div
+                className="account-popover"
+                onClick={(event) =>
+                  event.currentTarget
+                    .closest("details")
+                    ?.removeAttribute("open")
+                }
+              >
+                <strong>
+                  {account.hosted ? account.user.name : t("Local workspace")}
+                </strong>
+                <button onClick={() => navigate("/history")}>
+                  {t("My research")}
+                </button>
+                {account.user.isAdmin && (
+                  <button onClick={() => navigate("/admin")}>
+                    {t("Admin")}
+                  </button>
+                )}
+                {account.hosted && (
+                  <button
+                    onClick={() =>
+                      void api("/auth/logout", { method: "POST" })
+                        .then(() => location.assign(localUrl("/")))
+                        .catch((e) => setError(e.message))
+                    }
+                  >
+                    {t("Sign out")}
+                  </button>
+                )}
+              </div>
+            </details>
+          ) : (
+            account?.hosted && (
+              <button className="account-button" onClick={() => signIn()}>
+                {t("Sign in")}
+              </button>
+            )
           )}
           <button
             className="language-switch"
@@ -385,6 +423,7 @@ export function App() {
           <a
             className="github-button"
             href={SOURCE}
+            onClick={() => track("github_click")}
             target="_blank"
             rel="noreferrer"
           >
@@ -411,24 +450,22 @@ export function App() {
       <main>
         {route === "/" ? (
           <>
-            <section className="page-heading">
+            <section className="page-heading research-heading">
               <div>
                 <div className="eyebrow">
                   <span className="live-dot" />
                   {t("THE OPEN-SOURCE OPPORTUNITY RADAR")}
                 </div>
                 <h1>
-                  {t("Know where")}
-                  <br />
-                  {t("to build")}
+                  {t("Research your next idea")}
                   <span className="lime">.</span>
                 </h1>
               </div>
               <div className="heading-aside">
                 <p>
-                  {t("Spot growing demand.")}
+                  {t("Search interest. Active projects. Unresolved workflows.")}
                   <br />
-                  {t("Find the gaps in open source.")}
+                  {t("A short report with sources and a next step.")}
                 </p>
                 <div className="source-chips">
                   <span>
@@ -456,89 +493,10 @@ export function App() {
                 </div>
               </div>
             </section>
-            <section className="radar-section">
-              <div className="radar-sidebar">
-                <div className="section-kicker">
-                  {t("01 / THE BIG PICTURE")}
-                </div>
-                <h2>
-                  {t("Follow the")}
-                  <br />
-                  <span className="serif-word">{t("opportunity.")}</span>
-                </h2>
-                <p>
-                  {t(
-                    "Every signal puts search demand against active open-source supply. Explore a category to see what’s behind it.",
-                  )}
-                </p>
-                <div className="overview-numbers">
-                  <div>
-                    <strong>
-                      {markets.length.toString().padStart(2, "0")}
-                    </strong>
-                    <span>{t("categories scanned")}</span>
-                  </div>
-                  <div>
-                    <strong>{number(total)}</strong>
-                    <span>{t("matching active projects*")}</span>
-                  </div>
-                </div>
-                <div className="radar-legend">
-                  {(["blue", "expanding", "contested", "quiet"] as const).map(
-                    (k) => (
-                      <button
-                        key={k}
-                        onClick={() => setFilter(filter === k ? "all" : k)}
-                        className={filter === k ? "selected" : ""}
-                      >
-                        <i style={{ background: kindColors[k] }} />
-                        {kindLabels[k]}
-                        <span>
-                          {markets.filter((m) => m.kind === k).length}
-                        </span>
-                      </button>
-                    ),
-                  )}
-                </div>
-                <button className="text-link" onClick={() => navigate("/docs")}>
-                  {t("Understand the methodology")}
-                  <ArrowUpRight size={15} />
-                </button>
-              </div>
-              <Radar
-                markets={markets}
-                onSelect={(m) => navigate("/market/" + m.topic.slug)}
-              />
-            </section>
-            <section className="market-section">
-              <div className="section-header">
-                <div>
-                  <div className="section-kicker">
-                    {t("02 / EXPLORE THE LANDSCAPE")}
-                  </div>
-                  <h2>
-                    {t("Your next starting point")}
-                    <span className="lime">↗</span>
-                  </h2>
-                </div>
-                <span className="updated">
-                  {latest
-                    ? t("Updated {date}", {
-                        date: new Date(latest).toLocaleDateString(
-                          locale === "zh" ? "zh-CN" : "en",
-                          { month: "short", day: "numeric" },
-                        ),
-                      })
-                    : t("Ready for your first scan")}
-                </span>
-              </div>
-              <p className="scan-access-note">
-                {t(
-                  account?.hosted
-                    ? "Public reports are free to browse. Sign in for AI-assisted scans and saved history."
-                    : "Self-hosted: your keys, your data. Scans are saved on this server.",
-                )}
-              </p>
+            <section
+              className="search-hero"
+              aria-label={t("Research a direction")}
+            >
               <div className="toolbar">
                 <form
                   className="search-field"
@@ -584,18 +542,6 @@ export function App() {
                   </select>
                   <ChevronDown size={13} />
                 </label>
-                <label className="select-field">
-                  <SlidersHorizontal size={15} />
-                  <select
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value)}
-                    aria-label={t("Sort categories")}
-                  >
-                    <option value="recent">{t("Recently updated")}</option>
-                    <option value="growth">{t("Search growth")}</option>
-                  </select>
-                  <ChevronDown size={13} />
-                </label>
               </div>
               <details className="keyword-options">
                 <summary>{t("Choose a different Google search term")}</summary>
@@ -614,6 +560,64 @@ export function App() {
                   )}
                 </p>
               </details>
+              <p className="scan-access-note">
+                {t(
+                  account?.hosted
+                    ? "Public reports are free to browse. Sign in for AI-assisted scans and saved history."
+                    : "Self-hosted: your keys, your data. Scans are saved on this server.",
+                )}
+              </p>
+              <div className="example-links">
+                <span>{t("Read a public example")}</span>
+                {["browser-agents", "agent-memory", "mcp-servers"].map(
+                  (slug) => (
+                    <button
+                      key={slug}
+                      onClick={() => navigate("/market/" + slug)}
+                    >
+                      {t(resolveTopic(slug).name)} <ArrowUpRight size={14} />
+                    </button>
+                  ),
+                )}
+              </div>
+            </section>
+            <section className="market-section">
+              <div className="section-header">
+                <div>
+                  <div className="section-kicker">{t("PUBLIC RESEARCH")}</div>
+                  <h2>
+                    {t("Your next starting point")}
+                    <span className="lime">↗</span>
+                  </h2>
+                </div>
+                <span className="updated">
+                  {latest
+                    ? t("Updated {date}", {
+                        date: new Date(latest).toLocaleDateString(
+                          locale === "zh" ? "zh-CN" : "en",
+                          { month: "short", day: "numeric" },
+                        ),
+                      })
+                    : t("Ready for your first scan")}
+                </span>
+              </div>
+
+              <div className="category-tools">
+                {" "}
+                <label className="select-field">
+                  <SlidersHorizontal size={15} />
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value)}
+                    aria-label={t("Sort categories")}
+                  >
+                    <option value="recent">{t("Recently updated")}</option>
+                    <option value="growth">{t("Search growth")}</option>
+                  </select>
+                  <ChevronDown size={13} />
+                </label>
+                <span>{t("Public examples · updated source evidence")}</span>
+              </div>
               <div className="filter-tabs">
                 <button
                   className={filter === "all" ? "active" : ""}
@@ -667,7 +671,9 @@ export function App() {
                         {t(m.topic.name)}
                         <ArrowUpRight size={20} />
                       </h3>
-                      <p>{t(m.topic.description)}</p>
+                      <p className="card-assessment">
+                        {marketAssessment(m, locale).title}
+                      </p>
                       <Sparkline
                         values={completeWeeklySeries(m.demand, m.asOf)
                           .points.slice(-26)
@@ -698,10 +704,8 @@ export function App() {
                           </strong>
                         </div>
                         <div>
-                          <small>{t("Evidence")}</small>
-                          <span className="evidence-level">
-                            {t(m.confidence)}
-                          </span>
+                          <small>{t("Year-over-year search change")}</small>
+                          <Growth value={m.metrics.yearOverYear} />
                         </div>
                       </div>
                       <div className="card-bottom">
@@ -753,6 +757,66 @@ export function App() {
                 </div>
               )}
             </section>
+            <details className="overview-disclosure">
+              <summary>
+                {t("View the category map")} <ChevronDown size={18} />
+              </summary>
+              <section className="radar-section">
+                <div className="radar-sidebar">
+                  <div className="section-kicker">{t("CATEGORY MAP")}</div>
+                  <h2>
+                    {t("Follow the")}
+                    <br />
+                    <span className="serif-word">{t("opportunity.")}</span>
+                  </h2>
+                  <p>
+                    {t(
+                      "Every signal puts search demand against active open-source supply. Explore a category to see what’s behind it.",
+                    )}
+                  </p>
+                  <div className="overview-numbers">
+                    <div>
+                      <strong>
+                        {markets.length.toString().padStart(2, "0")}
+                      </strong>
+                      <span>{t("categories scanned")}</span>
+                    </div>
+                    <div>
+                      <strong>{number(total)}</strong>
+                      <span>{t("matching active projects*")}</span>
+                    </div>
+                  </div>
+                  <div className="radar-legend">
+                    {(["blue", "expanding", "contested", "quiet"] as const).map(
+                      (k) => (
+                        <button
+                          key={k}
+                          onClick={() => setFilter(filter === k ? "all" : k)}
+                          className={filter === k ? "selected" : ""}
+                        >
+                          <i style={{ background: kindColors[k] }} />
+                          {kindLabels[k]}
+                          <span>
+                            {markets.filter((m) => m.kind === k).length}
+                          </span>
+                        </button>
+                      ),
+                    )}
+                  </div>
+                  <button
+                    className="text-link"
+                    onClick={() => navigate("/docs")}
+                  >
+                    {t("Understand the methodology")}
+                    <ArrowUpRight size={15} />
+                  </button>
+                </div>
+                <Radar
+                  markets={markets}
+                  onSelect={(m) => navigate("/market/" + m.topic.slug)}
+                />
+              </section>
+            </details>
             <section className="cli-strip">
               <span className="terminal-icon">
                 <Terminal size={25} />
@@ -766,7 +830,7 @@ export function App() {
               <code>ghtrends scan --topic mcp-servers</code>
               <button
                 className="button subtle"
-                onClick={() => navigate("/docs")}
+                onClick={() => navigate("/start")}
               >
                 CLI & MCP <ArrowUpRight size={15} />
               </button>
@@ -798,24 +862,31 @@ export function App() {
           account?.user ? (
             <CompareView path={path} navigate={navigate} />
           ) : (
-            <SignInGate account={account} />
+            <SignInGate account={account} returnTo={path} purpose="compare" />
           )
         ) : route === "/admin" ? (
           <AdminView account={account} />
-        ) : route === "/history" ? (
-          <HistoryView account={account} navigate={navigate} />
-        ) : route === "/watch" ? (
-          account?.user ? (
+        ) : route === "/history" || route === "/watch" ? (
+          <HistoryView
+            account={account}
+            navigate={navigate}
+            tab={
+              route === "/watch" ||
+              new URLSearchParams(path.split("?")[1]).get("tab") === "projects"
+                ? "projects"
+                : "reports"
+            }
+          >
             <WatchView
               names={watch}
               onWatch={toggleWatch}
               navigate={navigate}
             />
-          ) : (
-            <SignInGate account={account} />
-          )
+          </HistoryView>
         ) : route === "/gaps" ? (
           <GapView />
+        ) : route === "/start" ? (
+          <StartView />
         ) : route === "/docs" ? (
           <Docs />
         ) : (
@@ -965,20 +1036,29 @@ function MarketView({
   const [access, setAccess] = useState<{
       public: boolean;
       owned: boolean;
+      saved: boolean;
     } | null>(null),
     [actionError, setActionError] = useState(""),
-    [saved, setSaved] = useState(false);
+    [saved, setSaved] = useState(false),
+    [selected, setSelected] = useState<string[]>([]);
   useEffect(() => {
     if (m)
-      void api<{ public: boolean; owned: boolean }>(
+      void api<{ public: boolean; owned: boolean; saved: boolean }>(
         "/api/reports/" + m.id + "/access",
       )
-        .then(setAccess)
+        .then((a) => {
+          setAccess(a);
+          setSaved(a.saved);
+        })
         .catch(() => {});
   }, [m?.id, account?.user?.name]);
   useEffect(() => {
+    if (m && account) track("report_view", m.id);
+  }, [m?.id, account]);
+  useEffect(() => {
     setLoading(true);
     setAccess(null);
+    setSelected([]);
     setSaved(false);
     setActionError("");
     setError("");
@@ -1031,6 +1111,7 @@ function MarketView({
   const assessment = marketAssessment(m, locale);
   const share = location.origin + localUrl("/report/" + m.id);
   const demandPoints = completeWeeklySeries(m.demand, m.asOf).points;
+  const gapSignals = selectGapSignals(m.gaps);
   return (
     <div className="detail-page">
       <button className="back-link" onClick={() => navigate("/")}>
@@ -1067,7 +1148,12 @@ function MarketView({
         </div>
         <div className="detail-actions">
           {access?.public ? (
-            <CopyButton value={share} label={t("Copy public link")} />
+            <CopyButton
+              value={share}
+              label={t("Share report")}
+              className="button"
+              onCopied={() => track("share_copy")}
+            />
           ) : access?.owned ? (
             <button
               className="button subtle"
@@ -1077,7 +1163,10 @@ function MarketView({
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ shared: true }),
                 })
-                  .then(() => setAccess({ public: true, owned: true }))
+                  .then(() => {
+                    setAccess({ public: true, owned: true, saved });
+                    track("share_publish");
+                  })
                   .catch((e) => setActionError(e.message))
               }
             >
@@ -1086,6 +1175,7 @@ function MarketView({
           ) : null}
           {account?.user && (
             <button
+              disabled={saved}
               className="button subtle"
               onClick={() =>
                 void api("/api/history", {
@@ -1093,7 +1183,10 @@ function MarketView({
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ id: m.id }),
                 })
-                  .then(() => setSaved(true))
+                  .then(() => {
+                    setSaved(true);
+                    track("report_save");
+                  })
                   .catch((e) => setActionError(e.message))
               }
             >
@@ -1101,25 +1194,37 @@ function MarketView({
               {t(saved ? "Saved" : "Save to my research")}
             </button>
           )}
-          <a
-            className="button subtle"
-            href={localUrl(`/api/reports/${m.id}?format=md&v=2`)}
-            download={`ghtrends-${m.topic.slug}.md`}
-          >
-            <Download size={15} />
-            Markdown
-          </a>
-          <button
-            className="button"
-            onClick={() =>
-              void downloadCard(m, share, locale).catch((e) =>
-                setError(e.message),
-              )
-            }
-          >
-            <Download size={15} />
-            {t("Save image")}
-          </button>
+          <details className="export-menu">
+            <summary className="button subtle">
+              <Download size={15} />
+              {t("Export")}
+            </summary>
+            <div>
+              <a
+                href={localUrl(`/api/reports/${m.id}?format=md&v=2`)}
+                download={`ghtrends-${m.topic.slug}.md`}
+                onClick={() => track("export_md")}
+              >
+                Markdown
+              </a>
+              <button
+                onClick={() =>
+                  void downloadCard(m, share, locale)
+                    .then(() => track("export_png"))
+                    .catch((e) => setActionError(e.message))
+                }
+              >
+                {t("Save image")}
+              </button>
+              <a
+                href={`/api/reports/${m.id}`}
+                download={`ghtrends-${m.topic.slug}.json`}
+                onClick={() => track("export_json")}
+              >
+                JSON
+              </a>
+            </div>
+          </details>
         </div>
       </div>
       {actionError && <p role="alert">{t(actionError)}</p>}
@@ -1139,7 +1244,7 @@ function MarketView({
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ shared: false }),
                 })
-                  .then(() => setAccess({ public: false, owned: true }))
+                  .then(() => setAccess({ public: false, owned: true, saved }))
                   .catch((e) => setActionError(e.message))
               }
             >
@@ -1196,72 +1301,39 @@ function MarketView({
           </small>
         </div>
       </section>
-      {assessment.level === "provisional" && (
-        <section className="panel next-move">
-          <div className="panel-title">
-            <h3>{t("Your next move")}</h3>
-            <span className="method-tag">{t("Partial evidence")}</span>
-          </div>
-          <div className="assessment-columns">
-            <div>
-              <h4>{t("What we know")}</h4>
-              <ul>
-                {assessment.facts.map((f) => (
-                  <li key={f}>{f}</li>
+      <section className="panel research-summary">
+        <h3>{t("Evidence and next step")}</h3>
+        <div className="assessment-columns">
+          <div>
+            <h4>{t("What we know")}</h4>
+            <ul>
+              {(m.reasons.length ? m.reasons : assessment.facts)
+                .slice(0, 3)
+                .map((f) => (
+                  <li key={f}>{t(f)}</li>
                 ))}
-              </ul>
-            </div>
-            <div>
-              <h4>{t("What to do next")}</h4>
-              <ol>
-                {assessment.nextSteps.map((step) => (
+            </ul>
+          </div>
+          <div>
+            <h4>{t("What to do next")}</h4>
+            {m.brief && <p>{m.brief[locale].summary}</p>}
+            <ol>
+              {(m.brief?.[locale].nextSteps || assessment.nextSteps)
+                .slice(0, 3)
+                .map((step) => (
                   <li key={step}>{step}</li>
                 ))}
-              </ol>
-            </div>
+            </ol>
+            {m.brief && (
+              <small>
+                {t(
+                  "AI interpretation of the evidence below. Verify the sources before acting.",
+                )}
+              </small>
+            )}
           </div>
-          {assessment.suggestedScan && (
-            <button
-              className="button"
-              onClick={() =>
-                onScan(
-                  assessment.suggestedScan!.topic,
-                  assessment.suggestedScan!.keyword,
-                )
-              }
-            >
-              <RefreshCw size={15} />
-              {t("Rescan with “{keyword}”", {
-                keyword: assessment.suggestedScan.keyword,
-              })}
-            </button>
-          )}
-          {assessment.contextSources?.map((source) => (
-            <a
-              className="text-link context-source"
-              href={source.url}
-              target="_blank"
-              rel="noreferrer"
-              key={source.url}
-            >
-              {t("Field context")}: {source.title}
-              <ExternalLink size={13} />
-            </a>
-          ))}
-        </section>
-      )}
-      {m.brief && (
-        <section className="panel ai-brief">
-          <div className="panel-title">
-            <h3>{t("Research brief")}</h3>
-            <span className="method-tag">{m.brief.model}</span>
-          </div>
-          <p>{m.brief[locale].summary}</p>
-          <ol>
-            {m.brief[locale].nextSteps.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
+        </div>
+        {m.brief && (
           <div className="source-chips">
             {m.brief.sources.map((source) => (
               <a
@@ -1274,13 +1346,23 @@ function MarketView({
               </a>
             ))}
           </div>
-          <small>
-            {t(
-              "AI interpretation of the evidence below. Verify the sources before acting.",
-            )}
-          </small>
-        </section>
-      )}
+        )}
+        {assessment.suggestedScan && (
+          <button
+            className="button secondary"
+            onClick={() =>
+              onScan(
+                assessment.suggestedScan!.topic,
+                assessment.suggestedScan!.keyword,
+              )
+            }
+          >
+            {t("Rescan with “{keyword}”", {
+              keyword: assessment.suggestedScan.keyword,
+            })}
+          </button>
+        )}
+      </section>
       {m.aiError && <p className="muted">{t(m.aiError)}</p>}
       {m.demand.selectionReason && (
         <p className="admin-note">
@@ -1392,7 +1474,8 @@ function MarketView({
             )}
           </p>
         </section>
-        <section className="panel reasoning-panel">
+        <details className="panel reasoning-panel">
+          <summary>{t("Method and detailed evidence")}</summary>
           <div className="panel-title">
             <h3>{t("Behind the classification")}</h3>
             <span className="method-tag">v{m.version}</span>
@@ -1407,10 +1490,11 @@ function MarketView({
             {t("Read the full method")}
             <ArrowUpRight size={15} />
           </button>
-        </section>
+        </details>
       </div>
       {!!m.demand.alternatives?.length && (
-        <section className="panel">
+        <details className="panel">
+          <summary>{t("Related search terms")}</summary>
           <div className="panel-title">
             <div>
               <h3>{t("Related search terms")}</h3>
@@ -1438,7 +1522,7 @@ function MarketView({
               </article>
             ))}
           </div>
-        </section>
+        </details>
       )}
       <section className="panel">
         <div className="panel-title">
@@ -1482,6 +1566,16 @@ function MarketView({
           <RepoRow
             key={r.name}
             repo={r}
+            selected={selected.includes(r.name)}
+            onSelect={() =>
+              setSelected((current) =>
+                current.includes(r.name)
+                  ? current.filter((n) => n !== r.name)
+                  : current.length < 6
+                    ? [...current, r.name]
+                    : current,
+              )
+            }
             watched={watch.includes(r.name)}
             onWatch={() => onWatch(r.name)}
             onView={() => navigate("/repo/" + r.name)}
@@ -1498,18 +1592,10 @@ function MarketView({
         <div className="panel-bottom">
           <button
             className="text-link"
-            disabled={m.supply.repositories.length < 2}
-            onClick={() =>
-              navigate(
-                "/compare?repos=" +
-                  m.supply.repositories
-                    .slice(0, 3)
-                    .map((r) => r.name)
-                    .join(","),
-              )
-            }
+            disabled={selected.length < 2}
+            onClick={() => navigate("/compare?repos=" + selected.join(","))}
           >
-            {t("Compare the leading projects")}
+            {t("Compare selected projects")} ({selected.length}/6)
             <GitCompareArrows size={16} />
           </button>
           <span className="footnote">
@@ -1528,13 +1614,13 @@ function MarketView({
             </p>
           </div>
           <span className="method-tag">
-            {m.gaps.length}
+            {gapSignals.length}
             {t("signals")}
           </span>
         </div>
-        {m.gaps.length ? (
+        {gapSignals.length ? (
           <div className="gap-grid">
-            {m.gaps.slice(0, 9).map((g) => (
+            {gapSignals.slice(0, 6).map((g) => (
               <a
                 className="gap-card"
                 href={g.url}
@@ -1644,7 +1730,7 @@ function RepoView({
         </div>
         <button className="button" onClick={() => onWatch(r.name)}>
           <Bookmark size={15} />
-          {watch.includes(r.name) ? t("Watching") : t("Add to watchlist")}
+          {watch.includes(r.name) ? t("Saved project") : t("Save project")}
         </button>
       </div>
       <div className="metric-grid">
@@ -1963,14 +2049,14 @@ function WatchView({
   }, [names.join(",")]);
   return (
     <div className="detail-page">
-      <div className="eyebrow">{t("YOUR PERSONAL SIGNALS")}</div>
-      <h1>
-        {t("Keep the good ones close")}
+      <div className="eyebrow">{t("YOUR RESEARCH")}</div>
+      <h2>
+        {t("Saved projects")}
         <span className="lime">.</span>
-      </h1>
+      </h2>
       <p className="page-intro">
         {t(
-          "Follow projects worth returning to. Your list stays in this browser.",
+          "Projects saved in your workspace. Data refreshes when you open this list; alerts are not enabled.",
         )}
       </p>
       <form
@@ -1988,7 +2074,7 @@ function WatchView({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="owner/repository"
-          aria-label={t("Add repository to watchlist")}
+          aria-label={t("Save a repository")}
         />
         <button className="button">
           {t("Add project")}
@@ -2001,7 +2087,7 @@ function WatchView({
         </p>
       ))}
       {loading ? (
-        <Loading text={t("Refreshing your watchlist…")} />
+        <Loading text={t("Loading saved projects…")} />
       ) : repos.length ? (
         <section className="panel">
           {repos.map((r) => (
@@ -2018,7 +2104,7 @@ function WatchView({
         <Empty
           title={t("Make room for your next discovery")}
           description={t(
-            "Save a project from any category or add a repository above. Your watchlist is saved on this server.",
+            "Save a project from any category or add a repository above. Your saved projects are stored on this server.",
           )}
           action={
             <button className="button" onClick={() => navigate("/")}>
@@ -2028,6 +2114,90 @@ function WatchView({
           }
         />
       )}
+    </div>
+  );
+}
+function StartView() {
+  useEffect(() => {
+    track("opensource_view", "start");
+  }, []);
+  return (
+    <div className="docs-page">
+      <div className="eyebrow">MIT · CLI · MCP</div>
+      <h1>{t("Research in your own workflow")}</h1>
+      <p className="page-intro">
+        {t(
+          "Use the hosted website, or run the same open-source engine with your own keys.",
+        )}
+      </p>
+      <div className="deployment-options">
+        <section className="panel">
+          <h2>{t("Hosted website")}</h2>
+          <p>
+            {t(
+              "Read public reports freely. Sign in for private scans, saved reports and projects across devices.",
+            )}
+          </p>
+        </section>
+        <section className="panel">
+          <h2>{t("Your own workspace")}</h2>
+          <p>
+            {t(
+              "CLI, MCP and local Web share your SQLite workspace. Configure your GitHub key and an optional DeepSeek key. Hosted account history is separate.",
+            )}
+          </p>
+        </section>
+      </div>
+      <section className="panel">
+        <h2>{t("Your terminal. Your agent.")}</h2>
+        <p>
+          {t(
+            "Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.",
+          )}
+        </p>
+        <div className="code-block">
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.5.0/ghtrends-radar-0.5.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <CopyButton
+            value="npm install -g https://radar.ghtrends.dev/ghtrends.tgz"
+            label={t("Copy installation command")}
+            onCopied={() => track("install_copy")}
+          />
+        </div>
+        <h3>{t("Connect an MCP client")}</h3>
+        <div className="code-block">
+          <pre>
+            {JSON.stringify(
+              {
+                mcpServers: {
+                  ghtrends: { command: "ghtrends", args: ["mcp"] },
+                },
+              },
+              null,
+              2,
+            )}
+          </pre>
+        </div>
+        <p>
+          {t("Tools:")}
+          <code>ghtrends_scan</code>, <code>ghtrends_repo</code>,{" "}
+          <code>ghtrends_compare</code>, <code>ghtrends_watch_list</code>
+          {t(
+            ". Results include data sources, time windows, confidence and limitations.",
+          )}
+        </p>
+      </section>
+      <p>
+        <a
+          className="button"
+          href={SOURCE}
+          onClick={() => track("github_click")}
+        >
+          {t("Source and setup instructions")} <ArrowUpRight size={15} />
+        </a>
+      </p>
+      <p>
+        <a href={localUrl("/docs")}>{t("Understand the methodology")}</a>
+      </p>
     </div>
   );
 }
@@ -2160,44 +2330,10 @@ function Docs() {
         </section>
       </div>
       <section className="panel">
-        <h2>{t("Your terminal. Your agent.")}</h2>
-        <p>
-          {t(
-            "Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.",
-          )}
-        </p>
-        <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.4.1/ghtrends-radar-0.4.1.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
-          <CopyButton value="ghtrends scan --topic mcp-servers --json" />
-        </div>
-        <h3>{t("Connect an MCP client")}</h3>
-        <div className="code-block">
-          <pre>
-            {JSON.stringify(
-              {
-                mcpServers: {
-                  ghtrends: { command: "ghtrends", args: ["mcp"] },
-                },
-              },
-              null,
-              2,
-            )}
-          </pre>
-        </div>
-        <p>
-          {t("Tools:")}
-          <code>ghtrends_scan</code>, <code>ghtrends_repo</code>,{" "}
-          <code>ghtrends_compare</code>, <code>ghtrends_watch_list</code>
-          {t(
-            ". Results include data sources, time windows, confidence and limitations.",
-          )}
-        </p>
-      </section>
-      <section className="panel">
         <h2>{t("How to use a classification")}</h2>
         <p>
           {t(
-            "Use it to decide where to investigate next. Validate real workflows with people, inspect existing alternatives and account for commercial products. The opportunity score ranks the measured signals; it does not predict revenue, investment outcomes or GitHub stars.",
+            "Use it to decide where to investigate next. Validate real workflows with people, inspect existing alternatives and account for commercial products. Search measurements do not predict revenue, investment outcomes or GitHub stars.",
           )}
         </p>
         <p>
@@ -2218,7 +2354,7 @@ function GapView() {
     [error, setError] = useState("");
   useEffect(() => {
     api<Gap[]>("/api/gaps")
-      .then(setGaps)
+      .then((rows) => setGaps(selectGapSignals(rows)))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

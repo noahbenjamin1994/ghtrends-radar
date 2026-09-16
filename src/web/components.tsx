@@ -382,10 +382,12 @@ export function CopyButton({
   value,
   label = t("Copy"),
   className = "button subtle",
+  onCopied,
 }: {
   value: string;
   label?: string;
   className?: string;
+  onCopied?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -395,6 +397,7 @@ export function CopyButton({
         try {
           await navigator.clipboard.writeText(value);
           setCopied(true);
+          onCopied?.();
           setTimeout(() => setCopied(false), 2000);
         } catch {
           window.prompt(t("Copy this link:"), value);
@@ -411,14 +414,27 @@ export function RepoRow({
   onView,
   watched,
   onWatch,
+  selected,
+  onSelect,
 }: {
   repo: Repo;
   onView: () => void;
   watched: boolean;
   onWatch: () => void;
+  selected?: boolean;
+  onSelect?: () => void;
 }) {
   return (
     <div className="repo-row">
+      {onSelect && (
+        <input
+          className="repo-select"
+          type="checkbox"
+          checked={!!selected}
+          onChange={onSelect}
+          aria-label={t("Select {repo} to compare", { repo: repo.name })}
+        />
+      )}
       <button className="repo-main" onClick={onView}>
         <span className="repo-avatar">
           {repo.name.split("/")[0]!.slice(0, 2).toUpperCase()}
@@ -426,11 +442,6 @@ export function RepoRow({
         <span>
           <strong>{repo.name}</strong>
           <small>{repo.description || t("No description provided.")}</small>
-          {!!repo.matchedQueries?.length && (
-            <small className="repo-matches">
-              {t("Matched via")}: {repo.matchedQueries.join(" · ")}
-            </small>
-          )}
         </span>
       </button>
       <div className="repo-stats">
@@ -446,10 +457,8 @@ export function RepoRow({
       <button
         className={`icon-button ${watched ? "selected" : ""}`}
         onClick={onWatch}
-        title={watched ? t("Remove from watchlist") : t("Add to watchlist")}
-        aria-label={
-          watched ? t("Remove from watchlist") : t("Add to watchlist")
-        }
+        title={watched ? t("Remove saved project") : t("Save project")}
+        aria-label={watched ? t("Remove saved project") : t("Save project")}
       >
         {watched ? <CheckCircle2 size={19} /> : <Plus size={19} />}
       </button>
