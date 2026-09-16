@@ -56,7 +56,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.9.0/ghtrends-radar-0.9.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.10.0/ghtrends-radar-0.10.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -161,6 +161,18 @@ ghtrends ui
 The model proposes one primary Trends phrase, up to two genuine synonyms, and bounded GitHub topic/phrase queries. Ambiguous acronyms request clarification. It then summarizes **collected evidence** in English and Chinese; it does not calculate or override metrics. Queries go to DeepSeek, Google and GitHub as needed. Do not enter secrets. A failed brief leaves the source report usable.
 
 `PUBLIC_URL` may include a directory, for example `https://example.com/radar`. The same build supports both directory hosting and a local root URL. Forward that prefix unchanged to the server and configure the matching Logto callback.
+
+**Access and research credits**
+
+| Access | Included |
+| --- | --- |
+| Guest | Public reports, examples, methodology, and cached project evidence |
+| Signed in | 10 research credits per UTC day, private saved history, sharing, and saved projects |
+| Self-hosted | Own credentials and database; locally managed usage |
+
+A fresh scan, project analysis, or comparison uses one credit. Cached results are free. The header, research form, and account menu show the balance and reset time in your timezone. A credit is reserved while research runs; collection issues and interrupted work return it exactly once, including after a server restart. Project and comparison collection starts through an explicit action protected by the session and CSRF token; opening a saved page reads cached evidence.
+
+`GHTRENDS_DAILY_REQUESTS` bounds hosted collection attempts across accounts (default 200/day, including returned credits). Each account can attempt up to three times its daily credit allowance. One fresh research job per account runs at a time. Admin shows today's reserved, used and returned credits, the service budget, and the Trends connection/recovery status. `GOOGLE_TRENDS_PROXY` supports authenticated HTTP(S) proxies; `GHTRENDS_TRENDS_PROXY_REGION` supplies a safe region label. Proxy credentials stay server-side, and provider recovery windows apply to the fixed route.
 
 For a public hosted instance configure `GHTRENDS_HOSTED=1`, HTTPS `PUBLIC_URL`, `LOGTO_ENDPOINT`, `LOGTO_APP_ID`, `LOGTO_APP_SECRET` and optionally `GHTRENDS_DAILY_SCANS` (default 10). Create a Traditional Logto application with `${PUBLIC_URL}/auth/callback` as its redirect. Keep GitHub/DeepSeek credentials in server secrets, never `VITE_*` or browser storage. OIDC uses PKCE, nonce/state and signed-token validation; the browser gets an HttpOnly, Secure session cookie. Personal mutations also require CSRF validation.
 

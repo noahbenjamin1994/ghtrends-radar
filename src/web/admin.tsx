@@ -102,6 +102,10 @@ interface AdminData {
     ai: boolean;
     model: string;
     dailyLimit: number;
+    serviceLimit: number;
+    attemptLimit: number;
+    trends: { proxy: boolean; region: string; retryAt: string | null };
+    usageToday: { kind: string; state: string; count: number }[];
     adminUserIds: string[];
     pricingConfigured: boolean;
   };
@@ -517,7 +521,10 @@ export function AdminView({ account }: { account: Account | null }) {
             </div>
             {!data.runs.length && (
               <p>
-                {l("Choose another filter to explore recorded scans.", "调整筛选条件，查看已记录的扫描。")}
+                {l(
+                  "Choose another filter to explore recorded scans.",
+                  "调整筛选条件，查看已记录的扫描。",
+                )}
               </p>
             )}
             <div className="admin-pagination">
@@ -613,8 +620,55 @@ export function AdminView({ account }: { account: Account | null }) {
                 Logto {data.configuration.auth ? "✓" : "—"} ·{" "}
                 {data.configuration.ai ? data.configuration.model : "—"}
               </dd>
-              <dt>{l("Daily scan allowance", "每日扫描额度")}</dt>
+              <dt>{l("Daily research allowance", "每人每日研究额度")}</dt>
               <dd>{data.configuration.dailyLimit}</dd>
+              <dt>{l("Daily collection budget", "全站每日采集预算")}</dt>
+              <dd>
+                {data.configuration.serviceLimit} ·{" "}
+                {l("Per account attempts", "每人采集尝试")}{" "}
+                {data.configuration.attemptLimit}
+              </dd>
+              <dt>{l("Trends connection", "Trends 采集连接")}</dt>
+              <dd>
+                {data.configuration.trends.proxy
+                  ? l("Fixed proxy", "固定代理")
+                  : l("Direct", "直连")}{" "}
+                · {data.configuration.trends.region}
+                {data.configuration.trends.retryAt && (
+                  <>
+                    {" "}
+                    · {l("Resumes", "恢复时间")}{" "}
+                    {date(data.configuration.trends.retryAt)}
+                  </>
+                )}
+              </dd>
+              <dt>{l("Today's credits", "今日额度记录")}</dt>
+              <dd>
+                {data.configuration.usageToday.map((row) => (
+                  <div key={row.kind + row.state}>
+                    {
+                      (
+                        {
+                          scan: l("Scan", "研究"),
+                          repo: l("Project", "项目"),
+                          compare: l("Compare", "对比"),
+                        } as Record<string, string>
+                      )[row.kind]
+                    }{" "}
+                    ·{" "}
+                    {
+                      (
+                        {
+                          used: l("Used", "已使用"),
+                          reserved: l("In progress", "进行中"),
+                          released: l("Returned", "已返还"),
+                        } as Record<string, string>
+                      )[row.state]
+                    }{" "}
+                    {row.count}
+                  </div>
+                ))}
+              </dd>
               <dt>{l("Database", "数据库")}</dt>
               <dd>
                 SQLite · {(data.totals.databaseBytes / 1048576).toFixed(1)} MiB

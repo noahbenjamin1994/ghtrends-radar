@@ -36,6 +36,8 @@ export class Store {
       CREATE TABLE IF NOT EXISTS report_owners(report_id TEXT PRIMARY KEY,user_id TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS user_watch(user_id TEXT NOT NULL,repo TEXT NOT NULL,created TEXT NOT NULL,PRIMARY KEY(user_id,repo));
       CREATE TABLE IF NOT EXISTS usage_daily(user_id TEXT NOT NULL,day TEXT NOT NULL,count INTEGER NOT NULL,PRIMARY KEY(user_id,day));
+      CREATE TABLE IF NOT EXISTS usage_reservations(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,day TEXT NOT NULL,kind TEXT NOT NULL,state TEXT NOT NULL,created TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS usage_reservations_day ON usage_reservations(day,user_id);
       CREATE TABLE IF NOT EXISTS engagement_daily(day TEXT NOT NULL,event TEXT NOT NULL,count INTEGER NOT NULL,PRIMARY KEY(day,event));
       CREATE TABLE IF NOT EXISTS operations_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS scan_runs(id TEXT PRIMARY KEY,user_id TEXT,input TEXT NOT NULL,geo TEXT NOT NULL,background INTEGER NOT NULL,created TEXT NOT NULL,started TEXT,finished TEXT,state TEXT NOT NULL,report_id TEXT,error TEXT,warnings TEXT);
@@ -74,6 +76,16 @@ export class Store {
       .prepare("DELETE FROM engagement_daily WHERE day<?")
       .run(before.slice(0, 10));
     this.db.prepare("DELETE FROM provider_calls WHERE started<?").run(before);
+    this.db
+      .prepare(
+        "DELETE FROM usage_reservations WHERE created<? AND state != 'reserved'",
+      )
+      .run(before);
+    this.db
+      .prepare(
+        "DELETE FROM usage_daily WHERE day<? AND day NOT IN (SELECT day FROM usage_reservations WHERE state='reserved')",
+      )
+      .run(before.slice(0, 10));
     this.db
       .prepare(
         "DELETE FROM scan_runs WHERE created<? AND state NOT IN ('queued','running')",
@@ -158,6 +170,10 @@ export class Store {
       );
   }
   interruptRuns() {
+    const reservations = this.db
+      .prepare("SELECT id FROM usage_reservations WHERE state='reserved'")
+      .all() as { id: string }[];
+    for (const row of reservations) this.settleUsage(row.id, false);
     this.db
       .prepare(
         "UPDATE scan_runs SET state='interrupted',finished=?,error='Server restarted before this scan completed.' WHERE state IN ('queued','running')",
@@ -387,6 +403,88 @@ export class Store {
       )
       .get(user, day, limit);
     return !!row;
+  }
+  allowance(user: string, limit: number) {
+    const used = this.usage(user);
+    const reset = new Date();
+    reset.setUTCHours(24, 0, 0, 0);
+    return {
+      limit,
+      used,
+      remaining: Math.max(0, limit - used),
+      resetAt: reset.toISOString(),
+    };
+  }
+  reserveUsage(
+    id: string,
+    user: string,
+    kind: string,
+    limit: number,
+    serviceLimit: number,
+  ) {
+    const now = new Date(),
+      day = now.toISOString().slice(0, 10);
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const total = this.db
+        .prepare("SELECT COUNT(*) AS count FROM usage_reservations WHERE day=?")
+        .get(day) as { count: number };
+      const personal = this.db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM usage_reservations WHERE day=? AND user_id=?",
+        )
+        .get(day, user) as { count: number };
+      let result: "reserved" | "daily" | "capacity" | "attempts";
+      if (this.usage(user, day) >= limit) result = "daily";
+      else if (total.count >= serviceLimit) result = "capacity";
+      else if (personal.count >= limit * 3) result = "attempts";
+      else {
+        this.db
+          .prepare(
+            "INSERT INTO usage_reservations VALUES(?,?,?,?, 'reserved', ?)",
+          )
+          .run(id, user, day, kind, now.toISOString());
+        this.db
+          .prepare(
+            "INSERT INTO usage_daily VALUES(?,?,1) ON CONFLICT(user_id,day) DO UPDATE SET count=count+1",
+          )
+          .run(user, day);
+        result = "reserved";
+      }
+      this.db.exec("COMMIT");
+      return result;
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+  settleUsage(id: string, success: boolean) {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const row = this.db
+        .prepare(
+          "UPDATE usage_reservations SET state=? WHERE id=? AND state='reserved' RETURNING user_id,day",
+        )
+        .get(success ? "used" : "released", id) as
+        { user_id: string; day: string } | undefined;
+      if (row && !success)
+        this.db
+          .prepare(
+            "UPDATE usage_daily SET count=MAX(0,count-1) WHERE user_id=? AND day=?",
+          )
+          .run(row.user_id, row.day);
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+  usageOverview() {
+    return this.db
+      .prepare(
+        "SELECT kind,state,COUNT(*) AS count FROM usage_reservations WHERE day=? GROUP BY kind,state",
+      )
+      .all(new Date().toISOString().slice(0, 10));
   }
   take<T>(key: string): T | null {
     const row = this.db

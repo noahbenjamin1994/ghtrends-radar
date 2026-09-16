@@ -56,7 +56,27 @@ export class Trends {
   private dispatcher: ProxyAgent | undefined;
   constructor(private store: Store) {
     const proxy = process.env.GOOGLE_TRENDS_PROXY;
-    if (proxy) this.dispatcher = new ProxyAgent(proxy);
+    if (proxy) {
+      try {
+        const url = new URL(proxy);
+        if (!["http:", "https:"].includes(url.protocol)) throw new Error();
+        this.dispatcher = new ProxyAgent(url.href);
+      } catch {
+        throw new Error(
+          "Set GOOGLE_TRENDS_PROXY to an HTTP or HTTPS proxy URL.",
+        );
+      }
+    }
+  }
+  status() {
+    const until = this.cooldown();
+    return {
+      proxy: !!this.dispatcher,
+      region: this.dispatcher
+        ? process.env.GHTRENDS_TRENDS_PROXY_REGION || "configured"
+        : "direct",
+      retryAt: until > Date.now() ? new Date(until).toISOString() : null,
+    };
   }
   private async read(
     path: string,

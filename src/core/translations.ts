@@ -1,4 +1,41 @@
 export const zh: Record<string, string> = {
+  "Your saved projects, with cached evidence. Open a project to request a fresh analysis.":
+    "查看已保存项目与已有证据，打开项目可主动发起新分析。",
+  "{remaining} of {limit} research credits left today":
+    "今日剩余 {remaining} / {limit} 次研究",
+  "Resets at {time}": "{time} 刷新额度",
+  "Research credits remaining": "剩余研究次数",
+  "Resume at {time}": "恢复时间：{time}",
+  "Fresh research uses 1 credit. Cached results are free; collection issues return your credit.":
+    "新研究使用 1 次额度；缓存结果直接读取，采集异常自动返还次数。",
+  "Public reports are free to browse. Sign in for {limit} research credits each day and your saved history.":
+    "公开报告自由浏览。登录后每天可研究 {limit} 次，研究记录自动保存。",
+  "Google Trends collection resumes at {time}. Explore public reports while it refreshes.":
+    "Google Trends 采集将在 {time} 恢复，期间可浏览公开报告。",
+  "Research · 1 credit": "研究 · 1 次",
+  "Sign in to research": "登录并研究",
+  "Analyze project · 1 credit": "分析项目 · 1 次",
+  "Analyze project": "分析项目",
+  "Compare · 1 credit": "对比 · 1 次",
+  "Explore this project's growth and maintenance.":
+    "查看项目的增长趋势与维护情况。",
+  "Cached result opened · 0 credits used": "已打开缓存结果 · 使用 0 次额度",
+  "Collection needs a refresh · Your research credit has been returned":
+    "来源采集待刷新 · 已返还研究次数",
+  "Your research credit has been returned": "已返还研究次数",
+  Dismiss: "关闭",
+  "Your research is in progress. Open its result before starting the next one.":
+    "当前研究进行中，查看结果后可继续下一次研究。",
+  "Your daily research allowance is used. Read saved reports or return at the reset time.":
+    "今日研究额度已用完，可浏览已有报告，或在刷新时间后继续研究。",
+  "Today's collection attempts are complete. Read saved reports and resume at the reset time.":
+    "今日采集尝试已完成，可浏览已有报告，或在刷新时间后继续研究。",
+  "Today's shared research capacity is in use. Read public reports and resume at the reset time.":
+    "今日公共研究容量已用完，可浏览公开报告，或在刷新时间后继续研究。",
+  "Start a project analysis to collect fresh evidence.":
+    "点击分析项目，采集最新证据。",
+  "Start a comparison to collect fresh evidence.": "点击对比，采集最新证据。",
+
   "Open Google Trends to review this keyword and region.":
     "打开 Google Trends，核对关键词与地区。",
   "Refresh after the displayed recovery time.":

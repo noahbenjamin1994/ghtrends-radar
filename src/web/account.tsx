@@ -7,7 +7,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { api } from "./api.js";
-import { t, localUrl, loginUrl } from "./i18n.js";
+import { t, locale, localUrl, loginUrl } from "./i18n.js";
 import type { MarketKind } from "../core/types.js";
 import { Loading, Empty } from "./components.js";
 export interface Account {
@@ -19,6 +19,13 @@ export interface Account {
   csrf: string;
   dailyLimit: number;
   used: number;
+  quota: {
+    limit: number;
+    used: number;
+    remaining: number;
+    resetAt: string;
+  } | null;
+  trends: { retryAt: string | null };
 }
 export function SignInGate({
   account,
@@ -111,12 +118,7 @@ export function HistoryView({
         {account.hosted && (
           <div className="account-summary">
             <strong>{account.user.name}</strong>
-            <span>
-              {t("{used} / {limit} scans used today", {
-                used: account.used,
-                limit: account.dailyLimit,
-              })}
-            </span>
+            <UsageSummary account={account} />
           </div>
         )}
       </div>
@@ -193,5 +195,50 @@ export function HistoryView({
         />
       )}
     </div>
+  );
+}
+
+export function UsageSummary({ account }: { account: Account | null }) {
+  if (!account?.quota) return null;
+  const q = account.quota;
+  return (
+    <div className="usage-summary">
+      <strong>
+        {t("{remaining} of {limit} research credits left today", {
+          remaining: q.remaining,
+          limit: q.limit,
+        })}
+      </strong>
+      <span>
+        {t("Resets at {time}", {
+          time: new Date(q.resetAt).toLocaleString(
+            locale === "zh" ? "zh-CN" : "en-US",
+            {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZoneName: "short",
+            },
+          ),
+        })}
+      </span>
+      <progress
+        value={q.remaining}
+        max={q.limit}
+        aria-label={t("Research credits remaining")}
+      />
+    </div>
+  );
+}
+export function ResearchCost({ account }: { account: Account | null }) {
+  return (
+    <p className="research-cost">
+      {t(
+        account?.hosted
+          ? "Fresh research uses 1 credit. Cached results are free; collection issues return your credit."
+          : "Self-hosted: your keys, your data. Scans are saved on this server.",
+      )}
+    </p>
   );
 }

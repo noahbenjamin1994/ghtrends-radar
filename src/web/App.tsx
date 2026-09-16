@@ -3,7 +3,13 @@ import { enableEngagement, track } from "./engagement.js";
 import { AdminView } from "./admin.js";
 import { ALGORITHM_VERSION } from "../core/version.js";
 import { api, setCsrf } from "./api.js";
-import { HistoryView, SignInGate, type Account } from "./account.js";
+import {
+  HistoryView,
+  SignInGate,
+  UsageSummary,
+  ResearchCost,
+  type Account,
+} from "./account.js";
 import { t, locale, localUrl, loginUrl, switchLanguage } from "./i18n.js";
 import React, { useEffect, useState } from "react";
 import {
@@ -72,6 +78,7 @@ export function App() {
     [watch, setWatch] = useState<string[]>([]),
     [mobileMenu, setMobileMenu] = useState(false);
   const [account, setAccount] = useState<Account | null>(null);
+  const [creditNotice, setCreditNotice] = useState("");
   const [choices, setChoices] = useState<{ label: string; query: string }[]>(
     [],
   );
@@ -106,6 +113,24 @@ export function App() {
         } else setWatch([]);
       })
       .catch((e) => setError(e.message));
+  }, []);
+  useEffect(() => {
+    const update = () => {
+      if (document.visibilityState === "visible")
+        void loadAccount().catch(() => {});
+    };
+    const returned = () =>
+      setCreditNotice("Your research credit has been returned");
+    window.addEventListener("ghtrends:credit-returned", returned);
+    window.addEventListener("ghtrends:usage", update);
+    window.addEventListener("focus", update);
+    const timer = setInterval(update, 60000);
+    return () => {
+      window.removeEventListener("ghtrends:credit-returned", returned);
+      window.removeEventListener("ghtrends:usage", update);
+      window.removeEventListener("focus", update);
+      clearInterval(timer);
+    };
   }, []);
   const [job, setJob] = useState<{
       id: string;
@@ -197,17 +222,6 @@ export function App() {
   const scan = async (input: string, demandKeyword?: string) => {
     if (!input.trim()) return;
     if (!account?.user) {
-      let recognized: string | undefined;
-      try {
-        recognized = resolveTopic(input).slug;
-      } catch {
-        // Natural-language queries are resolved after sign-in.
-      }
-      const existing = markets.find((m) => recognized === m.topic.slug);
-      if (existing && !demandKeyword && !keyword.trim()) {
-        navigate("/market/" + existing.topic.slug);
-        return;
-      }
       sessionStorage.setItem(
         "ghtrends:draft",
         JSON.stringify({ input, keyword: demandKeyword || keyword, geo }),
@@ -215,6 +229,7 @@ export function App() {
       signIn("/");
       return;
     }
+    setCreditNotice("");
     setChoices([]);
     setScanning(true);
     setScanError("");
@@ -229,6 +244,8 @@ export function App() {
         }),
       });
       if (d.state === "complete") {
+        if (d.credit === "free")
+          setCreditNotice("Cached result opened · 0 credits used");
         await refresh();
         navigate("/report/" + d.market.id);
         setScanning(false);
@@ -250,6 +267,10 @@ export function App() {
         const d = await api<any>("/api/jobs/" + job.id);
         if (stop) return;
         if (d.state === "complete") {
+          if (d.credit === "returned")
+            setCreditNotice(
+              "Collection needs a refresh · Your research credit has been returned",
+            );
           setJob(null);
           sessionStorage.removeItem("ghtrends:job");
           setScanning(false);
@@ -259,6 +280,9 @@ export function App() {
           return;
         }
         if (d.state === "failed") {
+          void loadAccount();
+          if (d.credit === "returned")
+            setCreditNotice("Your research credit has been returned");
           setScanError(d.clarification?.[locale] || d.error || "Scan failed.");
           setChoices(d.choices || []);
           sessionStorage.removeItem("ghtrends:job");
@@ -365,9 +389,29 @@ export function App() {
         <div className="header-end">
           {account?.user ? (
             <details className="account-menu">
-              <summary aria-label={t("Account")}>
+              <summary
+                aria-label={
+                  account.quota
+                    ? t("{remaining} of {limit} research credits left today", {
+                        remaining: account.quota.remaining,
+                        limit: account.quota.limit,
+                      })
+                    : t("Account")
+                }
+              >
                 <UserRound className="account-symbol" size={16} />
-                <span>{t("Account")}</span>
+                <span>
+                  {account.quota ? (
+                    <>
+                      <b className="quota-count">{account.quota.remaining}</b>
+                      <span className="quota-total">
+                        /{account.quota.limit}
+                      </span>
+                    </>
+                  ) : (
+                    t("Account")
+                  )}
+                </span>
                 <ChevronDown className="account-chevron" size={14} />
               </summary>
               <div
@@ -381,6 +425,7 @@ export function App() {
                 <strong>
                   {account.hosted ? account.user.name : t("Local workspace")}
                 </strong>
+                <UsageSummary account={account} />
                 <button onClick={() => navigate("/history")}>
                   {t("My research")}
                 </button>
@@ -452,6 +497,18 @@ export function App() {
         </div>
       )}
       <main>
+        {creditNotice && (
+          <div className="credit-notice" role="status">
+            <span>{t(creditNotice)}</span>
+            <button
+              className="icon-button"
+              aria-label={t("Dismiss")}
+              onClick={() => setCreditNotice("")}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
         {route === "/" ? (
           <>
             <section className="page-heading research-heading">
@@ -515,7 +572,13 @@ export function App() {
                     maxLength={300}
                   />
                   <button disabled={scanning || !query.trim()} type="submit">
-                    {t("Scan")}
+                    {t(
+                      account?.hosted
+                        ? account.user
+                          ? "Research · 1 credit"
+                          : "Sign in to research"
+                        : "Scan",
+                    )}
                     <ArrowUpRight size={15} />
                   </button>
                 </form>
@@ -565,13 +628,33 @@ export function App() {
                   </p>
                 </details>
               </div>
-              <p className="scan-access-note">
-                {t(
-                  account?.hosted
-                    ? "Public reports are free to browse. Sign in for AI-assisted scans and saved history."
-                    : "Self-hosted: your keys, your data. Scans are saved on this server.",
-                )}
-              </p>
+              {account?.hosted && account.user ? (
+                <div className="research-allowance">
+                  <UsageSummary account={account} />
+                  <ResearchCost account={account} />
+                </div>
+              ) : (
+                <p className="scan-access-note">
+                  {t(
+                    account?.hosted
+                      ? "Public reports are free to browse. Sign in for {limit} research credits each day and your saved history."
+                      : "Self-hosted: your keys, your data. Scans are saved on this server.",
+                    { limit: account?.dailyLimit || 10 },
+                  )}
+                </p>
+              )}
+              {account?.trends.retryAt && (
+                <p className="source-notice" role="status">
+                  {t(
+                    "Google Trends collection resumes at {time}. Explore public reports while it refreshes.",
+                    {
+                      time: new Date(
+                        account.trends.retryAt,
+                      ).toLocaleTimeString(),
+                    },
+                  )}
+                </p>
+              )}
               <div className="example-links">
                 <span>{t("Read a public example")}</span>
                 {["browser-agents", "agent-memory", "mcp-servers"].map(
@@ -864,6 +947,7 @@ export function App() {
           />
         ) : route.startsWith("/repo/") ? (
           <RepoView
+            account={account}
             name={decodeURIComponent(route.slice(6))}
             watch={watch}
             onWatch={toggleWatch}
@@ -871,7 +955,7 @@ export function App() {
           />
         ) : route === "/compare" ? (
           account?.user ? (
-            <CompareView path={path} navigate={navigate} />
+            <CompareView path={path} navigate={navigate} account={account} />
           ) : (
             <SignInGate account={account} returnTo={path} purpose="compare" />
           )
@@ -1722,11 +1806,13 @@ function MarketView({
   );
 }
 function RepoView({
+  account,
   name,
   watch,
   onWatch,
   navigate,
 }: {
+  account: Account | null;
   name: string;
   watch: string[];
   onWatch: (s: string) => void;
@@ -1734,20 +1820,68 @@ function RepoView({
 }) {
   const [r, setR] = useState<Repo | null>(null),
     [error, setError] = useState(""),
+    [required, setRequired] = useState(false),
+    [loading, setLoading] = useState(true),
     [days, setDays] = useState(30);
+  const load = (fresh = false) => {
+    setLoading(true);
+    setError("");
+    return api<Repo>(
+      fresh ? "/api/repo" : "/api/repo?name=" + encodeURIComponent(name),
+      fresh
+        ? {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name }),
+          }
+        : undefined,
+    )
+      .then((data) => {
+        setR(data);
+        setRequired(false);
+      })
+      .catch((e) => {
+        setRequired(e.status === 409 || e.status === 401);
+        setError(e.message);
+      })
+      .finally(() => setLoading(false));
+  };
   useEffect(() => {
     setR(null);
-    setError("");
-    api<Repo>("/api/repo?name=" + encodeURIComponent(name))
-      .then(setR)
-      .catch((e) => setError(e.message));
+    void load();
   }, [name]);
-  if (error)
-    return <Empty title={t("Repository unavailable")} description={t(error)} />;
-  if (!r)
+  if (loading)
     return (
       <Loading
         text={t("Reading repository history and maintenance signals…")}
+      />
+    );
+  if (!r)
+    return (
+      <Empty
+        title={name}
+        description={t(
+          required ? "Explore this project's growth and maintenance." : error,
+        )}
+        action={
+          <div className="research-start">
+            <UsageSummary account={account} />
+            <ResearchCost account={account} />
+            {account?.user ? (
+              <button className="button" onClick={() => void load(true)}>
+                {t(
+                  account.hosted
+                    ? "Analyze project · 1 credit"
+                    : "Analyze project",
+                )}
+              </button>
+            ) : (
+              <a className="button" href={loginUrl("/repo/" + name)}>
+                {t("Sign in to research")}
+              </a>
+            )}
+          </div>
+        }
       />
     );
   return (
@@ -1889,9 +2023,11 @@ function RepoView({
   );
 }
 function CompareView({
+  account,
   path,
   navigate,
 }: {
+  account: Account | null;
   path: string;
   navigate: (s: string) => void;
 }) {
@@ -1901,7 +2037,7 @@ function CompareView({
     [repos, setRepos] = useState<Repo[]>([]),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false);
-  const compare = async (value: string) => {
+  const compare = async (value: string, fresh = true) => {
     const names = value
       .trim()
       .split(/[\s,]+/)
@@ -1915,7 +2051,16 @@ function CompareView({
     try {
       setRepos(
         await api<Repo[]>(
-          "/api/compare?repos=" + encodeURIComponent(names.join(",")),
+          fresh
+            ? "/api/compare"
+            : "/api/compare?repos=" + encodeURIComponent(names.join(",")),
+          fresh
+            ? {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ repos: names }),
+              }
+            : undefined,
         ),
       );
     } catch (e) {
@@ -1925,7 +2070,7 @@ function CompareView({
     }
   };
   useEffect(() => {
-    if (initial) void compare(initial);
+    if (initial) void compare(initial, false);
   }, [initial]);
   return (
     <div className="detail-page">
@@ -1951,10 +2096,12 @@ function CompareView({
           aria-label={t("Repositories to compare")}
         />
         <button className="button" disabled={loading}>
-          {t("Compare")}
+          {t(account?.hosted ? "Compare · 1 credit" : "Compare")}
           <ArrowRight size={16} />
         </button>
       </form>
+      <UsageSummary account={account} />
+      <ResearchCost account={account} />
       {error && (
         <p role="alert" className="error-text">
           {t(error)}
@@ -2058,7 +2205,7 @@ function WatchView({
     Promise.all(
       names.map((name) =>
         api<Repo>("/api/repo?name=" + encodeURIComponent(name)).catch((e) => ({
-          error: name + ": " + e.message,
+          error: name + ": " + t(e.message),
         })),
       ),
     )
@@ -2084,7 +2231,7 @@ function WatchView({
       <h2>{t("Saved projects")}</h2>
       <p className="page-intro">
         {t(
-          "Projects saved in your workspace. Data refreshes when you open this list; alerts are not enabled.",
+          "Your saved projects, with cached evidence. Open a project to request a fresh analysis.",
         )}
       </p>
       <form
@@ -2184,7 +2331,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.9.0/ghtrends-radar-0.9.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.10.0/ghtrends-radar-0.10.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}

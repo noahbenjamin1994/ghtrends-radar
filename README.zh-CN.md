@@ -60,7 +60,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.9.0/ghtrends-radar-0.9.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.10.0/ghtrends-radar-0.10.0.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
@@ -167,6 +167,18 @@ ghtrends ui
 模型生成一个 Trends 主词、最多两个同义表达，以及受约束的 GitHub 主题与短语。歧义缩写会要求选择含义；采集完成后，根据**实际证据**生成中英文简报，不计算或改写指标。必要的查询会发送给 DeepSeek、Google、GitHub，请勿输入秘密。简报失败时，已采集的报告仍可阅读。
 
 `PUBLIC_URL` 支持子目录，例如 `https://example.com/radar`；同一安装包也支持本地根路径。反向代理需原样转发此前缀，并配置对应的 Logto 回调地址。
+
+### 访问与研究额度
+
+| 身份 | 可用功能 |
+| --- | --- |
+| 访客 | 浏览公开报告、示例、方法和已有项目证据 |
+| 登录用户 | 每个 UTC 日 10 次研究、私人历史、分享报告、保存项目 |
+| 自部署用户 | 使用自己的密钥和数据库，自主管理用量 |
+
+新研究、项目分析、仓库对比各使用 1 次额度。缓存结果直接读取。顶部、研究表单和账户菜单显示剩余次数，刷新时间按浏览器时区展示。运行期间预留次数，来源异常和任务中断时自动返还，服务器重启后同样恢复。项目采集与对比由用户点击启动，登录会话与 CSRF 共同校验；打开已有页面读取缓存。
+
+`GHTRENDS_DAILY_REQUESTS` 配置全站每日采集尝试预算，默认 200 次，包含返还额度的尝试。每个账户的每日尝试上限为额度的 3 倍，每次运行一个新研究。管理员可查看今日预留、使用、返还记录，以及代理连接和恢复状态。`GOOGLE_TRENDS_PROXY` 支持带认证的 HTTP(S) 代理，`GHTRENDS_TRENDS_PROXY_REGION` 设置后台展示的地区标签。代理凭证由服务器保管，固定出口继续遵循来源的恢复窗口。
 
 公开托管部署配置 `GHTRENDS_HOSTED=1`、HTTPS `PUBLIC_URL`、`LOGTO_ENDPOINT`、`LOGTO_APP_ID`、`LOGTO_APP_SECRET`，可通过 `GHTRENDS_DAILY_SCANS` 修改每日额度（默认 10）。Logto 选择 Traditional 应用，回调地址为 `${PUBLIC_URL}/auth/callback`。GitHub 与 DeepSeek 密钥放服务器 Secret，不能放入 `VITE_*` 或浏览器存储。登录使用 PKCE、nonce/state、签名令牌校验；浏览器只获得 HttpOnly、Secure 会话 Cookie，个人数据写入另做 CSRF 校验。
 

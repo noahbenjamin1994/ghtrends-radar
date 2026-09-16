@@ -39,6 +39,8 @@ interface Job {
   owner?: string;
   choices?: { label: string; query: string }[];
   clarification?: { en: string; zh: string };
+  credit?: "reserved" | "used" | "returned" | "free";
+  cacheKey?: string;
 }
 export function createApp(engine = new Engine()) {
   const basePath = process.env.PUBLIC_URL
@@ -65,8 +67,13 @@ export function createApp(engine = new Engine()) {
   });
   const dailyLimit = Math.max(
     1,
-    Number(process.env.GHTRENDS_DAILY_SCANS) || 10,
+    Math.floor(Number(process.env.GHTRENDS_DAILY_SCANS)) || 10,
   );
+  const serviceLimit = Math.max(
+    1,
+    Math.floor(Number(process.env.GHTRENDS_DAILY_REQUESTS) || 200),
+  );
+  const activeResearch = new Set<string>();
   const dashboardMarkets = (geo = "") =>
     engine.store
       .markets(geo, true)
@@ -75,8 +82,7 @@ export function createApp(engine = new Engine()) {
           process.env.GHTRENDS_HOSTED !== "1" ||
           TOPICS.some((t) => t.slug === m.topic.slug),
       );
-  const jobs = new Map<string, Job>(),
-    limits = new Map<string, { count: number; reset: number }>();
+  const jobs = new Map<string, Job>();
   const localeFor = (q: express.Request): Locale =>
     requestLocale(q.query.lang, q.get("cookie"), q.get("accept-language"));
   const baseURL = (q: express.Request) =>
@@ -102,13 +108,80 @@ export function createApp(engine = new Engine()) {
     const header = trusted ? q.get(trusted) : undefined;
     return header && isIP(header) ? header : q.ip || "anonymous";
   };
-  const permitted = (ip: string) => {
-    const now = Date.now();
-    for (const [k, v] of limits) if (v.reset < now) limits.delete(k);
-    const r = limits.get(ip) || { count: 0, reset: now + 3600000 };
-    r.count++;
-    limits.set(ip, r);
-    return r.count <= 8;
+  const reserve = (user: string, id: string, kind: string) => {
+    if (!auth.hosted) return;
+    if (
+      activeResearch.has(user) ||
+      [...jobs.values()].some(
+        (j) => j.owner === user && ["queued", "running"].includes(j.state),
+      )
+    )
+      throw Object.assign(
+        new Error(
+          "Your research is in progress. Open its result before starting the next one.",
+        ),
+        { status: 429, retryAfter: 5 },
+      );
+    const result = engine.store.reserveUsage(
+      id,
+      user,
+      kind,
+      dailyLimit,
+      serviceLimit,
+    );
+    if (result !== "reserved") {
+      const quota = engine.store.allowance(user, dailyLimit);
+      throw Object.assign(
+        new Error(
+          result === "daily"
+            ? "Your daily research allowance is used. Read saved reports or return at the reset time."
+            : result === "attempts"
+              ? "Today's collection attempts are complete. Read saved reports and resume at the reset time."
+              : "Today's shared research capacity is in use. Read public reports and resume at the reset time.",
+        ),
+        {
+          status: 429,
+          retryAt: quota.resetAt,
+          retryAfter: Math.max(
+            1,
+            (Date.parse(quota.resetAt) - Date.now()) / 1000,
+          ),
+        },
+      );
+    }
+  };
+  const freshResearch = async <T>(
+    user: string,
+    kind: string,
+    run: () => Promise<T>,
+    response: express.Response,
+  ) => {
+    const id = randomUUID();
+    reserve(user, id, kind);
+    activeResearch.add(user);
+    try {
+      const result = await operationContext.run(
+        { runId: id, userId: user },
+        run,
+      );
+      const repos = (Array.isArray(result) ? result : [result]) as {
+        errors?: string[];
+      }[];
+      const complete = repos.every((repo) =>
+        (repo.errors || []).every((error) =>
+          error.startsWith("Contributor counts and concentration cover"),
+        ),
+      );
+      engine.store.settleUsage(id, complete);
+      response.set("X-Research-Credit", complete ? "used" : "returned");
+      return result;
+    } catch (e) {
+      engine.store.settleUsage(id, false);
+      response.set("X-Research-Credit", "returned");
+      throw e;
+    } finally {
+      activeResearch.delete(user);
+    }
   };
   async function processJobs() {
     if (processing) return;
@@ -151,6 +224,18 @@ export function createApp(engine = new Engine()) {
               }),
           );
           job.state = "complete";
+          const success = ![
+            job.market.demand.error,
+            job.market.demand.collectionError,
+            job.market.supply.error,
+            job.market.aiError,
+          ].some(Boolean);
+          engine.store.settleUsage(job.id, success);
+          job.credit =
+            auth.hosted && job.owner ? (success ? "used" : "returned") : "free";
+          if (success && job.cacheKey && sourceEvidenceIsFresh(job.market))
+            engine.store.set(job.cacheKey, job.market.id, 86400000);
+
           engine.store.updateRun(job.id, "complete", {
             reportId: job.market.id,
             warnings: [
@@ -162,6 +247,8 @@ export function createApp(engine = new Engine()) {
           });
           delete job.progress?.preview;
         } catch (e) {
+          engine.store.settleUsage(job.id, false);
+          job.credit = auth.hosted && job.owner ? "returned" : "free";
           job.error = (e as Error).message;
           job.state = "failed";
           engine.store.updateRun(job.id, "failed", { error: job.error });
@@ -272,6 +359,11 @@ export function createApp(engine = new Engine()) {
       csrf: user?.csrf || "",
       dailyLimit,
       used: user ? engine.store.usage(user.id) : 0,
+      quota:
+        auth.hosted && user
+          ? engine.store.allowance(user.id, dailyLimit)
+          : null,
+      trends: { retryAt: engine.trends.status().retryAt },
     });
   });
   app.get(
@@ -315,6 +407,10 @@ export function createApp(engine = new Engine()) {
           ai: engine.research.enabled,
           model: engine.research.model,
           dailyLimit,
+          serviceLimit,
+          attemptLimit: dailyLimit * 3,
+          trends: engine.trends.status(),
+          usageToday: engine.store.usageOverview(),
           adminUserIds: (process.env.GHTRENDS_ADMIN_USER_IDS || "")
             .split(",")
             .map((s) => s.trim())
@@ -589,11 +685,42 @@ export function createApp(engine = new Engine()) {
           ["queued", "running"].includes(job.state)
         )
           return r.status(202).json(job);
-      if (!permitted(clientIP(q)))
-        return r.status(429).json({
-          error:
-            "Scan limit reached. Explore the existing reports or try again in an hour.",
-        });
+      const cacheKey =
+        "research:v1:" +
+        createHash("sha256")
+          .update(
+            JSON.stringify([
+              user.id,
+              input.toLowerCase(),
+              geo,
+              keyword || "",
+              ALGORITHM_VERSION,
+            ]),
+          )
+          .digest("hex");
+      const reportId = engine.store.get<string>(cacheKey);
+      const saved =
+        reportId && engine.store.canRead(reportId, user.id)
+          ? engine.store.report(reportId)
+          : null;
+      if (
+        saved &&
+        sourceEvidenceIsFresh(saved) &&
+        Date.now() - Date.parse(saved.asOf) < 86400000
+      )
+        return r.json({ state: "complete", market: saved, credit: "free" });
+      const retryAt = engine.trends.status().retryAt;
+      if (retryAt)
+        throw Object.assign(
+          new Error(
+            "Google Trends is cooling down. Refresh after the scheduled time or open the source.",
+          ),
+          {
+            status: 503,
+            retryAt,
+            retryAfter: Math.max(1, (Date.parse(retryAt) - Date.now()) / 1000),
+          },
+        );
       if (
         [...jobs.values()].filter((j) =>
           ["queued", "running"].includes(j.state),
@@ -602,11 +729,6 @@ export function createApp(engine = new Engine()) {
         return r
           .status(429)
           .json({ error: "The scan queue is full. Please try again shortly." });
-      if (auth.hosted && !engine.store.consumeUsage(user.id, dailyLimit))
-        return r.status(429).json({
-          error:
-            "Your daily scan allowance is used. Saved reports remain available.",
-        });
       for (const [id, j] of jobs)
         if (Date.now() - j.created > 3600000) jobs.delete(id);
       const job: Job = {
@@ -618,7 +740,10 @@ export function createApp(engine = new Engine()) {
         geo,
         keyword,
         created: Date.now(),
+        cacheKey,
+        credit: auth.hosted ? "reserved" : "free",
       };
+      reserve(user.id, job.id, "scan");
       jobs.set(job.id, job);
       engine.store.startRun({
         id: job.id,
@@ -642,6 +767,7 @@ export function createApp(engine = new Engine()) {
       return r.status(404).json({ error: "Scan not found." });
     if (job && !live && ["queued", "running"].includes(job.state)) {
       job.state = "failed";
+      job.credit = auth.hosted ? "returned" : "free";
       job.error = "The server restarted. Please run this scan again.";
     }
     return job
@@ -663,32 +789,66 @@ export function createApp(engine = new Engine()) {
           error: "Scan not found. It may have expired; check the topic page.",
         });
   });
-  app.get(
-    "/api/repo",
-    safe(async (q, r) => {
-      const name = validateRepo(String(q.query.name ?? ""));
-      const cached = engine.store.get("repo:" + name + ":true");
-      if (cached) return r.json(cached);
-      if (auth.hosted) auth.requireUser(q);
-      if (!permitted(clientIP(q)))
-        return r.status(429).json({
-          error: "Repository request limit reached. Try again later.",
-        });
-      return r.json(await engine.github.repo(name));
-    }),
-  );
-  app.get(
-    "/api/compare",
-    safe(async (q, r) => {
-      if (auth.hosted) auth.requireUser(q);
-      const names = String(q.query.repos ?? "").split(",");
-      if (!permitted(clientIP(q)))
-        return r.status(429).json({
-          error: "Comparison request limit reached. Try again later.",
-        });
-      return r.json(await engine.compare(names));
-    }),
-  );
+  const repository = safe(async (q, r) => {
+    const name = validateRepo(
+      String(q.method === "POST" ? (q.body?.name ?? "") : (q.query.name ?? "")),
+    );
+    // Reads only return cache in hosted mode; collection requires an explicit CSRF-protected action.
+    const cached = engine.store.get("repo:" + name + ":true");
+    if (cached) return r.json(cached);
+    if (!auth.hosted) return r.json(await engine.github.repo(name));
+    if (q.method === "GET") {
+      auth.requireUser(q);
+      return r.status(409).json({
+        error: "Start a project analysis to collect fresh evidence.",
+        code: "RESEARCH_REQUIRED",
+      });
+    }
+    const user = auth.protect(q);
+    return r.json(
+      await freshResearch(user.id, "repo", () => engine.github.repo(name), r),
+    );
+  });
+  app.get("/api/repo", repository);
+  app.post("/api/repo", repository);
+  const comparison = safe(async (q, r) => {
+    const input =
+      q.method === "POST"
+        ? q.body?.repos
+        : String(q.query.repos ?? "").split(",");
+    if (
+      !Array.isArray(input) ||
+      input.some((n) => typeof n !== "string") ||
+      input.length < 2 ||
+      input.length > 6
+    )
+      return r
+        .status(400)
+        .json({ error: "Compare between two and six repositories." });
+    const names = [...new Set(input.map(validateRepo))];
+    if (names.length < 2)
+      return r
+        .status(400)
+        .json({ error: "Choose at least two different repositories." });
+    const cached = names.map((name) =>
+      engine.store.get("repo:" + name + ":true"),
+    );
+    if (cached.every(Boolean)) return r.json(cached);
+    if (!auth.hosted) return r.json(await engine.compare(names));
+    if (q.method === "GET") {
+      auth.requireUser(q);
+      return r.status(409).json({
+        error: "Start a comparison to collect fresh evidence.",
+        code: "RESEARCH_REQUIRED",
+      });
+    }
+    const user = auth.protect(q);
+    return r.json(
+      await freshResearch(user.id, "compare", () => engine.compare(names), r),
+    );
+  });
+  app.get("/api/compare", comparison);
+  app.post("/api/compare", comparison);
   app.use("/api", (_q, r) =>
     r.status(404).json({ error: "Endpoint not found." }),
   );
@@ -700,7 +860,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.9.0/ghtrends-radar-0.9.0.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.10.0/ghtrends-radar-0.10.0.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>
@@ -831,7 +991,7 @@ export function createApp(engine = new Engine()) {
           : status && [401, 403, 404, 422, 429, 503].includes(status)
             ? status
             : 502,
-      ).json({ error: error.message });
+      ).json({ error: error.message, retryAt: (error as any).retryAt });
     },
   );
   if (!basePath) return app;

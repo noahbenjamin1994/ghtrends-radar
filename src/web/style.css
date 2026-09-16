@@ -4186,3 +4186,121 @@ footer small {
   width: 22px;
   height: auto;
 }
+
+/* Research allowance stays close to the action and remains readable on mobile. */
+.usage-summary {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: left;
+}
+.usage-summary strong {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--accent-ink);
+}
+.usage-summary span {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.usage-summary progress {
+  width: 100%;
+  max-width: 250px;
+  height: 3px;
+  border: 0;
+  border-radius: 3px;
+  overflow: hidden;
+  appearance: none;
+  background: #eceeeb;
+}
+.usage-summary progress::-webkit-progress-bar {
+  background: #eceeeb;
+}
+.usage-summary progress::-webkit-progress-value {
+  background: #347a61;
+}
+.usage-summary progress::-moz-progress-bar {
+  background: #347a61;
+}
+.research-allowance {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  justify-content: space-between;
+  margin: 22px 0 14px;
+  padding: 18px 0;
+  border-top: 1px solid #e9eae6;
+}
+.research-allowance .usage-summary {
+  flex-shrink: 0;
+}
+.research-cost {
+  margin: 8px 0 18px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.research-allowance .research-cost {
+  max-width: 360px;
+  margin: 0;
+}
+.account-popover .usage-summary {
+  padding: 12px 0;
+  border-block: 1px solid #eeefeb;
+  margin: 8px 0;
+}
+.account-menu .quota-count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.quota-total {
+  color: #747872;
+  font-size: 12px;
+}
+.credit-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-top: 16px;
+  background: #f0f6f2;
+  border-radius: 8px;
+  color: #275c48;
+  font-size: 13px;
+}
+.source-notice {
+  font-size: 12px;
+  color: #856523;
+  line-height: 1.7;
+}
+.research-start {
+  max-width: 400px;
+  margin: 20px auto 0;
+}
+.research-start .usage-summary {
+  text-align: center;
+}
+.research-start progress {
+  margin: 0 auto;
+}
+@media (max-width: 600px) {
+  .research-allowance {
+    display: grid;
+    gap: 12px;
+  }
+  .account-menu summary > span {
+    display: inline;
+  }
+  .account-menu summary {
+    gap: 4px;
+  }
+  .account-menu .account-symbol {
+    display: none;
+  }
+  .search-field button {
+    font-size: 12px;
+  }
+}
