@@ -78,7 +78,7 @@ export function renderDocument(
     (geo && (path === "/" || path.startsWith("/market/")) ? `?geo=${geo}` : "");
   const canonical = localeUrl(identity, locale);
   const image = m
-    ? localeUrl(`${base}/api/cards/${m.id}.png`, locale)
+    ? localeUrl(`${base}/api/cards/${m.id}.png?v=2`, locale)
     : `${base}/social-card.png`;
   const noindex = status !== 200 || options.noindex;
   let content: string;
@@ -100,7 +100,7 @@ export function renderDocument(
         )
         .join("")}</tbody></table></div></section>
       <section><h2>${e("Limits of this result")}</h2>${list(m.limitations)}<p>${e("Search interest measures attention, not paying customers. Classification thresholds are published heuristics and still require empirical calibration.")}</p></section>
-      <section><h2>${e("Use and share the evidence")}</h2><p>${link(`/report/${m.id}`, "Permanent report")} · ${link(`/api/reports/${m.id}?format=md`, "Markdown")} · ${link(`/api/reports/${m.id}`, "JSON")} · ${link(`/api/cards/${m.id}.png`, "PNG card")}</p><p>${link(SOURCE, "Use the open-source CLI and MCP server on GitHub")}</p></section>`;
+      <section><h2>${e("Use and share the evidence")}</h2><p>${link(`/report/${m.id}`, "Permanent report")} · ${link(`/api/reports/${m.id}?format=md&v=2`, "Markdown")} · ${link(`/api/reports/${m.id}`, "JSON")} · ${link(`/api/cards/${m.id}.png?v=2`, "PNG card")}</p><p>${link(SOURCE, "Use the open-source CLI and MCP server on GitHub")}</p></section>`;
   } else if (status === 404) {
     content = `<h1>${e("Page not found.")}</h1><p>${e("This report or page is unavailable.")} ${link("/", "Explore the radar")}</p>`;
   } else if (path === "/") {

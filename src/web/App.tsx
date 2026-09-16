@@ -907,7 +907,7 @@ function MarketView({
           <CopyButton value={share} label={t("Share report")} />
           <a
             className="button subtle"
-            href={localUrl(`/api/reports/${m.id}?format=md`)}
+            href={localUrl(`/api/reports/${m.id}?format=md&v=2`)}
             download={`ghtrends-${m.topic.slug}.md`}
           >
             <Download size={15} />
@@ -1255,7 +1255,7 @@ function MarketView({
             <p>{t("Share a permanent snapshot of the evidence.")}</p>
           </div>
           <CopyButton
-            value={`[![${t(m.topic.name)}: ${t(m.headline)}](${location.origin}${localUrl(`/api/cards/${m.id}.png`)})](${share})`}
+            value={`[![${t(m.topic.name)}: ${t(m.headline)}](${location.origin}${localUrl(`/api/cards/${m.id}.png?v=2`)})](${share})`}
             label={t("Copy README card")}
           />
         </div>

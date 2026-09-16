@@ -2,7 +2,7 @@ import express from "express";
 import sharp from "sharp";
 import { marketCard } from "../core/card.js";
 import { isIP } from "node:net";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -255,6 +255,7 @@ export function createApp(engine = new Engine()) {
       r.set("Cache-Control", "public,max-age=31536000,immutable");
       if (q.query.format === "md")
         return r
+          .set("Cache-Control", "public,max-age=3600,must-revalidate")
           .type("text/markdown")
           .send(
             marketMarkdown(m, baseURL(q), q.query.lang === "zh" ? "zh" : "en"),
@@ -279,10 +280,10 @@ export function createApp(engine = new Engine()) {
         ),
         q.query.lang === "zh" ? "zh" : "en",
       );
-      r.set("Cache-Control", "public,max-age=31536000,immutable");
+      r.set("Cache-Control", "public,max-age=3600,must-revalidate");
       if (String(q.params.file).endsWith(".svg"))
         return r.type("image/svg+xml").send(svg);
-      const key = `card:${base}:${id}`,
+      const key = `card:${createHash("sha256").update(svg).digest("hex")}`,
         cached = engine.store.get<string>(key);
       const bytes = cached
         ? Buffer.from(cached, "base64")

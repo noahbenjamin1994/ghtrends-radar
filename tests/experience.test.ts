@@ -122,6 +122,52 @@ test("Chinese reports, metadata and exports agree while preserving identity and 
   assert.equal(requestLocale(undefined, "ghtrends_lang=en", "zh-CN"), "en");
   assert.equal(requestLocale(undefined, "", "en;q=0.2,zh-CN;q=0.9"), "zh");
 });
+test("PNG exports keep language-specific caches and rendered exports can revalidate", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-cards-"));
+  const engine = new Engine(new Store(dir));
+  const m = abbreviationReport();
+  m.id = "abcdef1234567890";
+  engine.store.saveMarket(m);
+  const server = createApp(engine).listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  try {
+    const en = Buffer.from(
+      await (await fetch(`${base}/api/cards/${m.id}.png`)).arrayBuffer(),
+    );
+    const zh = Buffer.from(
+      await (
+        await fetch(`${base}/api/cards/${m.id}.png?lang=zh`)
+      ).arrayBuffer(),
+    );
+    assert.notDeepEqual(
+      en,
+      zh,
+      "one language must not reuse the other language's rendered PNG",
+    );
+    const enAgain = Buffer.from(
+      await (
+        await fetch(`${base}/api/cards/${m.id}.png`, {
+          headers: { cookie: "ghtrends_lang=zh" },
+        })
+      ).arrayBuffer(),
+    );
+    assert.deepEqual(
+      en,
+      enAgain,
+      "artifact language follows the URL, not a browser cookie",
+    );
+    const md = await fetch(`${base}/api/reports/${m.id}?format=md&lang=zh`);
+    assert.match(md.headers.get("cache-control") || "", /must-revalidate/);
+    assert.match(await md.text(), /接下来怎么做/);
+    const json = await fetch(`${base}/api/reports/${m.id}`);
+    assert.match(json.headers.get("cache-control") || "", /immutable/);
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()));
+    await engine.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 test("multi-topic supply is deduplicated, marks incomplete unions and exposes base facts before enrichment", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-union-")),
     store = new Store(dir),
