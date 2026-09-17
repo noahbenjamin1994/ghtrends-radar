@@ -38,7 +38,7 @@ A scan gives an evidence-based recommendation even when a reliable quadrant cann
 
 For example, `ai4s` resolves to **AI for Science**. GitHub searches `ai4science`, `ai-for-science`, and `ai4s` separately and deduplicates returned repositories. Incomplete unions report a lower bound. Google Trends measures the full field name. Existing abbreviation-only reports keep their original evidence and offer a one-click rescan.
 
-Scans show source progress and a preliminary result before optional project details finish. Interactive scans have priority over scheduled refreshes, and repository enrichment uses three bounded workers. Source rate limits can still increase latency. Without a model key, self-hosted scans use the built-in topic mappings. With a DeepSeek key, input normalization and a short evidence-based brief are enabled.
+Scans show source progress and a preliminary result before optional project details finish. Interactive scans have priority over scheduled refreshes, and repository enrichment uses three bounded workers. Source rate limits can still increase latency. Without a model key, self-hosted scans use the built-in topic mappings. With a DeepSeek key, input normalization and a source-grounded product strategy are enabled.
 
 The website supports **English and Simplified Chinese**, including report text, Markdown and PNG exports. It follows the browser language on first visit; the header switch saves your preference and preserves the current page. Add `?lang=zh` or `?lang=en` to open a specific language.
 
@@ -57,7 +57,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.12.1/ghtrends-radar-0.12.1.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.13.0/ghtrends-radar-0.13.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -160,7 +160,16 @@ export DEEPSEEK_MODEL=deepseek-flash
 ghtrends ui
 ```
 
-The model proposes one primary Trends phrase, up to two genuine synonyms, and bounded GitHub topic/phrase queries. It also reviews project roles using quoted repository metadata; deterministic code calculates pressure and search direction. Ambiguous acronyms request clarification. It then summarizes **collected evidence** in English and Chinese; it does not calculate or override metrics. Queries go to DeepSeek, Google and GitHub as needed. Do not enter secrets. A failed brief leaves the source report usable.
+The model proposes one primary Trends phrase, up to two genuine synonyms, and bounded GitHub topic/phrase queries. It also reviews project roles using quoted repository metadata; deterministic code calculates pressure and search direction. Ambiguous acronyms request clarification. It then develops one **product strategy to test** in English and Chinese. Market metrics remain a separate, deterministic layer. Use public research inputs: queries and bounded public-source excerpts go to DeepSeek, Google and GitHub as needed. Collected evidence remains readable during model recovery.
+
+**The strategy process**
+
+1. Read up to three relevant project READMEs and three individual issue excerpts.
+2. Enable DeepSeek Flash thinking at high effort to identify a specific audience, causal mechanism, first useful artifact, deliberate tradeoff and critical assumption.
+3. Check up to two targeted GitHub searches and two additional READMEs for existing implementations of the proposed idea. A second reasoning pass challenges duplication, factual support and the proposed adoption advantage. A bounded editing pass repairs wording or citation problems when needed.
+4. Deliver one feasible experiment with proposed continue/redirect thresholds and links to the premise sources. Exact cited excerpts are checked against the supplied source text.
+
+Sparse source coverage produces a **domain hypothesis**; document-grounded recommendations are labeled **source-led hypotheses**. Both represent research proposals. The interface shows source progress and preliminary measurements while the strategy develops. AI-enabled scans can proceed with available evidence during Trends cooldown, within the same account and attempt limits. Strategy generation, review and corrective editing are recorded separately in admin usage. Provider reasoning text stays outside stored reports. Results use a six-hour strategy cache; deeper analysis adds latency and model usage.
 
 `PUBLIC_URL` may include a directory, for example `https://example.com/radar`. The same build supports both directory hosting and a local root URL. Forward that prefix unchanged to the server and configure the matching Logto callback.
 

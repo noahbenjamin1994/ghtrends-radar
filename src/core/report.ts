@@ -1,6 +1,7 @@
 import type { Market, Repo } from "./types.js";
 import { text, localeUrl, type Locale } from "./i18n.js";
 import { marketAssessment, competitionPressure } from "./assessment.js";
+import { visibleStrategy, strategyRows } from "./strategy.js";
 const cell = (s: string) => s.replaceAll("|", "\\|").replace(/[\r\n]+/g, " ");
 export function compareMarkdown(repos: Repo[], locale: Locale = "en"): string {
   const t = (s: string) => text(s, locale);
@@ -31,6 +32,8 @@ export function marketMarkdown(
 ): string {
   const t = (s: string) => text(s, locale),
     a = marketAssessment(m, locale);
+  const strategy =
+    a.narrative.kind === "ai" ? visibleStrategy(m.brief, locale) : undefined;
   return [
     `# ${t(m.topic.name)}: ${a.title}`,
     "",
@@ -60,7 +63,28 @@ export function marketMarkdown(
           "",
           a.narrative.summary,
           "",
-          ...a.narrative.nextSteps.map((s) => "- " + s),
+          ...(strategy
+            ? strategyRows(strategy, locale).flatMap((row) => [
+                `### ${row.label}`,
+                "",
+                row.text,
+                "",
+              ])
+            : a.narrative.nextSteps.map((s) => "- " + s)),
+          ...(strategy
+            ? [
+                locale === "zh"
+                  ? "策略由 AI 提出；数字门槛为建议实验标准，真实结果用于决定下一步。"
+                  : "AI strategy hypothesis. Numeric thresholds are proposed experiment criteria; actual outcomes guide the next decision.",
+                "",
+                ...(m.brief?.evidence || []).flatMap((ref) => {
+                  const source = m.brief!.sources.find((s) => s.id === ref.id);
+                  return source
+                    ? [`- [${cell(source.label)}](${source.url})`]
+                    : [];
+                }),
+              ]
+            : []),
           "",
           t(
             a.narrative.kind === "ai"

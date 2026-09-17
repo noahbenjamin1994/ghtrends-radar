@@ -59,6 +59,7 @@ import { marketAssessment, competitionPressure } from "../core/assessment.js";
 import { resolveTopic } from "../core/topics.js";
 import type { ScanProgress } from "../core/engine.js";
 import { completeWeeklySeries } from "../core/evidence.js";
+import { visibleStrategy } from "../core/strategy.js";
 import { appUrl, routeUrl, currentRoute } from "./paths.js";
 const SOURCE = "https://github.com/noahbenjamin1994/ghtrends-radar";
 export function App() {
@@ -318,7 +319,9 @@ export function App() {
   const scanTopic = job?.progress?.topic || null;
   const stageLabels = {
     interpreting: "Understanding your research question",
-    brief: "Writing a short evidence-based brief",
+    brief: "Developing a focused product strategy",
+    researching: "Reading project documentation and user requests",
+    reviewing: "Challenging assumptions and sharpening the recommendation",
     refining: "Refining same-intent project searches",
     sources: "Collecting source evidence",
     github: "GitHub supply received",
@@ -1221,6 +1224,10 @@ function MarketView({
       />
     );
   const assessment = marketAssessment(m, locale);
+  const strategy =
+    assessment.narrative.kind === "ai"
+      ? visibleStrategy(m.brief, locale)
+      : undefined;
   const l = (en: string, zh: string) => (locale === "zh" ? zh : en);
   const share = location.origin + localUrl("/report/" + m.id);
   const demandPoints = completeWeeklySeries(m.demand, m.asOf).points;
@@ -1396,6 +1403,7 @@ function MarketView({
       )}
       <nav className="report-nav" aria-label={l("Report sections", "报告章节")}>
         <a href="#outlook">{l("Overview", "判断概览")}</a>
+        {strategy && <a href="#strategy">{l("Strategy", "产品判断")}</a>}
         <a href="#evidence">{l("Evidence", "趋势证据")}</a>
         <a href="#projects">{l("Projects", "相关项目")}</a>
         <a href="#method">{l("Research scope", "研究范围")}</a>
@@ -1496,28 +1504,119 @@ function MarketView({
           </small>
         </div>
       </div>
-      <section className="report-actions-section">
-        <div className="report-section-heading">
-          <div>
-            <div className="eyebrow">{l("YOUR NEXT MOVE", "下一步怎么做")}</div>
-            <h3>
-              {l(
-                "Turn the signal into a small experiment",
-                "把判断变成一次小验证",
-              )}
-            </h3>
+      {strategy ? (
+        <section className="strategy-section" id="strategy">
+          <div className="report-section-heading">
+            <div>
+              <div className="eyebrow">
+                {l("A PRODUCT THESIS TO TEST", "值得验证的产品判断")}
+              </div>
+              <h3>{strategy.angle}</h3>
+            </div>
+            <span className="strategy-basis">
+              {m.brief?.basis === "source-led"
+                ? l("Source-led hypothesis", "基于来源的策略假设")
+                : l("Domain hypothesis", "领域知识推演")}
+            </span>
           </div>
-          <span>{l("A practical starting point", "从具体行动开始")}</span>
-        </div>
-        <ol className="report-next-steps">
-          {assessment.narrative.nextSteps.slice(0, 3).map((step, i) => (
-            <li key={step}>
-              <span>{String(i + 1).padStart(2, "0")}</span>
-              <p>{step}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
+          <p className="strategy-audience">{strategy.audience}</p>
+          <div className="strategy-reasoning">
+            <div>
+              <h4>{l("The mechanism", "关键洞察")}</h4>
+              <p>{strategy.mechanism}</p>
+            </div>
+            <div>
+              <h4>{l("The first useful artifact", "第一件值得做的东西")}</h4>
+              <p>{strategy.wedge}</p>
+            </div>
+          </div>
+          <details className="strategy-tradeoffs">
+            <summary>
+              {l("The tradeoff & the assumption", "这条路的取舍与关键假设")}
+            </summary>
+            <div className="strategy-reasoning">
+              <div>
+                <h4>{l("Deliberate tradeoff", "主动取舍")}</h4>
+                <p>{strategy.tradeoff}</p>
+              </div>
+              <div>
+                <h4>{l("What must hold true", "成立条件")}</h4>
+                <p>{strategy.assumption}</p>
+              </div>
+            </div>
+          </details>
+          <div className="strategy-experiment">
+            <div className="eyebrow">
+              {l("THE DECIDING EXPERIMENT", "用一次实验决定投入")}
+            </div>
+            <p>{strategy.experiment}</p>
+            <div className="strategy-decisions">
+              <div>
+                <h4>{l("Continue when", "建议继续的信号")}</h4>
+                <p>{strategy.successSignal}</p>
+              </div>
+              <div>
+                <h4>{l("Change direction when", "建议转向的信号")}</h4>
+                <p>{strategy.pivotSignal}</p>
+              </div>
+            </div>
+          </div>
+          <div className="strategy-sources">
+            <span>{l("Premise sources", "推演依据")}</span>
+            {m.brief?.evidence
+              ?.filter(
+                (ref, index, refs) =>
+                  refs.findIndex((r) => r.id === ref.id) === index,
+              )
+              .map((ref) => {
+                const source = m.brief!.sources.find((s) => s.id === ref.id);
+                return source ? (
+                  <a
+                    key={ref.id}
+                    title={ref.quote}
+                    href={source.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {source.label}
+                    <ExternalLink size={12} />
+                  </a>
+                ) : null;
+              })}
+          </div>
+          <p className="footnote">
+            {l(
+              "AI strategy hypothesis. The thresholds are proposed experiment criteria; actual outcomes determine the next decision.",
+              "以上为 AI 提出的策略假设。数字门槛属于建议实验标准，真实结果用于决定下一步。",
+            )}
+          </p>
+        </section>
+      ) : (
+        <section className="report-actions-section">
+          <div className="report-section-heading">
+            <div>
+              <div className="eyebrow">
+                {l("YOUR NEXT MOVE", "下一步怎么做")}
+              </div>
+              <h3>
+                {l(
+                  "Turn the signal into a small experiment",
+                  "把判断变成一次小验证",
+                )}
+              </h3>
+            </div>
+            <span>{l("A practical starting point", "从具体行动开始")}</span>
+          </div>
+          <ol className="report-next-steps">
+            {assessment.narrative.nextSteps.slice(0, 3).map((step, i) => (
+              <li key={step}>
+                <span>{String(i + 1).padStart(2, "0")}</span>
+                <p>{step}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       {m.aiError && <p className="muted">{t(m.aiError)}</p>}
       {m.demand.retryAt && (
         <p className="admin-note">
@@ -2530,7 +2629,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.12.1/ghtrends-radar-0.12.1.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.13.0/ghtrends-radar-0.13.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}

@@ -42,7 +42,7 @@
 
 例如输入 `ai4s`，系统会识别为 **AI for Science**，分别查询 GitHub 的 `ai4science`、`ai-for-science`、`ai4s` 标签，再对返回项目去重；不完整的联合检索只报告已找到的下限。Google Trends 使用完整领域名称。旧的缩写报告保留原始数据，并提供一键重查入口。
 
-扫描会显示来源进度，在项目详情补充完毕前先展示初步结果。用户扫描优先于定时刷新，仓库详情最多使用三个并发请求；数据源限流仍可能增加等待时间。自托管未填模型 Key 时使用内置主题映射；填入 DeepSeek Key 后启用输入标准化和简短研究报告。
+扫描会显示来源进度，在项目详情补充完毕前先展示初步结果。用户扫描优先于定时刷新，仓库详情最多使用三个并发请求；数据源限流仍可能增加等待时间。自托管未填模型 Key 时使用内置主题映射；填入 DeepSeek Key 后启用输入标准化和基于来源的产品策略研判。
 
 ## 60 秒开始使用
 
@@ -61,7 +61,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.12.1/ghtrends-radar-0.12.1.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.13.0/ghtrends-radar-0.13.0.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
@@ -166,7 +166,16 @@ export DEEPSEEK_MODEL=deepseek-flash
 ghtrends ui
 ```
 
-模型基于项目元数据原文核对角色；竞争压力与搜索方向由确定性代码计算。模型生成一个 Trends 主词、最多两个同义表达，以及受约束的 GitHub 主题与短语。歧义缩写会要求选择含义；采集完成后，根据**实际证据**生成中英文简报，不计算或改写指标。必要的查询会发送给 DeepSeek、Google、GitHub，请勿输入秘密。简报失败时，已采集的报告仍可阅读。
+模型基于项目元数据原文核对角色；竞争压力与搜索方向由确定性代码计算。模型生成一个 Trends 主词、最多两个同义表达，以及受约束的 GitHub 主题与短语。歧义缩写会要求选择含义；随后生成中英文**产品策略假设**。市场指标与策略推演分层呈现。输入应限于公开研究内容；查询与限量的公开来源摘录会按需发送给 DeepSeek、Google、GitHub。模型恢复期间，已采集的报告仍可阅读。
+
+### 产品策略如何生成
+
+1. 阅读最多 3 份相关项目 README 和 3 条具体 Issue 摘录。
+2. 为 DeepSeek Flash 开启高强度思考，提出具体用户、因果机制、首个交付物、主动取舍和关键假设。
+3. 围绕建议本身补充最多 2 次 GitHub 检索、2 份现有工具 README，再进行第二轮推理，检查已有方案、事实依据与采用理由。需要时追加一轮措辞与引用校订。
+4. 给出一项可执行实验，写清建议继续、建议转向的门槛，并链接推演依据。引用原文会与提供给模型的摘录核对。
+
+材料稀疏时标为**领域知识推演**，有项目文档支撑时标为**基于来源的策略假设**，均作为待检验的研究建议。页面在研判期间展示来源进度和初步指标。启用 AI 的扫描在 Trends 冷却期间仍可结合现有材料分析，同时沿用账户额度与尝试上限。管理员可分别查看深度研判、建议复核和校订的用量。报告仅存储最终结论与证据摘录。策略结果缓存 6 小时；深度分析会增加等待时间与模型消耗。
 
 `PUBLIC_URL` 支持子目录，例如 `https://example.com/radar`；同一安装包也支持本地根路径。反向代理需原样转发此前缀，并配置对应的 Logto 回调地址。
 

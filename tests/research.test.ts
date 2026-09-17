@@ -514,7 +514,8 @@ test("pipeline retries sparse supply once, preserves successful evidence on repa
     engine.research.plan = async () => topic;
     engine.trends.demand = async () => m.demand;
     engine.github.gaps = async () => [];
-    engine.research.brief = async () => {
+    engine.github.researchSources = async () => [];
+    engine.research.insights = async () => {
       throw new Error("optional brief");
     };
     engine.research.reviewSupply = async (_topic, s) => s;

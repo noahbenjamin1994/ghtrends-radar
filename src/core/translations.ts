@@ -357,6 +357,11 @@ export const zh: Record<string, string> = {
   "Start a scan": "开始研究",
   "Understanding your research question": "正在理解研究方向",
   "Writing a short evidence-based brief": "正在撰写简短研究报告",
+  "Developing a focused product strategy": "正在推演具体产品策略",
+  "Reading project documentation and user requests":
+    "正在阅读项目说明与用户反馈",
+  "Challenging assumptions and sharpening the recommendation":
+    "正在核对关键假设并打磨建议",
   "Public reports are free to browse. Sign in for AI-assisted scans and saved history.":
     "公开报告免登录浏览；登录后可使用 AI 扫描并保存研究。",
   "Self-hosted: your keys, your data. Scans are saved on this server.":

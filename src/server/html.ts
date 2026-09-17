@@ -4,6 +4,7 @@ import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
 import { marketAssessment, competitionPressure } from "../core/assessment.js";
 import { text, localeUrl, MARKET_LABELS, type Locale } from "../core/i18n.js";
 import type { Market } from "../core/types.js";
+import { visibleStrategy, strategyRows } from "../core/strategy.js";
 
 const SOURCE = "https://github.com/noahbenjamin1994/ghtrends-radar";
 export const escapeHtml = (value: string | number) =>
@@ -93,6 +94,10 @@ export function renderDocument(
   const noindex = status !== 200 || options.noindex;
   let content: string;
   if (m && assessment) {
+    const strategy =
+      assessment.narrative.kind === "ai"
+        ? visibleStrategy(m.brief, locale)
+        : undefined;
     const sources = m.supply.searches?.length
       ? m.supply.searches
       : [{ url: m.supply.sourceUrl, query: m.supply.query }];
@@ -101,6 +106,21 @@ export function renderDocument(
       <p>${e("Measured search term")}: ${escapeHtml(m.demand.keyword)} · ${escapeHtml(assessment.demandNote)}</p>${m.demand.retryAt ? `<p>${e("Google Trends refresh window")}: ${escapeHtml(m.demand.retryAt)}</p>` : ""}${list(assessment.facts)}${m.kind === "uncertain" ? `<p>${e("Quadrant not yet established")}</p><h3>${e("What to do next")}</h3>${list(assessment.nextSteps)}` : ""}
       <dl>${m.competition ? `<dt>${e("Competition pressure")}</dt><dd>${escapeHtml(competitionPressure(m))} / 100 · ${e("pressure." + m.competition.level)}</dd><dt>${e("Direct alternatives")}</dt><dd>${m.competition.direct}</dd><dt>${e("Direction basis")}</dt><dd>${e("basis." + (m.metrics.directionBasis || "recent-windows"))}</dd>` : ""}<dt>${e("Matching active GitHub projects")}</dt><dd>${m.supply.error ? "—" : (m.supply.complete ? "" : "≥") + number(m.supply.total)}</dd><dt>${e("Search-interest growth")}</dt><dd>${growth(m)} · ${e("Last 8 complete weeks vs previous 8")}</dd><dt>${e("Search term and region")}</dt><dd>${escapeHtml(m.demand.keyword)} · ${e(m.geo || "Worldwide")}</dd><dt>${e("Complete weekly observations")}</dt><dd>${m.metrics.points}</dd></dl></section>
       ${m.brief ? `<section><h2>${e("Research brief")}</h2><p>${escapeHtml(assessment.narrative.summary)}</p>${list(assessment.narrative.nextSteps)}<p>${e(assessment.narrative.kind === "ai" ? "AI interpretation of the evidence below. Verify the sources before acting." : "This recommendation follows the collected source evidence.")}</p></section>` : ""}
+      ${
+        strategy
+          ? `<section><h2>${locale === "zh" ? "值得验证的产品判断" : "A product thesis to test"}</h2>${strategyRows(
+              strategy,
+              locale,
+            )
+              .map(
+                (row) =>
+                  `<h3>${escapeHtml(row.label)}</h3><p>${escapeHtml(row.text)}</p>`,
+              )
+              .join(
+                "",
+              )}<p>${locale === "zh" ? "策略由 AI 提出，数字门槛为建议实验标准，真实结果用于决定下一步。" : "AI strategy hypothesis. Numeric thresholds are proposed experiment criteria; actual outcomes guide the next decision."}</p></section>`
+          : ""
+      }
       <section><h2>${e("Why this classification")}</h2>${list(m.reasons)}</section>
       <section><h2>${e("Source evidence")}</h2>${sources.map((s) => `<p>${link(s.url, "GitHub repository search")} · <code>${escapeHtml(s.query)}</code></p>`).join("")}<p>${e("Collected")} ${escapeHtml(m.supply.fetchedAt)}</p><p>${link(m.demand.sourceUrl, "Google Trends search interest")} · ${e("Collected")} ${escapeHtml(m.demand.fetchedAt)}</p></section>
       <section><h2>${e("Leading repositories")}</h2><div class="snapshot-table"><table><thead><tr>${["Repository", "Stars", "Description"].map((s) => `<th scope="col">${e(s)}</th>`).join("")}</tr></thead><tbody>${m.supply.repositories

@@ -28,9 +28,37 @@ export interface QueryPlan {
 export interface Brief {
   model: string;
   generatedAt: string;
-  en: { headline?: string; summary: string; nextSteps: string[] };
-  zh: { headline?: string; summary: string; nextSteps: string[] };
-  sources: { label: string; url: string }[];
+  en: BriefParagraph;
+  zh: BriefParagraph;
+  sources: ResearchSource[];
+  strategyVersion?: string;
+  reviewed?: boolean;
+  basis?: "source-led" | "hypothesis-led";
+  evidence?: { id: string; quote: string }[];
+}
+export interface BriefParagraph {
+  headline?: string;
+  summary: string;
+  nextSteps: string[];
+  strategy?: Strategy;
+}
+export interface Strategy {
+  angle: string;
+  audience: string;
+  mechanism: string;
+  wedge: string;
+  tradeoff: string;
+  assumption: string;
+  experiment: string;
+  successSignal: string;
+  pivotSignal: string;
+}
+export interface ResearchSource {
+  id?: string;
+  label: string;
+  url: string;
+  excerpt?: string;
+  fetchedAt?: string;
 }
 export interface InterestPoint {
   date: string;

@@ -5,7 +5,13 @@ import { Store } from "../core/store.js";
 import { repoRelevance } from "../core/competition.js";
 import { POLICY, median } from "../core/analyze.js";
 import { validateRepo } from "../core/topics.js";
-import type { Repo, SupplyEvidence, Topic, Gap } from "../core/types.js";
+import type {
+  Repo,
+  SupplyEvidence,
+  Topic,
+  Gap,
+  ResearchSource,
+} from "../core/types.js";
 export class ProviderError extends Error {
   constructor(
     message: string,
@@ -22,7 +28,11 @@ export class GitHub {
     const cached = this.store.get<T>("github:" + path);
     const call: ProviderCall = {
       provider: "github",
-      operation: path.startsWith("/search/") ? "search" : "repository",
+      operation: path.endsWith("/readme")
+        ? "readme"
+        : path.startsWith("/search/")
+          ? "search"
+          : "repository",
       started: new Date().toISOString(),
       durationMs: 0,
     };
@@ -318,6 +328,123 @@ export class GitHub {
       onBase?.(structuredClone(result));
     }
     return result;
+  }
+  async ideaAlternatives(queries: string[]): Promise<ResearchSource[]> {
+    const terms = [...new Set(queries)]
+      .filter(
+        (q) =>
+          q.length >= 2 &&
+          q.length <= 70 &&
+          /^[\p{L}\p{N}][\p{L}\p{N} .+/#()&-]*$/u.test(q),
+      )
+      .slice(0, 2);
+    const results = await Promise.allSettled(
+      terms.map(async (term, i) => {
+        const q = `${term} in:name,description fork:false archived:false`;
+        const data = await this.get<{
+          total_count: number;
+          items: { full_name: string; description: string | null }[];
+        }>(
+          "/search/repositories?" +
+            new URLSearchParams({ q, per_page: "4", sort: "stars" }),
+          21600000,
+        );
+        const candidates = data.items.slice(0, 4).map((r) => ({
+          name: validateRepo(r.full_name),
+          description: (r.description || "").slice(0, 500),
+        }));
+        const sources: ResearchSource[] = [
+          {
+            id: `A${i + 1}`,
+            label: `Related tools: ${term}`,
+            url:
+              "https://github.com/search?" +
+              new URLSearchParams({ q, type: "repositories" }),
+            excerpt:
+              `Targeted check for the proposed artifact: ${term}. Matching public projects: ${data.total_count}. Bounded search coverage; assess each candidate's actual scope.\n` +
+              candidates.map((r) => `${r.name}: ${r.description}`).join("\n"),
+          },
+        ];
+        if (candidates[0]) {
+          const docs = await this.researchSources(
+            [{ name: candidates[0].name } as Repo],
+            [],
+          );
+          sources.push(...docs.map((d) => ({ ...d, id: `A${i + 1}R` })));
+        }
+        return sources;
+      }),
+    );
+    return results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+  }
+  async researchSources(repos: Repo[], gaps: Gap[]): Promise<ResearchSource[]> {
+    const direct = repos.filter((r) => r.relevance?.role === "direct");
+    const selected = (direct.length ? direct : repos).slice(0, 3);
+    const clean = (s: string, limit: number) =>
+      s
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .slice(0, limit);
+    const documents = await Promise.allSettled([
+      ...selected.map(async (repo, i): Promise<ResearchSource> => {
+        const name = validateRepo(repo.name);
+        const doc = await this.get<{
+          encoding?: string;
+          content?: string;
+          html_url?: string;
+          size?: number;
+        }>(`/repos/${name}/readme`, 86400000);
+        if (
+          doc.encoding !== "base64" ||
+          !doc.content ||
+          (doc.size || 0) > 300000
+        )
+          throw new Error("README excerpt pending");
+        const url = new URL(
+          doc.html_url || `https://github.com/${name}#readme`,
+        );
+        if (
+          url.origin !== "https://github.com" ||
+          (url.pathname !== `/${name}` && !url.pathname.startsWith(`/${name}/`))
+        )
+          throw new Error("README source pending");
+        return {
+          id: `R${i + 1}`,
+          label: `${name} · README`,
+          url: url.href,
+          excerpt:
+            `Project: ${name}. Reviewed role: ${repo.relevance?.role || "pending"}. Maintainer documentation:\n` +
+            clean(Buffer.from(doc.content, "base64").toString("utf8"), 7000),
+        };
+      }),
+      ...gaps.slice(0, 3).map(async (gap, i): Promise<ResearchSource> => {
+        const match =
+          /^https:\/\/github\.com\/([^/]+\/[^/]+)\/issues\/(\d+)$/.exec(
+            gap.url,
+          );
+        if (!match) throw new Error("Issue source pending");
+        const name = validateRepo(match[1]!);
+        const issue = await this.get<{
+          title: string;
+          body?: string;
+          state: string;
+          created_at?: string;
+          updated_at?: string;
+        }>(`/repos/${name}/issues/${match[2]}`, 21600000);
+        return {
+          id: `I${i + 1}`,
+          label: gap.title,
+          url: gap.url,
+          excerpt: `Individual issue request: ${issue.title}. State: ${issue.state}. Created: ${issue.created_at || gap.createdAt}. Updated: ${issue.updated_at || gap.updatedAt}.\n${clean(issue.body || gap.excerpt, 1800)}`,
+        };
+      }),
+    ]);
+    return documents.flatMap((d) =>
+      d.status === "fulfilled" ? [d.value] : [],
+    );
   }
   async gaps(repos: Repo[]): Promise<Gap[]> {
     if (!repos.length) return [];

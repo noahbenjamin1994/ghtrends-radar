@@ -272,3 +272,42 @@ test("partial project evidence returns its credit while keeping the useful resul
     assert.equal(engine.store.usage("alice"), 0);
     assert.equal((await response.json()).name, "a/one");
   }));
+
+test("AI research remains available during source cooldown within attempt limits and returns partial-evidence credits", async () =>
+  hosted(async ({ engine, get, post }) => {
+    (engine.research as any).enabled = true;
+    engine.store.set(
+      "trends:cooldown:v1",
+      { until: Date.now() + 60000 },
+      60000,
+    );
+    let calls = 0;
+    engine.scan = async () => {
+      calls++;
+      const m = structuredClone(seed);
+      m.id = "fedcba9876543210";
+      m.demand.error = "Collection pending";
+      m.demand.points = [];
+      m.kind = "uncertain";
+      engine.store.saveMarket(m, false, "alice");
+      return m;
+    };
+    for (let i = 0; i < 6; i++) {
+      const response = await post("/api/scan", { topic: "new idea " + i });
+      assert.equal(response.status, 202);
+      const run = await response.json();
+      const job = await (await get("/api/jobs/" + run.id)).json();
+      assert.equal(job.state, "complete");
+      assert.equal(job.credit, "returned");
+      assert.equal(engine.store.usage("alice"), 0);
+    }
+    assert.equal(
+      (await post("/api/scan", { topic: "another idea" })).status,
+      429,
+    );
+    assert.equal(calls, 6);
+    assert.equal(
+      (await post("/api/scan", { topic: "guest idea" }, false)).status,
+      401,
+    );
+  }));

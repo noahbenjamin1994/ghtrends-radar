@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { Engine, type ScanProgress } from "../core/engine.js";
 import { ProxyUsageClient } from "../providers/proxy-usage.js";
 import { QUERY_PLAN_VERSION } from "../providers/research.js";
+import { STRATEGY_VERSION } from "../core/strategy.js";
 import {
   TOPICS,
   resolveTopic,
@@ -701,6 +702,7 @@ export function createApp(engine = new Engine()) {
               keyword || "",
               ALGORITHM_VERSION,
               QUERY_PLAN_VERSION,
+              STRATEGY_VERSION,
             ]),
           )
           .digest("hex");
@@ -716,7 +718,7 @@ export function createApp(engine = new Engine()) {
       )
         return r.json({ state: "complete", market: saved, credit: "free" });
       const retryAt = engine.trends.status().retryAt;
-      if (retryAt)
+      if (retryAt && !engine.research.enabled)
         throw Object.assign(
           new Error(
             "Google Trends is cooling down. Refresh after the scheduled time or open the source.",
@@ -866,7 +868,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.12.1/ghtrends-radar-0.12.1.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.13.0/ghtrends-radar-0.13.0.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>

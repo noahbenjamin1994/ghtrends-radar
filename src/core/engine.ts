@@ -9,6 +9,7 @@ import { resolveTopic, validateGeo, validateRepo, TOPICS } from "./topics.js";
 import { importDemand } from "./import.js";
 import { analyze, ALGORITHM_VERSION } from "./analyze.js";
 import { sourceEvidenceIsFresh, completeWeeklySeries } from "./evidence.js";
+import { STRATEGY_VERSION } from "./strategy.js";
 import type { Market, DemandEvidence, SupplyEvidence, Topic } from "./types.js";
 export interface ScanProgress {
   stage:
@@ -18,6 +19,8 @@ export interface ScanProgress {
     | "demand"
     | "details"
     | "brief"
+    | "researching"
+    | "reviewing"
     | "refining";
   supplyCount?: number;
   weeklyPoints?: number;
@@ -81,6 +84,7 @@ export class Engine {
       !options.private &&
       existing &&
       existing.version === ALGORITHM_VERSION &&
+      (!ai || existing.brief?.strategyVersion === STRATEGY_VERSION) &&
       existing.topic.query === topic.query &&
       JSON.stringify(existing.topic.queries) ===
         JSON.stringify(topic.queries) &&
@@ -170,10 +174,20 @@ export class Engine {
       ),
     );
     const market = analyze(topic, demand, supply, gaps);
-    if (ai && (market.metrics.points > 0 || market.supply.total > 0)) {
-      options.onProgress?.({ stage: "brief", preview: market });
+    if (ai) {
+      options.onProgress?.({ stage: "researching", preview: market });
       try {
-        market.brief = await this.research.brief(market);
+        const documents = await this.github.researchSources(
+          supply.repositories,
+          gaps,
+        );
+        options.onProgress?.({ stage: "brief", preview: market });
+        market.brief = await this.research.insights(
+          market,
+          documents,
+          () => options.onProgress?.({ stage: "reviewing", preview: market }),
+          (queries) => this.github.ideaAlternatives(queries),
+        );
       } catch {
         market.aiError =
           "The AI brief is unavailable. Verified source evidence is still shown.";

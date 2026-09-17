@@ -686,13 +686,19 @@ export function AdminView({ account }: { account: Account | null }) {
                         <small>
                           {m.operation === "plan"
                             ? l("Query planning", "搜索词整理")
-                            : m.operation === "relevance"
-                              ? l("Project relevance", "项目相关性")
-                              : m.operation === "query-repair"
-                                ? l("Query refinement", "检索修复")
-                                : m.operation === "brief-rewrite"
-                                  ? l("Brief review", "报告校验")
-                                  : l("Research brief", "简短报告")}
+                            : m.operation === "strategy"
+                              ? l("Product strategy", "深度研判")
+                              : m.operation === "strategy-edit"
+                                ? l("Strategy editing", "建议校订")
+                                : m.operation === "strategy-review"
+                                  ? l("Strategy review", "建议复核")
+                                  : m.operation === "relevance"
+                                    ? l("Project relevance", "项目相关性")
+                                    : m.operation === "query-repair"
+                                      ? l("Query refinement", "检索修复")
+                                      : m.operation === "brief-rewrite"
+                                        ? l("Brief review", "报告校验")
+                                        : l("Research brief", "简短报告")}
                         </small>
                       </th>
                       <td>

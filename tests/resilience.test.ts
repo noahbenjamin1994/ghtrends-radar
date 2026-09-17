@@ -402,12 +402,13 @@ test("saved negative narratives render positive evidence in HTML and exports whi
   assert.equal(JSON.stringify(m), original);
 });
 
-test("source-only empty scans return evidence actions directly and save the report", async () => {
+test("empty source evidence still reaches hypothesis generation and preserves measured uncertainty", async () => {
   const { Engine } = await import("../src/core/engine.js");
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-pending-")),
     engine = new Engine(new Store(dir));
   (engine.research as any).enabled = true;
   engine.research.plan = async () => seed.topic;
+  engine.research.repairQueries = async () => null;
   engine.trends.demand = async () => ({
     ...seed.demand,
     points: [],
@@ -425,14 +426,30 @@ test("source-only empty scans return evidence actions directly and save the repo
   });
   engine.github.gaps = async () => [];
   let briefs = 0;
-  engine.research.brief = async () => {
+  engine.github.researchSources = async () => [];
+  engine.research.insights = async (_m, docs) => {
     briefs++;
-    throw new Error("unexpected model call");
+    assert.equal(docs?.length, 0);
+    return {
+      model: "test",
+      generatedAt: new Date().toISOString(),
+      sources: [],
+      basis: "hypothesis-led",
+      en: {
+        summary:
+          "Test a conditional workflow hypothesis with a targeted prototype.",
+        nextSteps: ["Compare observations from a specific user task."],
+      },
+      zh: {
+        summary: "围绕具体用户任务，验证一个有条件成立的工作假设。",
+        nextSteps: ["比较具体任务中的用户行为。"],
+      },
+    };
   };
   try {
     const m = await engine.scan("小猫语言翻译器", { refresh: true });
-    assert.equal(briefs, 0);
-    assert.equal(m.brief, undefined);
+    assert.equal(briefs, 1);
+    assert.equal(m.brief?.basis, "hypothesis-led");
     assert.equal(m.aiError, undefined);
     assert.equal(m.kind, "uncertain");
     assert.ok(engine.store.report(m.id));
