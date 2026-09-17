@@ -361,7 +361,7 @@ export class GitHub {
               "https://github.com/search?" +
               new URLSearchParams({ q, type: "repositories" }),
             excerpt:
-              `Targeted check for the proposed artifact: ${term}. Matching public projects: ${data.total_count}. Bounded search coverage; assess each candidate's actual scope.\n` +
+              `Targeted check for the proposed artifact: ${term}. ${candidates.length ? "Candidate names and descriptions follow." : "This phrase matched zero listed candidates; broaden or refine this artifact phrase."} These checks use a separate search scope from the market metrics; evaluate features and workflow fit.\n` +
               candidates.map((r) => `${r.name}: ${r.description}`).join("\n"),
           },
         ];
