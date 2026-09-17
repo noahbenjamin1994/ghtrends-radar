@@ -3,8 +3,75 @@ import { ArrowUpRight, Check, ChevronRight } from "lucide-react";
 import {
   visibleOpportunities,
   opportunityLabel,
+  overviewRows,
 } from "../core/opportunities.js";
 import type { Brief } from "../core/types.js";
+
+export function TopicOverview({
+  brief,
+  locale,
+  topic,
+}: {
+  brief: Brief;
+  locale: "en" | "zh";
+  topic: string;
+}) {
+  const overview = visibleOpportunities(brief)?.overview;
+  if (!overview) return null;
+  const rows = overviewRows(overview, locale);
+  return (
+    <section className="topic-overview" id="topic-overview">
+      <div className="report-section-heading">
+        <div>
+          <div className="eyebrow">
+            {locale === "zh" ? "先看整体，再选方向" : "THE WHOLE OPPORTUNITY"}
+          </div>
+          <h3>
+            {topic}
+            {locale === "zh"
+              ? "，整体机会怎么看？"
+              : ": the overall opportunity"}
+          </h3>
+        </div>
+        <span>
+          {locale === "zh"
+            ? "综合研判 · 含领域推演"
+            : "Research judgment · includes domain inference"}
+        </span>
+      </div>
+      <p className="topic-verdict">{overview[locale].verdict}</p>
+      <div className="topic-overview-grid">
+        {rows.slice(1, 5).map((row) => (
+          <div key={row.label}>
+            <h4>{row.label}</h4>
+            <p>{row.text}</p>
+          </div>
+        ))}
+      </div>
+      <div className="topic-coverage">
+        <strong>{rows[5]!.label}</strong>
+        <p>{rows[5]!.text}</p>
+        <div className="strategy-sources">
+          {overview.evidence.map((ref) => {
+            const source = brief.sources.find((s) => s.id === ref.id);
+            return source ? (
+              <a
+                key={ref.id}
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                title={ref.quote}
+              >
+                {source.label}
+                <ArrowUpRight size={12} />
+              </a>
+            ) : null;
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function OpportunityMap({
   brief,
@@ -97,7 +164,12 @@ export function OpportunityMap({
                 {String(i + 1).padStart(2, "0")}
               </span>
               <span>
-                {o[locale].title}
+                <strong>{o[locale].title}</strong>
+                {o[locale].service && (
+                  <span className="opportunity-service">
+                    {o[locale].service}
+                  </span>
+                )}
                 {o.id === map.recommendedId && (
                   <small>
                     <Check size={12} />
@@ -138,7 +210,24 @@ export function OpportunityMap({
       >
         <div className="eyebrow">{l("DIRECTION IN FOCUS", "方向详情")}</div>
         <h4 id="opportunity-title">{p.title}</h4>
-        <p className="opportunity-audience">{p.audience}</p>
+        <dl className="opportunity-explainer">
+          <div>
+            <dt>{l("Who it serves", "服务谁")}</dt>
+            <dd>{p.audience}</dd>
+          </div>
+          {p.need && (
+            <div>
+              <dt>{l("The need", "解决什么问题")}</dt>
+              <dd>{p.need}</dd>
+            </div>
+          )}
+          {p.service && (
+            <div>
+              <dt>{l("What you offer", "提供什么服务")}</dt>
+              <dd>{p.service}</dd>
+            </div>
+          )}
+        </dl>
         <div className="opportunity-assessments">
           <div>
             <h5>

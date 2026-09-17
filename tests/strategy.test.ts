@@ -36,6 +36,36 @@ const documents: ResearchSource[] = [
 const sample = (): StrategyResponse => ({
   checks: ["markdown comment anchors"],
   recommendedId: "review-anchors",
+  overview: {
+    en: {
+      verdict:
+        "Documentation tools have openings in review continuity and release coordination.",
+      demand:
+        "Repeated document revisions could create demand for preserving decisions.",
+      competition:
+        "Editors cover authoring; workflow opportunities depend on existing export behavior.",
+      opening:
+        "Review handoffs and multilingual release checks offer distinct tasks to investigate.",
+      entry:
+        "A small team can prototype with public fixtures and documentation reviewers.",
+      scope:
+        "GitHub excerpts describe tool features; broader adoption is a conditional hypothesis.",
+    },
+    zh: {
+      verdict: "技术文档工具可围绕评审连续性与发布协作探索机会。",
+      demand: "重复修订可能带来保留评审决策的需求。",
+      competition: "编辑器提供创作能力，流程机会取决于具体导出行为。",
+      opening: "评审交接与多语言发布检查分别对应值得探索的任务。",
+      entry: "小团队可借助公开样例与文档评审者开展原型验证。",
+      scope: "GitHub 摘录描述工具功能，更广泛的采用情况属于条件性假设。",
+    },
+    evidence: [
+      {
+        id: "R1",
+        quote: "Export preserves document text and discards review comments.",
+      },
+    ],
+  },
   selection: {
     en: "Start with review anchors for a small documentation team; release automation fits a team with CI expertise.",
     zh: "小型团队可优先验证评审锚点；具备持续集成经验的团队可选择发布自动化。",
@@ -58,6 +88,9 @@ const sample = (): StrategyResponse => ({
       en: {
         title: id,
         audience: "Small documentation teams during a file revision.",
+        need: "Keep review comments attached when a document is split into files.",
+        service:
+          "Upload two document revisions and receive comments attached to the new locations.",
         demand:
           "Repeat review work could justify a focused adapter; team usage is a hypothesis.",
         competition:
@@ -75,6 +108,8 @@ const sample = (): StrategyResponse => ({
       zh: {
         title: id,
         audience: "文档修订期间的小型技术文档团队。",
+        need: "文档拆分后需要将评审意见重新对应到段落。",
+        service: "提交两版文档，获得带有对应评审意见的新文档。",
         demand:
           "重复评审任务可能支持适配器的采用，团队使用频率属于待检验假设。",
         competition: "现有编辑器提供参照，可通过真实改动比较锚点表现。",
@@ -238,6 +273,7 @@ test("an invalid second pass preserves the validated first pass; sparse data sta
       n++;
       const a = sample();
       a.evidence = [];
+      a.overview.evidence = [];
       if (n >= 2) a.en.strategy.wedge = "Build an MVP";
       return a;
     };
@@ -640,4 +676,157 @@ test("a shared competitor can inform two directions; citations keep only supplie
     ),
     [],
   );
+});
+
+test("new reports require an overall answer and a readable customer need and offer; old reports remain readable", async () =>
+  fixture(async (r) => {
+    const missingOverview: any = sample();
+    delete missingOverview.overview;
+    assert.ok(
+      strategyProblems(
+        missingOverview,
+        strategySources(seed, documents),
+        seed,
+      ).some((p) => p.includes("overview")),
+    );
+    const missingOffer: any = sample();
+    delete missingOffer.opportunities[0].zh.service;
+    assert.ok(
+      strategyProblems(
+        missingOffer,
+        strategySources(seed, documents),
+        seed,
+      ).some((p) => p.includes("zh.service")),
+    );
+    r.json = async () => sample();
+    const brief = await r.insights(seed, documents);
+    assert.equal(brief.strategyVersion, "3");
+    const legacy = {
+      ...brief,
+      strategyVersion: "2",
+      overview: undefined,
+      opportunities: brief.opportunities!.map((o) => ({
+        ...o,
+        en: { ...o.en, need: undefined, service: undefined },
+        zh: { ...o.zh, need: undefined, service: undefined },
+      })),
+    };
+    assert.equal(visibleOpportunities(legacy)?.opportunities.length, 3);
+    assert.ok(visibleStrategy(legacy, "zh"));
+    assert.equal(
+      visibleOpportunities({ ...legacy, strategyVersion: "3" }),
+      undefined,
+    );
+    for (const locale of ["en", "zh"] as const) {
+      const md = marketMarkdown({ ...seed, brief }, undefined, locale);
+      assert.ok(
+        md.indexOf(brief.overview![locale].verdict) <
+          md.indexOf(brief.opportunities![0]![locale].service!),
+      );
+      assert.ok(md.includes(brief.opportunities![0]![locale].need!));
+      const html = renderDocument(
+        '<html><head></head><body><div id="root"></div></body></html>',
+        {
+          base: "https://ghtrends.dev/radar",
+          path: "/report/" + seed.id,
+          geo: "",
+          market: { ...seed, brief },
+          markets: [],
+          status: 200,
+          locale,
+        },
+      );
+      assert.ok(html.includes(brief.overview![locale].verdict));
+      assert.ok(html.includes(brief.opportunities![0]![locale].service!));
+    }
+  }));
+
+test("overall judgments validate quotes and allow only requested affirmative copy repair", () => {
+  const data = sample();
+  data.overview.zh.competition = "不能用项目数量说明商业竞争。";
+  const fields = proseRepairs(data);
+  assert.deepEqual(
+    fields.map((f) => f.path),
+    ["overview.zh.competition"],
+  );
+  const revised = applyProseRepairs(
+    data,
+    {
+      edits: [
+        {
+          path: fields[0]!.path,
+          value: "项目数量描述开源覆盖，商业竞争需结合具体替代服务核对。",
+        },
+      ],
+    },
+    fields,
+  ) as StrategyResponse;
+  assert.deepEqual(revised.overview.evidence, data.overview.evidence);
+  assert.deepEqual(
+    strategyProblems(revised, strategySources(seed, documents), seed),
+    [],
+  );
+  revised.overview.evidence[0]!.quote = "Fabricated commercial sales figures";
+  assert.ok(
+    strategyProblems(revised, strategySources(seed, documents), seed).some(
+      (p) => p.startsWith("Overview"),
+    ),
+  );
+});
+
+test("broad topics draft customer jobs from parent measurements before project documents enter review", async () =>
+  fixture(async (r) => {
+    const market = structuredClone(seed);
+    market.topic.scope = "field";
+    market.topic.plan = {
+      input: "小米手机",
+      intent: "Research phone opportunities",
+      version: "11",
+      model: "test",
+      trends: ["Xiaomi smartphones"],
+      githubTopics: ["xiaomi"],
+      githubTerms: [],
+      explanation: { en: "Phone scope", zh: "手机相关机会" },
+    };
+    const calls: string[] = [];
+    r.json = async (_system, input: any, _budget, operation) => {
+      calls.push(operation!);
+      assert.equal(input.input, "小米手机");
+      if (operation === "strategy") {
+        assert.deepEqual(
+          input.sources.map((s: ResearchSource) => s.id),
+          ["S1", "S2"],
+        );
+        assert.equal(input.basis, "hypothesis-led");
+      } else
+        assert.ok(input.sources.some((s: ResearchSource) => s.id === "R1"));
+      const result = sample();
+      result.evidence = [];
+      result.overview.evidence = [];
+      return result;
+    };
+    const before = JSON.stringify(market);
+    const result = await r.insights(market, documents);
+    assert.equal(result.reviewed, true);
+    assert.ok(result.overview);
+    assert.deepEqual(calls, ["strategy", "strategy-review"]);
+    assert.equal(JSON.stringify(market), before);
+  }));
+
+test("parent measurements keep direction ratings inferred instead of becoming observed market demand", () => {
+  const data = sample();
+  const sources = strategySources(seed, documents);
+  const ref = {
+    id: "S2",
+    quote: sources.find((s) => s.id === "S2")!.excerpt!.slice(0, 60),
+  };
+  data.opportunities[0]!.competition = {
+    level: "high",
+    basis: "observed",
+    evidence: [ref],
+  };
+  const grounded = groundOpportunityRatings(data, sources) as StrategyResponse;
+  assert.equal(grounded.opportunities[0]!.competition.basis, "inferred");
+  assert.deepEqual(strategyProblems(grounded, sources, seed), []);
+  assert.equal(data.opportunities[0]!.competition.basis, "observed");
 });

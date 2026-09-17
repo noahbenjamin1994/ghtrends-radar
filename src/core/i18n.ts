@@ -180,7 +180,7 @@ function translateEvidenceEnglish(value: string) {
 
 // Applied to product-authored prose; repository titles and quoted source material retain their wording.
 export function hasNegativeWording(value: string) {
-  return /不|不是|不能|并非|没有|无法|未|无|勿|\b(?:not|no|never|neither|cannot|can't|doesn't|don't|won't|isn't|aren't|without|unavailable|unknown|unconfirmed)\b/i.test(
+  return /不|不是|不能|并非|而非|没有|无法|未|无|勿|\b(?:not|no|never|neither|cannot|can't|doesn't|don't|won't|isn't|aren't|without|unavailable|unknown|unconfirmed)\b/i.test(
     value,
   );
 }

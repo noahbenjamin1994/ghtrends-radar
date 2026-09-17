@@ -5251,3 +5251,112 @@ footer small {
   color: #30352d;
   font-size: 14px;
 }
+
+/* Parent-topic judgment and plain-language customer offers. */
+.topic-overview {
+  padding: 48px 0;
+  scroll-margin-top: 100px;
+  border-bottom: 1px solid #e7e7e2;
+}
+.topic-overview h3 {
+  font-size: clamp(23px, 2.4vw, 30px);
+  letter-spacing: -0.035em;
+  line-height: 1.45;
+  margin: 10px 0;
+}
+.topic-verdict {
+  max-width: 900px;
+  font-size: 20px;
+  line-height: 1.9;
+  margin: 24px 0 32px;
+}
+.topic-overview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px 48px;
+}
+.topic-overview h4 {
+  font-size: 15px;
+  margin: 0 0 10px;
+  font-weight: 550;
+}
+.topic-overview-grid p {
+  font-size: 15px;
+  line-height: 1.9;
+  margin: 0;
+  color: #60645d;
+}
+.topic-coverage {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid #e9e9e3;
+  font-size: 12px;
+  line-height: 1.85;
+  color: #757b70;
+}
+.topic-coverage strong {
+  font-weight: 500;
+}
+.topic-coverage p {
+  margin: 6px 0 12px;
+  max-width: 950px;
+}
+.opportunity-name strong {
+  font-weight: 550;
+}
+.opportunity-service {
+  display: block;
+  font-size: 12px;
+  line-height: 1.75;
+  font-weight: 400;
+  color: #73776e;
+  margin-top: 6px;
+}
+.opportunity-columns,
+.opportunity-row {
+  grid-template-columns: minmax(260px, 2.4fr) 0.7fr 1fr 1fr 18px;
+}
+.opportunity-explainer {
+  display: grid;
+  grid-template-columns: 0.9fr 1fr 1.25fr;
+  gap: 24px;
+  margin: 24px 0 30px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid #e7e8e1;
+}
+.opportunity-explainer dt {
+  font-size: 12px;
+  color: #707868;
+  margin-bottom: 8px;
+}
+.opportunity-explainer dd {
+  font-size: 15px;
+  line-height: 1.85;
+  margin: 0;
+}
+@media (max-width: 760px) {
+  .topic-overview {
+    padding: 32px 0;
+  }
+  .topic-overview .report-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .topic-verdict {
+    font-size: 18px;
+    margin: 20px 0 28px;
+  }
+  .topic-overview-grid,
+  .opportunity-explainer {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .opportunity-columns {
+    display: none;
+  }
+  .opportunity-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px 10px;
+  }
+}

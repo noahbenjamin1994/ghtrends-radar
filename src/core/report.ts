@@ -1,4 +1,8 @@
-import { visibleOpportunities, opportunityRows } from "./opportunities.js";
+import {
+  visibleOpportunities,
+  opportunityRows,
+  overviewRows,
+} from "./opportunities.js";
 import type { Market, Repo } from "./types.js";
 import { text, localeUrl, type Locale } from "./i18n.js";
 import { marketAssessment, competitionPressure } from "./assessment.js";
@@ -65,6 +69,25 @@ export function marketMarkdown(
           "",
           a.narrative.summary,
           "",
+          ...(map?.overview
+            ? [
+                `## ${locale === "zh" ? "原词整体机会" : "The overall opportunity"}`,
+                "",
+                ...overviewRows(map.overview, locale).flatMap((row) => [
+                  `### ${row.label}`,
+                  "",
+                  row.text,
+                  "",
+                ]),
+                ...map.overview.evidence.flatMap((ref) => {
+                  const source = m.brief!.sources.find((s) => s.id === ref.id);
+                  return source
+                    ? [`- [${cell(source.label)}](${source.url})`]
+                    : [];
+                }),
+                "",
+              ]
+            : []),
           ...(map
             ? [
                 `## ${locale === "zh" ? "细分方向地图" : "Opportunity map"}`,

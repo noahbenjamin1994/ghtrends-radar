@@ -1,4 +1,4 @@
-import type { Opportunity } from "./opportunities.js";
+import type { Opportunity, MarketOverview } from "./opportunities.js";
 export type MarketKind =
   "blue" | "expanding" | "contested" | "quiet" | "uncertain";
 export type Confidence = "high" | "moderate" | "low";
@@ -33,6 +33,7 @@ export interface Brief {
   zh: BriefParagraph;
   sources: ResearchSource[];
   strategyVersion?: string;
+  overview?: MarketOverview;
   opportunities?: Opportunity[];
   recommendedId?: string;
   selection?: { en: string; zh: string };

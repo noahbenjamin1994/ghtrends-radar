@@ -1,4 +1,4 @@
-import { OpportunityMap } from "./opportunities.js";
+import { OpportunityMap, TopicOverview } from "./opportunities.js";
 import { visibleOpportunities } from "../core/opportunities.js";
 import { COMPETITION_POLICY } from "../core/competition.js";
 import { selectGapSignals } from "../core/gaps.js";
@@ -1406,6 +1406,9 @@ function MarketView({
       )}
       <nav className="report-nav" aria-label={l("Report sections", "报告章节")}>
         <a href="#outlook">{l("Overview", "判断概览")}</a>
+        {opportunityMap?.overview && (
+          <a href="#topic-overview">{l("Whole topic", "整体机会")}</a>
+        )}
         {visibleOpportunities(m.brief) && (
           <a href="#opportunities">{l("Directions", "方向地图")}</a>
         )}
@@ -1425,15 +1428,19 @@ function MarketView({
             </span>
           </div>
           <h2>
-            {opportunityMap
-              ? l(
-                  `${opportunityMap.opportunities.length} directions. Find your way in.`,
-                  `${opportunityMap.opportunities.length} 个细分方向，找到适合你的切入点`,
-                )
-              : assessment.narrative.kind === "ai" &&
-                  assessment.narrative.headline
-                ? assessment.narrative.headline
-                : assessment.title}
+            {opportunityMap?.overview &&
+            assessment.narrative.kind === "ai" &&
+            assessment.narrative.headline
+              ? assessment.narrative.headline
+              : opportunityMap
+                ? l(
+                    `${opportunityMap.opportunities.length} directions. Find your way in.`,
+                    `${opportunityMap.opportunities.length} 个细分方向，找到适合你的切入点`,
+                  )
+                : assessment.narrative.kind === "ai" &&
+                    assessment.narrative.headline
+                  ? assessment.narrative.headline
+                  : assessment.title}
           </h2>
           <p className="outlook-summary">
             {assessment.narrative.kind === "ai"
@@ -1516,6 +1523,13 @@ function MarketView({
           </small>
         </div>
       </div>
+      {m.brief && (
+        <TopicOverview
+          brief={m.brief}
+          locale={locale}
+          topic={m.topic.plan?.input || m.topic.name}
+        />
+      )}
       {m.brief && <OpportunityMap key={m.id} brief={m.brief} locale={locale} />}
       {strategy ? (
         <section className="strategy-section" id="strategy">
@@ -2642,7 +2656,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.14.0/ghtrends-radar-0.14.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.15.0/ghtrends-radar-0.15.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}

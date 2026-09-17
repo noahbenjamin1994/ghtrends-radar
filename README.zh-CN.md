@@ -61,7 +61,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.14.0/ghtrends-radar-0.14.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.15.0/ghtrends-radar-0.15.0.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
@@ -170,8 +170,8 @@ ghtrends ui
 
 ### 产品策略如何生成
 
-1. 阅读最多 3 份相关项目 README 和 3 条具体 Issue 摘录。
-2. 为 DeepSeek Flash 开启高强度思考，宽泛领域通常拆出 5 个方向，具体品类拆出 3 个方向。每项包含用户任务、需求判断、竞争情况、资源清单、首版投入估算、持续成本、采用理由与验证实验。
+1. 采集最多 3 份相关项目 README 和 3 条具体 Issue 摘录。宽泛领域先以用户原词和整体测量值构思机会；文档在方向形成后进入复核，降低来源覆盖对方向选择的偏置。
+2. 为 DeepSeek Flash 开启高强度思考，先分析原词整体机会、需求来源、竞争结构、进入条件与证据覆盖，再整理方向。宽泛领域通常拆出 5 个方向，具体品类拆出 3 个方向。每项先用日常语言讲清名称、服务谁、解决什么问题、提供什么服务，再展示需求、竞争、资源、工期、持续投入与实验。消费品牌类主题覆盖多个使用阶段，来源丰富程度用于决定证据标签，分析范围保留用户原词。
 3. 每个方向分别进行 1 次 GitHub 项目检索、最多 1 份 README 阅读、1 次 Issue 检索（最多 3 条摘录），由两个采集任务并行处理。第二轮推理复核完整地图，并面向独立开发者或小团队给出优先顺序；需要时追加一轮校订。
 4. 来源信号与研究推断分别标注。总词搜索趋势与细分方向需求分层呈现，项目功能用于判断供给，个体诉求用于支持需求判断。较强需求信号需要多条诉求来源与相关性复核；竞争空间估计注明检索范围。
 5. 深入分析优先方向的因果机制、主动取舍、成立条件与建议继续或转向门槛。引用原文和方向归属经过校验。交互报告、Markdown、JSON 与服务端 HTML 均包含全部方向；历史单方向报告保留阅读能力。

@@ -57,7 +57,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.14.0/ghtrends-radar-0.14.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.15.0/ghtrends-radar-0.15.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -164,8 +164,8 @@ The model proposes one primary Trends phrase, up to two genuine synonyms, and bo
 
 **The strategy process**
 
-1. Read up to three relevant project READMEs and three individual issue excerpts.
-2. Enable DeepSeek Flash thinking at high effort to map distinct user tasks: typically five for a broad field and three for a narrow product. Each direction includes demand, competition, resource needs, a scoped first-release estimate, ongoing costs, adoption rationale and an experiment.
+1. Collect up to three relevant project READMEs and three individual issue excerpts. For broad fields, the first reasoning pass sees parent measurements and the original input; project documents enter the review after the customer jobs are drafted, reducing source-coverage bias.
+2. Enable DeepSeek Flash thinking at high effort to answer the original topic first: overall opportunity, demand drivers, competition, entry conditions and evidence coverage. Then map distinct customer jobs: typically five for a broad field and three for a narrow product. Every direction opens with a plain-language name, customer, need and offered service, followed by demand, competition, resources, a first-release estimate, upkeep and a concrete experiment. Broad consumer fields span multiple lifecycle stages; source availability guides evidence confidence while preserving the original scope.
 3. Check each direction with one targeted GitHub repository search, up to one README and one issue search (up to three excerpts), using two source workers. The second reasoning pass reviews the whole map and chooses a priority for a solo developer or small team; a bounded editing pass repairs wording or citations.
 4. Show source signals separately from research inference. Parent-query search growth stays separate from direction-level demand. Project features establish supply; observed demand needs relevant user-request evidence. Strong demand requires multiple request sources and model review of their relevance. Limited search coverage keeps competition estimates provisional.
 5. Develop the selected direction in depth with a causal mechanism, tradeoff, critical assumption and proposed continue/redirect criteria. Exact cited excerpts and direction IDs are checked. All directions appear in the interactive report, Markdown, JSON and server-rendered HTML. Old single-strategy reports remain readable.

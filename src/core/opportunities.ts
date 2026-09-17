@@ -15,6 +15,8 @@ const assessment = z.object({
 const copy = z.object({
   title: z.string().trim().min(3).max(90),
   audience: prose,
+  need: prose.optional(),
+  service: prose.optional(),
   demand: prose,
   competition: prose,
   resources: prose,
@@ -37,8 +39,28 @@ export const opportunitySchema = z.object({
   en: copy,
   zh: copy,
 });
+const clearCopy = copy.extend({ need: prose, service: prose });
+export const clearOpportunitySchema = opportunitySchema.extend({
+  en: clearCopy,
+  zh: clearCopy,
+});
+const overviewCopy = z.object({
+  verdict: prose,
+  demand: prose,
+  competition: prose,
+  opening: prose,
+  entry: prose,
+  scope: prose,
+});
+export const overviewSchema = z.object({
+  en: overviewCopy,
+  zh: overviewCopy,
+  evidence: z.array(evidenceRef).max(6),
+});
+export type MarketOverview = z.infer<typeof overviewSchema>;
 export type Opportunity = z.infer<typeof opportunitySchema>;
 export const opportunityMapSchema = z.object({
+  overview: overviewSchema.optional(),
   opportunities: z.array(opportunitySchema).min(3).max(5),
   recommendedId: z.string(),
   selection: z.object({
@@ -62,6 +84,7 @@ export function proseRepairs(raw: unknown): { path: string; value: string }[] {
   };
   for (const lang of ["en", "zh"]) {
     visit(data[lang], lang);
+    visit(data.overview?.[lang], `overview.${lang}`);
     visit(data.selection?.[lang], `selection.${lang}`);
     if (Array.isArray(data.opportunities))
       data.opportunities.forEach((o: any, i: number) =>
@@ -127,6 +150,7 @@ export function groundOpportunityRatings(
           (r) => r && typeof r.id === "string" && typeof r.quote === "string",
         )
       : []),
+    ...(result.overview?.evidence || []),
     ...result.opportunities.flatMap((o) => [
       ...o.demand.evidence,
       ...o.competition.evidence,
@@ -145,6 +169,12 @@ export function groundOpportunityRatings(
       ref.quote = trimmed;
   }
   for (const o of result.opportunities) {
+    for (const axis of ["demand", "competition"] as const) {
+      if (o[axis].evidence.some((r) => r.id === "S1" || r.id === "S2"))
+        o[axis].basis = "inferred";
+    }
+    if (o.demand.level === "high" && o.demand.basis === "inferred")
+      o.demand.level = "medium";
     const requests = new Set(
       o.demand.evidence
         .filter((r) =>
@@ -182,6 +212,9 @@ export function opportunityProblems(
       problems.push("Directions need distinct titles and user tasks.");
     const fields: [string, string][] = [
       [`selection.${lang}`, map.selection[lang]],
+      ...Object.entries(map.overview?.[lang] || {}).map(
+        ([k, v]): [string, string] => [`overview.${lang}.${k}`, v],
+      ),
       ...map.opportunities.flatMap((o) =>
         Object.entries(o[lang]).map(([key, value]): [string, string] => [
           `${o.id}.${lang}.${key}`,
@@ -194,6 +227,12 @@ export function opportunityProblems(
         problems.push(
           `${path}: rewrite this field in affirmative product prose (Chinese excludes every 不/无/未/没): ${JSON.stringify(value.slice(0, 500))}`,
         );
+  }
+  for (const ref of map.overview?.evidence || []) {
+    const source = sources.find((s) => s.id === ref.id);
+    const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+    if (!source?.excerpt || !norm(source.excerpt).includes(norm(ref.quote)))
+      problems.push(`Overview ${ref.id}: quote a supplied source verbatim.`);
   }
   for (const o of map.opportunities) {
     for (const axis of ["demand", "competition"] as const) {
@@ -258,7 +297,17 @@ export function opportunityProblems(
 export function visibleOpportunities(
   brief?: Brief,
 ): OpportunityMap | undefined {
-  if (brief?.strategyVersion !== "2") return;
+  if (!brief || !["2", "3"].includes(brief.strategyVersion || "")) return;
+  if (
+    brief.strategyVersion === "3" &&
+    (!overviewSchema.safeParse(brief.overview).success ||
+      !z
+        .array(clearOpportunitySchema)
+        .min(3)
+        .max(5)
+        .safeParse(brief.opportunities).success)
+  )
+    return;
   const parsed = opportunityMapSchema.safeParse(brief);
   if (!parsed.success || opportunityProblems(parsed.data, brief.sources).length)
     return;
@@ -299,7 +348,11 @@ export function opportunityLabel(
 export function opportunityRows(o: Opportunity, lang: "en" | "zh") {
   const p = o[lang];
   return [
-    [lang === "zh" ? "用户与任务" : "Audience & task", p.audience],
+    [lang === "zh" ? "服务谁" : "Who it serves", p.audience],
+    ...(p.need ? [[lang === "zh" ? "解决什么问题" : "The need", p.need]] : []),
+    ...(p.service
+      ? [[lang === "zh" ? "提供什么服务" : "What you offer", p.service]]
+      : []),
     [
       lang === "zh" ? "需求" : "Demand",
       `${opportunityLabel("demand", o.demand.level, lang)} · ${opportunityLabel("basis", o.demand.basis, lang)}. ${p.demand}`,
@@ -319,7 +372,51 @@ export function opportunityRows(o: Opportunity, lang: "en" | "zh") {
   ].map(([label, text]) => ({ label: label!, text: text! }));
 }
 
+export function overviewRows(overview: MarketOverview, lang: "en" | "zh") {
+  const labels =
+    lang === "zh"
+      ? [
+          "整体判断",
+          "需求从哪里来",
+          "竞争集中在哪里",
+          "机会集中在哪里",
+          "适合谁进入",
+          "本次依据覆盖范围",
+        ]
+      : [
+          "Overall judgment",
+          "Demand drivers",
+          "Competitive landscape",
+          "Where the openings are",
+          "Who can enter",
+          "Evidence coverage",
+        ];
+  const keys = [
+    "verdict",
+    "demand",
+    "competition",
+    "opening",
+    "entry",
+    "scope",
+  ] as const;
+  return keys.map((key, i) => ({
+    label: labels[i]!,
+    text: overview[lang][key],
+  }));
+}
+
 export const OPPORTUNITY_PROMPT = `
+PARENT TOPIC FIRST — mandatory top-level overview:
+"overview":{"en":{"verdict":"a direct overall judgment about the ORIGINAL input and its opportunity structure","demand":"why people need products/services around this topic; distinguish observed search attention from conditional purchase/service demand","competition":"where competition concentrates across relevant product, commercial service, built-in and open-source alternatives; identify evidence scope","opening":"two or three kinds of unmet job or friction worth testing, and WHY they could support an opportunity","entry":"who could enter given skills, capital, access and distribution; explain small-team versus resource-heavy entry","scope":"the measured query, region and source coverage; explain which broader judgments are conditional"},"zh":{"verdict":"先直接回答原词整体的机会判断","demand":"需求来自哪些人和情境，分清搜索关注与消费或付费推断","competition":"原词整体的竞争结构，覆盖商品、服务、官方功能及开源方案","opening":"机会集中在哪些环节，以及形成机会的具体原因","entry":"哪些创业者或团队适合进入，各自需要什么关键条件","scope":"原词、实际检索词、地域与来源覆盖的关系，明示哪些属于领域推演"},"evidence":[{"id":"supplied source ID","quote":"exact excerpt"}]}.
+This overview is an independent answer to the original topic, useful even if every direction card is hidden. Judge the core business of the topic as well as adjacent services. For a phone brand, explain demand for buying/replacing/using those phones, competition in selling/distributing them, and resources such as stock, supplier access, working capital and after-sales service; compare these with adjacent-service entry using conditional domain reasoning. Designing a competing phone changes the object and belongs outside this input unless requested. This section must answer the original field even when all five direction cards are hidden. Summarizing or enumerating the five services is incomplete. Use everyday language in the headline and overview too. Replace abstractions such as 可信验证、流程支持、交接物、窄软件/数据交付物 with the actual person, task and useful result. For example, 帮买家选对机型、帮门店检查旧手机 immediately describe an offer. It must address the broad opportunity before prioritizing one service. Keep the measured classification unchanged. For a physical-product or brand field, GitHub documents cover software workflows; overall commercial competition and demand are conditional domain analysis unless directly supported. Compare making/selling the core product with adjacent services where relevant. Parent search growth belongs only to the measured parent term. Use at most six evidence references. Use 2-3 sentences per field, specific to THIS topic. All prose follows the affirmative wording rules.
+
+READER COMPREHENSION — every direction's en and zh object additionally requires:
+"need":"the specific question, decision or task the customer struggles with, expressed in everyday language",
+"service":"what YOU would provide: what the customer gives you, what they receive, and how it helps their task".
+The title names a familiar customer benefit or service, around 8-18 Chinese characters / 4-9 English words. Prefer everyday verbs such as 帮用户选、帮门店检查、教用户设置. Leave protocol names, technical ledgers, signatures and indexes to implementation details. Explain technical terms through the user's concrete task. Audience <= 50 Chinese characters / 28 English words; need and service <= 100 Chinese characters / 50 English words. A reader must identify customer, need and offer from the title and these three fields alone. Use conditional wording in demand/assumptions, while service describes the concrete proposed offer. Preserve depth in mechanism, resources and experiments.
+
+DIVERSITY BEFORE SOURCE DETAIL: For a broad input, independently consider at least five materially different customer jobs across its lifecycle before reading source prominence as a priority. Select five directions that cover at least three jobs/stages or customer groups, subject to explicit user constraints. Limit closely related technical maintenance features to one direction for an unconstrained consumer-brand input. A phrase such as 小米手机 asks for opportunities around phones; it retains buying, everyday use, upkeep, resale and professional services as candidate jobs. Choose useful specific offerings across that scope; each still needs a distinctive mechanism. README availability is a retrieval property. It must never set the report's audience or erase consumer/service opportunities. Keep broad hypotheses clearly labeled and give each a discriminating experiment. Never turn a broad consumer field into five developer utilities. For a narrow requested tool, keep the explicit task and vary real customer workflows instead.
+
 OPPORTUNITY MAP — mandatory additional top-level fields:
 "recommendedId":"one direction ID", "selection":{"en":"why this direction comes first for a small independent team, and who should choose an alternative","zh":"优先顺序的具体理由及其它方向更适合谁"},
 "opportunities":[{"id":"stable-english-slug","query":"short 2-3 word GitHub phrase","effort":"low|medium|high","demand":{"level":"high|medium|low|exploratory","basis":"observed|inferred","evidence":[{"id":"source ID","quote":"exact excerpt"}]},"competition":{"level":"high|medium|low|exploratory","basis":"observed|inferred","evidence":[]},"en":{"title":"distinct direction","audience":"persona, triggering task and frequency","demand":"frequency, urgency, individual request signals or conditional inference; separate attention from willingness to pay","competition":"named documented alternatives, built-in substitutes, switching costs, scope of current comparison","resources":"skills plus data/device/hardware/access/distribution needed, and the hardest dependency","delivery":"estimated team size and elapsed time for a defined prototype, with assumptions","upkeep":"recurring data curation, testing, support, compute or acquisition costs","wedge":"concrete artifact and mechanism that earns adoption alongside alternatives","experiment":"feasible first test with proposed numerical decision threshold"},"zh":{"title":"细分方向","audience":"人群、触发任务、频率","demand":"需求信号与成立条件","competition":"已有替代方案与进入门槛","resources":"技能、数据、设备、权限、触达渠道及最难获得的资源","delivery":"明示估算的首版人数、工期、交付范围与前提","upkeep":"持续维护、支持、算力、数据更新等成本","wedge":"首个交付物及采用理由","experiment":"针对该方向的实验与建议数字门槛"}}].
