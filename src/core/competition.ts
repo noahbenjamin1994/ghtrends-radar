@@ -16,7 +16,7 @@ export const COMPETITION_POLICY = {
   dominanceWeight: 20,
   activeDays: 365,
 };
-export const RELEVANCE_VERSION = "2";
+export const RELEVANCE_VERSION = "3";
 const clamp = (n: number) => Math.max(0, Math.min(1, n));
 const normalize = (s: string) =>
   s.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
@@ -50,6 +50,14 @@ export function repoRelevance(
     const phrase = q.match(/^"([^"]+)"/)?.[1];
     if (phrase) return [normalize(phrase)];
     const tags = [...q.matchAll(/topic:([\w-]+)/g)].map((m) => m[1]!);
+    // Broad brand tags identify an ecosystem, not the requested product object.
+    if (
+      topic.scope === "field" &&
+      tags.length === 1 &&
+      normalize(topic.keyword).split(" ").length >
+        normalize(tags[0]!).split(" ").length
+    )
+      return [];
     return tags.length === 1 ? [normalize(tags[0]!)] : [];
   });
   const content = normalize(name + " " + description);

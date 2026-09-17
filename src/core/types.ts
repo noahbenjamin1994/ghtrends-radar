@@ -1,3 +1,4 @@
+import type { Opportunity } from "./opportunities.js";
 export type MarketKind =
   "blue" | "expanding" | "contested" | "quiet" | "uncertain";
 export type Confidence = "high" | "moderate" | "low";
@@ -32,6 +33,9 @@ export interface Brief {
   zh: BriefParagraph;
   sources: ResearchSource[];
   strategyVersion?: string;
+  opportunities?: Opportunity[];
+  recommendedId?: string;
+  selection?: { en: string; zh: string };
   reviewed?: boolean;
   basis?: "source-led" | "hypothesis-led";
   evidence?: { id: string; quote: string }[];
@@ -54,6 +58,8 @@ export interface Strategy {
   pivotSignal: string;
 }
 export interface ResearchSource {
+  directionId?: string;
+  kind?: "request" | "project" | "search";
   id?: string;
   label: string;
   url: string;

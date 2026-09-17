@@ -1,3 +1,4 @@
+import { visibleOpportunities, opportunityRows } from "./opportunities.js";
 import type { Market, Repo } from "./types.js";
 import { text, localeUrl, type Locale } from "./i18n.js";
 import { marketAssessment, competitionPressure } from "./assessment.js";
@@ -34,6 +35,7 @@ export function marketMarkdown(
     a = marketAssessment(m, locale);
   const strategy =
     a.narrative.kind === "ai" ? visibleStrategy(m.brief, locale) : undefined;
+  const map = visibleOpportunities(m.brief);
   return [
     `# ${t(m.topic.name)}: ${a.title}`,
     "",
@@ -63,6 +65,36 @@ export function marketMarkdown(
           "",
           a.narrative.summary,
           "",
+          ...(map
+            ? [
+                `## ${locale === "zh" ? "细分方向地图" : "Opportunity map"}`,
+                "",
+                map.selection[locale],
+                "",
+                ...map.opportunities.flatMap((o) => [
+                  `### ${o[locale].title}${o.id === map.recommendedId ? (locale === "zh" ? " · 建议优先" : " · First to explore") : ""}`,
+                  "",
+                  ...opportunityRows(o, locale).flatMap((r) => [
+                    `**${r.label}**`,
+                    r.text,
+                    "",
+                  ]),
+                  ...[...o.demand.evidence, ...o.competition.evidence]
+                    .filter(
+                      (r, i, all) => all.findIndex((x) => x.id === r.id) === i,
+                    )
+                    .flatMap((r) => {
+                      const s = m.brief!.sources.find((s) => s.id === r.id);
+                      return s ? [`- [${cell(s.label)}](${s.url})`] : [];
+                    }),
+                  "",
+                ]),
+                locale === "zh"
+                  ? "资源与工期为首版范围估算；需求与竞争均标明来源信号或研究推断。"
+                  : "Resources and timelines estimate the scoped first release. Demand and competition distinguish source signals from research inference.",
+                "",
+              ]
+            : []),
           ...(strategy
             ? strategyRows(strategy, locale).flatMap((row) => [
                 `### ${row.label}`,

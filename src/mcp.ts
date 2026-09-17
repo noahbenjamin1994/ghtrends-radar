@@ -6,7 +6,7 @@ import { Engine } from "./core/engine.js";
 import { completeWeeklySeries } from "./core/evidence.js";
 export async function startMcp() {
   const engine = new Engine(),
-    server = new McpServer({ name: "ghtrends", version: "0.13.1" });
+    server = new McpServer({ name: "ghtrends", version: "0.14.0" });
   const result = (data: unknown) => ({
     content: [{ type: "text" as const, text: JSON.stringify(data) }],
   });

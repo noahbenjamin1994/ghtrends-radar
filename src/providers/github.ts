@@ -329,6 +329,84 @@ export class GitHub {
     }
     return result;
   }
+  async directionEvidence(
+    directions: { id: string; query: string }[],
+  ): Promise<ResearchSource[]> {
+    const selected = directions
+      .filter(
+        (d, i, all) =>
+          /^[a-z][a-z0-9-]{1,40}$/.test(d.id) &&
+          all.findIndex((x) => x.id === d.id) === i &&
+          d.query.length >= 2 &&
+          d.query.length <= 70 &&
+          /^[\p{L}\p{N}][\p{L}\p{N} .+/#()&-]*$/u.test(d.query),
+      )
+      .slice(0, 5);
+    const output: ResearchSource[][] = new Array(selected.length);
+    let cursor = 0;
+    // Two source workers bound API pressure. Each task keeps its own evidence IDs.
+    await Promise.all(
+      Array.from({ length: Math.min(2, selected.length) }, async () => {
+        while (cursor < selected.length) {
+          const index = cursor++,
+            direction = selected[index]!;
+          const prefix = `D${index + 1}`;
+          const docs = await this.ideaAlternatives([direction.query]);
+          const sources: ResearchSource[] = docs.map((s) => ({
+            ...s,
+            id: prefix + s.id,
+            directionId: direction.id,
+            kind: s.id?.endsWith("R")
+              ? ("project" as const)
+              : ("search" as const),
+          }));
+          try {
+            const q = `${direction.query} is:issue is:open`;
+            const data = await this.get<{
+              items: {
+                html_url: string;
+                title: string;
+                body?: string;
+                created_at: string;
+                updated_at: string;
+                reactions?: { total_count: number };
+              }[];
+            }>(
+              "/search/issues?" +
+                new URLSearchParams({ q, per_page: "3", sort: "updated" }),
+              21600000,
+            );
+            for (const [i, issue] of data.items.slice(0, 3).entries()) {
+              if (
+                !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+$/.test(
+                  issue.html_url,
+                )
+              )
+                continue;
+              sources.push({
+                id: `${prefix}I${i + 1}`,
+                directionId: direction.id,
+                kind: "request",
+                label: issue.title.slice(0, 150),
+                url: issue.html_url,
+                fetchedAt: stamp(),
+                excerpt: `Individual issue signal for phrase ${direction.query}; task relevance needs review. Created: ${issue.created_at}. Updated: ${issue.updated_at}. Reactions: ${issue.reactions?.total_count ?? 0}. Title: ${issue.title.slice(0, 300)}.\n${(
+                  issue.body || ""
+                )
+                  .replace(/<!--[\s\S]*?-->/g, "")
+                  .replace(/<[^>]*>/g, " ")
+                  .slice(0, 1600)}`,
+              });
+            }
+          } catch {
+            /* Project evidence survives issue-search rate limits. */
+          }
+          output[index] = sources;
+        }
+      }),
+    );
+    return output.flat();
+  }
   async ideaAlternatives(queries: string[]): Promise<ResearchSource[]> {
     const terms = [...new Set(queries)]
       .filter(
@@ -413,6 +491,7 @@ export class GitHub {
           throw new Error("README source pending");
         return {
           id: `R${i + 1}`,
+          kind: "project",
           label: `${name} · README`,
           url: url.href,
           excerpt:
@@ -436,6 +515,7 @@ export class GitHub {
         }>(`/repos/${name}/issues/${match[2]}`, 21600000);
         return {
           id: `I${i + 1}`,
+          kind: "request",
           label: gap.title,
           url: gap.url,
           excerpt: `Individual issue request: ${issue.title}. State: ${issue.state}. Created: ${issue.created_at || gap.createdAt}. Updated: ${issue.updated_at || gap.updatedAt}.\n${clean(issue.body || gap.excerpt, 1800)}`,

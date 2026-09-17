@@ -294,3 +294,35 @@ test("recorded holiday evidence uses recurring annual shape and preserves the re
   assert.ok(Math.abs(m.growth! - 1 / 3) < 0.001);
   assert.ok(Math.abs(m.yearOverYear! - 2 / 3) < 0.001);
 });
+
+test("a broad brand tag keeps other device types outside direct phone alternatives", () => {
+  const phones = {
+    ...topic,
+    scope: "field" as const,
+    keyword: "Xiaomi smartphones",
+    query: "topic:xiaomi",
+    queries: ["topic:xiaomi", '"xiaomi phone" in:name,description'],
+  };
+  assert.equal(
+    repoRelevance(
+      repo(1, {
+        name: "team/xiaomi-vacuum",
+        description: "A Xiaomi vacuum map for Home Assistant",
+        topics: ["xiaomi"],
+      }),
+      phones,
+    ).role,
+    "unclear",
+  );
+  assert.equal(
+    repoRelevance(
+      repo(2, {
+        name: "team/phone-check",
+        description: "Xiaomi phone firmware checks",
+        topics: ["xiaomi"],
+      }),
+      phones,
+    ).role,
+    "direct",
+  );
+});

@@ -360,6 +360,8 @@ export const zh: Record<string, string> = {
   "Developing a focused product strategy": "正在推演具体产品策略",
   "Reading project documentation and user requests":
     "正在阅读项目说明与用户反馈",
+  "Comparing directions, resources and evidence":
+    "正在逐项比较方向、资源和依据",
   "Challenging assumptions and sharpening the recommendation":
     "正在核对关键假设并打磨建议",
   "Public reports are free to browse. Sign in for AI-assisted scans and saved history.":

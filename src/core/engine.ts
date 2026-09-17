@@ -187,6 +187,7 @@ export class Engine {
           documents,
           () => options.onProgress?.({ stage: "reviewing", preview: market }),
           (queries) => this.github.ideaAlternatives(queries),
+          (directions) => this.github.directionEvidence(directions),
         );
       } catch {
         market.aiError =

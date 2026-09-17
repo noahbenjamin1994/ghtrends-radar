@@ -1,3 +1,9 @@
+import {
+  visibleOpportunities,
+  groundOpportunityRatings,
+  proseRepairs,
+  applyProseRepairs,
+} from "../src/core/opportunities.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
@@ -29,6 +35,57 @@ const documents: ResearchSource[] = [
 ];
 const sample = (): StrategyResponse => ({
   checks: ["markdown comment anchors"],
+  recommendedId: "review-anchors",
+  selection: {
+    en: "Start with review anchors for a small documentation team; release automation fits a team with CI expertise.",
+    zh: "小型团队可优先验证评审锚点；具备持续集成经验的团队可选择发布自动化。",
+  },
+  opportunities: ["review-anchors", "release-audit", "translation-review"].map(
+    (id) => ({
+      id,
+      query: id.replaceAll("-", " "),
+      effort: "medium" as const,
+      demand: {
+        level: "medium" as const,
+        basis: "inferred" as const,
+        evidence: [],
+      },
+      competition: {
+        level: "medium" as const,
+        basis: "inferred" as const,
+        evidence: [],
+      },
+      en: {
+        title: id,
+        audience: "Small documentation teams during a file revision.",
+        demand:
+          "Repeat review work could justify a focused adapter; team usage is a hypothesis.",
+        competition:
+          "Existing editors provide a baseline; compare anchor behavior on real changes.",
+        resources:
+          "A TypeScript developer, Git fixtures and five documentation reviewers.",
+        delivery:
+          "Estimate two weeks for a local prototype with three redacted fixtures.",
+        upkeep: "Maintain adapters when document and editor formats change.",
+        wedge:
+          "Export anchor relocation decisions as a reviewable Git artifact.",
+        experiment:
+          "Proposed threshold: four of five reviewers restore 90% of comments.",
+      },
+      zh: {
+        title: id,
+        audience: "文档修订期间的小型技术文档团队。",
+        demand:
+          "重复评审任务可能支持适配器的采用，团队使用频率属于待检验假设。",
+        competition: "现有编辑器提供参照，可通过真实改动比较锚点表现。",
+        resources: "一位 TypeScript 开发者、Git 样例和五位文档评审者。",
+        delivery: "估算两周交付本地原型，先覆盖三份脱敏样例。",
+        upkeep: "编辑器和文档格式变化时持续维护适配器。",
+        wedge: "将锚点迁移判断导出为可复核的 Git 文件。",
+        experiment: "建议门槛：五位评审者中四位恢复 90% 的评论。",
+      },
+    }),
+  ),
   en: {
     headline: "Preserve review decisions when Markdown changes",
     summary:
@@ -116,6 +173,8 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     assert.equal(b.reviewed, true);
     assert.equal(b.basis, "source-led");
     assert.ok(visibleStrategy(b, "zh"));
+    assert.equal(visibleOpportunities(b)?.opportunities.length, 3);
+    assert.ok(visibleStrategy({ ...b, strategyVersion: "1" }, "zh"));
     assert.equal(reviews, 1);
     assert.deepEqual(ops, ["strategy", "strategy-review"]);
     assert.deepEqual(await r.insights(seed, documents), b);
@@ -124,6 +183,8 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     const m = { ...seed, brief: b };
     const md = marketMarkdown(m, undefined, "zh");
     assert.match(md, /建议继续门槛/);
+    assert.match(md, /细分方向地图/);
+    assert.match(md, /首版投入估算/);
     assert.match(md, /策略由 AI 提出/);
     assert.match(md, /github.com\/team\/editor/);
     const html = renderDocument(
@@ -373,3 +434,210 @@ test("idea checks reject query operators and bound searches and current document
         ?.excerpt?.includes("Supports review comment migration."),
     );
   }));
+
+test("direction ratings keep umbrella trends, project supply and task demand separate", () => {
+  const data = sample();
+  data.opportunities[0]!.demand = {
+    level: "high",
+    basis: "observed",
+    evidence: [
+      { id: "S1", quote: strategySources(seed, [])[0]!.excerpt!.slice(0, 30) },
+    ],
+  };
+  const errors = strategyProblems(data, strategySources(seed, documents), seed);
+  assert.ok(errors.some((e) => e.includes("umbrella metrics")));
+  assert.ok(errors.some((e) => e.includes("multiple relevant")));
+  const other = sample();
+  other.opportunities[0]!.demand = {
+    level: "low",
+    basis: "observed",
+    evidence: [
+      { id: "D2I1", quote: "A documented request for release audit exports." },
+    ],
+  };
+  assert.ok(
+    strategyProblems(
+      other,
+      [
+        ...documents,
+        {
+          id: "D2I1",
+          directionId: "release-audit",
+          kind: "request",
+          label: "Request",
+          url: "https://github.com/team/repo/issues/2",
+          excerpt: "A documented request for release audit exports.",
+        },
+      ],
+      seed,
+    ).some((e) => e.includes("this direction")),
+  );
+  other.recommendedId = "invented";
+  assert.ok(
+    strategyProblems(other, documents, seed).some((e) =>
+      e.includes("select one"),
+    ),
+  );
+});
+
+test("every direction receives scoped evidence; one source failure preserves the map", async () =>
+  fixture(async (r, s) => {
+    const gh = new GitHub(s),
+      paths: string[] = [];
+    gh.get = async <T>(path: string): Promise<T> => {
+      paths.push(path);
+      if (path.startsWith("/search/issues"))
+        return {
+          items: [
+            {
+              html_url: "https://github.com/team/tool/issues/1",
+              title: "Keep the review comments",
+              body: "An individual user request to retain review comments across files.",
+              created_at: "2026-08-01",
+              updated_at: "2026-09-01",
+              reactions: { total_count: 2 },
+            },
+          ],
+        } as T;
+      if (path.includes("translation")) throw Error("source recovering");
+      if (path.startsWith("/search/repositories"))
+        return {
+          total_count: 4,
+          items: [{ full_name: "team/tool", description: "Review adapter" }],
+        } as T;
+      return {
+        encoding: "base64",
+        content: Buffer.from(
+          "An inspectable review adapter with export support.",
+        ).toString("base64"),
+      } as T;
+    };
+    const dirs = sample().opportunities.map(({ id, query }) => ({ id, query }));
+    const evidence = await gh.directionEvidence([
+      ...dirs,
+      { id: "unsafe", query: "org:private" },
+    ]);
+    assert.equal(
+      paths.filter((p) => p.startsWith("/search/repositories")).length,
+      3,
+    );
+    assert.equal(paths.filter((p) => p.startsWith("/search/issues")).length, 3);
+    assert.ok(dirs.every((d) => evidence.some((s) => s.directionId === d.id)));
+    assert.equal(new Set(evidence.map((s) => s.id)).size, evidence.length);
+    r.json = async (_prompt, input: any, _budget, operation) => {
+      if (operation === "strategy-review")
+        assert.ok(
+          input.sources.some(
+            (s: ResearchSource) => s.directionId === "translation-review",
+          ),
+        );
+      return sample();
+    };
+    let calls = 0;
+    const b = await r.insights(
+      seed,
+      documents,
+      undefined,
+      undefined,
+      async (requested) => {
+        calls++;
+        assert.deepEqual(requested, dirs);
+        return evidence;
+      },
+    );
+    assert.equal(calls, 1);
+    assert.equal(b.opportunities?.length, 3);
+    assert.equal(b.reviewed, true);
+  }));
+
+test("source scope corrects overconfident rating labels while preserving all directions", () => {
+  const data = sample();
+  data.opportunities[0]!.competition = {
+    level: "low",
+    basis: "observed",
+    evidence: [],
+  };
+  data.opportunities[0]!.demand = {
+    level: "high",
+    basis: "observed",
+    evidence: [],
+  };
+  const grounded = groundOpportunityRatings(
+    data,
+    documents,
+  ) as StrategyResponse;
+  assert.equal(grounded.opportunities[0]!.competition.basis, "inferred");
+  assert.equal(grounded.opportunities[0]!.demand.level, "exploratory");
+  assert.equal(grounded.opportunities[0]!.demand.basis, "inferred");
+  assert.deepEqual(
+    grounded.opportunities.map((o) => o.zh),
+    data.opportunities.map((o) => o.zh),
+  );
+  assert.equal(data.opportunities[0]!.demand.level, "high");
+  assert.deepEqual(
+    strategyProblems(grounded, strategySources(seed, documents), seed),
+    [],
+  );
+});
+
+test("targeted copy editing changes requested prose only, preserving evidence and direction ratings", () => {
+  const data = sample();
+  data.opportunities[0]!.zh.competition =
+    "这个方向与现有项目不同，需要通过真实工作流比较。";
+  const fields = proseRepairs(data);
+  assert.deepEqual(
+    fields.map((f) => f.path),
+    ["opportunities.0.zh.competition"],
+  );
+  const edited = applyProseRepairs(
+    data,
+    {
+      edits: [
+        {
+          path: fields[0]!.path,
+          value: "这个方向提供另一种工作流，建议通过实际使用比较采用理由。",
+        },
+        { path: "opportunities.0.demand.level", value: "high" },
+        { path: "__proto__.polluted", value: "value" },
+      ],
+    },
+    fields,
+  ) as StrategyResponse;
+  assert.equal(edited.opportunities[0]!.demand.level, "medium");
+  assert.deepEqual(edited.evidence, data.evidence);
+  assert.deepEqual(proseRepairs(edited), []);
+  assert.equal(({} as any).polluted, undefined);
+});
+
+test("a shared competitor can inform two directions; citations keep only supplied punctuation", () => {
+  const data = sample();
+  const source: ResearchSource = {
+    id: "D2A1",
+    directionId: "release-audit",
+    kind: "project",
+    label: "Tool",
+    url: "https://github.com/team/tool",
+    excerpt: "An adapter preserving review anchors across file changes",
+  };
+  data.opportunities[0]!.competition = {
+    level: "medium",
+    basis: "observed",
+    evidence: [{ id: source.id!, quote: source.excerpt! + "." }],
+  };
+  const grounded = groundOpportunityRatings(data, [
+    ...documents,
+    source,
+  ]) as StrategyResponse;
+  assert.equal(
+    grounded.opportunities[0]!.competition.evidence[0]!.quote,
+    source.excerpt,
+  );
+  assert.deepEqual(
+    strategyProblems(
+      grounded,
+      strategySources(seed, [...documents, source]),
+      seed,
+    ),
+    [],
+  );
+});

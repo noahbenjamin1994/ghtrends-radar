@@ -1,3 +1,7 @@
+import {
+  visibleOpportunities,
+  opportunityRows,
+} from "../core/opportunities.js";
 import { appPath, basePathFromUrl } from "../core/paths.js";
 import { selectGapSignals } from "../core/gaps.js";
 import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
@@ -106,6 +110,24 @@ export function renderDocument(
       <p>${e("Measured search term")}: ${escapeHtml(m.demand.keyword)} · ${escapeHtml(assessment.demandNote)}</p>${m.demand.retryAt ? `<p>${e("Google Trends refresh window")}: ${escapeHtml(m.demand.retryAt)}</p>` : ""}${list(assessment.facts)}${m.kind === "uncertain" ? `<p>${e("Quadrant not yet established")}</p><h3>${e("What to do next")}</h3>${list(assessment.nextSteps)}` : ""}
       <dl>${m.competition ? `<dt>${e("Competition pressure")}</dt><dd>${escapeHtml(competitionPressure(m))} / 100 · ${e("pressure." + m.competition.level)}</dd><dt>${e("Direct alternatives")}</dt><dd>${m.competition.direct}</dd><dt>${e("Direction basis")}</dt><dd>${e("basis." + (m.metrics.directionBasis || "recent-windows"))}</dd>` : ""}<dt>${e("Matching active GitHub projects")}</dt><dd>${m.supply.error ? "—" : (m.supply.complete ? "" : "≥") + number(m.supply.total)}</dd><dt>${e("Search-interest growth")}</dt><dd>${growth(m)} · ${e("Last 8 complete weeks vs previous 8")}</dd><dt>${e("Search term and region")}</dt><dd>${escapeHtml(m.demand.keyword)} · ${e(m.geo || "Worldwide")}</dd><dt>${e("Complete weekly observations")}</dt><dd>${m.metrics.points}</dd></dl></section>
       ${m.brief ? `<section><h2>${e("Research brief")}</h2><p>${escapeHtml(assessment.narrative.summary)}</p>${list(assessment.narrative.nextSteps)}<p>${e(assessment.narrative.kind === "ai" ? "AI interpretation of the evidence below. Verify the sources before acting." : "This recommendation follows the collected source evidence.")}</p></section>` : ""}
+      ${
+        visibleOpportunities(m.brief)
+          ? `<section><h2>${locale === "zh" ? "细分方向地图" : "Opportunity map"}</h2><p>${escapeHtml(m.brief!.selection![locale])}</p>${m
+              .brief!.opportunities!.map(
+                (o) =>
+                  `<article><h3>${escapeHtml(o[locale].title)}</h3>${opportunityRows(
+                    o,
+                    locale,
+                  )
+                    .map(
+                      (r) =>
+                        `<h4>${escapeHtml(r.label)}</h4><p>${escapeHtml(r.text)}</p>`,
+                    )
+                    .join("")}</article>`,
+              )
+              .join("")}</section>`
+          : ""
+      }
       ${
         strategy
           ? `<section><h2>${locale === "zh" ? "值得验证的产品判断" : "A product thesis to test"}</h2>${strategyRows(

@@ -1,3 +1,5 @@
+import { OpportunityMap } from "./opportunities.js";
+import { visibleOpportunities } from "../core/opportunities.js";
 import { COMPETITION_POLICY } from "../core/competition.js";
 import { selectGapSignals } from "../core/gaps.js";
 import { enableEngagement, track } from "./engagement.js";
@@ -321,7 +323,7 @@ export function App() {
     interpreting: "Understanding your research question",
     brief: "Developing a focused product strategy",
     researching: "Reading project documentation and user requests",
-    reviewing: "Challenging assumptions and sharpening the recommendation",
+    reviewing: "Comparing directions, resources and evidence",
     refining: "Refining same-intent project searches",
     sources: "Collecting source evidence",
     github: "GitHub supply received",
@@ -1229,6 +1231,7 @@ function MarketView({
       ? visibleStrategy(m.brief, locale)
       : undefined;
   const l = (en: string, zh: string) => (locale === "zh" ? zh : en);
+  const opportunityMap = visibleOpportunities(m.brief);
   const share = location.origin + localUrl("/report/" + m.id);
   const demandPoints = completeWeeklySeries(m.demand, m.asOf).points;
   const gapSignals = selectGapSignals(m.gaps);
@@ -1403,7 +1406,10 @@ function MarketView({
       )}
       <nav className="report-nav" aria-label={l("Report sections", "报告章节")}>
         <a href="#outlook">{l("Overview", "判断概览")}</a>
-        {strategy && <a href="#strategy">{l("Strategy", "产品判断")}</a>}
+        {visibleOpportunities(m.brief) && (
+          <a href="#opportunities">{l("Directions", "方向地图")}</a>
+        )}
+        {strategy && <a href="#strategy">{l("Strategy", "优先方向")}</a>}
         <a href="#evidence">{l("Evidence", "趋势证据")}</a>
         <a href="#projects">{l("Projects", "相关项目")}</a>
         <a href="#method">{l("Research scope", "研究范围")}</a>
@@ -1419,9 +1425,15 @@ function MarketView({
             </span>
           </div>
           <h2>
-            {assessment.narrative.kind === "ai" && assessment.narrative.headline
-              ? assessment.narrative.headline
-              : assessment.title}
+            {opportunityMap
+              ? l(
+                  `${opportunityMap.opportunities.length} directions. Find your way in.`,
+                  `${opportunityMap.opportunities.length} 个细分方向，找到适合你的切入点`,
+                )
+              : assessment.narrative.kind === "ai" &&
+                  assessment.narrative.headline
+                ? assessment.narrative.headline
+                : assessment.title}
           </h2>
           <p className="outlook-summary">
             {assessment.narrative.kind === "ai"
@@ -1504,12 +1516,13 @@ function MarketView({
           </small>
         </div>
       </div>
+      {m.brief && <OpportunityMap key={m.id} brief={m.brief} locale={locale} />}
       {strategy ? (
         <section className="strategy-section" id="strategy">
           <div className="report-section-heading">
             <div>
               <div className="eyebrow">
-                {l("A PRODUCT THESIS TO TEST", "值得验证的产品判断")}
+                {l("FIRST DIRECTION · A DEEPER LOOK", "优先方向 · 深入一步")}
               </div>
               <h3>{strategy.angle}</h3>
             </div>
@@ -2629,7 +2642,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.13.1/ghtrends-radar-0.13.1.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.14.0/ghtrends-radar-0.14.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}

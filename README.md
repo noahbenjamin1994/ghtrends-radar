@@ -19,14 +19,14 @@ Find growing categories, inspect the competition, and share the evidence.
 
 ## What does it tell you?
 
-| Landscape | Search direction | Observed competition | Starting strategy |
-|---|---|---|---|
-| Blue ocean | Rising | Limited, covered search results | Validate a focused use case |
-| Growing red ocean | Rising | Established alternatives | Find a specific audience or advantage |
-| Red ocean | Stable / falling / mixed / pending | Established alternatives | Find a reason users would switch; inspect search status separately |
-| Quiet ocean | Stable / falling | Limited, covered search results | Validate a focused niche |
-| Needs validation | Any | Coverage or project roles need review | Inspect measured facts and complete the highlighted evidence |
-| Field overview | Measured separately | Several workflows or a broader market | Choose one software task for the next scan |
+| Landscape         | Search direction                   | Observed competition                  | Starting strategy                                                  |
+| ----------------- | ---------------------------------- | ------------------------------------- | ------------------------------------------------------------------ |
+| Blue ocean        | Rising                             | Limited, covered search results       | Validate a focused use case                                        |
+| Growing red ocean | Rising                             | Established alternatives              | Find a specific audience or advantage                              |
+| Red ocean         | Stable / falling / mixed / pending | Established alternatives              | Find a reason users would switch; inspect search status separately |
+| Quiet ocean       | Stable / falling                   | Limited, covered search results       | Validate a focused niche                                           |
+| Needs validation  | Any                                | Coverage or project roles need review | Inspect measured facts and complete the highlighted evidence       |
+| Field overview    | Measured separately                | Several workflows or a broader market | Choose one software task for the next scan                         |
 
 Ocean names summarize the observed search and open-source signals; they do not establish commercial competition. A quiet ocean can still be a valuable niche.
 
@@ -57,7 +57,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.13.1/ghtrends-radar-0.13.1.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.14.0/ghtrends-radar-0.14.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -140,13 +140,13 @@ ghtrends scan --topic mcp-servers --trends-file demand.json --json
 
 ## Hosted and self-hosted
 
-| Capability | Hosted guest | Hosted signed in | Self-hosted |
-|---|---|---|---|
-| Public radar, reports, gaps, public exports | Yes | Yes | Yes |
-| New scans and uncached repository comparisons | — | Yes, daily allowance | Yes, own provider limits |
-| Persistent history and watchlist | — | Per account, across devices | Local SQLite workspace |
-| Input normalization and brief | View existing public briefs | Server DeepSeek key | Optional own DeepSeek key |
-| Private reports and opt-in public links | — | Yes | Access limited to your deployment |
+| Capability                                    | Hosted guest                | Hosted signed in            | Self-hosted                       |
+| --------------------------------------------- | --------------------------- | --------------------------- | --------------------------------- |
+| Public radar, reports, gaps, public exports   | Yes                         | Yes                         | Yes                               |
+| New scans and uncached repository comparisons | —                           | Yes, daily allowance        | Yes, own provider limits          |
+| Persistent history and watchlist              | —                           | Per account, across devices | Local SQLite workspace            |
+| Input normalization and brief                 | View existing public briefs | Server DeepSeek key         | Optional own DeepSeek key         |
+| Private reports and opt-in public links       | —                           | Yes                         | Access limited to your deployment |
 
 **One codebase.** Self-hosting needs no login provider and no external database. Hosted mode requires sign-in for resource-consuming research and stores user/report ownership, history, watchlists, sessions and daily usage in SQLite. Single instance with a persistent data volume; back up with SQLite's backup API or while stopped, rather than copying a live WAL database file alone.
 
@@ -160,14 +160,15 @@ export DEEPSEEK_MODEL=deepseek-flash
 ghtrends ui
 ```
 
-The model proposes one primary Trends phrase, up to two genuine synonyms, and bounded GitHub topic/phrase queries. It also reviews project roles using quoted repository metadata; deterministic code calculates pressure and search direction. Ambiguous acronyms request clarification. It then develops one **product strategy to test** in English and Chinese. Market metrics remain a separate, deterministic layer. Use public research inputs: queries and bounded public-source excerpts go to DeepSeek, Google and GitHub as needed. Collected evidence remains readable during model recovery.
+The model proposes one primary Trends phrase, up to two genuine synonyms, and bounded GitHub topic/phrase queries. It also reviews project roles using quoted repository metadata; deterministic code calculates pressure and search direction. Ambiguous acronyms request clarification. It then maps **3–5 distinct opportunity directions** in English and Chinese, with one prioritized strategy to test. Market metrics remain a separate, deterministic layer. Use public research inputs: queries and bounded public-source excerpts go to DeepSeek, Google and GitHub as needed. Collected evidence remains readable during model recovery.
 
 **The strategy process**
 
 1. Read up to three relevant project READMEs and three individual issue excerpts.
-2. Enable DeepSeek Flash thinking at high effort to identify a specific audience, causal mechanism, first useful artifact, deliberate tradeoff and critical assumption.
-3. Check up to two targeted GitHub searches and two additional READMEs for existing implementations of the proposed idea. A second reasoning pass challenges duplication, factual support and the proposed adoption advantage. A bounded editing pass repairs wording or citation problems when needed.
-4. Deliver one feasible experiment with proposed continue/redirect thresholds and links to the premise sources. Exact cited excerpts are checked against the supplied source text.
+2. Enable DeepSeek Flash thinking at high effort to map distinct user tasks: typically five for a broad field and three for a narrow product. Each direction includes demand, competition, resource needs, a scoped first-release estimate, ongoing costs, adoption rationale and an experiment.
+3. Check each direction with one targeted GitHub repository search, up to one README and one issue search (up to three excerpts), using two source workers. The second reasoning pass reviews the whole map and chooses a priority for a solo developer or small team; a bounded editing pass repairs wording or citations.
+4. Show source signals separately from research inference. Parent-query search growth stays separate from direction-level demand. Project features establish supply; observed demand needs relevant user-request evidence. Strong demand requires multiple request sources and model review of their relevance. Limited search coverage keeps competition estimates provisional.
+5. Develop the selected direction in depth with a causal mechanism, tradeoff, critical assumption and proposed continue/redirect criteria. Exact cited excerpts and direction IDs are checked. All directions appear in the interactive report, Markdown, JSON and server-rendered HTML. Old single-strategy reports remain readable.
 
 Sparse source coverage produces a **domain hypothesis**; document-grounded recommendations are labeled **source-led hypotheses**. Both represent research proposals. The interface shows source progress and preliminary measurements while the strategy develops. AI-enabled scans can proceed with available evidence during Trends cooldown, within the same account and attempt limits. Strategy generation, review and corrective editing are recorded separately in admin usage. Provider reasoning text stays outside stored reports. Results use a six-hour strategy cache; deeper analysis adds latency and model usage.
 
@@ -175,11 +176,11 @@ Sparse source coverage produces a **domain hypothesis**; document-grounded recom
 
 **Access and research credits**
 
-| Access | Included |
-| --- | --- |
-| Guest | Public reports, examples, methodology, and cached project evidence |
-| Signed in | 10 research credits per UTC day, private saved history, sharing, and saved projects |
-| Self-hosted | Own credentials and database; locally managed usage |
+| Access      | Included                                                                            |
+| ----------- | ----------------------------------------------------------------------------------- |
+| Guest       | Public reports, examples, methodology, and cached project evidence                  |
+| Signed in   | 10 research credits per UTC day, private saved history, sharing, and saved projects |
+| Self-hosted | Own credentials and database; locally managed usage                                 |
 
 A fresh scan, project analysis, or comparison uses one credit. Cached results are free. The header, research form, and account menu show the balance and reset time in your timezone. A credit is reserved while research runs; collection issues and interrupted work return it exactly once, including after a server restart. Project and comparison collection starts through an explicit action protected by the session and CSRF token; opening a saved page reads cached evidence.
 
