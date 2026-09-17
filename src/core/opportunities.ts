@@ -33,6 +33,8 @@ export const opportunitySchema = z.object({
     .min(2)
     .max(70)
     .regex(/^[\p{L}\p{N}][\p{L}\p{N} .+/#()&-]*$/u),
+  route: z.enum(["opensource", "product", "service"]).optional(),
+  basedOn: z.array(evidenceRef).max(3).optional(),
   effort: z.enum(["low", "medium", "high"]),
   demand: assessment,
   competition: assessment,
@@ -70,13 +72,25 @@ export const opportunityMapSchema = z.object({
 });
 export type OpportunityMap = z.infer<typeof opportunityMapSchema>;
 
-export function proseRepairs(raw: unknown): { path: string; value: string }[] {
+export function proseRepairs(
+  raw: unknown,
+  all = false,
+): { path: string; value: string }[] {
   if (!raw || typeof raw !== "object") return [];
   const data = raw as Record<string, any>,
     fields: { path: string; value: string }[] = [];
+  const directionIds = (data.opportunities || [])
+    .map((o: any) => o.id)
+    .filter((id: unknown) => typeof id === "string");
   const visit = (node: unknown, path: string) => {
     if (typeof node === "string") {
-      if (hasNegativeWording(node) || hasRecoveryTimeReference(node))
+      if (
+        all ||
+        hasNegativeWording(node) ||
+        hasRecoveryTimeReference(node) ||
+        /\b(?:S[12]|[RI]\d+|W\d+R\d+|D\d+[AIR]\d+)\b/.test(node) ||
+        directionIds.some((id: string) => node.includes(id))
+      )
         fields.push({ path, value: node });
     } else if (node && typeof node === "object") {
       for (const [k, v] of Object.entries(node)) visit(v, `${path}.${k}`);
@@ -85,6 +99,13 @@ export function proseRepairs(raw: unknown): { path: string; value: string }[] {
   for (const lang of ["en", "zh"]) {
     visit(data[lang], lang);
     visit(data.overview?.[lang], `overview.${lang}`);
+    visit(data.landscape?.[lang], `landscape.${lang}`);
+    data.landscape?.leaders?.forEach((x: any, i: number) =>
+      visit(x[lang], `landscape.leaders.${i}.${lang}`),
+    );
+    data.issueInsights?.forEach((x: any, i: number) =>
+      visit(x[lang], `issueInsights.${i}.${lang}`),
+    );
     visit(data.selection?.[lang], `selection.${lang}`);
     if (Array.isArray(data.opportunities))
       data.opportunities.forEach((o: any, i: number) =>
@@ -105,7 +126,7 @@ export function applyProseRepairs(
         .array(
           z.object({ path: z.string(), value: z.string().min(1).max(1000) }),
         )
-        .max(40),
+        .max(100),
     })
     .safeParse(response);
   if (!parsed.success) return raw;
@@ -151,7 +172,16 @@ export function groundOpportunityRatings(
         )
       : []),
     ...(result.overview?.evidence || []),
+    ...((result as any).landscape?.demand?.evidence || []),
+    ...((result as any).landscape?.competition?.evidence || []),
+    ...((result as any).landscape?.leaders?.flatMap(
+      (x: any) => x.evidence || [],
+    ) || []),
+    ...((result as any).issueInsights
+      ?.map((x: any) => x.evidence)
+      .filter(Boolean) || []),
     ...result.opportunities.flatMap((o) => [
+      ...(o.basedOn || []),
       ...o.demand.evidence,
       ...o.competition.evidence,
     ]),
@@ -185,12 +215,19 @@ export function groundOpportunityRatings(
               (!s.directionId || s.directionId === o.id),
           ),
         )
-        .map((r) => r.id),
+        .map((r) => sources.find((s) => s.id === r.id)!.url),
     );
     if (o.demand.level === "high" && requests.size < 2)
       o.demand.level = requests.size ? "medium" : "exploratory";
     if (!requests.size) o.demand.basis = "inferred";
-    if (o.competition.level === "low" || !o.competition.evidence.length)
+    // A named tool documents an alternative. Pressure across a whole niche is
+    // an inference unless the evidence was collected for that specific job.
+    const nicheSupply = o.competition.evidence.some((r) =>
+      sources.some(
+        (s) => s.id === r.id && s.directionId === o.id && s.kind === "project",
+      ),
+    );
+    if (o.competition.level === "low" || !nicheSupply)
       o.competition.basis = "inferred";
   }
   return result;
@@ -235,6 +272,25 @@ export function opportunityProblems(
       problems.push(`Overview ${ref.id}: quote a supplied source verbatim.`);
   }
   for (const o of map.opportunities) {
+    for (const ref of o.basedOn || []) {
+      const source = sources.find((s) => s.id === ref.id);
+      if (
+        !source?.excerpt ||
+        !source.excerpt
+          .replace(/\s+/g, " ")
+          .includes(ref.quote.replace(/\s+/g, " "))
+      )
+        problems.push(`${o.id}: basedOn needs an exact project quotation.`);
+    }
+    if (
+      o.route === "opensource" &&
+      !o.basedOn?.some((r) =>
+        sources.some((s) => s.id === r.id && s.kind === "project"),
+      )
+    )
+      problems.push(
+        `${o.id}: name and quote a supplied project document for the open-source contribution.`,
+      );
     for (const axis of ["demand", "competition"] as const) {
       const a = o[axis];
       for (const ref of a.evidence) {
@@ -273,7 +329,7 @@ export function opportunityProblems(
               (!s.directionId || s.directionId === o.id),
           ),
         )
-        .map((r) => r.id),
+        .map((r) => sources.find((s) => s.id === r.id)!.url),
     );
     if (
       o.demand.level === "high" &&
@@ -297,9 +353,9 @@ export function opportunityProblems(
 export function visibleOpportunities(
   brief?: Brief,
 ): OpportunityMap | undefined {
-  if (!brief || !["2", "3"].includes(brief.strategyVersion || "")) return;
+  if (!brief || !["2", "3", "4"].includes(brief.strategyVersion || "")) return;
   if (
-    brief.strategyVersion === "3" &&
+    ["3", "4"].includes(brief.strategyVersion || "") &&
     (!overviewSchema.safeParse(brief.overview).success ||
       !z
         .array(clearOpportunitySchema)
@@ -348,6 +404,14 @@ export function opportunityLabel(
 export function opportunityRows(o: Opportunity, lang: "en" | "zh") {
   const p = o[lang];
   return [
+    ...(o.route
+      ? [
+          [
+            lang === "zh" ? "机会类型" : "Opportunity type",
+            opportunityRoute(o.route, lang),
+          ],
+        ]
+      : []),
     [lang === "zh" ? "服务谁" : "Who it serves", p.audience],
     ...(p.need ? [[lang === "zh" ? "解决什么问题" : "The need", p.need]] : []),
     ...(p.service
@@ -421,6 +485,8 @@ OPPORTUNITY MAP — mandatory additional top-level fields:
 "recommendedId":"one direction ID", "selection":{"en":"why this direction comes first for a small independent team, and who should choose an alternative","zh":"优先顺序的具体理由及其它方向更适合谁"},
 "opportunities":[{"id":"stable-english-slug","query":"short 2-3 word GitHub phrase","effort":"low|medium|high","demand":{"level":"high|medium|low|exploratory","basis":"observed|inferred","evidence":[{"id":"source ID","quote":"exact excerpt"}]},"competition":{"level":"high|medium|low|exploratory","basis":"observed|inferred","evidence":[]},"en":{"title":"distinct direction","audience":"persona, triggering task and frequency","demand":"frequency, urgency, individual request signals or conditional inference; separate attention from willingness to pay","competition":"named documented alternatives, built-in substitutes, switching costs, scope of current comparison","resources":"skills plus data/device/hardware/access/distribution needed, and the hardest dependency","delivery":"estimated team size and elapsed time for a defined prototype, with assumptions","upkeep":"recurring data curation, testing, support, compute or acquisition costs","wedge":"concrete artifact and mechanism that earns adoption alongside alternatives","experiment":"feasible first test with proposed numerical decision threshold"},"zh":{"title":"细分方向","audience":"人群、触发任务、频率","demand":"需求信号与成立条件","competition":"已有替代方案与进入门槛","resources":"技能、数据、设备、权限、触达渠道及最难获得的资源","delivery":"明示估算的首版人数、工期、交付范围与前提","upkeep":"持续维护、支持、算力、数据更新等成本","wedge":"首个交付物及采用理由","experiment":"针对该方向的实验与建议数字门槛"}}].
 
+Each direction includes route:"opensource|product|service" and basedOn:[{id,quote}] (maximum three exact project-source references). Actively evaluate open-source project opportunities: useful upstream contribution, plugin/integration, reusable dataset or testing tool, and hosting/support around a concrete project. If a relevant project document exists, include at least one genuinely useful open-source direction alongside other user jobs. The basedOn array names the exact reusable source; explain what it already does and what contribution or complement the proposal adds. Source snippets can identify candidates; implementation and license compatibility belong in the explicit next check. Generic software with an open-source label is weak. Keep diverse jobs; at most two directions centered on specialist maintenance. A relevant open-source direction can share an ordinary consumer job. Public stars are supply signals.
+
 Return 3-5 genuinely distinct directions: five for a broad brand, field or ecosystem when coherent, three for a narrow product. Distinguish different user jobs, buyers, lifecycle stages or business/resource models; renaming the same feature three times is weak. Keep the user's original object: Xiaomi phones spans phone selection, ownership, maintenance, resale, specialist tooling; Xiaomi vacuums and lamps serve other objects. Source prominence reflects GitHub coverage rather than user importance. Retain consumer/professional/service or hardware-adjacent directions when relevant, and describe their data, trust or distribution requirements. Favor an implementable software/data contribution in each. Preserve explicit constraints.
 
 Draft the full map first, with one short targeted query for EACH direction. The application will check each query, read a candidate README and seek individual issue signals. In the review, keep direction IDs and their tasks stable; refine the artifact and assessments using directionId-tagged sources. A-source and D-source searches are scoped feature checks. Documents for another object (e.g. a vacuum in a phone search) belong outside the argument. Explicitly consider alternatives outside GitHub as hypotheses for further comparison unless a supplied source documents them. Originality requires a mechanism, bottleneck or adoption advantage. An existing implementation motivates a complementary workflow or a specific difference to test.
@@ -431,3 +497,20 @@ Effort describes the scoped first deliverable: low ~ one generalist and public d
 
 The report headline and summary introduce the portfolio and its tradeoffs. The existing nine-field strategy develops recommendedId in greater depth and matches that direction exactly. The selection explains prioritization assuming a solo developer or small team; also state which direction suits a team with additional resources. Rank through an explicit judgment rather than invented numeric scores. Keep all three to five directions in the final answer, even if source collection is partial; inferred judgments remain useful with testable assumptions. Both languages represent identical directions, ratings and resource estimates. Every narrative field follows the affirmative language rules. References retain original source text.
 `;
+
+export function opportunityRoute(
+  route: string | undefined,
+  locale: "en" | "zh",
+) {
+  return route === "opensource"
+    ? locale === "zh"
+      ? "开源切入"
+      : "Open-source contribution"
+    : route === "service"
+      ? locale === "zh"
+        ? "服务机会"
+        : "Service opportunity"
+      : locale === "zh"
+        ? "产品机会"
+        : "Product opportunity";
+}

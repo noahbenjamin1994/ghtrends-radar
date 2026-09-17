@@ -1,10 +1,15 @@
+import { landscapeRows, researchLandscape } from "../core/landscape.js";
 import {
   visibleOpportunities,
   overviewRows,
   opportunityRows,
 } from "../core/opportunities.js";
 import { appPath, basePathFromUrl } from "../core/paths.js";
-import { selectGapSignals } from "../core/gaps.js";
+import {
+  marketGapSignals,
+  reportIssueSignals,
+  selectGapSignals,
+} from "../core/gaps.js";
 import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
 import { marketAssessment, competitionPressure } from "../core/assessment.js";
 import { text, localeUrl, MARKET_LABELS, type Locale } from "../core/i18n.js";
@@ -77,14 +82,18 @@ export function renderDocument(
     "/admin": "Operations · ghtrends",
     "/history": "Your research history · ghtrends",
   };
+  const reportTitle =
+    assessment?.narrative.kind === "ai" && assessment.narrative.headline
+      ? assessment.narrative.headline
+      : assessment?.title;
   const title =
     status === 404
       ? t("Page not found · ghtrends")
       : m
-        ? `${t(m.topic.name)}: ${assessment!.title} · ghtrends`
+        ? `${t(m.topic.name)}: ${reportTitle} · ghtrends`
         : t(titles[path] || "Repository intelligence · ghtrends");
   const description = m
-    ? `${assessment!.title}. ${t("{count} active projects match the published GitHub search scope.", { count: m.supply.complete ? m.supply.total : "≥" + m.supply.total })} ${t("Evidence dated {date}.", { date: m.asOf.slice(0, 10) })}`
+    ? `${reportTitle}. ${t("{count} active projects match the published GitHub search scope.", { count: m.supply.complete ? m.supply.total : "≥" + m.supply.total })} ${t("Evidence dated {date}.", { date: m.asOf.slice(0, 10) })}`
     : t(
         "GitHub supply × Google search demand. Explore category evidence, compare repositories, and use the open-source CLI and MCP server.",
       );
@@ -103,7 +112,9 @@ export function renderDocument(
       assessment.narrative.kind === "ai"
         ? visibleStrategy(m.brief, locale)
         : undefined;
-    const overview = visibleOpportunities(m.brief)?.overview;
+    const overview = researchLandscape(m)
+      ? undefined
+      : visibleOpportunities(m.brief)?.overview;
     const sources = m.supply.searches?.length
       ? m.supply.searches
       : [{ url: m.supply.sourceUrl, query: m.supply.query }];
@@ -125,6 +136,12 @@ export function renderDocument(
               .join("")}</section>`
           : ""
       }
+      <section>${landscapeRows(m, locale)
+        .map(
+          (row) =>
+            `<h3>${escapeHtml(row.label)}</h3><p>${escapeHtml(row.text)}</p>`,
+        )
+        .join("")}</section>
       ${
         visibleOpportunities(m.brief)
           ? `<section><h2>${locale === "zh" ? "细分方向地图" : "Opportunity map"}</h2><p>${escapeHtml(m.brief!.selection![locale])}</p>${m
@@ -168,6 +185,19 @@ export function renderDocument(
         )
         .join("")}</tbody></table></div></section>
       <section><h2>${e("Limits of this result")}</h2>${list(assessment.scopeNotes)}<p>${e("Search interest measures attention, not paying customers. Classification thresholds are published heuristics and still require empirical calibration.")}</p></section>
+      <section><h2>${locale === "zh" ? "社区需求解读" : "Community requests"}</h2>${reportIssueSignals(
+        m,
+      )
+        .map((g) => {
+          const p = m.brief?.issueInsights?.find(
+            (i) =>
+              i.relevance === "direct" &&
+              m.brief?.sources.find((s) => s.id === i.sourceId)?.url === g.url,
+          )?.[locale];
+          return `<article><h3>${link(g.url, p?.title || g.title)}</h3>${p ? list([p.audience, p.need, p.opportunity, p.check]) : `<p>${escapeHtml(g.excerpt)}</p>`}<p>${escapeHtml(g.repo)}${g.createdAt ? ` · ${escapeHtml(g.createdAt.slice(0, 10))}` : ""}</p></article>`;
+        })
+        .join("")}</section>
+      ${m.web?.queries.length ? `<section><h2>${locale === "zh" ? "Google 网页证据" : "Google web evidence"}</h2><p>${escapeHtml(m.web.region)} · ${escapeHtml(m.web.language)} · ${escapeHtml(m.web.fetchedAt.slice(0, 10))}</p>${m.web.queries.map((q) => `<h3>${escapeHtml(q.query)}</h3>${q.results.map((r) => `<p>${r.kind === "ad" ? (locale === "zh" ? "广告" : "Ad") : locale === "zh" ? "自然结果" : "Organic"} · ${link(r.url, r.title)}</p>`).join("")}`).join("")}</section>` : ""}
       <section><h2>${e("Use and share the evidence")}</h2><p>${link(`/report/${m.id}`, "Permanent report")} · ${link(`/api/reports/${m.id}?format=md&v=2`, "Markdown")} · ${link(`/api/reports/${m.id}`, "JSON")} · ${link(`/api/cards/${m.id}.png?v=2`, "PNG card")}</p><p>${link(SOURCE, "Use the open-source CLI and MCP server on GitHub")}</p></section>`;
   } else if (status === 404) {
     content = `<h1>${e("Page not found.")}</h1><p>${e("This report or page is unavailable.")} ${link("/", "Explore the radar")}</p>`;
@@ -182,7 +212,7 @@ export function renderDocument(
   } else if (path === "/gaps") {
     const gaps = selectGapSignals([
       ...new Map(
-        markets.flatMap((m) => m.gaps).map((g) => [g.url, g]),
+        markets.flatMap((m) => marketGapSignals(m)).map((g) => [g.url, g]),
       ).values(),
     ]).slice(0, 20);
     content = `<h1>${e("Find the friction")}</h1><p>${e("Open issues people care enough to react to. Follow the source, understand the workflow, and validate the need.")}</p><ul>${gaps.map((g) => `<li>${link(g.url, g.title)} — ${escapeHtml(g.repo)} · ↑ ${number(g.reactions)}</li>`).join("")}</ul>`;

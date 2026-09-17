@@ -439,7 +439,7 @@ export class GitHub {
               "https://github.com/search?" +
               new URLSearchParams({ q, type: "repositories" }),
             excerpt:
-              `Targeted check for the proposed artifact: ${term}. ${candidates.length ? "Candidate names and descriptions follow." : "This phrase matched zero listed candidates; broaden or refine this artifact phrase."} These checks use a separate search scope from the market metrics; evaluate features and workflow fit.\n` +
+              `GitHub repository search for the proposed artifact: ${term}. ${candidates.length ? "Candidate names and descriptions follow." : "This phrase matched zero listed candidates; broaden or refine this artifact phrase."} This is repository coverage for a literal phrase. Demand and Google Trends are measured separately. Evaluate candidate features and workflow fit.\n` +
               candidates.map((r) => `${r.name}: ${r.description}`).join("\n"),
           },
         ];
@@ -456,8 +456,9 @@ export class GitHub {
     return results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
   }
   async researchSources(repos: Repo[], gaps: Gap[]): Promise<ResearchSource[]> {
-    const direct = repos.filter((r) => r.relevance?.role === "direct");
-    const selected = (direct.length ? direct : repos).slice(0, 3);
+    const selected = repos
+      .filter((r) => !r.relevance || r.relevance.role === "direct")
+      .slice(0, 4);
     const clean = (s: string, limit: number) =>
       s
         .replace(/<!--[\s\S]*?-->/g, "")

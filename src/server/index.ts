@@ -1,6 +1,6 @@
 import { appPath, basePathFromUrl } from "../core/paths.js";
 import { ENGAGEMENT_EVENTS, type EngagementEvent } from "../core/engagement.js";
-import { selectGapSignals } from "../core/gaps.js";
+import { marketGapSignals, selectGapSignals } from "../core/gaps.js";
 import express from "express";
 import { operationContext } from "../core/operations.js";
 import sharp from "sharp";
@@ -416,6 +416,7 @@ export function createApp(engine = new Engine()) {
           serviceLimit,
           attemptLimit: dailyLimit * 3,
           trends: engine.trends.status(),
+          search: engine.search.status(),
           usageToday: engine.store.usageOverview(),
           adminUserIds: (process.env.GHTRENDS_ADMIN_USER_IDS || "")
             .split(",")
@@ -540,7 +541,7 @@ export function createApp(engine = new Engine()) {
   app.get("/api/gaps", (_q, r) => {
     const unique = new Map<string, Market["gaps"][number]>();
     for (const m of dashboardMarkets())
-      for (const gap of m.gaps) unique.set(gap.url, gap);
+      for (const gap of marketGapSignals(m)) unique.set(gap.url, gap);
     r.set("Cache-Control", "public,max-age=300").json(
       selectGapSignals([...unique.values()]),
     );
@@ -703,6 +704,7 @@ export function createApp(engine = new Engine()) {
               ALGORITHM_VERSION,
               QUERY_PLAN_VERSION,
               STRATEGY_VERSION,
+              engine.search.enabled ? `google-v2-${engine.search.mode}` : "google-off",
             ]),
           )
           .digest("hex");
@@ -868,7 +870,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.15.0/ghtrends-radar-0.15.0.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.16.0/ghtrends-radar-0.16.0.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>

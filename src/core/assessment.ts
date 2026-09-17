@@ -1,3 +1,4 @@
+import { researchLandscape, landscapeLabel } from "./landscape.js";
 import type { Market } from "./types.js";
 import { completeWeeklySeries } from "./evidence.js";
 import { resolveTopic } from "./topics.js";
@@ -213,11 +214,13 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
                 ? "Too many weekly values are reported as zero"
                 : "Last 8 complete weeks vs previous 8",
   );
+  const research = researchLandscape(m);
   return {
     searchReady,
     demandNote,
-    landscape:
-      m.topic.scope === "field"
+    landscape: research
+      ? landscapeLabel(research.kind, locale)
+      : m.topic.scope === "field"
         ? t("Field overview")
         : provisional && searchReady
           ? l(
@@ -243,7 +246,10 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
           : provisional
             ? l("Research outlook", "研究判断")
             : t(MARKET_LABELS[m.kind]),
-    level: provisional ? ("provisional" as const) : ("measured" as const),
+    level:
+      provisional || research
+        ? ("provisional" as const)
+        : ("measured" as const),
     title,
     summary,
     facts,

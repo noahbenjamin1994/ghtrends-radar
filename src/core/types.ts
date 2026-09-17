@@ -25,6 +25,7 @@ export interface QueryPlan {
   githubTerms: string[];
   explanation: { en: string; zh: string };
   ambiguity?: { en: string; zh: string };
+  webQueries?: import("../providers/search.js").SearchQuery[];
 }
 export interface Brief {
   model: string;
@@ -40,6 +41,8 @@ export interface Brief {
   reviewed?: boolean;
   basis?: "source-led" | "hypothesis-led";
   evidence?: { id: string; quote: string }[];
+  landscape?: import("./landscape.js").Landscape;
+  issueInsights?: import("./landscape.js").IssueInsight[];
 }
 export interface BriefParagraph {
   headline?: string;
@@ -60,6 +63,8 @@ export interface Strategy {
 }
 export interface ResearchSource {
   directionId?: string;
+  searchIntent?: "competition" | "demand" | "opensource";
+  placement?: "organic" | "ad";
   kind?: "request" | "project" | "search";
   id?: string;
   label: string;
@@ -238,6 +243,7 @@ export interface Market {
   score: number | null;
   brief?: Brief;
   aiError?: string;
+  web?: import("../providers/search.js").WebEvidence;
 }
 export interface MarketSummary extends Omit<
   Market,

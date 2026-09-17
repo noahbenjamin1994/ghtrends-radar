@@ -3,11 +3,48 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Research } from "../src/providers/research.js";
+import { Research, parseModelJson } from "../src/providers/research.js";
 import { Trends, parseTimeline } from "../src/providers/trends.js";
 import { Store } from "../src/core/store.js";
 import { marketAssessment } from "../src/core/assessment.js";
 import type { Market } from "../src/core/types.js";
+import { hasRecoveryTimeReference } from "../src/core/i18n.js";
+
+test("source observation times remain valid prose while operational recovery timers stay in source status", () => {
+  assert.equal(
+    hasRecoveryTimeReference("Publisher claims for the shown time and region."),
+    false,
+  );
+  assert.equal(
+    hasRecoveryTimeReference("Refresh at the time shown on this page."),
+    true,
+  );
+  assert.equal(hasRecoveryTimeReference("按页面提示的时间刷新。"), true);
+});
+
+test("model JSON recovery preserves content and only repairs structural punctuation", () => {
+  assert.deepEqual(
+    parseModelJson(
+      '{"opportunities":[{"en":{"title":"A, B: phones"}}],"count":2,}',
+    ),
+    { opportunities: [{ en: { title: "A, B: phones" } }], count: 2 },
+  );
+  assert.deepEqual(
+    parseModelJson(
+      '{"items":[{"id":"phone","copy":{"title":"原样保留"}}],"ok":true}',
+    ),
+    { items: [{ id: "phone", copy: { title: "原样保留" } }], ok: true },
+  );
+  assert.deepEqual(
+    parseModelJson(
+      '{"items":[{"id":"phone","copy":{"title":"原样保留"}}],"ok":true,}',
+    ),
+    { items: [{ id: "phone", copy: { title: "原样保留" } }], ok: true },
+  );
+  assert.throws(() => parseModelJson('{"title":"cut off'));
+  assert.throws(() => parseModelJson('{title:"invented key quotes"}'));
+  assert.throws(() => parseModelJson('{"rating":None}'));
+});
 
 test("repository reviews preserve individually valid evidence and reject conflicting or fabricated rows", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-roles-"));

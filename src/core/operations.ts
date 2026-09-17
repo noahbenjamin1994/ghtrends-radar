@@ -5,7 +5,7 @@ export const operationContext = new AsyncLocalStorage<{
   userId?: string;
 }>();
 export interface ProviderCall {
-  provider: "deepseek" | "github" | "trends";
+  provider: "deepseek" | "github" | "trends" | "search";
   operation: string;
   started: string;
   durationMs: number;

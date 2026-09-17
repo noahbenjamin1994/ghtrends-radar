@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { Store } from "./store.js";
 import { GitHub } from "../providers/github.js";
 import { Trends } from "../providers/trends.js";
+import { GoogleSearch, searchSources } from "../providers/search.js";
+import { marketGapSignals } from "./gaps.js";
 import { Research } from "../providers/research.js";
 import { resolveTopic, validateGeo, validateRepo, TOPICS } from "./topics.js";
 import { importDemand } from "./import.js";
@@ -31,10 +33,12 @@ export class Engine {
   github: GitHub;
   trends: Trends;
   research: Research;
+  search: GoogleSearch;
   constructor(public store = new Store()) {
     this.github = new GitHub(store);
     this.trends = new Trends(store);
     this.research = new Research(store);
+    this.search = new GoogleSearch(store);
     const seed = fileURLToPath(
       new URL("../../web-dist/seed.json", import.meta.url),
     );
@@ -85,6 +89,7 @@ export class Engine {
       existing &&
       existing.version === ALGORITHM_VERSION &&
       (!ai || existing.brief?.strategyVersion === STRATEGY_VERSION) &&
+      (!ai || !this.search.enabled || existing.web?.state === "ready") &&
       existing.topic.query === topic.query &&
       JSON.stringify(existing.topic.queries) ===
         JSON.stringify(topic.queries) &&
@@ -116,7 +121,7 @@ export class Engine {
       preview();
     };
     options.onProgress?.({ stage: "sources", topic });
-    let [demand, supply] = await Promise.all([
+    let [demand, supply, web] = await Promise.all([
       options.demand
         ? Promise.resolve(
             importDemand(options.demand, topic.keyword, geo),
@@ -137,6 +142,7 @@ export class Engine {
           preview();
         })
         .then((data) => (ai ? this.research.reviewSupply(topic, data) : data)),
+      ai ? this.search.collect(topic, geo) : Promise.resolve(undefined),
     ]);
     if (ai && !supply.error && supply.repositories.length < 3) {
       const repair = await this.research.repairQueries(topic, supply);
@@ -168,19 +174,49 @@ export class Engine {
       stage: "details",
       preview: analyze(topic, demand, supply),
     });
-    const gaps = await this.github.gaps(
-      supply.repositories.filter(
-        (r) => !r.relevance || r.relevance.role === "direct",
-      ),
-    );
+    const selectedProjects = ai
+      ? await this.research.selectProjects(topic, supply.repositories)
+      : supply.repositories
+          .filter((r) => !r.relevance || r.relevance.role === "direct")
+          .slice(0, 4);
+    const gaps = await this.github.gaps(selectedProjects);
     const market = analyze(topic, demand, supply, gaps);
+    market.gaps = marketGapSignals(market);
+    market.web = web;
     if (ai) {
       options.onProgress?.({ stage: "researching", preview: market });
       try {
         const documents = await this.github.researchSources(
-          supply.repositories,
-          gaps,
+          selectedProjects,
+          market.gaps,
         );
+        const projectNames = [
+          ...new Set(
+            searchSources(web)
+              .filter(
+                (s) =>
+                  s.searchIntent === "opensource" && s.placement === "organic",
+              )
+              .flatMap(
+                (s) =>
+                  /^https:\/\/github\.com\/([^/?#]+\/[^/?#]+)(?:[/?#]|$)/.exec(
+                    s.url,
+                  )?.[1] || [],
+              ),
+          ),
+        ]
+          .filter(
+            (name) =>
+              !supply.repositories.some(
+                (r) => r.name.toLowerCase() === name.toLowerCase(),
+              ),
+          )
+          .slice(0, 2);
+        const webDocs = await this.github.researchSources(
+          projectNames.map((name) => ({ name }) as any),
+          [],
+        );
+        documents.push(...webDocs.map((s, i) => ({ ...s, id: `WR${i + 1}` })));
         options.onProgress?.({ stage: "brief", preview: market });
         market.brief = await this.research.insights(
           market,

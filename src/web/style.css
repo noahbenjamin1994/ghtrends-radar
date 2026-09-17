@@ -4399,6 +4399,7 @@ footer small {
   font-size: 13px;
 }
 .report-nav a {
+  white-space: nowrap;
   color: #64655f;
 }
 .report-nav a:first-child {
@@ -4767,8 +4768,9 @@ footer small {
 }
 @media (max-width: 560px) {
   .report-nav {
-    gap: 0;
-    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    justify-content: flex-start;
     font-size: 12px;
     padding: 15px 0;
     margin: 24px 0;
@@ -5358,5 +5360,176 @@ footer small {
   .opportunity-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px 10px;
+  }
+}
+
+/* Evidence-led market reading: quiet surfaces and a clear editorial hierarchy. */
+.landscape-section {
+  margin: 44px 0;
+  padding: 36px 0;
+  border-top: 1px solid var(--line, #e8e8e8);
+  border-bottom: 1px solid var(--line, #e8e8e8);
+}
+.landscape-summary {
+  font-size: clamp(20px, 2vw, 27px);
+  line-height: 1.5;
+  max-width: 900px;
+  margin: 24px 0 12px;
+  letter-spacing: -0.025em;
+}
+.research-caption {
+  font-size: 12px;
+  color: #6c7176;
+  line-height: 1.7;
+}
+.landscape-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 30px;
+  margin: 30px 0;
+}
+.landscape-columns h4,
+.incumbent-list h4 {
+  font-size: 15px;
+  margin: 0 0 12px;
+}
+.landscape-columns p,
+.incumbent-list p {
+  font-size: 14px;
+  line-height: 1.85;
+  color: #50575b;
+  margin: 0 0 12px;
+}
+.ocean-label {
+  border-radius: 100px;
+  padding: 9px 16px;
+  font-size: 14px;
+  white-space: nowrap;
+  background: #f1f2f3;
+  color: #52585d;
+}
+.ocean-blue {
+  background: #eaf5fc;
+  color: #2075a7;
+}
+.ocean-contested,
+.ocean-expanding {
+  background: #fff0eb;
+  color: #a64c36;
+}
+.ocean-quiet {
+  background: #eff2f4;
+  color: #5d6b75;
+}
+.incumbent-list {
+  border-top: 1px solid #ededed;
+  padding-top: 24px;
+  margin-bottom: 24px;
+}
+.incumbent-list article {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 28px;
+  padding: 22px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.incumbent-list h5 {
+  font-size: 17px;
+  margin: 0;
+}
+.incumbent-list p strong {
+  display: block;
+  color: #17191b;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+.direction-route {
+  display: table;
+  margin: 8px 0;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 4px 7px;
+  border-radius: 4px;
+  background: #f3f3f3;
+  color: #60666b;
+}
+.route-opensource {
+  background: #e8f5ed;
+  color: #257244;
+}
+.issue-reading p strong {
+  display: block;
+  color: #212629;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.issue-reading p {
+  margin: 12px 0;
+}
+.issue-reading small {
+  display: block;
+  line-height: 1.7;
+}
+.web-evidence {
+  margin-top: 24px;
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+}
+.web-evidence summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.web-query {
+  margin: 20px 0;
+}
+.web-query h5 {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.web-query h5 a {
+  display: flex;
+  gap: 5px;
+}
+.web-query > a {
+  display: block;
+  padding: 14px 0;
+  border-bottom: 1px solid #eee;
+  overflow-wrap: anywhere;
+}
+.web-query > a > span {
+  font-size: 10px;
+  color: #68747e;
+  display: block;
+  margin-bottom: 5px;
+}
+.web-query > a > strong {
+  font-size: 14px;
+}
+.web-query > a > p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #626b71;
+  margin: 7px 0;
+}
+@media (max-width: 700px) {
+  .landscape-section {
+    padding: 26px 0;
+    margin: 28px 0;
+  }
+  .landscape-columns {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .incumbent-list article {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .landscape-section .report-section-heading {
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .landscape-summary {
+    font-size: 21px;
   }
 }

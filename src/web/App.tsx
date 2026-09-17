@@ -1,7 +1,9 @@
+import { researchLandscape } from "../core/landscape.js";
 import { OpportunityMap, TopicOverview } from "./opportunities.js";
 import { visibleOpportunities } from "../core/opportunities.js";
 import { COMPETITION_POLICY } from "../core/competition.js";
-import { selectGapSignals } from "../core/gaps.js";
+import { IssueReading, LandscapePanel } from "./landscape.js";
+import { reportIssueSignals, selectGapSignals } from "../core/gaps.js";
 import { enableEngagement, track } from "./engagement.js";
 import { AdminView } from "./admin.js";
 import { ALGORITHM_VERSION } from "../core/version.js";
@@ -1226,6 +1228,7 @@ function MarketView({
       />
     );
   const assessment = marketAssessment(m, locale);
+  const displayKind = researchLandscape(m)?.kind || m.kind;
   const strategy =
     assessment.narrative.kind === "ai"
       ? visibleStrategy(m.brief, locale)
@@ -1234,7 +1237,7 @@ function MarketView({
   const opportunityMap = visibleOpportunities(m.brief);
   const share = location.origin + localUrl("/report/" + m.id);
   const demandPoints = completeWeeklySeries(m.demand, m.asOf).points;
-  const gapSignals = selectGapSignals(m.gaps);
+  const gapSignals = reportIssueSignals(m);
   return (
     <div className="detail-page report-page">
       <button className="back-link" onClick={() => navigate("/")}>
@@ -1407,7 +1410,13 @@ function MarketView({
       <nav className="report-nav" aria-label={l("Report sections", "报告章节")}>
         <a href="#outlook">{l("Overview", "判断概览")}</a>
         {opportunityMap?.overview && (
-          <a href="#topic-overview">{l("Whole topic", "整体机会")}</a>
+          <a
+            href={
+              researchLandscape(m) ? "#market-landscape" : "#topic-overview"
+            }
+          >
+            {l("Whole topic", "整体机会")}
+          </a>
         )}
         {visibleOpportunities(m.brief) && (
           <a href="#opportunities">{l("Directions", "方向地图")}</a>
@@ -1417,10 +1426,10 @@ function MarketView({
         <a href="#projects">{l("Projects", "相关项目")}</a>
         <a href="#method">{l("Research scope", "研究范围")}</a>
       </nav>
-      <section id="outlook" className={`report-outlook ${m.kind}`}>
+      <section id="outlook" className={`report-outlook ${displayKind}`}>
         <div className="outlook-copy">
           <div className="outlook-meta">
-            <Pill kind={m.kind} label={assessment.landscape} />
+            <Pill kind={displayKind} label={assessment.landscape} />
             <span>
               {assessment.level === "provisional"
                 ? l("Preliminary assessment", "初步研判")
@@ -1523,13 +1532,14 @@ function MarketView({
           </small>
         </div>
       </div>
-      {m.brief && (
+      {m.brief && !researchLandscape(m) && (
         <TopicOverview
           brief={m.brief}
           locale={locale}
           topic={m.topic.plan?.input || m.topic.name}
         />
       )}
+      <LandscapePanel market={m} locale={locale} />
       {m.brief && <OpportunityMap key={m.id} brief={m.brief} locale={locale} />}
       {strategy ? (
         <section className="strategy-section" id="strategy">
@@ -1903,17 +1913,27 @@ function MarketView({
               >
                 <div>
                   <span className="gap-label">
-                    {t(g.label.replaceAll("-", " "))}
+                    {g.reactions == null
+                      ? locale === "zh"
+                        ? "社区请求"
+                        : "Community request"
+                      : t(g.label.replaceAll("-", " "))}
                   </span>
-                  <span>↑ {g.reactions}</span>
+                  {g.reactions != null && <span>↑ {g.reactions}</span>}
                 </div>
                 <h4>
-                  {g.title}
+                  {m.brief?.issueInsights?.find(
+                    (i) =>
+                      i.relevance === "direct" &&
+                      m.brief?.sources.find((s) => s.id === i.sourceId)?.url ===
+                        g.url,
+                  )?.[locale].title || g.title}
                   <ArrowUpRight size={15} />
                 </h4>
-                <p>{g.excerpt}</p>
+                <IssueReading gap={g} brief={m.brief} locale={locale} />
                 <small>
-                  {g.repo} · {g.createdAt.slice(0, 10)}
+                  {g.repo}
+                  {g.createdAt ? ` · ${g.createdAt.slice(0, 10)}` : ""}
                 </small>
               </a>
             ))}
@@ -2656,7 +2676,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.15.0/ghtrends-radar-0.15.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.16.0/ghtrends-radar-0.16.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}
@@ -2933,9 +2953,13 @@ function GapView() {
               >
                 <div>
                   <span className="gap-label">
-                    {t(g.label.replaceAll("-", " "))}
+                    {g.reactions == null
+                      ? locale === "zh"
+                        ? "社区请求"
+                        : "Community request"
+                      : t(g.label.replaceAll("-", " "))}
                   </span>
-                  <span>↑ {g.reactions}</span>
+                  {g.reactions != null && <span>↑ {g.reactions}</span>}
                 </div>
                 <h4>
                   {g.title}

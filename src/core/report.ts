@@ -1,3 +1,5 @@
+import { landscapeRows, researchLandscape } from "./landscape.js";
+import { reportIssueSignals } from "./gaps.js";
 import {
   visibleOpportunities,
   opportunityRows,
@@ -69,7 +71,7 @@ export function marketMarkdown(
           "",
           a.narrative.summary,
           "",
-          ...(map?.overview
+          ...(map?.overview && !researchLandscape(m)
             ? [
                 `## ${locale === "zh" ? "原词整体机会" : "The overall opportunity"}`,
                 "",
@@ -88,6 +90,12 @@ export function marketMarkdown(
                 "",
               ]
             : []),
+          ...landscapeRows(m, locale).flatMap((row) => [
+            `### ${row.label}`,
+            "",
+            row.text,
+            "",
+          ]),
           ...(map
             ? [
                 `## ${locale === "zh" ? "细分方向地图" : "Opportunity map"}`,
@@ -212,10 +220,45 @@ export function marketMarkdown(
       : []),
     `## ${t("Open demand signals")}`,
     "",
-    ...m.gaps.map(
-      (g) =>
-        `- [${cell(g.title)}](${g.url}) (↑ ${g.reactions}; ${g.state}; ${g.repo})`,
-    ),
+    ...reportIssueSignals(m).flatMap((g) => {
+      const insight = m.brief?.issueInsights?.find(
+        (i) =>
+          i.relevance === "direct" &&
+          m.brief?.sources.find((s) => s.id === i.sourceId)?.url === g.url,
+      )?.[locale];
+      return [
+        `- [${cell(insight?.title || g.title)}](${g.url}) (${[g.reactions == null ? undefined : `↑ ${g.reactions}`, g.state, g.repo, g.createdAt?.slice(0, 10)].filter(Boolean).join("; ")})`,
+        ...(insight
+          ? [
+              "",
+              insight.audience,
+              insight.need,
+              insight.opportunity,
+              insight.check,
+              "",
+            ]
+          : []),
+      ];
+    }),
+    ...(m.web
+      ? [
+          "",
+          `## ${locale === "zh" ? "Google 网页搜索证据" : "Google web search evidence"}`,
+          "",
+          `${m.web.region} · ${m.web.language} · ${m.web.fetchedAt.slice(0, 10)}`,
+          locale === "zh"
+            ? "搜索结果为地域样本。广告反映商业投放意向，购买与持续使用需要行为证据。"
+            : "A regional search sample. Ads signal marketing intent; purchases and sustained use need behavioral evidence.",
+          ...m.web.queries.flatMap((q) => [
+            "",
+            `### ${cell(q.query)}`,
+            ...q.results.map(
+              (r) =>
+                `- ${r.kind === "ad" ? (locale === "zh" ? "广告" : "Ad") : locale === "zh" ? "自然结果" : "Organic"}: [${cell(r.title)}](${r.url}) — ${cell(r.excerpt)}`,
+            ),
+          ]),
+        ]
+      : []),
     "",
     `## ${t("Scope and limitations")}`,
     "",

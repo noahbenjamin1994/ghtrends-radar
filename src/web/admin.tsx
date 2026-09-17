@@ -133,6 +133,12 @@ interface AdminData {
     dailyLimit: number;
     serviceLimit: number;
     attemptLimit: number;
+    search?: {
+      configured: boolean;
+      mode?: "direct" | "api" | "off";
+      maxQueries: number;
+      cacheHours: number;
+    };
     trends: {
       proxy: boolean;
       region: string;
@@ -245,7 +251,7 @@ export function AdminView({ account }: { account: Account | null }) {
           <section className="proxy-overview panel">
             <div className="panel-title">
               <div>
-                <div className="eyebrow">GOOGLE TRENDS / DECODO</div>
+                <div className="eyebrow">GOOGLE TRENDS + SEARCH / DECODO</div>
                 <h2>
                   {l("Proxy traffic & reliability", "代理流量与采集质量")}
                 </h2>
@@ -324,7 +330,7 @@ export function AdminView({ account }: { account: Account | null }) {
                 </strong>
                 <small>
                   {data.configuration.trends.routes || 1}{" "}
-                  {l("sticky sessions", "个粘性会话")} ·{" "}
+                  {l("Trends sessions", "个 Trends 会话")} ·{" "}
                   {data.configuration.trends.coolingRoutes || 0}{" "}
                   {l("cooling down", "个等待恢复")}
                 </small>
@@ -542,7 +548,7 @@ export function AdminView({ account }: { account: Account | null }) {
                     <td>
                       {l(
                         "Completed user scans (excludes scheduled refreshes)",
-                        "用户完成的扫描（定时刷新单列）",
+                        "用户完成的扫描（后台任务单列）",
                       )}
                     </td>
                     <td>
@@ -688,17 +694,66 @@ export function AdminView({ account }: { account: Account | null }) {
                             ? l("Query planning", "搜索词整理")
                             : m.operation === "strategy"
                               ? l("Product strategy", "深度研判")
-                              : m.operation === "strategy-edit"
-                                ? l("Strategy editing", "建议校订")
-                                : m.operation === "strategy-review"
-                                  ? l("Strategy review", "建议复核")
-                                  : m.operation === "relevance"
-                                    ? l("Project relevance", "项目相关性")
-                                    : m.operation === "query-repair"
-                                      ? l("Query refinement", "检索修复")
-                                      : m.operation === "brief-rewrite"
-                                        ? l("Brief review", "报告校验")
-                                        : l("Research brief", "简短报告")}
+                              : m.operation === "issue-reading"
+                                ? l("Issue interpretation", "社区请求解读")
+                                : m.operation === "strategy-evidence-review"
+                                  ? l(
+                                      "Evidence and meaning review",
+                                      "证据与语义复核",
+                                    )
+                                  : m.operation === "strategy-copy"
+                                    ? l("Copy & citations", "文案与引用校验")
+                                    : m.operation === "strategy-edit"
+                                      ? l("Strategy editing", "建议校订")
+                                      : m.operation === "strategy-direction"
+                                        ? l(
+                                            "Direction analysis",
+                                            "细分方向分析",
+                                          )
+                                        : m.operation === "strategy-overall"
+                                          ? l(
+                                              "Overall analysis",
+                                              "整体机会分析",
+                                            )
+                                          : m.operation ===
+                                              "strategy-section-edit"
+                                            ? l("Section review", "分项校验")
+                                            : m.operation ===
+                                                "strategy-translate"
+                                              ? l("Bilingual copy", "双语整理")
+                                              : m.operation ===
+                                                  "strategy-review"
+                                                ? l(
+                                                    "Strategy review",
+                                                    "建议复核",
+                                                  )
+                                                : m.operation ===
+                                                    "document-selection"
+                                                  ? l(
+                                                      "Source selection",
+                                                      "文档选取",
+                                                    )
+                                                  : m.operation === "relevance"
+                                                    ? l(
+                                                        "Project relevance",
+                                                        "项目相关性",
+                                                      )
+                                                    : m.operation ===
+                                                        "query-repair"
+                                                      ? l(
+                                                          "Query refinement",
+                                                          "检索修复",
+                                                        )
+                                                      : m.operation ===
+                                                          "brief-rewrite"
+                                                        ? l(
+                                                            "Brief review",
+                                                            "报告校验",
+                                                          )
+                                                        : l(
+                                                            "Research brief",
+                                                            "简短报告",
+                                                          )}
                         </small>
                       </th>
                       <td>
@@ -733,7 +788,7 @@ export function AdminView({ account }: { account: Account | null }) {
                 <p key={q.id}>
                   {q.input} · {labels[q.state]} ·{" "}
                   {q.background
-                    ? l("scheduled", "定时采集")
+                    ? l("background", "后台任务")
                     : l("user scan", "用户扫描")}
                 </p>
               ))}
@@ -771,7 +826,7 @@ export function AdminView({ account }: { account: Account | null }) {
                   </div>
                   <p>
                     {r.background
-                      ? l("Scheduled collection", "定时采集")
+                      ? l("Background task", "后台任务")
                       : r.user_name ||
                         r.user_id ||
                         l("Local workspace", "本地工作区")}{" "}
@@ -900,6 +955,26 @@ export function AdminView({ account }: { account: Account | null }) {
                 {data.configuration.serviceLimit} ·{" "}
                 {l("Per account attempts", "每人采集尝试")}{" "}
                 {data.configuration.attemptLimit}
+              </dd>
+              <dt>{l("Google web search", "Google 网页搜索")}</dt>
+              <dd>
+                {data.configuration.search?.configured
+                  ? data.configuration.search.mode === "direct"
+                    ? l(
+                        "Residential proxy · lightweight pages",
+                        "住宅代理 · 轻量页面",
+                      )
+                    : l("Managed search API", "托管搜索 API")
+                  : l("Awaiting configuration", "等待配置")}{" "}
+                ·{" "}
+                {l(
+                  data.configuration.search?.mode === "direct"
+                    ? "Up to 3 queries; 6-hour cache; uses residential traffic"
+                    : "Up to 3 queries; 6-hour cache; managed service balance",
+                  data.configuration.search?.mode === "direct"
+                    ? "最多 3 组查询，缓存 6 小时；使用住宅流量"
+                    : "最多 3 组查询，缓存 6 小时；使用托管服务额度",
+                )}
               </dd>
               <dt>{l("Trends connection", "Trends 采集连接")}</dt>
               <dd>

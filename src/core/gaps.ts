@@ -1,3 +1,6 @@
+import { repoRelevance } from "./competition.js";
+import { issueInsightSchema, validQuote } from "./landscape.js";
+import type { Market } from "./types.js";
 import type { Gap } from "./types.js";
 
 // These rules select reading leads, not validated product opportunities. Use the
@@ -43,4 +46,63 @@ export function selectGapSignals(gaps: Gap[]): Gap[] {
     if (label) unique.set(gap.url, { ...gap, label });
   }
   return [...unique.values()].sort((a, b) => b.reactions - a.reactions);
+}
+
+// Apply the current object scope at read time as well as during collection.
+// Old snapshots keep their raw evidence; adjacent leads stay out of the report.
+export function marketGapSignals(m: Market): Gap[] {
+  const eligible = new Set(
+    m.supply.repositories
+      .filter(
+        (r) => (r.relevance || repoRelevance(r, m.topic)).role === "direct",
+      )
+      .map((r) => r.name.toLowerCase()),
+  );
+  const rejected = new Set(
+    (m.brief?.issueInsights || [])
+      .filter((i) => i.relevance === "adjacent")
+      .map((i) => m.brief?.sources.find((s) => s.id === i.sourceId)?.url),
+  );
+  return selectGapSignals(m.gaps).filter(
+    (g) => eligible.has(g.repo.toLowerCase()) && !rejected.has(g.url),
+  );
+}
+
+/** Include researched requests with their real metadata, preserving missing counts/dates. */
+export function reportIssueSignals(m: Market) {
+  const rows: (Omit<Gap, "reactions" | "createdAt" | "updatedAt" | "state"> & {
+    reactions?: number;
+    createdAt?: string;
+    updatedAt?: string;
+    state?: Gap["state"];
+  })[] = marketGapSignals(m);
+  const seen = new Set(rows.map((g) => g.url));
+  for (const raw of m.brief?.issueInsights || []) {
+    const parsed = issueInsightSchema.safeParse(raw);
+    if (!parsed.success || parsed.data.relevance !== "direct") continue;
+    const i = parsed.data;
+    const s = m.brief?.sources.find(
+      (s) => s.id === i.sourceId && s.kind === "request",
+    );
+    if (
+      !s ||
+      seen.has(s.url) ||
+      i.evidence.id !== s.id ||
+      !validQuote(i.evidence, [s])
+    )
+      continue;
+    const match = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/issues\/\d+$/.exec(
+      s.url,
+    );
+    if (!match) continue;
+    rows.push({
+      url: s.url,
+      title: s.label,
+      excerpt: i.evidence.quote,
+      repo: match[1]!,
+      label: "friction",
+    });
+    seen.add(s.url);
+  }
+  return rows;
 }

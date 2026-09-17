@@ -3,6 +3,7 @@ import { ArrowUpRight, Check, ChevronRight } from "lucide-react";
 import {
   visibleOpportunities,
   opportunityLabel,
+  opportunityRoute,
   overviewRows,
 } from "../core/opportunities.js";
 import type { Brief } from "../core/types.js";
@@ -165,6 +166,11 @@ export function OpportunityMap({
               </span>
               <span>
                 <strong>{o[locale].title}</strong>
+                {o.route && (
+                  <span className={`direction-route route-${o.route}`}>
+                    {opportunityRoute(o.route, locale)}
+                  </span>
+                )}
                 {o[locale].service && (
                   <span className="opportunity-service">
                     {o[locale].service}
@@ -210,6 +216,25 @@ export function OpportunityMap({
       >
         <div className="eyebrow">{l("DIRECTION IN FOCUS", "方向详情")}</div>
         <h4 id="opportunity-title">{p.title}</h4>
+        {!!selected.basedOn?.length && (
+          <div className="strategy-sources">
+            {selected.basedOn.map((ref) => {
+              const source = brief.sources.find((s) => s.id === ref.id);
+              return source ? (
+                <a
+                  key={ref.id}
+                  href={source.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={ref.quote}
+                >
+                  {l("Build on", "基于项目")} · {source.label}
+                  <ArrowUpRight size={12} />
+                </a>
+              ) : null;
+            })}
+          </div>
+        )}
         <dl className="opportunity-explainer">
           <div>
             <dt>{l("Who it serves", "服务谁")}</dt>

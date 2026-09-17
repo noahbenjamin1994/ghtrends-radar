@@ -18,6 +18,7 @@ import {
   visibleStrategy,
   type StrategyResponse,
 } from "../src/core/strategy.js";
+import { reportIssueSignals } from "../src/core/gaps.js";
 import { marketMarkdown } from "../src/core/report.js";
 import { renderDocument } from "../src/server/html.js";
 import type { Market, ResearchSource } from "../src/core/types.js";
@@ -86,7 +87,7 @@ const sample = (): StrategyResponse => ({
         evidence: [],
       },
       en: {
-        title: id,
+        title: id.replaceAll("-", " "),
         audience: "Small documentation teams during a file revision.",
         need: "Keep review comments attached when a document is split into files.",
         service:
@@ -106,7 +107,7 @@ const sample = (): StrategyResponse => ({
           "Proposed threshold: four of five reviewers restore 90% of comments.",
       },
       zh: {
-        title: id,
+        title: id.replaceAll("-", " "),
         audience: "文档修订期间的小型技术文档团队。",
         need: "文档拆分后需要将评审意见重新对应到段落。",
         service: "提交两版文档，获得带有对应评审意见的新文档。",
@@ -142,7 +143,7 @@ const sample = (): StrategyResponse => ({
       successSignal:
         "Proposed continue threshold: 4 of 5 reviewers retain at least 90% of comment anchors in the task.",
       pivotSignal:
-        "Proposed redirect threshold: at most 1 reviewer repeats the task; focus the tool on release-audit exports.",
+        "Proposed redirect threshold: at most 1 reviewer repeats the task; focus the tool on release audit exports.",
     },
   },
   zh: {
@@ -194,7 +195,7 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     let reviews = 0;
     r.json = async (_system, input: any, budget, operation, thinking) => {
       ops.push(operation!);
-      assert.equal(thinking, true);
+      assert.equal(thinking, operation === "strategy");
       assert.ok(budget! >= 8000);
       if (ops.length === 1) {
         const bad = sample();
@@ -700,7 +701,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "3");
+    assert.equal(brief.strategyVersion, "4");
     const legacy = {
       ...brief,
       strategyVersion: "2",
@@ -774,7 +775,7 @@ test("overall judgments validate quotes and allow only requested affirmative cop
   );
 });
 
-test("broad topics draft customer jobs from parent measurements before project documents enter review", async () =>
+test("broad topics retain their original scope while relevant project evidence informs the draft", async () =>
   fixture(async (r) => {
     const market = structuredClone(seed);
     market.topic.scope = "field";
@@ -795,9 +796,10 @@ test("broad topics draft customer jobs from parent measurements before project d
       if (operation === "strategy") {
         assert.deepEqual(
           input.sources.map((s: ResearchSource) => s.id),
-          ["S1", "S2"],
+          strategySources(market, documents).map((s) => s.id),
         );
         assert.equal(input.basis, "hypothesis-led");
+        assert.ok(input.projectInventory.some((p: any) => p.id === "R1"));
       } else
         assert.ok(input.sources.some((s: ResearchSource) => s.id === "R1"));
       const result = sample();
@@ -830,3 +832,228 @@ test("parent measurements keep direction ratings inferred instead of becoming ob
   assert.deepEqual(strategyProblems(grounded, sources, seed), []);
   assert.equal(data.opportunities[0]!.competition.basis, "observed");
 });
+
+test("a compact reasoning blueprint is researched before a separate bilingual evidence editor writes the report", async () =>
+  fixture(async (r) => {
+    const blueprint = {
+      overall: { verdict: "Review continuity is a focused opportunity." },
+      opportunities: sample().opportunities.map((o) => ({
+        id: o.id,
+        query: o.query,
+        route: "opensource",
+        offer: o.en.service,
+      })),
+      recommendedId: sample().recommendedId,
+    };
+    let checked = false;
+    r.json = async (_system, input: any, _budget, operation, thinking) => {
+      if (operation === "strategy") {
+        assert.equal(thinking, true);
+        return blueprint;
+      }
+      if (operation === "strategy-evidence-review") {
+        assert.equal(thinking, true);
+        assert.ok(input.editablePaths.includes("overview.zh.competition"));
+        return { edits: [] };
+      }
+      assert.equal(thinking, true);
+      assert.ok(checked);
+      if (operation === "strategy-direction") {
+        assert.ok(
+          input.sources.every(
+            (s: ResearchSource) => !["S1", "S2"].includes(s.id!),
+          ),
+        );
+        return sample().opportunities.find((o) => o.id === input.candidate.id);
+      }
+      assert.equal(operation, "strategy-overall");
+      const { opportunities, ...overall } = sample();
+      return overall;
+    };
+    const brief = await r.insights(
+      seed,
+      documents,
+      undefined,
+      undefined,
+      async (directions) => {
+        checked = true;
+        assert.deepEqual(
+          directions,
+          blueprint.opportunities.map((o) => ({ id: o.id, query: o.query })),
+        );
+        return [];
+      },
+    );
+    assert.equal(brief.reviewed, true);
+    assert.equal(brief.opportunities?.length, 3);
+  }));
+
+test("the same issue found through two queries remains a single demand signal", () => {
+  const data = sample(),
+    o = data.opportunities[0]!;
+  o.demand = {
+    level: "high",
+    basis: "observed",
+    evidence: [
+      { id: "I1", quote: "Please preserve review comments during export." },
+      { id: "D1I1", quote: "Please preserve review comments during export." },
+    ],
+  };
+  const refs: ResearchSource[] = ["I1", "D1I1"].map((id) => ({
+    id,
+    kind: "request",
+    url: "https://github.com/team/editor/issues/1",
+    label: "Export comments",
+    excerpt: "Please preserve review comments during export.",
+  }));
+  const result: any = groundOpportunityRatings(data, refs);
+  assert.equal(result.opportunities[0].demand.level, "medium");
+});
+
+test("researched Issue readings include direct requests with honest optional metadata", () => {
+  const m = structuredClone(seed);
+  const reading = {
+    title: "Keep review comments attached",
+    audience: "Documentation reviewers revising exported files.",
+    need: "Keep reviewer decisions when a document changes.",
+    opportunity: "Explore an export adapter with stable comment anchors.",
+    check:
+      "Check the latest release and ask the maintainer about export behavior.",
+  };
+  const source: ResearchSource = {
+    id: "D1I1",
+    kind: "request",
+    label: "Export comments",
+    url: "https://github.com/team/editor/issues/4",
+    excerpt: "Please preserve review comments during export.",
+  };
+  m.gaps = [];
+  m.brief = {
+    model: "test",
+    generatedAt: m.asOf,
+    en: { summary: "Research summary", nextSteps: [] },
+    zh: { summary: "研究总结", nextSteps: [] },
+    sources: [source],
+    issueInsights: [
+      {
+        sourceId: source.id!,
+        relevance: "direct",
+        en: reading,
+        zh: reading,
+        evidence: { id: source.id!, quote: source.excerpt! },
+      },
+    ],
+  };
+  const rows = reportIssueSignals(m);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]!.url, source.url);
+  assert.equal(rows[0]!.reactions, undefined);
+  assert.equal(rows[0]!.createdAt, undefined);
+  assert.ok(marketMarkdown(m).includes(reading.opportunity));
+  const html = renderDocument(
+    '<html><head></head><body><div id="root"></div></body></html>',
+    {
+      base: "https://ghtrends.dev/radar",
+      path: "/report/" + m.id,
+      geo: "",
+      market: m,
+      markets: [],
+      status: 200,
+      locale: "en",
+    },
+  );
+  assert.ok(html.includes(reading.opportunity));
+  m.brief.issueInsights![0]!.relevance = "adjacent";
+  assert.equal(reportIssueSignals(m).length, 0);
+  m.brief.issueInsights![0]!.relevance = "direct";
+  m.brief.issueInsights![0]!.evidence.quote = "Fabricated demand assertion";
+  assert.equal(reportIssueSignals(m).length, 0);
+});
+
+test("semantic review can edit prose and ratings while source quotes and identifiers stay immutable", async () =>
+  fixture(async (r) => {
+    const data = sample(),
+      id = data.opportunities[0]!.id;
+    r.json = async (prompt, input: any, _budget, operation, thinking) => {
+      assert.equal(operation, "strategy-evidence-review");
+      assert.equal(thinking, true);
+      assert.ok(prompt.includes("preserve truth conditions"));
+      assert.ok(input.editablePaths.includes("overview.zh.competition"));
+      assert.ok(!input.editablePaths.includes("overview.evidence.0.quote"));
+      return {
+        edits: [
+          {
+            path: "overview.zh.competition",
+            value: "编辑器提供文档创作能力，评审迁移服务需要另行核对导出行为。",
+          },
+          { path: "opportunities.0.competition.basis", value: "inferred" },
+          { path: "opportunities.0.id", value: "tampered-id" },
+          { path: "overview.evidence.0.quote", value: "Fabricated claim" },
+        ],
+      };
+    };
+    const result = await (r as any).reviewStrategyMeaning(data, {
+      input: "Documentation",
+      sources: documents,
+    });
+    assert.equal(result.opportunities[0].id, id);
+    assert.deepEqual(result.overview.evidence, data.overview.evidence);
+    assert.equal(
+      result.overview.zh.competition,
+      "编辑器提供文档创作能力，评审迁移服务需要另行核对导出行为。",
+    );
+  }));
+
+test("Issue interpretation accepts only real request identities and exact quotes", async () =>
+  fixture(async (r) => {
+    const text = {
+      title: "Preserve exported comments",
+      audience: "Documentation teams preparing revisions.",
+      need: "Keep comments attached to revised files.",
+      opportunity: "Explore a comment relocation adapter.",
+      check: "Check current export behavior with the maintainer.",
+    };
+    const source: ResearchSource = {
+      id: "I1",
+      kind: "request",
+      label: "Export comments",
+      url: "https://github.com/team/editor/issues/7",
+      excerpt: "Please preserve review comments during export.",
+    };
+    r.json = async (_system, input: any, _budget, operation, thinking) => {
+      assert.equal(operation, "issue-reading");
+      assert.equal(thinking, true);
+      assert.deepEqual(input.sources, [source]);
+      return {
+        issueInsights: [
+          {
+            sourceId: "S1",
+            relevance: "direct",
+            en: text,
+            zh: text,
+            evidence: { id: "S1", quote: source.excerpt },
+          },
+          {
+            sourceId: "I1",
+            relevance: "direct",
+            en: text,
+            zh: text,
+            evidence: { id: "I1", quote: source.excerpt },
+          },
+          {
+            sourceId: "I1",
+            relevance: "direct",
+            en: text,
+            zh: text,
+            evidence: { id: "I1", quote: "Fabricated demand assertion" },
+          },
+        ],
+      };
+    };
+    const result = await (r as any).interpretIssues({
+      input: "Documentation",
+      sources: [...strategySources(seed, documents), source],
+    });
+    assert.equal(result.length, 1);
+    assert.equal(result[0].sourceId, "I1");
+  }));

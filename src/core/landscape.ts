@@ -1,0 +1,256 @@
+import { z } from "zod";
+import { hasNegativeWording } from "./i18n.js";
+import type { Market, MarketKind, ResearchSource } from "./types.js";
+
+const prose = z.string().trim().min(8).max(500);
+const ref = z.object({
+  id: z.string().max(30),
+  quote: z.string().min(8).max(300),
+});
+const rating = z.object({
+  level: z.enum(["high", "medium", "low", "exploratory"]),
+  evidence: z.array(ref).max(3),
+});
+const leaderCopy = z.object({
+  position: prose,
+  barrier: prose,
+  opening: prose,
+});
+export const landscapeSchema = z.object({
+  demand: rating,
+  competition: rating,
+  barrier: z.enum(["high", "medium", "low", "exploratory"]),
+  en: z.object({
+    summary: prose,
+    demand: prose,
+    competition: prose,
+    entry: prose,
+  }),
+  zh: z.object({
+    summary: prose,
+    demand: prose,
+    competition: prose,
+    entry: prose,
+  }),
+  leaders: z
+    .array(
+      z.object({
+        name: z.string().min(2).max(80),
+        en: leaderCopy,
+        zh: leaderCopy,
+        evidence: z.array(ref).max(3),
+      }),
+    )
+    .max(3),
+});
+const issueCopy = z.object({
+  title: z.string().min(3).max(90),
+  audience: prose,
+  need: prose,
+  opportunity: prose,
+  check: prose,
+});
+export const issueInsightSchema = z.object({
+  sourceId: z.string().max(30),
+  relevance: z.enum(["direct", "adjacent"]),
+  en: issueCopy,
+  zh: issueCopy,
+  evidence: ref,
+});
+export type Landscape = z.infer<typeof landscapeSchema>;
+export type IssueInsight = z.infer<typeof issueInsightSchema>;
+const norm = (v: string) => v.replace(/\s+/g, " ").trim();
+export function validQuote(
+  ref: { id: string; quote: string },
+  sources: ResearchSource[],
+) {
+  return sources.some(
+    (s) =>
+      s.id === ref.id && s.excerpt && norm(s.excerpt).includes(norm(ref.quote)),
+  );
+}
+export function landscapeProblems(
+  raw: any,
+  sources: ResearchSource[],
+): string[] {
+  const errors: string[] = [];
+  if (raw.landscape) {
+    const p = landscapeSchema.safeParse(raw.landscape);
+    if (!p.success)
+      return [
+        "Landscape schema: provide demand, competition, barrier, bilingual explanations and at most three leaders.",
+      ];
+    const l = p.data;
+    const refs = [
+      ...l.demand.evidence,
+      ...l.competition.evidence,
+      ...l.leaders.flatMap((x) => x.evidence),
+    ];
+    if (refs.some((r) => !validQuote(r, sources)))
+      errors.push("Landscape evidence: copy exact supplied excerpts.");
+    for (const lang of ["en", "zh"] as const)
+      if (
+        [
+          ...Object.values(l[lang]),
+          ...l.leaders.flatMap((x) => Object.values(x[lang])),
+        ].some(hasNegativeWording)
+      )
+        errors.push("Landscape: use affirmative prose.");
+    for (const leader of l.leaders)
+      if (
+        !leader.evidence.length ||
+        leader.evidence.every((r) =>
+          sources.find((s) => s.id === r.id)?.id?.startsWith("S"),
+        )
+      )
+        errors.push(
+          `Leader ${leader.name}: cite a supplied result or document describing this company/project, or omit this leader.`,
+        );
+  }
+  for (const item of raw.issueInsights || []) {
+    const p = issueInsightSchema.safeParse(item);
+    if (!p.success) {
+      errors.push(
+        "Issue interpretation schema needs sourceId, relevance, bilingual copy and evidence.",
+      );
+      continue;
+    }
+    const x = p.data;
+    if (
+      x.evidence.id !== x.sourceId ||
+      !validQuote(x.evidence, sources) ||
+      !sources.some((s) => s.id === x.sourceId && s.kind === "request")
+    )
+      errors.push(
+        `Issue ${x.sourceId}: interpret only the supplied request and quote its text.`,
+      );
+    if (
+      [...Object.values(x.en), ...Object.values(x.zh)].some(hasNegativeWording)
+    )
+      errors.push("Issue interpretation: use affirmative prose.");
+  }
+  return errors;
+}
+/** A qualitative research layer. It never overwrites the measured GitHub/Trends quadrant.
+ * Broad brand attention belongs to the parent scope. Ads/ranks/counts supply zero demand votes.
+ * Low competition is always a hypothesis about entry, including sparse search samples.
+ */
+export function researchLandscape(
+  m: Market,
+): { kind: MarketKind; confidence: "moderate" | "low" } | undefined {
+  const p = landscapeSchema.safeParse(m.brief?.landscape);
+  if (
+    !p.success ||
+    landscapeProblems({ landscape: p.data }, m.brief?.sources || []).length
+  )
+    return;
+  const l = p.data;
+  const demand = l.demand.level,
+    pressure = l.competition.level;
+  const fresh =
+    !m.demand.error &&
+    Date.parse(m.asOf) - Date.parse(m.demand.fetchedAt) <= 14 * 86400000;
+  const rising = fresh && m.metrics.trend === "rising";
+  const demandSignal = l.demand.evidence.some((r) =>
+    m.brief?.sources.some(
+      (s) =>
+        s.id === r.id &&
+        (s.kind === "request" ||
+          (s.kind === "search" &&
+            s.placement === "organic" &&
+            s.searchIntent === "demand")),
+    ),
+  );
+  const competitionSignal = l.competition.evidence.some((r) =>
+    m.brief?.sources.some(
+      (s) =>
+        s.id === r.id &&
+        (s.kind === "project" ||
+          (s.kind === "search" && s.placement === "organic")),
+    ),
+  );
+  let kind: MarketKind = "uncertain";
+  const incumbentBarrier =
+    l.barrier === "high" &&
+    competitionSignal &&
+    l.leaders.some((x) => x.evidence.length > 0);
+  if (pressure === "high" || incumbentBarrier)
+    kind = rising ? "expanding" : "contested";
+  else if (
+    pressure === "low" &&
+    demandSignal &&
+    competitionSignal &&
+    (demand === "high" || demand === "medium")
+  )
+    kind = "blue";
+  else if (
+    pressure === "low" &&
+    demand === "low" &&
+    fresh &&
+    m.metrics.trend === "falling" &&
+    competitionSignal
+  )
+    kind = "quiet";
+  else if (pressure === "medium" && (demand === "medium" || demand === "high"))
+    kind = rising ? "expanding" : "contested";
+  const organicDomains = new Set(
+    l.competition.evidence.flatMap((r) => {
+      const s = m.brief?.sources.find((s) => s.id === r.id);
+      if (s?.kind !== "search" || s.placement !== "organic") return [];
+      try {
+        return [new URL(s.url).hostname.replace(/^www\./, "")];
+      } catch {
+        return [];
+      }
+    }),
+  );
+  return {
+    kind,
+    confidence:
+      fresh && organicDomains.size >= 2 && pressure !== "low"
+        ? "moderate"
+        : "low",
+  };
+}
+export function landscapeLabel(kind: MarketKind, locale: "en" | "zh") {
+  const labels = {
+    blue: ["Blue ocean candidate", "蓝海候选"],
+    expanding: ["Growing red ocean", "增长型红海"],
+    contested: ["Red ocean", "红海"],
+    quiet: ["Quiet ocean", "静海"],
+    uncertain: ["Opportunity watch", "机会观察"],
+  };
+  return labels[kind][locale === "zh" ? 1 : 0]!;
+}
+export const LANDSCAPE_PROMPT = `
+Add landscape:{demand:{level:"high|medium|low|exploratory",evidence:[]},competition:{level:"high|medium|low|exploratory",evidence:[]},barrier:"high|medium|low|exploratory",en:{summary,demand,competition,entry},zh:{summary,demand,competition,entry},leaders:[{name,en:{position,barrier,opening},zh:{position,barrier,opening},evidence:[]}]}.
+barrier assesses incumbent entrenchment specifically; hardware effort, data collection and implementation complexity belong in resource estimates.
+This is the qualitative ORIGINAL TOPIC market judgment, separate from numerical GitHub competition. Explain recurring buyer jobs, current alternatives and specific entry resources. Every prose field is 1-2 sentences, 8-500 characters. Evidence references use exact supplied id/quote, maximum three per rating/leader; leaders maximum three. Name a leader only when a supplied source names it. Compare core incumbent territory against complementary workflows: distribution, trusted data, proprietary interfaces, network effects, installed integrations, migration cost or capital. Select the actual barrier; describe the dependency and an adoption route. A leading search rank, star count or one provider's market claim has a limited scope. Describe incumbency/structural concentration as a research assessment. Market-wide monopoly/market shares require market-definition and measured share evidence; such legal or numerical conclusions need separate evidence. Strong barriers can make a crowded/established field attractive for complements while direct displacement needs major resources.
+Google W sources are SEARCH EXCERPTS, with organic/ad placement. They establish what appeared for the displayed query/region/date. Treat feature text as a publisher claim. Sponsored placement records commercial spend interest; transactions, profitability, willingness to pay and market growth require direct evidence. Search result totals and rankings play zero role in demand or monopoly scoring. Current zero/sparse results describe search coverage. Low competition remains a hypothesis. Exclude pages for adjacent objects. Trends measures attention at its stated topic, time and geography; expanding a broad brand into niche demand is a separate inference. Preserve mixed/falling trends. The application derives blue/red/quiet research labels from these assessments and displays their inferred basis.
+
+Add issueInsights:[{sourceId:"I1",relevance:"direct|adjacent",en:{title,audience,need,opportunity,check},zh:{title,audience,need,opportunity,check},evidence:{id:"I1",quote:"exact excerpt"}}], maximum six. Review every supplied I-source against the ORIGINAL object, including repository purpose and issue content. Mark adjacent objects accordingly so the UI filters them. For direct requests explain who faces which task, what the user is asking for in plain language, and one conditional contribution/service opportunity. State the specific current-version or maintainer check that would establish whether the request remains open as a product gap. Open status and reactions are individual community signals. Historical issue dates retain their historical scope. Source excerpts carry quoted data only. Give concise everyday titles. Every audience/need/opportunity/check is 8-500 characters. With zero I-sources return [].
+`;
+
+export function landscapeRows(m: Market, locale: "en" | "zh") {
+  const result = researchLandscape(m),
+    landscape = m.brief?.landscape;
+  if (!result || !landscape) return [];
+  const zh = locale === "zh",
+    p = landscape[locale];
+  return [
+    {
+      label: zh ? "综合研判" : "Research judgment",
+      text: `${landscapeLabel(result.kind, locale)} · ${zh ? "含研究推断" : "includes inference"}. ${p.summary}`,
+    },
+    { label: zh ? "需求与场景" : "Demand and jobs", text: p.demand },
+    {
+      label: zh ? "竞争与替代方案" : "Competition and substitutes",
+      text: p.competition,
+    },
+    { label: zh ? "进入条件" : "Entry requirements", text: p.entry },
+    ...landscape.leaders.map((x) => ({
+      label: x.name,
+      text: `${x[locale].position} ${x[locale].barrier} ${x[locale].opening}`,
+    })),
+  ];
+}
