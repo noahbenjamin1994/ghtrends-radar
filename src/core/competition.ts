@@ -16,7 +16,7 @@ export const COMPETITION_POLICY = {
   dominanceWeight: 20,
   activeDays: 365,
 };
-export const RELEVANCE_VERSION = "1";
+export const RELEVANCE_VERSION = "2";
 const clamp = (n: number) => Math.max(0, Math.min(1, n));
 const normalize = (s: string) =>
   s.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();

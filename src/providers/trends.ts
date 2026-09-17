@@ -1,12 +1,68 @@
 import { completeWeeklySeries } from "../core/evidence.js";
 import { demandMetrics } from "../core/analyze.js";
 import type { ProviderCall } from "../core/operations.js";
-import { fetch as request, ProxyAgent } from "undici";
+import { fetch as request, ProxyAgent, Dispatcher } from "undici";
 import type { DemandEvidence, InterestPoint } from "../core/types.js";
 import { Store } from "../core/store.js";
 import { createHash } from "node:crypto";
 import { validateGeo } from "../core/topics.js";
 const ORIGIN = "https://trends.google.com";
+// Count HTTP bytes before decompression. Provider billing also includes TLS;
+// the administrator sees this as an HTTP measurement, alongside the invoice API.
+export class TrafficMeter extends Dispatcher {
+  constructor(
+    private inner: Dispatcher,
+    private call: ProviderCall,
+  ) {
+    super();
+  }
+  dispatch(
+    options: Dispatcher.DispatchOptions,
+    handler: Dispatcher.DispatchHandler,
+  ): boolean {
+    const call = this.call;
+    call.transferBytes =
+      (call.transferBytes || 0) +
+      Buffer.byteLength(
+        `${options.method || "GET"} ${options.path} HTTP/1.1\r\n`,
+      );
+    const headers = options.headers;
+    if (Array.isArray(headers))
+      call.transferBytes += headers.reduce(
+        (n, h) => n + Buffer.byteLength(String(h)) + 2,
+        0,
+      );
+    else if (headers)
+      call.transferBytes += Object.entries(headers).reduce(
+        (n, [k, v]) => n + Buffer.byteLength(`${k}: ${v}\r\n`),
+        0,
+      );
+    return this.inner.dispatch(
+      options,
+      new Proxy(handler, {
+        get(target, prop) {
+          const original = Reflect.get(target, prop);
+          if (prop === "onData")
+            return (chunk: Buffer) => {
+              call.transferBytes! += chunk.length;
+              return original?.call(target, chunk);
+            };
+          if (prop === "onHeaders")
+            return (...args: any[]) => {
+              call.transferBytes! += args[1].reduce(
+                (n: number, h: Buffer | string) => n + Buffer.byteLength(h) + 2,
+                0,
+              );
+              return original?.apply(target, args);
+            };
+          return typeof original === "function"
+            ? original.bind(target)
+            : original;
+        },
+      }),
+    );
+  }
+}
 export function parseGoogleJson(text: string): any {
   return JSON.parse(text.replace(/^\)\]\}',?\s*/, ""));
 }
@@ -57,10 +113,12 @@ export class Trends {
     );
   }
   private dispatcher: ProxyAgent | undefined;
+  private routeName: "primary" | "backup";
   constructor(
     private store: Store,
     route?: { proxy?: string; cooldownKey?: string },
   ) {
+    this.routeName = route ? "backup" : "primary";
     const proxy = route ? route.proxy : process.env.GOOGLE_TRENDS_PROXY;
     this.cooldownKey =
       route?.cooldownKey ||
@@ -145,10 +203,15 @@ export class Trends {
               : "warmup",
         started: new Date(started).toISOString(),
         durationMs: 0,
+        ...(this.dispatcher
+          ? { proxyRoute: this.routeName, transferBytes: 0 }
+          : {}),
       };
       try {
         const r = await request(url, {
-          dispatcher: this.dispatcher,
+          dispatcher: this.dispatcher
+            ? new TrafficMeter(this.dispatcher, call)
+            : undefined,
           headers: {
             "User-Agent":
               "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",

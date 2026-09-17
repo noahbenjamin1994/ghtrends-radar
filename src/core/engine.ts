@@ -11,7 +11,14 @@ import { analyze, ALGORITHM_VERSION } from "./analyze.js";
 import { sourceEvidenceIsFresh, completeWeeklySeries } from "./evidence.js";
 import type { Market, DemandEvidence, SupplyEvidence, Topic } from "./types.js";
 export interface ScanProgress {
-  stage: "interpreting" | "sources" | "github" | "demand" | "details" | "brief";
+  stage:
+    | "interpreting"
+    | "sources"
+    | "github"
+    | "demand"
+    | "details"
+    | "brief"
+    | "refining";
   supplyCount?: number;
   weeklyPoints?: number;
   preview?: Market;
@@ -105,7 +112,7 @@ export class Engine {
       preview();
     };
     options.onProgress?.({ stage: "sources", topic });
-    const [demand, supply] = await Promise.all([
+    let [demand, supply] = await Promise.all([
       options.demand
         ? Promise.resolve(
             importDemand(options.demand, topic.keyword, geo),
@@ -127,6 +134,26 @@ export class Engine {
         })
         .then((data) => (ai ? this.research.reviewSupply(topic, data) : data)),
     ]);
+    if (ai && !supply.error && supply.repositories.length < 3) {
+      const repair = await this.research.repairQueries(topic, supply);
+      if (repair) {
+        options.onProgress?.({ stage: "refining", topic });
+        const expanded = await this.github.supply(repair.topic);
+        // Retain the successful original evidence if an additional query fails.
+        if (!expanded.error) {
+          const reviewed = await this.research.reviewSupply(topic, expanded);
+          reviewed.recovery = {
+            model: this.research.model,
+            originalCount: supply.total,
+            addedQueries: repair.topic.queries!.filter(
+              (q) => !(topic.queries || [topic.query]).includes(q),
+            ),
+            explanation: repair.explanation,
+          };
+          supply = reviewed;
+        }
+      }
+    }
     if (options.demand)
       this.store.set(
         `trends:v3:${JSON.stringify([topic.keyword])}:${geo}`,

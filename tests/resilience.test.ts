@@ -237,7 +237,7 @@ test("collection gaps stay pending instead of becoming measured zero baselines",
   research.json = async (_system, input: any) => {
     assert.equal(input.search.baselineObserved, false);
     assert.equal(input.search.collectionStatus, "cooling-down");
-    assert.equal(input.search.observedWeeks, 0);
+    assert.equal(input.search.coverage, "recent weekly coverage pending");
     return {
       en: {
         summary:
@@ -253,6 +253,92 @@ test("collection gaps stay pending instead of becoming measured zero baselines",
   try {
     const brief = await research.brief(m);
     assert.equal(hasNegativeWording(brief.zh.summary), false);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("briefs keep historical coverage separate from the measured comparison window", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-brief-window-"));
+  const store = new Store(dir),
+    research = new Research(store);
+  let calls = 0;
+  research.json = async (_system, input: any) => {
+    calls++;
+    if (calls === 1) {
+      assert.equal(input.search.observedWeeks, undefined);
+      return {
+        en: {
+          summary: `Search interest declined across ${seed.metrics.points} weeks.`,
+          nextSteps: ["Compare specific alternatives."],
+        },
+        zh: {
+          summary: `搜索热度在 ${seed.metrics.points} 周下降。`,
+          nextSteps: ["比较具体替代方案。"],
+        },
+      };
+    }
+    return {
+      en: {
+        headline: "Test a focused use case",
+        summary:
+          "Compare the recent search window with the annual change before choosing a focused experiment.",
+        nextSteps: ["Compare specific alternatives."],
+      },
+      zh: {
+        headline: "从具体场景开始验证",
+        summary: "结合近期搜索变化与同比变化，选择一个具体场景开展验证。",
+        nextSteps: ["比较具体替代方案。"],
+      },
+    };
+  };
+  try {
+    const brief = await research.brief(seed);
+    assert.equal(calls, 2);
+    assert.equal(brief.zh.headline, "从具体场景开始验证");
+    const saved = {
+      ...seed,
+      brief: {
+        ...brief,
+        en: {
+          ...brief.en,
+          summary: `Search interest declined across ${seed.metrics.points} weeks.`,
+        },
+      },
+    };
+    assert.equal(marketAssessment(saved).narrative.kind, "evidence");
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an invented refresh timer is removed while grounded brief actions remain", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-brief-actions-"));
+  const store = new Store(dir),
+    research = new Research(store);
+  research.json = async () => ({
+    en: {
+      summary:
+        "Compare the existing alternatives around a specific user workflow.",
+      nextSteps: [
+        "Inspect the leading projects.",
+        "Refresh after the time shown on this page.",
+      ],
+    },
+    zh: {
+      summary: "围绕具体用户流程比较现有替代方案。",
+      nextSteps: ["查看头部项目。", "在页面提示的时间之后刷新本页。"],
+    },
+  });
+  try {
+    const brief = await research.brief({
+      ...seed,
+      demand: { ...seed.demand, retryAt: undefined, alternatives: [] },
+    });
+    assert.deepEqual(brief.en.nextSteps, ["Inspect the leading projects."]);
+    assert.deepEqual(brief.zh.nextSteps, ["查看头部项目。"]);
   } finally {
     store.close();
     rmSync(dir, { recursive: true, force: true });

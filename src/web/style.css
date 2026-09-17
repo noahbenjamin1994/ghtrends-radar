@@ -4356,3 +4356,538 @@ footer small {
     gap: 14px;
   }
 }
+
+/* Research reports: calm editorial hierarchy with evidence close to decisions. */
+.report-page {
+  max-width: 1160px;
+  margin-inline: auto;
+  padding-bottom: 70px;
+}
+.report-page .detail-heading {
+  align-items: flex-end;
+  gap: 32px;
+  margin-bottom: 16px;
+}
+.report-page .detail-heading h1 {
+  font-size: clamp(30px, 3.1vw, 46px);
+  letter-spacing: -0.045em;
+  line-height: 1.15;
+  margin: 14px 0 10px;
+}
+.report-page .detail-heading p {
+  max-width: 650px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #74736d;
+}
+.report-page .detail-actions {
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.report-page .report-privacy {
+  font-size: 12px;
+  color: #797870;
+  margin: 16px 0 28px;
+}
+.report-nav {
+  display: flex;
+  gap: 32px;
+  border-block: 1px solid var(--line);
+  margin: 26px 0 36px;
+  padding: 17px 0;
+  font-size: 13px;
+}
+.report-nav a {
+  color: #64655f;
+}
+.report-nav a:first-child {
+  color: #202820;
+}
+.report-page [id] {
+  scroll-margin-top: 100px;
+}
+.report-outlook {
+  --outlook-accent: #587367;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 64px;
+  padding: 40px 42px;
+  background: #f5f7f3;
+  border-radius: 16px;
+}
+.report-outlook.quiet {
+  background: #f4f5f7;
+  --outlook-accent: #5f7095;
+}
+.report-outlook.contested,
+.report-outlook.expanding {
+  background: #faf5ef;
+  --outlook-accent: #9c6849;
+}
+.report-outlook.blue {
+  background: #eff6f7;
+  --outlook-accent: #227c87;
+}
+.outlook-meta {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 22px;
+  font-size: 12px;
+  color: #666c64;
+}
+.outlook-copy h2 {
+  font-size: clamp(25px, 2.8vw, 38px);
+  font-weight: 560;
+  line-height: 1.38;
+  letter-spacing: -0.025em;
+  max-width: 650px;
+}
+.outlook-summary {
+  margin-top: 20px;
+  font-size: 15px;
+  line-height: 1.95;
+  max-width: 640px;
+  color: #535950;
+}
+.outlook-byline {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 27px;
+  font-size: 11px;
+  color: #72766e;
+}
+.outlook-signal {
+  border-left: 1px solid #dce2d8;
+  padding-left: 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.outlook-signal .eyebrow {
+  margin-bottom: 0;
+  color: var(--outlook-accent);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+}
+.outlook-signal > strong {
+  font-size: 58px;
+  line-height: 1.25;
+  letter-spacing: -0.06em;
+  font-weight: 500;
+  margin: 13px 0 6px;
+}
+.outlook-signal > span {
+  font-size: 11px;
+  color: #6d726a;
+}
+.outlook-signal svg {
+  max-width: 100%;
+}
+.outlook-signal > a {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: #777b73;
+}
+.report-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 30px 0 52px;
+  padding: 0 8px 28px;
+  border-bottom: 1px solid var(--line);
+}
+.report-facts > div {
+  padding: 8px 25px;
+  border-left: 1px solid var(--line);
+}
+.report-facts > div:first-child {
+  border: 0;
+  padding-left: 0;
+}
+.report-facts span,
+.report-facts small {
+  display: block;
+  font-size: 12px;
+  color: #74746d;
+}
+.report-facts strong {
+  display: block;
+  margin: 15px 0 8px;
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+.report-facts strong .growth {
+  font-size: inherit;
+}
+.report-facts em {
+  font-size: 12px;
+  font-style: normal;
+  color: #777b74;
+  margin-left: 7px;
+  letter-spacing: 0;
+}
+.report-facts small {
+  font-size: 11px;
+  line-height: 1.6;
+}
+.report-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.report-section-heading .eyebrow {
+  font-size: 10px;
+  color: #7d8176;
+  letter-spacing: 0.14em;
+  margin-bottom: 12px;
+}
+.report-section-heading h3 {
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.report-section-heading > span {
+  font-size: 12px;
+  color: #7a7c75;
+}
+.report-next-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 24px;
+}
+.report-next-steps li {
+  border-top: 2px solid #d7e1d2;
+  padding: 19px 0;
+  display: flex;
+  gap: 17px;
+}
+.report-next-steps li > span {
+  font-family: var(--mono);
+  color: #8a9885;
+  font-size: 12px;
+  padding-top: 4px;
+}
+.report-next-steps p {
+  font-size: 14px;
+  line-height: 1.85;
+  color: #414a40;
+}
+.report-actions-section {
+  margin-bottom: 42px;
+}
+.report-page .panel {
+  border-radius: 12px;
+  box-shadow: none;
+}
+.report-evidence {
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: 24px;
+  margin: 0 0 38px;
+}
+.report-evidence > .panel {
+  padding: 28px;
+  margin: 0;
+  background: #fff;
+}
+.report-evidence .large-chart {
+  margin: 30px 0 16px;
+}
+.report-reading .eyebrow {
+  font-size: 10px;
+  color: #8c9285;
+}
+.report-reading h3 {
+  font-size: 20px;
+  font-weight: 500;
+  margin: 14px 0 21px;
+}
+.reading-fact {
+  display: flex;
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid #eceee8;
+}
+.reading-fact > span {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: #8e9888;
+  padding-top: 4px;
+}
+.reading-fact p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #52594e;
+}
+.report-reading > .footnote {
+  font-size: 11px;
+  line-height: 1.8;
+  margin-top: 20px;
+}
+.report-projects {
+  margin-top: 30px;
+}
+.report-method {
+  margin-top: 48px;
+}
+.report-method details.panel {
+  padding: 20px 24px;
+  margin: 0;
+  border-radius: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: white;
+}
+.report-method details.panel:last-child {
+  border-bottom: 1px solid var(--line);
+}
+.report-method details > summary {
+  font-size: 14px;
+  font-weight: 500;
+}
+.report-method details[open] > summary {
+  margin-bottom: 20px;
+}
+.report-method p {
+  font-size: 13px;
+  line-height: 1.85;
+}
+.report-page .limits-panel {
+  background: #fafaf8;
+  border: 0;
+  margin-top: 30px;
+}
+.report-page .limits-panel li {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #71756b;
+}
+.proxy-overview {
+  margin-top: 28px;
+  padding: 30px;
+}
+.proxy-overview .eyebrow {
+  margin-bottom: 12px;
+  font-size: 10px;
+  color: #748675;
+}
+.proxy-overview .proxy-metrics {
+  margin: 28px 0;
+}
+.proxy-metrics > div {
+  background: #f5f7f3;
+  border-radius: 10px;
+  padding: 22px;
+}
+.proxy-metrics strong {
+  font-size: 29px;
+}
+.usage-track {
+  height: 5px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #eef0ea;
+  margin-bottom: 15px;
+}
+.usage-track > span {
+  display: block;
+  height: 100%;
+  background: #608977;
+  border-radius: 5px;
+}
+.proxy-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 36px;
+  margin-top: 28px;
+}
+.proxy-detail-grid h3 {
+  font-size: 15px;
+  margin-bottom: 18px;
+}
+.traffic-bars {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  overflow: auto;
+  padding-top: 10px;
+}
+.traffic-bars > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  min-width: 26px;
+}
+.traffic-bars span,
+.traffic-bars small {
+  font-size: 10px;
+  color: #737a70;
+  white-space: nowrap;
+}
+.traffic-bars i {
+  display: block;
+  width: 70%;
+  max-width: 40px;
+  border-radius: 4px 4px 0 0;
+  background: #b5c7b0;
+}
+@media (max-width: 800px) {
+  .report-outlook {
+    grid-template-columns: minmax(0, 1fr) 220px;
+    gap: 30px;
+    padding: 30px;
+  }
+  .report-page .detail-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .report-evidence,
+  .proxy-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .report-facts > div {
+    padding: 8px 16px;
+  }
+  .report-facts strong {
+    font-size: 28px;
+  }
+}
+@media (max-width: 560px) {
+  .report-nav {
+    gap: 0;
+    justify-content: space-between;
+    font-size: 12px;
+    padding: 15px 0;
+    margin: 24px 0;
+  }
+  .report-outlook {
+    grid-template-columns: 1fr;
+    padding: 24px;
+    gap: 26px;
+    border-radius: 12px;
+  }
+  .outlook-copy h2 {
+    font-size: 26px;
+  }
+  .outlook-summary {
+    font-size: 14px;
+  }
+  .outlook-signal {
+    border-left: 0;
+    border-top: 1px solid #dce2d8;
+    padding: 22px 0 0;
+  }
+  .outlook-signal > strong {
+    font-size: 46px;
+  }
+  .outlook-signal > svg {
+    max-height: 70px;
+  }
+  .report-facts {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px 0;
+    margin: 22px 0 36px;
+    padding: 0 0 22px;
+  }
+  .report-facts > div:nth-child(3) {
+    border: 0;
+    padding-left: 0;
+  }
+  .report-facts strong {
+    font-size: 28px;
+  }
+  .report-section-heading > span {
+    display: none;
+  }
+  .report-section-heading h3 {
+    font-size: 20px;
+  }
+  .report-next-steps {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .report-next-steps li {
+    padding: 16px 0;
+    border-top-width: 1px;
+  }
+  .report-evidence > .panel {
+    padding: 20px;
+  }
+  .report-page .detail-actions {
+    width: 100%;
+  }
+  .report-page .detail-actions .button {
+    padding: 9px 12px;
+    font-size: 12px;
+  }
+  .outlook-byline {
+    font-size: 10px;
+    gap: 10px;
+  }
+  .proxy-overview {
+    padding: 20px;
+  }
+  .proxy-overview .panel-title {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .proxy-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .proxy-metrics > div {
+    padding: 14px;
+  }
+  .proxy-metrics strong {
+    font-size: 23px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .report-outlook {
+    animation: report-enter 0.4s ease-out both;
+  }
+  @keyframes report-enter {
+    from {
+      opacity: 0;
+      transform: translateY(7px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+.outlook-signal > .sparkline {
+  height: 96px;
+  margin: 12px 0;
+  flex-shrink: 0;
+}
+.report-page {
+  padding-top: 16px;
+}
+.report-page .back-link {
+  margin-bottom: 24px;
+}
+.report-page .detail-heading .eyebrow {
+  margin-bottom: 10px;
+}
+.report-page .detail-heading h1 {
+  font-weight: 600;
+}
+.outlook-signal .growth {
+  font-family: var(--display);
+  font-variant-numeric: tabular-nums;
+}

@@ -61,7 +61,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.11.2/ghtrends-radar-0.11.2.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.12.0/ghtrends-radar-0.12.0.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
@@ -200,6 +200,8 @@ export GHTRENDS_ADMIN_USER_IDS=your_logto_user_id,another_logto_user_id
 
 消耗从升级接入记录时开始，此前消耗**未知**；失败响应未返回的用量也保持未知。可通过 `GHTRENDS_LLM_PRICING_JSON` 配置各模型的每百万 token 美元单价：`{"your-model":{"input":0.3,"cachedInput":0.006,"output":1.2}}`（仅示例，请核实当前价格）。可选 `offPeakMultiplier` 使用 DeepSeek 的 UTC 工作日 01:00–04:00 / 06:00–10:00 高峰规则；固定价格时不填。每次调用保存当时估价，不包含未知价格的请求，**不作为服务商账单**。[价格说明](https://api-docs.deepseek.com/quick_start/pricing/) · [用量字段](https://api-docs.deepseek.com/api/create-chat-completion/)。
 
+服务端配置 `DECODO_API_KEY` 后，管理员可查看住宅代理套餐余额、有效期和每日官方计费流量。官方数据每 15 分钟刷新，来源恢复期间保留最近一次成功记录。另有每次研究的 HTTP 流量、主备线路成功率和 429 次数。HTTP 统计从升级后开始，计量压缩正文和报头；官方账单包含自身计费开销，以供应商记录为准。代理凭证与管理 API Key 均由服务端保管。
+
 ## 判断方法
 
 ### 竞争压力 · 方法 2.0.0
@@ -217,6 +219,8 @@ GitHub 按主题及名称、描述中的具体短语检索。初筛保留原创�
 分类参考线为 **45/100**，距离参考线 5 分以内降低置信度。实测下限达到 45 分，支持已有成熟竞争的判断。竞争较少需要完整枚举当前检索范围、至少一个直接替代项目，且将待核对项目计入后的上限仍低于 45 分。采样结果展示 `≥ 分数`；完整样本可展示角色待核对产生的区间。直接替代数量为零时，建议补充研究。[完整参数与公式](src/core/competition.ts)。
 
 这套带版本的经验指标描述**已观察开源竞争**。Star 反映开发者关注，Fork 反映复用，账号近似团队。商业产品、客户使用和付费意愿需要额外证据。宽泛领域、实体商品市场展示领域概览，并引导到具体软件工作流。
+
+检索候选较少时，DeepSeek 可围绕原始任务补充一次等价产品名称。GitHub 精确词组可省略“app”等通用交付词，同时保留对象与功能约束；报告完整展示原检索式和新增检索式。相关性审核分成三批，每批最多 20 个项目，各批有效结论分别保留。页面将搜索证据、竞争覆盖和行动建议分层展示，初步研判也提供基于已知信号的具体下一步。
 
 ### 搜索方向
 

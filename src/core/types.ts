@@ -28,8 +28,8 @@ export interface QueryPlan {
 export interface Brief {
   model: string;
   generatedAt: string;
-  en: { summary: string; nextSteps: string[] };
-  zh: { summary: string; nextSteps: string[] };
+  en: { headline?: string; summary: string; nextSteps: string[] };
+  zh: { headline?: string; summary: string; nextSteps: string[] };
   sources: { label: string; url: string }[];
 }
 export interface InterestPoint {
@@ -105,6 +105,12 @@ export interface SupplyEvidence {
     model: string;
     reviewed: number;
     status: "complete" | "partial" | "fallback";
+  };
+  recovery?: {
+    model: string;
+    originalCount: number;
+    addedQueries: string[];
+    explanation: { en: string; zh: string };
   };
 }
 export interface CompetitionMetrics {

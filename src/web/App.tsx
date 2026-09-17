@@ -315,6 +315,7 @@ export function App() {
   const stageLabels = {
     interpreting: "Understanding your research question",
     brief: "Writing a short evidence-based brief",
+    refining: "Refining same-intent project searches",
     sources: "Collecting source evidence",
     github: "GitHub supply received",
     demand: "Search history received",
@@ -1216,11 +1217,12 @@ function MarketView({
       />
     );
   const assessment = marketAssessment(m, locale);
+  const l = (en: string, zh: string) => (locale === "zh" ? zh : en);
   const share = location.origin + localUrl("/report/" + m.id);
   const demandPoints = completeWeeklySeries(m.demand, m.asOf).points;
   const gapSignals = selectGapSignals(m.gaps);
   return (
-    <div className="detail-page">
+    <div className="detail-page report-page">
       <button className="back-link" onClick={() => navigate("/")}>
         <ArrowLeft size={16} />
         {t("Back to the radar")}
@@ -1249,10 +1251,29 @@ function MarketView({
             {t("CATEGORY INTELLIGENCE /")}
             {m.geo || t("WORLDWIDE")}
           </div>
-          <h1>{t(m.topic.name)}</h1>
-          <p>{t(m.topic.description)}</p>
+          <h1>
+            {locale === "zh" && m.topic.plan
+              ? m.topic.plan.input
+              : t(m.topic.name)}
+          </h1>
+          <p>
+            {locale === "zh" && m.topic.plan
+              ? m.topic.name
+              : t(m.topic.description)}
+          </p>
         </div>
         <div className="detail-actions">
+          {(account?.user || account?.hosted === false) && (
+            <button
+              className="button subtle"
+              onClick={() =>
+                onScan(m.topic.plan?.input || m.topic.slug, m.topic.keyword)
+              }
+            >
+              <RefreshCw size={14} />
+              {l("Update research", "更新研究")}
+            </button>
+          )}
           {access?.public ? (
             <CopyButton
               value={share}
@@ -1359,121 +1380,129 @@ function MarketView({
           )}
         </p>
       )}
-      {m.topic.plan && (
-        <details className="panel query-plan">
-          <summary>
-            {t("How we understood your search")}: {m.topic.plan.input}
-          </summary>
-          <p>{assessment.queryExplanation}</p>
-          <div>
-            <strong>Google Trends</strong>
-            <p>{m.topic.plan.trends.join(" · ")}</p>
-            <strong>GitHub</strong>
-            <p>{(m.topic.queries || [m.topic.query]).join(" · ")}</p>
+      <nav className="report-nav" aria-label={l("Report sections", "报告章节")}>
+        <a href="#outlook">{l("Overview", "判断概览")}</a>
+        <a href="#evidence">{l("Evidence", "趋势证据")}</a>
+        <a href="#projects">{l("Projects", "相关项目")}</a>
+        <a href="#method">{l("Research scope", "研究范围")}</a>
+      </nav>
+      <section id="outlook" className={`report-outlook ${m.kind}`}>
+        <div className="outlook-copy">
+          <div className="outlook-meta">
+            <Pill kind={m.kind} label={assessment.landscape} />
+            <span>
+              {assessment.level === "provisional"
+                ? l("Preliminary assessment", "初步研判")
+                : l("Evidence-led assessment", "数据研判")}
+            </span>
           </div>
+          <h2>
+            {assessment.narrative.kind === "ai" && assessment.narrative.headline
+              ? assessment.narrative.headline
+              : assessment.title}
+          </h2>
+          <p className="outlook-summary">
+            {assessment.narrative.kind === "ai"
+              ? assessment.narrative.summary
+              : assessment.summary}
+          </p>
+          <div className="outlook-byline">
+            <span>
+              {assessment.narrative.kind === "ai"
+                ? "DeepSeek Flash"
+                : "ghtrends"}{" "}
+              · {l("Source-led interpretation", "基于来源的解读")}
+            </span>
+            <span>
+              {new Date(m.asOf).toLocaleDateString(
+                locale === "zh" ? "zh-CN" : "en-US",
+              )}
+            </span>
+          </div>
+        </div>
+        <aside className="outlook-signal">
+          <div className="eyebrow">{l("SEARCH MOMENTUM", "搜索动向")}</div>
+          <strong>
+            {m.metrics.emerging ? (
+              t("Low-base rise")
+            ) : (
+              <Growth
+                value={assessment.searchReady ? m.metrics.growth : null}
+              />
+            )}
+          </strong>
+          <span>{t("Last 8 complete weeks vs previous 8")}</span>
+          <Sparkline
+            values={demandPoints.slice(-26).map((p) => p.value)}
+            color={m.metrics.trend === "falling" ? "#a65c42" : "#277c81"}
+            height={96}
+            domain={[0, 100]}
+          />
+          <a href={m.demand.sourceUrl} target="_blank" rel="noreferrer">
+            Google Trends <ExternalLink size={12} />
+          </a>
+        </aside>
+      </section>
+      <div className="report-facts">
+        <div>
+          <span>{l("Year over year", "同比搜索变化")}</span>
+          <strong>
+            <Growth value={m.metrics.yearOverYear} />
+          </strong>
           <small>
-            {m.topic.plan.model === "curated"
-              ? t("Curated search scope")
-              : m.topic.plan.model}{" "}
-            · {t("You can edit the demand keyword and scan again.")}
+            {l("Same 8 weeks, one year apart", "与去年相同的 8 周比较")}
           </small>
-        </details>
-      )}
-      <section className={`verdict ${m.kind}`}>
-        <div className="verdict-icon">
-          <Radio size={30} />
         </div>
         <div>
-          <Pill kind={m.kind} label={assessment.landscape} />
-          <h2>{assessment.title}</h2>
-          <p>{assessment.summary}</p>
-          {assessment.level === "provisional" && (
-            <small className="verdict-qualification">
-              {t("Preliminary recommendation")} ·{" "}
-              {t(
-                m.topic.scope === "field"
-                  ? "Choose one software workflow to compare."
-                  : "Quadrant not yet established",
-              )}
-            </small>
-          )}
-        </div>
-        <div className="verdict-evidence">
-          <span>{t(m.confidence)}</span>
-          <small>{t("evidence confidence")}</small>
+          <span>{l("Direct alternatives", "直接替代项目")}</span>
+          <strong>
+            {m.supply.error ? "—" : number(m.competition?.direct ?? 0)}
+            <em>{l("projects", "个")}</em>
+          </strong>
           <small>
-            {new Date(m.asOf).toLocaleDateString(
-              locale === "zh" ? "zh-CN" : "en",
-              {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              },
-            )}
+            {l("Reviewed GitHub search matches", "当前 GitHub 检索与审核范围")}
           </small>
         </div>
-      </section>
-      <section className="panel research-summary">
-        <h3>{t("Evidence and next step")}</h3>
-        <div className="assessment-columns">
-          <div>
-            <h4>{t("What we know")}</h4>
-            <ul>
-              {(m.reasons.length ? m.reasons : assessment.facts)
-                .slice(0, 3)
-                .map((f) => (
-                  <li key={f}>{t(f)}</li>
-                ))}
-            </ul>
-          </div>
-          <div>
-            <h4>{t("What to do next")}</h4>
-            {assessment.narrative.kind === "ai" && (
-              <p>{assessment.narrative.summary}</p>
-            )}
-            <ol>
-              {assessment.narrative.nextSteps.slice(0, 3).map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
-            {assessment.narrative.kind === "ai" && (
-              <small>
-                {t(
-                  "AI interpretation of the evidence below. Verify the sources before acting.",
-                )}
-              </small>
-            )}
-          </div>
+        <div>
+          <span>{l("Competition pressure", "开源竞争压力")}</span>
+          <strong>
+            {competitionPressure(m)}
+            <em>/ 100</em>
+          </strong>
+          <small>{t("pressure." + (m.competition?.level || "pending"))}</small>
         </div>
-        {m.brief && (
-          <div className="source-chips">
-            {m.brief.sources.map((source) => (
-              <a
-                key={source.url}
-                href={source.url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {source.label} <ExternalLink size={12} />
-              </a>
-            ))}
+        <div>
+          <span>{l("Search coverage", "搜索数据覆盖")}</span>
+          <strong>
+            {m.metrics.points}
+            <em>{l("weeks", "周")}</em>
+          </strong>
+          <small>
+            {t(m.confidence)} · {t("evidence confidence")}
+          </small>
+        </div>
+      </div>
+      <section className="report-actions-section">
+        <div className="report-section-heading">
+          <div>
+            <div className="eyebrow">{l("YOUR NEXT MOVE", "下一步怎么做")}</div>
+            <h3>
+              {l(
+                "Turn the signal into a small experiment",
+                "把判断变成一次小验证",
+              )}
+            </h3>
           </div>
-        )}
-        {assessment.suggestedScan && (
-          <button
-            className="button secondary"
-            onClick={() =>
-              onScan(
-                assessment.suggestedScan!.topic,
-                assessment.suggestedScan!.keyword,
-              )
-            }
-          >
-            {t("Rescan with “{keyword}”", {
-              keyword: assessment.suggestedScan.keyword,
-            })}
-          </button>
-        )}
+          <span>{l("A practical starting point", "从具体行动开始")}</span>
+        </div>
+        <ol className="report-next-steps">
+          {assessment.narrative.nextSteps.slice(0, 3).map((step, i) => (
+            <li key={step}>
+              <span>{String(i + 1).padStart(2, "0")}</span>
+              <p>{step}</p>
+            </li>
+          ))}
+        </ol>
       </section>
       {m.aiError && <p className="muted">{t(m.aiError)}</p>}
       {m.demand.retryAt && (
@@ -1494,176 +1523,7 @@ function MarketView({
           {m.demand.keyword})
         </p>
       )}
-      <div className="research-scope">
-        <span>
-          {t("Measured search term")}: <strong>{m.demand.keyword}</strong>
-        </span>
-        <span>
-          {t("GitHub search scope")}:{" "}
-          {(m.topic.queries || [m.topic.query]).map((q) => (
-            <code key={q}>{q}</code>
-          ))}
-        </span>
-      </div>
-      <div className="search-direction">
-        <strong>
-          {t("Search direction")}:{" "}
-          {t("trend." + (m.metrics.trend || "unknown"))}
-        </strong>
-        <span>
-          {t("Direction basis")}:{" "}
-          {t("basis." + (m.metrics.directionBasis || "recent-windows"))}
-        </span>
-        <span>
-          {t("4-week change")}: {pct(m.metrics.shortGrowth ?? null)}
-        </span>
-        <span>
-          {t("13-week change")}: {pct(m.metrics.quarterGrowth ?? null)}
-        </span>
-      </div>
-      {m.metrics.windows?.main && (
-        <p className="footnote">
-          {t("Measured windows")}:{" "}
-          {m.metrics.windows.main.recentStart.slice(0, 10)}–
-          {m.metrics.windows.main.recentEnd.slice(0, 10)} /{" "}
-          {m.metrics.windows.main.baselineStart.slice(0, 10)}–
-          {m.metrics.windows.main.baselineEnd.slice(0, 10)} (
-          {t("recent / baseline")})
-        </p>
-      )}
-      <div className="metric-grid">
-        <div>
-          <span>{t("Search interest change")}</span>
-          <strong>
-            {m.metrics.emerging ? (
-              t("Low-base rise")
-            ) : (
-              <Growth
-                value={m.metrics.fast === null ? null : m.metrics.growth}
-              />
-            )}
-          </strong>
-          <small>{assessment.demandNote}</small>
-        </div>
-        <div>
-          <span>
-            {t(
-              m.competition
-                ? "Competition pressure"
-                : "Matching active projects",
-            )}
-          </span>
-          <strong>
-            {m.competition
-              ? competitionPressure(m)
-              : m.supply.error
-                ? "—"
-                : (m.supply.complete ? "" : "≥") + number(m.supply.total)}
-          </strong>
-          <small>
-            {m.competition
-              ? t("pressure." + m.competition.level) +
-                " · " +
-                t("Operational index / 100")
-              : t("Observed GitHub search scope")}
-          </small>
-        </div>
-        <div>
-          <span>{t("Year-over-year search change")}</span>
-          <strong>
-            <Growth value={m.metrics.yearOverYear} />
-          </strong>
-          <small>{t("Same 8-week window, one year apart")}</small>
-        </div>
-        <div>
-          <span>
-            {t(m.competition ? "Direct alternatives" : "Top 3 attention share")}
-          </span>
-          <strong>
-            {m.competition
-              ? number(m.competition.direct)
-              : m.concentration === null
-                ? "—"
-                : (m.concentration * 100).toFixed(0) + "%"}
-          </strong>
-          <small>
-            {m.competition
-              ? t("Within {sample} inspected projects", {
-                  sample: m.competition.sampled,
-                })
-              : t("Share of stars within returned projects")}
-          </small>
-        </div>
-      </div>
-      {m.competition && (
-        <details className="panel competition-evidence">
-          <summary>{t("How competition is assessed")}</summary>
-          <p>
-            {t(
-              "Independent alternatives, maintained project adoption signals, and established leaders determine pressure. Project roles keep resources and integrations in their own groups.",
-            )}
-          </p>
-          <dl className="competition-breakdown">
-            <div>
-              <dt>{t("Independent alternatives")}</dt>
-              <dd>
-                {m.competition.breadth.toFixed(1)} /{" "}
-                {COMPETITION_POLICY.breadthWeight}
-              </dd>
-            </div>
-            <div>
-              <dt>{t("Established alternatives")}</dt>
-              <dd>
-                {m.competition.incumbency.toFixed(1)} /{" "}
-                {COMPETITION_POLICY.incumbencyWeight}
-              </dd>
-            </div>
-            <div>
-              <dt>{t("Leading project strength")}</dt>
-              <dd>
-                {m.competition.dominance.toFixed(1)} /{" "}
-                {COMPETITION_POLICY.dominanceWeight}
-              </dd>
-            </div>
-          </dl>
-          <p>
-            {t("Roles in the inspected sample")}: {t("role.direct")}{" "}
-            {m.competition.direct} · {t("role.adjacent")}{" "}
-            {m.competition.adjacent} · {t("role.resource")}{" "}
-            {m.competition.resources} · {t("role.unclear")}{" "}
-            {m.competition.unclear}
-          </p>
-          <p>
-            {t("Matching active projects")}: {m.supply.complete ? "" : "≥"}
-            {number(m.supply.total)} ·{" "}
-            {t("Original search filters shown below.")}
-          </p>
-          <p>
-            {t(
-              m.competition.enumerated
-                ? "All matches in this search scope were inspected."
-                : "The inspected projects form a sample; the displayed pressure is a lower bound.",
-            )}
-          </p>
-          {!!m.competition.unclear && (
-            <p>{t("The range includes projects whose role awaits review.")}</p>
-          )}
-          {m.supply.review?.status === "fallback" && (
-            <p>
-              {t(
-                "Roles use local metadata rules. A refreshed scan can add AI review.",
-              )}
-            </p>
-          )}
-          <p>
-            {t("Top 3 owner attention share")}:{" "}
-            {m.concentration === null
-              ? "—"
-              : (m.concentration * 100).toFixed(0) + "%"}
-          </p>
-        </details>
-      )}
-      <div className="detail-columns">
+      <div id="evidence" className="detail-columns report-evidence">
         <section className="panel demand-panel">
           <div className="panel-title">
             <h3>{t("What demand looks like")}</h3>
@@ -1705,23 +1565,26 @@ function MarketView({
             )}
           </p>
         </section>
-        <details className="panel reasoning-panel">
-          <summary>{t("Method and detailed evidence")}</summary>
-          <div className="panel-title">
-            <h3>{t("Behind the classification")}</h3>
-            <span className="method-tag">v{m.version}</span>
+        <aside className="panel report-reading">
+          <div className="eyebrow">
+            {l("READING THE EVIDENCE", "如何读这些信号")}
           </div>
-          {m.reasons.map((r, i) => (
-            <div className="reason" key={r}>
-              <span>{String(i + 1).padStart(2, "0")}</span>
-              <p>{t(r)}</p>
-            </div>
-          ))}
-          <button className="text-link" onClick={() => navigate("/docs")}>
-            {t("Read the full method")}
-            <ArrowUpRight size={15} />
-          </button>
-        </details>
+          <h3>{l("The facts behind the recommendation", "这份判断的依据")}</h3>
+          {(m.reasons.length ? m.reasons : assessment.facts)
+            .slice(0, 3)
+            .map((f, i) => (
+              <div className="reading-fact" key={f}>
+                <span>{i + 1}</span>
+                <p>{t(f)}</p>
+              </div>
+            ))}
+          <p className="footnote">
+            {l(
+              "Search attention, open-source alternatives and customer demand are distinct research signals. Validate your audience through direct conversations.",
+              "搜索关注度、开源替代项目与客户需求分别提供研究线索。可通过直接交流核实目标用户的需求。",
+            )}
+          </p>
+        </aside>
       </div>
       {!!m.demand.alternatives?.length && (
         <details className="panel">
@@ -1755,7 +1618,7 @@ function MarketView({
           </div>
         </details>
       )}
-      <section className="panel">
+      <section id="projects" className="panel report-projects">
         <div className="panel-title">
           <div>
             <h3>{t("The projects shaping this space")}</h3>
@@ -1957,6 +1820,172 @@ function MarketView({
             />
           </div>
         )}
+      </section>
+      <section id="method" className="report-method">
+        <div className="report-section-heading">
+          <div>
+            <div className="eyebrow">{l("RESEARCH NOTES", "研究记录")}</div>
+            <h3>{l("Scope, sources & method", "范围、来源与方法")}</h3>
+          </div>
+        </div>
+        {m.topic.plan && (
+          <details className="panel query-plan">
+            <summary>
+              {t("How we understood your search")}: {m.topic.plan.input}
+            </summary>
+            <p>{assessment.queryExplanation}</p>
+            <div>
+              <strong>Google Trends</strong>
+              <p>{m.topic.plan.trends.join(" · ")}</p>
+              <strong>GitHub</strong>
+              <p>{(m.topic.queries || [m.topic.query]).join(" · ")}</p>
+            </div>
+            <small>
+              {m.topic.plan.model === "curated"
+                ? t("Curated search scope")
+                : m.topic.plan.model}{" "}
+              · {t("You can edit the demand keyword and scan again.")}
+            </small>
+          </details>
+        )}
+        {m.supply.recovery && (
+          <details className="panel">
+            <summary>
+              {l("AI improved the search coverage", "AI 已优化检索覆盖")}
+            </summary>
+            <p>{m.supply.recovery.explanation[locale]}</p>
+            <p>{m.supply.recovery.addedQueries.join(" · ")}</p>
+          </details>
+        )}
+        <details className="panel">
+          <summary>
+            {l("Search windows & source queries", "搜索窗口与来源查询")}
+          </summary>
+          <div className="research-scope">
+            <span>
+              {t("Measured search term")}: <strong>{m.demand.keyword}</strong>
+            </span>
+            <span>
+              {t("GitHub search scope")}:{" "}
+              {(m.topic.queries || [m.topic.query]).map((q) => (
+                <code key={q}>{q}</code>
+              ))}
+            </span>
+          </div>
+          <div className="search-direction">
+            <strong>
+              {t("Search direction")}:{" "}
+              {t("trend." + (m.metrics.trend || "unknown"))}
+            </strong>
+            <span>
+              {t("Direction basis")}:{" "}
+              {t("basis." + (m.metrics.directionBasis || "recent-windows"))}
+            </span>
+            <span>
+              {t("4-week change")}: {pct(m.metrics.shortGrowth ?? null)}
+            </span>
+            <span>
+              {t("13-week change")}: {pct(m.metrics.quarterGrowth ?? null)}
+            </span>
+          </div>
+          {m.metrics.windows?.main && (
+            <p className="footnote">
+              {t("Measured windows")}:{" "}
+              {m.metrics.windows.main.recentStart.slice(0, 10)}–
+              {m.metrics.windows.main.recentEnd.slice(0, 10)} /{" "}
+              {m.metrics.windows.main.baselineStart.slice(0, 10)}–
+              {m.metrics.windows.main.baselineEnd.slice(0, 10)} (
+              {t("recent / baseline")})
+            </p>
+          )}
+        </details>
+        {m.competition && (
+          <details className="panel competition-evidence">
+            <summary>{t("How competition is assessed")}</summary>
+            <p>
+              {t(
+                "Independent alternatives, maintained project adoption signals, and established leaders determine pressure. Project roles keep resources and integrations in their own groups.",
+              )}
+            </p>
+            <dl className="competition-breakdown">
+              <div>
+                <dt>{t("Independent alternatives")}</dt>
+                <dd>
+                  {m.competition.breadth.toFixed(1)} /{" "}
+                  {COMPETITION_POLICY.breadthWeight}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("Established alternatives")}</dt>
+                <dd>
+                  {m.competition.incumbency.toFixed(1)} /{" "}
+                  {COMPETITION_POLICY.incumbencyWeight}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("Leading project strength")}</dt>
+                <dd>
+                  {m.competition.dominance.toFixed(1)} /{" "}
+                  {COMPETITION_POLICY.dominanceWeight}
+                </dd>
+              </div>
+            </dl>
+            <p>
+              {t("Roles in the inspected sample")}: {t("role.direct")}{" "}
+              {m.competition.direct} · {t("role.adjacent")}{" "}
+              {m.competition.adjacent} · {t("role.resource")}{" "}
+              {m.competition.resources} · {t("role.unclear")}{" "}
+              {m.competition.unclear}
+            </p>
+            <p>
+              {t("Matching active projects")}: {m.supply.complete ? "" : "≥"}
+              {number(m.supply.total)} ·{" "}
+              {t("Original search filters shown below.")}
+            </p>
+            <p>
+              {t(
+                m.competition.enumerated
+                  ? "All matches in this search scope were inspected."
+                  : "The inspected projects form a sample; the displayed pressure is a lower bound.",
+              )}
+            </p>
+            {!!m.competition.unclear && (
+              <p>
+                {t("The range includes projects whose role awaits review.")}
+              </p>
+            )}
+            {m.supply.review?.status === "fallback" && (
+              <p>
+                {t(
+                  "Roles use local metadata rules. A refreshed scan can add AI review.",
+                )}
+              </p>
+            )}
+            <p>
+              {t("Top 3 owner attention share")}:{" "}
+              {m.concentration === null
+                ? "—"
+                : (m.concentration * 100).toFixed(0) + "%"}
+            </p>
+          </details>
+        )}
+        <details className="panel reasoning-panel">
+          <summary>{t("Method and detailed evidence")}</summary>
+          <div className="panel-title">
+            <h3>{t("Behind the classification")}</h3>
+            <span className="method-tag">v{m.version}</span>
+          </div>
+          {m.reasons.map((r, i) => (
+            <div className="reason" key={r}>
+              <span>{String(i + 1).padStart(2, "0")}</span>
+              <p>{t(r)}</p>
+            </div>
+          ))}
+          <button className="text-link" onClick={() => navigate("/docs")}>
+            {t("Read the full method")}
+            <ArrowUpRight size={15} />
+          </button>
+        </details>{" "}
       </section>
     </div>
   );

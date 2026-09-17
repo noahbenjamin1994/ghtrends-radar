@@ -12,6 +12,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Engine, type ScanProgress } from "../core/engine.js";
+import { ProxyUsageClient } from "../providers/proxy-usage.js";
+import { QUERY_PLAN_VERSION } from "../providers/research.js";
 import {
   TOPICS,
   resolveTopic,
@@ -43,6 +45,7 @@ interface Job {
   cacheKey?: string;
 }
 export function createApp(engine = new Engine()) {
+  const proxyUsage = new ProxyUsageClient(engine.store);
   const basePath = process.env.PUBLIC_URL
     ? basePathFromUrl(process.env.PUBLIC_URL)
     : "";
@@ -369,7 +372,7 @@ export function createApp(engine = new Engine()) {
   });
   app.get(
     "/api/admin",
-    safe((q, r) => {
+    safe(async (q, r) => {
       auth.requireAdmin(q);
       const days = Number(q.query.days || 7),
         page = Number(q.query.page || 0),
@@ -391,6 +394,7 @@ export function createApp(engine = new Engine()) {
         return r.status(400).json({ error: "Invalid admin filter." });
       return r.json({
         ...engine.store.adminOverview(days, page, state),
+        proxyUsage: await proxyUsage.overview(days),
         version: ALGORITHM_VERSION,
         queue: [...jobs.values()]
           .filter((j) => j.state === "queued" || j.state === "running")
@@ -696,6 +700,7 @@ export function createApp(engine = new Engine()) {
               geo,
               keyword || "",
               ALGORITHM_VERSION,
+              QUERY_PLAN_VERSION,
             ]),
           )
           .digest("hex");

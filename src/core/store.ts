@@ -7,6 +7,7 @@ import { resolveTopic } from "./topics.js";
 import type { Market, Repo } from "./types.js";
 import {
   operationContext,
+  tokenCount,
   type ProviderCall,
   type RunRecord,
   type RunState,
@@ -48,6 +49,20 @@ export class Store {
       CREATE INDEX IF NOT EXISTS provider_calls_run ON provider_calls(run_id);
       CREATE INDEX IF NOT EXISTS provider_calls_user ON provider_calls(user_id,started);
     `);
+    const columns = this.db
+      .prepare("PRAGMA table_info(provider_calls)")
+      .all() as { name: string }[];
+    for (const [name, type] of [
+      ["transfer_bytes", "INTEGER"],
+      ["proxy_route", "TEXT"],
+    ])
+      if (!columns.some((c) => c.name === name))
+        this.db.exec(`ALTER TABLE provider_calls ADD COLUMN ${name} ${type}`);
+    this.db
+      .prepare(
+        "INSERT OR IGNORE INTO operations_meta VALUES('traffic_since',?)",
+      )
+      .run(new Date().toISOString());
     this.db
       .prepare("INSERT OR IGNORE INTO operations_meta VALUES('since',?)")
       .run(new Date().toISOString());
@@ -112,7 +127,7 @@ export class Store {
     const context = operationContext.getStore();
     this.db
       .prepare(
-        "INSERT INTO provider_calls(run_id,user_id,provider,operation,started,duration_ms,cached,status,error,model,input_tokens,output_tokens,cached_tokens,cost_usd,rate_bucket,rate_remaining,rate_reset) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO provider_calls(run_id,user_id,provider,operation,started,duration_ms,cached,status,error,model,input_tokens,output_tokens,cached_tokens,cost_usd,rate_bucket,rate_remaining,rate_reset,transfer_bytes,proxy_route) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
       )
       .run(
         context?.runId ?? null,
@@ -132,6 +147,8 @@ export class Store {
         c.rateBucket ?? null,
         c.rateRemaining ?? null,
         c.rateReset ?? null,
+        tokenCount(c.transferBytes) ?? null,
+        c.proxyRoute ?? null,
       );
   }
   startRun(r: RunRecord) {
@@ -215,6 +232,35 @@ export class Store {
       retentionDays: this.retentionDays,
       days,
       page,
+      traffic: {
+        since: (
+          this.db
+            .prepare(
+              "SELECT value FROM operations_meta WHERE key='traffic_since'",
+            )
+            .get() as { value: string }
+        ).value,
+        today: this.db
+          .prepare(
+            "SELECT SUM(transfer_bytes) AS bytes,COUNT(*) AS requests,SUM(CASE WHEN transfer_bytes IS NOT NULL THEN 1 ELSE 0 END) AS measuredRequests FROM provider_calls WHERE proxy_route IS NOT NULL AND started>=?",
+          )
+          .get(new Date().toISOString().slice(0, 10)),
+        period: this.db
+          .prepare(
+            "SELECT SUM(transfer_bytes) AS bytes,COUNT(*) AS requests,COUNT(DISTINCT run_id) AS scans,SUM(CASE WHEN run_id IS NOT NULL THEN transfer_bytes END)*1.0/NULLIF(COUNT(DISTINCT run_id),0) AS averageScanBytes,SUM(CASE WHEN error IS NOT NULL THEN 1 ELSE 0 END) AS errors,SUM(CASE WHEN transfer_bytes IS NOT NULL THEN 1 ELSE 0 END) AS measuredRequests FROM provider_calls WHERE proxy_route IS NOT NULL AND started>=?",
+          )
+          .get(since),
+        daily: this.db
+          .prepare(
+            "SELECT substr(started,1,10) AS day,SUM(transfer_bytes) AS bytes,COUNT(*) AS requests FROM provider_calls WHERE proxy_route IS NOT NULL AND started>=? GROUP BY day ORDER BY day",
+          )
+          .all(since),
+        routes: this.db
+          .prepare(
+            "SELECT proxy_route AS route,COUNT(*) AS requests,SUM(CASE WHEN status BETWEEN 200 AND 299 AND error IS NULL THEN 1 ELSE 0 END) AS successes,SUM(CASE WHEN status=429 THEN 1 ELSE 0 END) AS throttled,AVG(duration_ms) AS averageMs,SUM(transfer_bytes) AS bytes FROM provider_calls WHERE proxy_route IS NOT NULL AND started>=? GROUP BY proxy_route",
+          )
+          .all(since),
+      },
       totals: this.db
         .prepare(
           "SELECT (SELECT COUNT(*) FROM users) AS users,(SELECT COUNT(*) FROM markets) AS reports,(SELECT COUNT(*) FROM report_visibility WHERE public=0) AS privateReports,(SELECT page_count*page_size FROM pragma_page_count(),pragma_page_size()) AS databaseBytes",

@@ -385,3 +385,190 @@ test("synonyms use separate normalization and choose usable coverage, never the 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("sparse query recovery preserves scope, escapes query construction, deduplicates and caches", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-repair-")),
+    store = new Store(dir),
+    old = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = "unit";
+  try {
+    const research = new Research(store),
+      m: Market = JSON.parse(
+        readFileSync(new URL("../public/seed.json", import.meta.url), "utf8"),
+      )[0];
+    const topic = {
+      ...m.topic,
+      scope: "category" as const,
+      keyword: "cat translator app",
+      description: "A cat vocalization translator app",
+      queries: ['"cat translator app" in:name,description'],
+    };
+    let calls = 0;
+    research.json = async () => {
+      calls++;
+      return {
+        terms: ["cat translator", "meow translator"],
+        explanation: {
+          en: "Retrieve equivalent names for cat translation apps.",
+          zh: "补充猫语翻译应用的常见名称。",
+        },
+      };
+    };
+    const repaired = await research.repairQueries(topic, {
+      ...m.supply,
+      total: 0,
+      repositories: [],
+      error: undefined,
+    });
+    assert.equal(repaired?.topic.keyword, "cat translator app");
+    assert.equal(repaired?.topic.description, topic.description);
+    assert.equal(repaired?.topic.queries?.length, 3);
+    await research.repairQueries(topic, m.supply);
+    assert.equal(calls, 1);
+    research.json = async () => ({
+      terms: ['cat" OR stars:>1'],
+      explanation: { en: "x", zh: "x" },
+    });
+    assert.equal(
+      await research.repairQueries(
+        { ...topic, description: "new scope" },
+        m.supply,
+      ),
+      null,
+    );
+    assert.equal(
+      await research.repairQueries({ ...topic, scope: "field" }, m.supply),
+      null,
+    );
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+    if (old === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = old;
+  }
+});
+test("one failed relevance batch preserves source-quoted reviews from the other batches", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-batches-")),
+    store = new Store(dir),
+    old = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = "unit";
+  try {
+    const research = new Research(store),
+      m: Market = JSON.parse(
+        readFileSync(new URL("../public/seed.json", import.meta.url), "utf8"),
+      )[0];
+    const repos = Array.from({ length: 45 }, (_, i) => ({
+      ...m.supply.repositories[0]!,
+      name: `team${i}/project`,
+      description: `Usable software for task ${i}`,
+    }));
+    let sizes: number[] = [];
+    research.json = async (_s, input: any) => {
+      sizes.push(input.projects.length);
+      if (input.projects[0].id === "team20/project") throw new Error("timeout");
+      return {
+        projects: input.projects.map((p: any) => ({
+          id: p.id,
+          role: "direct",
+          quote: p.description,
+        })),
+      };
+    };
+    const result = await research.reviewSupply(m.topic, {
+      ...m.supply,
+      repositories: repos,
+      error: undefined,
+    });
+    assert.deepEqual(sizes, [20, 20, 5]);
+    assert.equal(result.review?.reviewed, 25);
+    assert.equal(result.review?.status, "partial");
+    assert.equal(
+      result.repositories.filter((r) => r.relevance?.method === "model").length,
+      25,
+    );
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+    if (old === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = old;
+  }
+});
+
+test("pipeline retries sparse supply once, preserves successful evidence on repair failure, and saves to its owner", async () => {
+  const { Engine } = await import("../src/core/engine.js");
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-repair-flow-")),
+    old = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = "unit";
+  const engine = new Engine(new Store(dir));
+  try {
+    const m: Market = JSON.parse(
+      readFileSync(new URL("../public/seed.json", import.meta.url), "utf8"),
+    )[0];
+    const topic = {
+      ...m.topic,
+      scope: "category" as const,
+      keyword: "cat translator app",
+      query: '"cat translator app" in:name,description',
+      queries: ['"cat translator app" in:name,description'],
+    };
+    engine.research.plan = async () => topic;
+    engine.trends.demand = async () => m.demand;
+    engine.github.gaps = async () => [];
+    engine.research.brief = async () => {
+      throw new Error("optional brief");
+    };
+    engine.research.reviewSupply = async (_topic, s) => s;
+    engine.research.repairQueries = async () => ({
+      topic: {
+        ...topic,
+        queries: [...topic.queries, '"cat translator" in:name,description'],
+      },
+      explanation: { en: "Equivalent product naming.", zh: "补充同用途名称。" },
+    });
+    let calls = 0,
+      fail = false;
+    engine.github.supply = async (t) => {
+      calls++;
+      if (t.queries!.length === 1)
+        return {
+          ...m.supply,
+          total: 0,
+          repositories: [],
+          complete: true,
+          error: undefined,
+        };
+      return {
+        ...m.supply,
+        total: 1,
+        repositories: [m.supply.repositories[0]!],
+        complete: true,
+        error: fail ? "upstream" : undefined,
+      };
+    };
+    const result = await engine.scan("小猫语言翻译app", {
+      private: true,
+      owner: "alice",
+    });
+    assert.equal(calls, 2);
+    assert.equal(result.supply.total, 1);
+    assert.deepEqual(result.supply.recovery?.addedQueries, [
+      '"cat translator" in:name,description',
+    ]);
+    assert.equal(engine.store.canRead(result.id, "alice"), true);
+    assert.equal(engine.store.canRead(result.id, "other"), false);
+    fail = true;
+    const failed = await engine.scan("小猫语言翻译app", {
+      private: true,
+      owner: "alice",
+      refresh: true,
+    });
+    assert.equal(failed.supply.total, 0);
+    assert.equal(failed.supply.error, undefined);
+    assert.equal(calls, 4);
+  } finally {
+    await engine.close();
+    rmSync(dir, { recursive: true, force: true });
+    if (old === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = old;
+  }
+});

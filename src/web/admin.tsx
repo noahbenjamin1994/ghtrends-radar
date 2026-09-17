@@ -4,12 +4,19 @@ import { api } from "./api.js";
 import { locale } from "./i18n.js";
 import { Loading, Empty } from "./components.js";
 import { SignInGate, type Account } from "./account.js";
+import type { ProxyUsage } from "../providers/proxy-usage.js";
 const l = (en: string, zh: string) => (locale === "zh" ? zh : en);
 const n = (x: number | null | undefined) =>
   x == null ? "—" : Math.round(x).toLocaleString();
 const money = (x: number | null) => (x == null ? "—" : "$" + x.toFixed(5));
 const date = (s: string) =>
   new Date(s).toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
+const bytes = (v: number | null) =>
+  v === null
+    ? "—"
+    : v >= 1e9
+      ? (v / 1e9).toFixed(2) + " GB"
+      : (v / 1e6).toFixed(2) + " MB";
 const labels: Record<string, string> = {
   queued: l("Queued", "排队中"),
   running: l("Running", "进行中"),
@@ -18,6 +25,28 @@ const labels: Record<string, string> = {
   interrupted: l("Interrupted", "重启中断"),
 };
 interface AdminData {
+  proxyUsage: ProxyUsage;
+  traffic: {
+    since: string;
+    today: { bytes: number | null; requests: number; measuredRequests: number };
+    period: {
+      bytes: number | null;
+      requests: number;
+      scans: number;
+      averageScanBytes: number | null;
+      errors: number;
+      measuredRequests: number;
+    };
+    daily: { day: string; bytes: number; requests: number }[];
+    routes: {
+      route: string;
+      requests: number;
+      successes: number;
+      throttled: number;
+      averageMs: number;
+      bytes: number | null;
+    }[];
+  };
   engagement: {
     since: string;
     events: { event: string; count: number }[];
@@ -213,6 +242,232 @@ export function AdminView({ account }: { account: Account | null }) {
         !error && <Loading />
       ) : (
         <>
+          <section className="proxy-overview panel">
+            <div className="panel-title">
+              <div>
+                <div className="eyebrow">GOOGLE TRENDS / DECODO</div>
+                <h2>
+                  {l("Proxy traffic & reliability", "代理流量与采集质量")}
+                </h2>
+              </div>
+              <a
+                href="https://dashboard.decodo.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-link"
+              >
+                {l("Decodo dashboard ↗", "Decodo 账单 ↗")}
+              </a>
+            </div>
+            <div className="metric-grid proxy-metrics">
+              <div>
+                <span>{l("Plan remaining", "套餐剩余")}</span>
+                <strong>
+                  {data.proxyUsage.subscription
+                    ? data.proxyUsage.subscription.remainingGb.toFixed(2) +
+                      " GB"
+                    : "—"}
+                </strong>
+                <small>
+                  {data.proxyUsage.subscription
+                    ? l("of ", "套餐总量 ") +
+                      data.proxyUsage.subscription.totalGb.toFixed(2) +
+                      " GB"
+                    : l(
+                        "Connect the management API for balance",
+                        "接入管理 API 后显示余额",
+                      )}
+                </small>
+              </div>
+              <div>
+                <span>{l("Billed today · UTC", "今日计费流量 · UTC")}</span>
+                <strong>
+                  {bytes(
+                    data.proxyUsage.traffic
+                      ? (data.proxyUsage.traffic.daily.find(
+                          (d) =>
+                            d.day === new Date().toISOString().slice(0, 10),
+                        )?.bytes ?? 0)
+                      : null,
+                  )}
+                </strong>
+                <small>
+                  {l(
+                    "Decodo account · uploads + downloads",
+                    "Decodo 账号 · 上传与下载合计",
+                  )}
+                </small>
+              </div>
+              <div>
+                <span>
+                  {l("HTTP bytes per research", "单次研究 HTTP 流量")}
+                </span>
+                <strong>{bytes(data.traffic.period.averageScanBytes)}</strong>
+                <small>
+                  {l(
+                    "Measured transfers · TLS billed separately",
+                    "实测传输量 · 计费另含 TLS 开销",
+                  )}
+                </small>
+              </div>
+              <div>
+                <span>{l("Proxy request success", "代理请求成功率")}</span>
+                <strong>
+                  {data.traffic.period.requests
+                    ? (
+                        ((data.traffic.period.requests -
+                          data.traffic.period.errors) /
+                          data.traffic.period.requests) *
+                        100
+                      ).toFixed(1) + "%"
+                    : "—"}
+                </strong>
+                <small>
+                  {data.configuration.trends.routes || 1}{" "}
+                  {l("sticky sessions", "个粘性会话")} ·{" "}
+                  {data.configuration.trends.coolingRoutes || 0}{" "}
+                  {l("cooling down", "个等待恢复")}
+                </small>
+              </div>
+            </div>
+            {data.proxyUsage.subscription && (
+              <div
+                className="usage-track"
+                role="meter"
+                aria-label={l("Plan traffic used", "套餐已用流量")}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.min(
+                  100,
+                  (data.proxyUsage.subscription.usedGb /
+                    Math.max(0.001, data.proxyUsage.subscription.totalGb)) *
+                    100,
+                )}
+              >
+                <span
+                  style={{
+                    width:
+                      Math.min(
+                        100,
+                        (data.proxyUsage.subscription.usedGb /
+                          Math.max(
+                            0.001,
+                            data.proxyUsage.subscription.totalGb,
+                          )) *
+                          100,
+                      ) + "%",
+                  }}
+                />
+              </div>
+            )}
+            <p className="footnote">
+              {data.proxyUsage.state === "setup"
+                ? l(
+                    "Add DECODO_API_KEY to the server environment to connect official usage. Local HTTP measurements are already active.",
+                    "在服务端配置 DECODO_API_KEY 即可接入官方用量。本地 HTTP 流量统计已启用。",
+                  )
+                : data.proxyUsage.state === "refreshing"
+                  ? l(
+                      "Official usage is awaiting synchronization. The last recorded snapshot stays visible.",
+                      "官方用量等待同步，当前保留最近记录的快照。",
+                    )
+                  : l(
+                      "Official figures cover this Decodo account and refresh every 15 minutes.",
+                      "官方数据覆盖整个 Decodo 账号，每 15 分钟刷新。",
+                    )}
+              {data.proxyUsage.fetchedAt && (
+                <> · {date(data.proxyUsage.fetchedAt)}</>
+              )}
+              {data.proxyUsage.subscription?.validUntil && (
+                <>
+                  {" · "}
+                  {l("Plan valid through ", "套餐有效期至 ")}
+                  {data.proxyUsage.subscription.validUntil.slice(0, 10)}
+                </>
+              )}
+            </p>
+            <div className="proxy-detail-grid">
+              <div>
+                <h3>{l("Daily billed traffic", "每日计费流量")}</h3>
+                <div className="traffic-bars">
+                  {(data.proxyUsage.traffic?.daily || []).map((d) => (
+                    <div
+                      key={d.day}
+                      title={`${d.day}: ${bytes(d.bytes)} · ${d.requests} requests`}
+                    >
+                      <span>{bytes(d.bytes)}</span>
+                      <i
+                        style={{
+                          height: Math.max(
+                            3,
+                            (90 * d.bytes) /
+                              Math.max(
+                                1,
+                                ...data.proxyUsage.traffic!.daily.map(
+                                  (x) => x.bytes,
+                                ),
+                              ),
+                          ),
+                        }}
+                      />
+                      <small>{d.day.slice(5)}</small>
+                    </div>
+                  ))}
+                </div>
+                {!data.proxyUsage.traffic && (
+                  <p className="muted">
+                    {l(
+                      "Official daily totals appear after connection.",
+                      "接入后显示官方每日消耗曲线。",
+                    )}
+                  </p>
+                )}
+              </div>
+              <div>
+                <h3>{l("Session health", "会话状态")}</h3>
+                <div className="admin-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>{l("Session", "会话")}</th>
+                        <th>{l("Success", "成功")}</th>
+                        <th>429</th>
+                        <th>{l("HTTP traffic", "HTTP 流量")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.traffic.routes.map((r) => (
+                        <tr key={r.route}>
+                          <th>
+                            {r.route === "primary"
+                              ? l("Primary", "主会话")
+                              : l("Backup", "备用会话")}
+                          </th>
+                          <td>
+                            {r.successes}/{r.requests}
+                          </td>
+                          <td>{r.throttled}</td>
+                          <td>{bytes(r.bytes)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="footnote">
+                  {l("HTTP measurement began ", "HTTP 流量开始统计于 ")}
+                  {date(data.traffic.since)} · {l("today ", "今日 ")}
+                  {bytes(data.traffic.today.bytes)}
+                  {data.configuration.trends.retryAt && (
+                    <>
+                      {" "}
+                      · {l("Recovery ", "恢复于 ")}
+                      {date(data.configuration.trends.retryAt)}
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+          </section>
           <p className="admin-note">
             {l("Recording began", "记录开始于")} {date(data.recordedSince)}.{" "}
             {l(
@@ -433,7 +688,11 @@ export function AdminView({ account }: { account: Account | null }) {
                             ? l("Query planning", "搜索词整理")
                             : m.operation === "relevance"
                               ? l("Project relevance", "项目相关性")
-                              : l("Research brief", "简短报告")}
+                              : m.operation === "query-repair"
+                                ? l("Query refinement", "检索修复")
+                                : m.operation === "brief-rewrite"
+                                  ? l("Brief review", "报告校验")
+                                  : l("Research brief", "简短报告")}
                         </small>
                       </th>
                       <td>
@@ -639,11 +898,12 @@ export function AdminView({ account }: { account: Account | null }) {
               <dt>{l("Trends connection", "Trends 采集连接")}</dt>
               <dd>
                 {data.configuration.trends.proxy
-                  ? l("Fixed proxy", "固定代理")
+                  ? l("Residential proxy", "住宅代理")
                   : l("Direct", "直连")}{" "}
                 · {data.configuration.trends.region}
                 {" · "}
-                {data.configuration.trends.routes || 1} {l("routes", "个出口")}
+                {data.configuration.trends.routes || 1}{" "}
+                {l("sticky sessions", "个粘性会话")}
                 {!!data.configuration.trends.coolingRoutes && (
                   <>
                     {" "}

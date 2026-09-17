@@ -57,7 +57,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.11.2/ghtrends-radar-0.11.2.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.12.0/ghtrends-radar-0.12.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -194,13 +194,15 @@ Restart after changing deployment configuration. There is no hosted administrato
 
 AI usage recording begins at upgrade: earlier consumption is **unknown**. Missing usage on failed responses also stays unknown. Optional `GHTRENDS_LLM_PRICING_JSON` maps each requested model to USD per million token rates: `{"your-model":{"input":0.3,"cachedInput":0.006,"output":1.2}}` (illustration only, verify your provider's current prices). An optional `offPeakMultiplier` follows DeepSeek's Monday–Friday 01:00–04:00 / 06:00–10:00 UTC peak schedule. Omit it for flat pricing. Per-call estimates are saved at request time, exclude unpriced calls, and are **not invoices**. [Provider pricing](https://api-docs.deepseek.com/quick_start/pricing/) and [usage fields](https://api-docs.deepseek.com/api/create-chat-completion/).
 
+With `DECODO_API_KEY` configured on the server, administration also shows the official residential plan balance, expiry and daily billed traffic. It refreshes every 15 minutes and retains the last successful reading during provider recovery. Separate HTTP measurements show compressed traffic per research run, request success and 429 counts by primary/backup route. These measurements begin at upgrade and cover HTTP payloads and headers; official provider accounting includes its own overhead and remains the billing reference. Proxy credentials and the management API key stay on the server.
+
 ## How the method works
 
 ### Competition pressure · method 2.0.0
 
 GitHub searches use topics and specific name/description phrases. Initial coverage includes original, active repositories with at least **1 star and a push within 365 days**. Each query returns up to 100 leaders; overlapping results are deduplicated. An exact search count and an enumerated project sample are separate properties. Known categories keep their published query scope; compound requirements use topic intersections.
 
-Projects are classified as **direct alternatives, adjacent integrations, resources, or awaiting review**. An optional model reviews the top 60 project descriptions, with a verified verbatim source quotation for each accepted result. Invalid or ambiguous review items retain local metadata rules. Reports show every project's role, quote and review method. Direct alternatives are grouped by GitHub owner as a proxy for independent teams; each owner's strongest project contributes to three components:
+Projects are classified as **direct alternatives, adjacent integrations, resources, or awaiting review**. An optional model reviews the top 60 project descriptions in three bounded batches, with a verified verbatim source quotation for each accepted result. Successful batches remain useful when another batch needs source review. Invalid or ambiguous review items retain local metadata rules. Reports show every project's role, quote and review method. Direct alternatives are grouped by GitHub owner as a proxy for independent teams; each owner's strongest project contributes to three components:
 
 - **Breadth, up to 50 points:** `50 × (1 − exp(−effectiveTeams / 12))`. Team weights combine log-scaled stars, forks and maintenance.
 - **Established alternatives, up to 30 points:** `30 × (1 − exp(−2 × sum(maturity)))`. Maturity combines project age, stars, forks and maintenance.
@@ -209,6 +211,8 @@ Projects are classified as **direct alternatives, adjacent integrations, resourc
 The operational reference line is **45/100**, with lower confidence within 5 points. A lower bound at or above 45 supports established competition even from a partial sample. Limited competition requires complete enumeration of the displayed scope, at least one direct alternative, and an upper bound below 45 after including projects awaiting review. Truncated samples show `≥ score`; complete samples can show a role-uncertainty interval. Zero direct matches prompt further research. See [the exact weights and equations](src/core/competition.ts).
 
 These versioned heuristics describe **observed open-source competition**. Stars indicate developer attention, forks indicate reuse, and owners approximate teams. Commercial products, customer adoption and willingness to pay deserve separate evidence. Broad fields and physical-product markets receive a field overview and guidance toward a concrete software workflow.
+
+For sparse candidate results, DeepSeek can refine the search once using equivalent product names within the original task. Generic delivery words such as “app” can be omitted from exact GitHub phrases; subject and feature requirements remain explicit. The report retains original and added queries. Search evidence, competition coverage and the recommendation appear separately, so a useful observed signal leads to a concrete next step even while the landscape remains provisional.
 
 ### Search direction
 

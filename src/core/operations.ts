@@ -20,6 +20,8 @@ export interface ProviderCall {
   rateBucket?: string;
   rateRemaining?: number;
   rateReset?: number;
+  transferBytes?: number;
+  proxyRoute?: "primary" | "backup";
 }
 export interface RunRecord {
   id: string;

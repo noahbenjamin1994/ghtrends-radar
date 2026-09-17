@@ -67,8 +67,36 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
     );
   let title = t(m.headline),
     summary = t(m.strategy);
+  const l = (en: string, zh: string) => (locale === "zh" ? zh : en);
   if (provisional) {
-    if (m.metrics.trend === "mixed") {
+    if (searchReady && m.metrics.trend === "falling") {
+      title = l(
+        "Search is cooling. Start with a focused test.",
+        "搜索热度回落，先做轻量验证",
+      );
+      summary = l(
+        "Recent search attention is falling. Test one specific use case with a small prototype; use the observed projects and customer conversations to choose your investment.",
+        "近期搜索关注度呈下降趋势。先用小原型验证一个具体场景，再结合现有项目和用户反馈决定投入。",
+      );
+    } else if (searchReady && m.metrics.trend === "rising") {
+      title = l(
+        "Attention is rising. Find your entry point.",
+        "搜索关注度上升，寻找具体切入点",
+      );
+      summary = l(
+        "Growing search attention provides a research lead. Compare alternatives for one audience and test a focused offer while expanding competition coverage.",
+        "搜索增长提供了值得跟进的线索。围绕一类用户比较替代方案，测试具体产品，并继续补充竞品覆盖。",
+      );
+    } else if (searchReady && m.metrics.trend === "stable") {
+      title = l(
+        "Steady attention. Win a specific use case.",
+        "关注度平稳，从具体场景切入",
+      );
+      summary = l(
+        "Search attention is steady. Focus on a recurring task and a clear improvement over the way people solve it today.",
+        "搜索关注度保持平稳。优先选择反复发生的任务，验证相对现有做法的明确提升。",
+      );
+    } else if (m.metrics.trend === "mixed") {
       title = t("Mixed search signals");
       summary = t(
         "The time windows or related search terms disagree. Narrow the use case and compare the original curves before making a market claim.",
@@ -188,9 +216,33 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
   return {
     searchReady,
     demandNote,
-    landscape: t(
-      m.topic.scope === "field" ? "Field overview" : MARKET_LABELS[m.kind],
-    ),
+    landscape:
+      m.topic.scope === "field"
+        ? t("Field overview")
+        : provisional && searchReady
+          ? l(
+              (
+                {
+                  rising: "Growth signal",
+                  falling: "Cooling search",
+                  stable: "Steady interest",
+                  mixed: "Diverging signals",
+                  unknown: "Research outlook",
+                } as const
+              )[m.metrics.trend || "unknown"],
+              (
+                {
+                  rising: "增长信号",
+                  falling: "需求降温",
+                  stable: "平稳市场",
+                  mixed: "分化市场",
+                  unknown: "研究判断",
+                } as const
+              )[m.metrics.trend || "unknown"],
+            )
+          : provisional
+            ? l("Research outlook", "研究判断")
+            : t(MARKET_LABELS[m.kind]),
     level: provisional ? ("provisional" as const) : ("measured" as const),
     title,
     summary,
@@ -205,9 +257,17 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
     ),
     narrative:
       m.brief &&
-      [m.brief[locale].summary, ...m.brief[locale].nextSteps].every(
+      [
+        m.brief[locale].headline || "",
+        m.brief[locale].summary,
+        ...m.brief[locale].nextSteps,
+      ].every(
         (v) =>
           !hasNegativeWording(v) &&
+          !new RegExp(
+            `(?:across|over|throughout)\\s+${m.metrics.points}\\b|在\\s*${m.metrics.points}\\s*(?:个|周)`,
+            "i",
+          ).test(v) &&
           (!!recoveryTime || !hasRecoveryTimeReference(v)),
       )
         ? { ...m.brief[locale], kind: "ai" as const }
