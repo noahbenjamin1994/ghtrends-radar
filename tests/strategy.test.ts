@@ -1057,3 +1057,26 @@ test("Issue interpretation accepts only real request identities and exact quotes
     assert.equal(result.length, 1);
     assert.equal(result[0].sourceId, "I1");
   }));
+
+test("the selected open-source direction can provide the strategy's documented premise", () => {
+  const sources = strategySources(
+    seed,
+    documents.map((d) => ({ ...d, kind: "project" as const })),
+  );
+  const data = sample();
+  data.evidence = [];
+  data.opportunities[0]!.route = "opensource";
+  data.opportunities[0]!.basedOn = [
+    {
+      id: "R1",
+      quote: "Export preserves document text and discards review comments.",
+    },
+  ];
+  assert.deepEqual(strategyProblems(data, sources, seed), []);
+  data.opportunities[0]!.basedOn = [];
+  assert.ok(
+    strategyProblems(data, sources, seed).some((p) =>
+      p.startsWith("Ground the factual premise"),
+    ),
+  );
+});

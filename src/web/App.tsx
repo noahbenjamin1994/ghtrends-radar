@@ -1891,8 +1891,9 @@ function MarketView({
           <div>
             <h3>{t("Listen to what’s missing")}</h3>
             <p>
-              {t(
-                "Open issues with community reactions. These are leads to investigate, not proven product opportunities.",
+              {l(
+                "Public requests from relevant projects. Review the original report and current version.",
+                "来自相关项目的公开请求，结合原文与当前版本继续核对。",
               )}
             </p>
           </div>

@@ -142,7 +142,11 @@ export function strategyProblems(
         s.kind === "request" ||
         /^(?:[RI]\d|A\dR)/.test(s.id || ""),
     ) &&
-    !data.evidence.some((ref) =>
+    ![
+      ...data.evidence,
+      ...(data.opportunities.find((o) => o.id === data.recommendedId)
+        ?.basedOn || []),
+    ].some((ref) =>
       sources.some(
         (s) =>
           s.id === ref.id &&
