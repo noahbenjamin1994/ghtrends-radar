@@ -220,12 +220,16 @@ export function App() {
       })
       .catch((e) => setError(e.message));
   };
-  const scan = async (input: string, demandKeyword?: string) => {
+  const scan = async (input: string, demandKeyword?: string, region = geo) => {
     if (!input.trim()) return;
     if (!account?.user) {
       sessionStorage.setItem(
         "ghtrends:draft",
-        JSON.stringify({ input, keyword: demandKeyword || keyword, geo }),
+        JSON.stringify({
+          input,
+          keyword: demandKeyword || keyword,
+          geo: region,
+        }),
       );
       signIn("/");
       return;
@@ -240,7 +244,7 @@ export function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           topic: input,
-          geo,
+          geo: region,
           keyword: demandKeyword || keyword.trim() || undefined,
         }),
       });
@@ -1140,7 +1144,7 @@ function MarketView({
   navigate: (s: string) => void;
   watch: string[];
   onWatch: (s: string) => void;
-  onScan: (s: string, keyword?: string) => void;
+  onScan: (s: string, keyword?: string, region?: string) => void;
   account: Account | null;
 }) {
   const [m, setM] = useState<Market | null>(null),
@@ -1238,7 +1242,11 @@ function MarketView({
           <button
             className="button secondary"
             onClick={() =>
-              onScan(m.topic.plan?.input || m.topic.slug, m.topic.keyword)
+              onScan(
+                m.topic.plan?.input || m.topic.slug,
+                m.topic.keyword,
+                m.geo,
+              )
             }
           >
             {t("Run an updated scan")}
@@ -1252,7 +1260,9 @@ function MarketView({
             {m.geo || t("WORLDWIDE")}
           </div>
           <h1>
-            {locale === "zh" && m.topic.plan
+            {locale === "zh" &&
+            m.topic.plan &&
+            m.topic.plan.input !== m.topic.slug
               ? m.topic.plan.input
               : t(m.topic.name)}
           </h1>
@@ -1267,7 +1277,11 @@ function MarketView({
             <button
               className="button subtle"
               onClick={() =>
-                onScan(m.topic.plan?.input || m.topic.slug, m.topic.keyword)
+                onScan(
+                  m.topic.plan?.input || m.topic.slug,
+                  m.topic.keyword,
+                  m.geo,
+                )
               }
             >
               <RefreshCw size={14} />
@@ -2516,7 +2530,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.12.0/ghtrends-radar-0.12.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.12.1/ghtrends-radar-0.12.1.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}
