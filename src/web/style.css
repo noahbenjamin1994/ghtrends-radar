@@ -4411,24 +4411,11 @@ footer small {
 .report-outlook {
   --outlook-accent: #587367;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 290px;
-  gap: 64px;
+  grid-template-columns: minmax(0, 1fr) 342px;
+  gap: 48px;
   padding: 40px 42px;
-  background: #f5f7f3;
+  background: var(--outlook-wash, #f5f7f3);
   border-radius: 16px;
-}
-.report-outlook.quiet {
-  background: #f4f5f7;
-  --outlook-accent: #5f7095;
-}
-.report-outlook.contested,
-.report-outlook.expanding {
-  background: #faf5ef;
-  --outlook-accent: #9c6849;
-}
-.report-outlook.blue {
-  background: #eff6f7;
-  --outlook-accent: #227c87;
 }
 .outlook-meta {
   display: flex;
@@ -4439,7 +4426,7 @@ footer small {
   color: #666c64;
 }
 .outlook-copy h2 {
-  font-size: clamp(25px, 2.8vw, 38px);
+  font-size: clamp(25px, 2.5vw, 34px);
   font-weight: 560;
   line-height: 1.38;
   letter-spacing: -0.025em;
@@ -4461,29 +4448,56 @@ footer small {
   color: #72766e;
 }
 .outlook-signal {
-  border-left: 1px solid #dce2d8;
-  padding-left: 34px;
+  border-left: 1px solid
+    color-mix(in srgb, var(--outlook-accent) 15%, transparent);
+  padding-left: 32px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-width: 0;
 }
-.outlook-signal .eyebrow {
-  margin-bottom: 0;
-  color: var(--outlook-accent);
-  font-size: 10px;
-  letter-spacing: 0.15em;
-}
-.outlook-signal > strong {
-  font-size: 58px;
-  line-height: 1.25;
-  letter-spacing: -0.06em;
-  font-weight: 500;
-  margin: 13px 0 6px;
-}
-.outlook-signal > span {
+.outlook-verdict-caption {
   font-size: 11px;
+  color: #77716a;
+}
+.outlook-verdict h3 {
+  color: var(--outlook-accent);
+  font-size: 56px;
+  font-weight: 650;
+  letter-spacing: -0.05em;
+  line-height: 1.14;
+  margin: 16px 0 14px;
+  text-wrap: balance;
+}
+.outlook-verdict p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--outlook-accent);
+  margin: 0 0 32px;
+}
+.outlook-momentum {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  border-top: 1px solid
+    color-mix(in srgb, var(--outlook-accent) 15%, transparent);
+  padding-top: 20px;
+  font-size: 12px;
+  color: #716e68;
+}
+.outlook-momentum strong {
+  font-size: 34px;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+  font-weight: 550;
+}
+.outlook-window {
+  font-size: 11px;
+  line-height: 1.6;
   color: #6d726a;
+  margin: 8px 0 12px;
 }
 .outlook-signal svg {
   max-width: 100%;
@@ -4744,12 +4758,17 @@ footer small {
   border-radius: 4px 4px 0 0;
   background: #b5c7b0;
 }
-@media (max-width: 800px) {
+@media (max-width: 960px) {
   .report-outlook {
-    grid-template-columns: minmax(0, 1fr) 220px;
+    grid-template-columns: minmax(0, 1fr) 270px;
     gap: 30px;
     padding: 30px;
   }
+  .outlook-verdict h3 {
+    font-size: 44px;
+  }
+}
+@media (max-width: 800px) {
   .report-page .detail-heading {
     align-items: flex-start;
     flex-direction: column;
@@ -4766,7 +4785,7 @@ footer small {
     font-size: 28px;
   }
 }
-@media (max-width: 560px) {
+@media (max-width: 720px) {
   .report-nav {
     flex-wrap: wrap;
     gap: 12px 20px;
@@ -4788,12 +4807,20 @@ footer small {
     font-size: 14px;
   }
   .outlook-signal {
+    order: -1;
     border-left: 0;
-    border-top: 1px solid #dce2d8;
-    padding: 22px 0 0;
+    border-bottom: 1px solid
+      color-mix(in srgb, var(--outlook-accent) 15%, transparent);
+    padding: 0 0 22px;
   }
-  .outlook-signal > strong {
-    font-size: 46px;
+  .outlook-verdict h3 {
+    font-size: clamp(38px, 11vw, 52px);
+  }
+  .outlook-verdict p {
+    margin-bottom: 20px;
+  }
+  .outlook-momentum strong {
+    font-size: 32px;
   }
   .outlook-signal > svg {
     max-height: 70px;

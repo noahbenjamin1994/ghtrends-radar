@@ -59,7 +59,11 @@ import {
   topicColor,
 } from "./components.js";
 import { downloadCard } from "./export.js";
-import { marketAssessment, competitionPressure } from "../core/assessment.js";
+import {
+  marketAssessment,
+  competitionPressure,
+  outlookPresentation,
+} from "../core/assessment.js";
 import { resolveTopic } from "../core/topics.js";
 import type { ScanProgress } from "../core/engine.js";
 import { completeWeeklySeries } from "../core/evidence.js";
@@ -1229,6 +1233,7 @@ function MarketView({
     );
   const assessment = marketAssessment(m, locale);
   const displayKind = researchLandscape(m)?.kind || m.kind;
+  const presentation = outlookPresentation(displayKind, locale);
   const strategy =
     assessment.narrative.kind === "ai"
       ? visibleStrategy(m.brief, locale)
@@ -1426,15 +1431,19 @@ function MarketView({
         <a href="#projects">{l("Projects", "相关项目")}</a>
         <a href="#method">{l("Research scope", "研究范围")}</a>
       </nav>
-      <section id="outlook" className={`report-outlook ${displayKind}`}>
+      <section
+        id="outlook"
+        className={`report-outlook ${displayKind}`}
+        style={
+          {
+            "--outlook-accent": presentation.color,
+            "--outlook-wash": presentation.wash,
+          } as React.CSSProperties
+        }
+      >
         <div className="outlook-copy">
           <div className="outlook-meta">
-            <Pill kind={displayKind} label={assessment.landscape} />
-            <span>
-              {assessment.level === "provisional"
-                ? l("Preliminary assessment", "初步研判")
-                : l("Evidence-led assessment", "数据研判")}
-            </span>
+            {l("THE OPPORTUNITY IN FOCUS", "这次，机会在哪里")}
           </div>
           <h2>
             {opportunityMap?.overview &&
@@ -1471,21 +1480,34 @@ function MarketView({
           </div>
         </div>
         <aside className="outlook-signal">
-          <div className="eyebrow">{l("SEARCH MOMENTUM", "搜索动向")}</div>
-          <strong>
-            {m.metrics.emerging ? (
-              t("Low-base rise")
-            ) : (
-              <Growth
-                value={assessment.searchReady ? m.metrics.growth : null}
-              />
-            )}
-          </strong>
-          <span>{t("Last 8 complete weeks vs previous 8")}</span>
+          <div className="outlook-verdict">
+            <span className="outlook-verdict-caption">
+              {assessment.level === "provisional"
+                ? l("Preliminary assessment", "初步研判")
+                : l("Evidence-led assessment", "数据研判")}
+            </span>
+            <h3>{assessment.landscape}</h3>
+            <p>{presentation.line}</p>
+          </div>
+          <div className="outlook-momentum">
+            <span>{l("Search momentum", "搜索动向")}</span>
+            <strong>
+              {m.metrics.emerging ? (
+                t("Low-base rise")
+              ) : (
+                <Growth
+                  value={assessment.searchReady ? m.metrics.growth : null}
+                />
+              )}
+            </strong>
+          </div>
+          <span className="outlook-window">
+            {t("Last 8 complete weeks vs previous 8")}
+          </span>
           <Sparkline
             values={demandPoints.slice(-26).map((p) => p.value)}
             color={m.metrics.trend === "falling" ? "#a65c42" : "#277c81"}
-            height={96}
+            height={70}
             domain={[0, 100]}
           />
           <a href={m.demand.sourceUrl} target="_blank" rel="noreferrer">
@@ -2677,7 +2699,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.0/ghtrends-radar-0.17.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.1/ghtrends-radar-0.17.1.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}

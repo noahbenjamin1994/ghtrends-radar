@@ -5,6 +5,47 @@ import { resolveTopic } from "./topics.js";
 import { hasNegativeWording, hasRecoveryTimeReference } from "./i18n.js";
 import { text, MARKET_LABELS, type Locale } from "./i18n.js";
 
+export function outlookPresentation(kind: Market["kind"], locale: Locale) {
+  const themes = {
+    expanding: {
+      color: "#b44336",
+      wash: "#fcf5f1",
+      en: "Interest is rising. Find your way in.",
+      zh: "热度在涨，找准你的切口。",
+    },
+    contested: {
+      color: "#b33d47",
+      wash: "#fcf3f3",
+      en: "A crowded field. Make your answer distinct.",
+      zh: "拥挤的赛道，需要鲜明的答案。",
+    },
+    blue: {
+      color: "#176c91",
+      wash: "#f0f7fa",
+      en: "An opening to explore. Make the first test count.",
+      zh: "机会初现，让第一步更有把握。",
+    },
+    quiet: {
+      color: "#666b8a",
+      wash: "#f5f5f9",
+      en: "Start with a niche. Find a need worth serving.",
+      zh: "从小众需求里，寻找下一步。",
+    },
+    uncertain: {
+      color: "#78684b",
+      wash: "#f8f6f1",
+      en: "A clearer question. A stronger next move.",
+      zh: "看清问题，让下一步更笃定。",
+    },
+  };
+  const theme = themes[kind];
+  return {
+    color: theme.color,
+    wash: theme.wash,
+    line: locale === "zh" ? theme.zh : theme.en,
+  };
+}
+
 export function marketAssessment(m: Market, locale: Locale = "en") {
   const t = (value: string, vars: Record<string, string | number> = {}) =>
     text(value, locale, vars);
