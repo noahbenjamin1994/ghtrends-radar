@@ -1256,7 +1256,7 @@ footer small {
   border-color: #666666;
   color: inherit;
 }
-.gap-card > div {
+.gap-card > .gap-card-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5457,18 +5457,55 @@ footer small {
   background: #e8f5ed;
   color: #257244;
 }
+.gap-grid-research {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.gap-grid-research .gap-card {
+  padding: 24px;
+}
+.gap-grid-research .gap-card h4 {
+  font-size: 17px;
+  line-height: 1.6;
+  margin: 14px 0 20px;
+}
+.issue-reading {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
 .issue-reading p strong {
   display: block;
   color: #212629;
-  font-size: 12px;
+  font-size: 13px;
   margin-bottom: 4px;
 }
 .issue-reading p {
-  margin: 12px 0;
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  font: 14px/1.75 var(--display);
+  margin: 0;
 }
 .issue-reading small {
   display: block;
+  font: 12px/1.7 var(--display);
+  color: #787878;
+  border-top: 1px solid #e5e5e5;
+  padding-top: 14px;
+}
+.gap-grid-research .gap-card > small {
+  font-size: 12px;
   line-height: 1.7;
+}
+@media (max-width: 760px) {
+  .gap-grid-research {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .gap-grid-research .gap-card {
+    padding: 20px;
+  }
 }
 .web-evidence {
   margin-top: 24px;

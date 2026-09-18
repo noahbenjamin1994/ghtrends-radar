@@ -77,6 +77,8 @@ interface AdminData {
     cacheHits: number;
     inputTokens: number | null;
     outputTokens: number | null;
+    reasoningTokens: number | null;
+    reasoningPending: number;
     cachedTokens: number | null;
     estimatedUsd: number | null;
     unknownUsage: number;
@@ -130,6 +132,7 @@ interface AdminData {
     auth: boolean;
     ai: boolean;
     model: string;
+    researchThinking: "off" | "low";
     dailyLimit: number;
     serviceLimit: number;
     attemptLimit: number;
@@ -710,50 +713,59 @@ export function AdminView({ account }: { account: Account | null }) {
                                             "Direction analysis",
                                             "细分方向分析",
                                           )
-                                        : m.operation === "strategy-overall"
+                                        : m.operation === "strategy-priority"
                                           ? l(
-                                              "Overall analysis",
-                                              "整体机会分析",
+                                              "Priority strategy",
+                                              "优先方向策略",
                                             )
-                                          : m.operation ===
-                                              "strategy-section-edit"
-                                            ? l("Section review", "分项校验")
+                                          : m.operation === "strategy-overall"
+                                            ? l(
+                                                "Overall analysis",
+                                                "整体机会分析",
+                                              )
                                             : m.operation ===
-                                                "strategy-translate"
-                                              ? l("Bilingual copy", "双语整理")
+                                                "strategy-section-edit"
+                                              ? l("Section review", "分项校验")
                                               : m.operation ===
-                                                  "strategy-review"
+                                                  "strategy-translate"
                                                 ? l(
-                                                    "Strategy review",
-                                                    "建议复核",
+                                                    "Bilingual copy",
+                                                    "双语整理",
                                                   )
                                                 : m.operation ===
-                                                    "document-selection"
+                                                    "strategy-review"
                                                   ? l(
-                                                      "Source selection",
-                                                      "文档选取",
+                                                      "Strategy review",
+                                                      "建议复核",
                                                     )
-                                                  : m.operation === "relevance"
+                                                  : m.operation ===
+                                                      "document-selection"
                                                     ? l(
-                                                        "Project relevance",
-                                                        "项目相关性",
+                                                        "Source selection",
+                                                        "文档选取",
                                                       )
                                                     : m.operation ===
-                                                        "query-repair"
+                                                        "relevance"
                                                       ? l(
-                                                          "Query refinement",
-                                                          "检索修复",
+                                                          "Project relevance",
+                                                          "项目相关性",
                                                         )
                                                       : m.operation ===
-                                                          "brief-rewrite"
+                                                          "query-repair"
                                                         ? l(
-                                                            "Brief review",
-                                                            "报告校验",
+                                                            "Query refinement",
+                                                            "检索修复",
                                                           )
-                                                        : l(
-                                                            "Research brief",
-                                                            "简短报告",
-                                                          )}
+                                                        : m.operation ===
+                                                            "brief-rewrite"
+                                                          ? l(
+                                                              "Brief review",
+                                                              "报告校验",
+                                                            )
+                                                          : l(
+                                                              "Research brief",
+                                                              "简短报告",
+                                                            )}
                         </small>
                       </th>
                       <td>
@@ -761,6 +773,17 @@ export function AdminView({ account }: { account: Account | null }) {
                       </td>
                       <td>
                         {n(m.inputTokens)} / {n(m.outputTokens)}
+                        <small>
+                          {l("Reasoning within output", "输出中的思考 Token")}:{" "}
+                          {n(m.reasoningTokens)}
+                          {!!m.reasoningPending && (
+                            <>
+                              {" "}
+                              · {n(m.reasoningPending)}{" "}
+                              {l("calls awaiting detail", "次待补明细")}
+                            </>
+                          )}
+                        </small>
                       </td>
                       <td>{n(m.cachedTokens)}</td>
                       <td>{money(m.estimatedUsd)}</td>
@@ -947,6 +970,18 @@ export function AdminView({ account }: { account: Account | null }) {
               <dd>
                 Logto {data.configuration.auth ? "✓" : "—"} ·{" "}
                 {data.configuration.ai ? data.configuration.model : "—"}
+              </dd>
+              <dt>{l("Research generation", "研究生成模式")}</dt>
+              <dd>
+                {data.configuration.researchThinking === "low"
+                  ? l(
+                      "Light reasoning for blueprint and evidence review",
+                      "提纲与证据复核：轻量思考 · 正文：直接生成",
+                    )
+                  : l(
+                      "Direct generation with evidence review",
+                      "直接生成 · 保留证据复核",
+                    )}
               </dd>
               <dt>{l("Daily research allowance", "每人每日研究额度")}</dt>
               <dd>{data.configuration.dailyLimit}</dd>

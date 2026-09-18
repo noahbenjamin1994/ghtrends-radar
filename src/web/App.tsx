@@ -1903,7 +1903,7 @@ function MarketView({
           </span>
         </div>
         {gapSignals.length ? (
-          <div className="gap-grid">
+          <div className="gap-grid gap-grid-research">
             {gapSignals.slice(0, 6).map((g) => (
               <a
                 className="gap-card"
@@ -1912,7 +1912,7 @@ function MarketView({
                 rel="noreferrer"
                 key={g.url}
               >
-                <div>
+                <div className="gap-card-meta">
                   <span className="gap-label">
                     {g.reactions == null
                       ? locale === "zh"
@@ -2677,7 +2677,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.16.0/ghtrends-radar-0.16.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.0/ghtrends-radar-0.17.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}
@@ -2952,7 +2952,7 @@ function GapView() {
                 target="_blank"
                 rel="noreferrer"
               >
-                <div>
+                <div className="gap-card-meta">
                   <span className="gap-label">
                     {g.reactions == null
                       ? locale === "zh"

@@ -55,6 +55,7 @@ export class Store {
     for (const [name, type] of [
       ["transfer_bytes", "INTEGER"],
       ["proxy_route", "TEXT"],
+      ["reasoning_tokens", "INTEGER"],
     ])
       if (!columns.some((c) => c.name === name))
         this.db.exec(`ALTER TABLE provider_calls ADD COLUMN ${name} ${type}`);
@@ -127,7 +128,7 @@ export class Store {
     const context = operationContext.getStore();
     this.db
       .prepare(
-        "INSERT INTO provider_calls(run_id,user_id,provider,operation,started,duration_ms,cached,status,error,model,input_tokens,output_tokens,cached_tokens,cost_usd,rate_bucket,rate_remaining,rate_reset,transfer_bytes,proxy_route) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO provider_calls(run_id,user_id,provider,operation,started,duration_ms,cached,status,error,model,input_tokens,output_tokens,cached_tokens,cost_usd,rate_bucket,rate_remaining,rate_reset,transfer_bytes,proxy_route,reasoning_tokens) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
       )
       .run(
         context?.runId ?? null,
@@ -149,6 +150,7 @@ export class Store {
         c.rateReset ?? null,
         tokenCount(c.transferBytes) ?? null,
         c.proxyRoute ?? null,
+        tokenCount(c.reasoningTokens) ?? null,
       );
   }
   startRun(r: RunRecord) {
@@ -278,7 +280,7 @@ export class Store {
         .all(since),
       models: this.db
         .prepare(
-          "SELECT model,operation,COUNT(*) AS requests,SUM(cached) AS cacheHits,SUM(input_tokens) AS inputTokens,SUM(output_tokens) AS outputTokens,SUM(cached_tokens) AS cachedTokens,SUM(cost_usd) AS estimatedUsd,SUM(CASE WHEN cached=0 AND (input_tokens IS NULL OR output_tokens IS NULL) THEN 1 ELSE 0 END) AS unknownUsage,SUM(CASE WHEN cached=0 AND cost_usd IS NULL THEN 1 ELSE 0 END) AS unpriced FROM provider_calls WHERE provider='deepseek' AND started>=? GROUP BY model,operation",
+          "SELECT model,operation,COUNT(*) AS requests,SUM(cached) AS cacheHits,SUM(input_tokens) AS inputTokens,SUM(output_tokens) AS outputTokens,SUM(reasoning_tokens) AS reasoningTokens,SUM(CASE WHEN cached=0 AND reasoning_tokens IS NULL THEN 1 ELSE 0 END) AS reasoningPending,SUM(cached_tokens) AS cachedTokens,SUM(cost_usd) AS estimatedUsd,SUM(CASE WHEN cached=0 AND (input_tokens IS NULL OR output_tokens IS NULL) THEN 1 ELSE 0 END) AS unknownUsage,SUM(CASE WHEN cached=0 AND cost_usd IS NULL THEN 1 ELSE 0 END) AS unpriced FROM provider_calls WHERE provider='deepseek' AND started>=? GROUP BY model,operation",
         )
         .all(since),
       users: this.db

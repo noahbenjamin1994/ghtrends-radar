@@ -187,6 +187,8 @@ test("provider-reported tokens are counted even when JSON validation fails; cost
     const row = store.adminOverview(1, 0, "").models[0]!;
     assert.equal(row.inputTokens, 1000);
     assert.equal(row.outputTokens, 100);
+    assert.equal(row.reasoningTokens, 0);
+    assert.equal(row.reasoningPending, 0);
     assert.equal(row.cachedTokens, 400);
     assert.equal(row.unknownUsage, 0);
     assert.ok(Number(row.estimatedUsd) > 0);

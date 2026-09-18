@@ -15,6 +15,7 @@ export interface ProviderCall {
   model?: string;
   inputTokens?: number;
   outputTokens?: number;
+  reasoningTokens?: number;
   cachedTokens?: number;
   costUsd?: number;
   rateBucket?: string;

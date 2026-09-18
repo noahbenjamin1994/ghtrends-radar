@@ -57,7 +57,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.16.0/ghtrends-radar-0.16.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.0/ghtrends-radar-0.17.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -165,8 +165,8 @@ The model proposes one primary Trends phrase, up to two genuine synonyms, and bo
 **The strategy process**
 
 1. Select up to four relevant project READMEs across distinct user jobs and three individual issue excerpts. Historical reports also filter adjacent-object Issues at display time. The model explains each relevant request in plain language: audience, need, a possible contribution and the current-version check. Broad fields retain their full original scope alongside open-source directions.
-2. Enable DeepSeek Flash thinking at high effort to answer the original topic first: overall opportunity, demand drivers, competition, entry conditions and evidence coverage. Then map distinct customer jobs: typically five for a broad field and three for a narrow product. Every direction opens with a plain-language name, customer, need and offered service, followed by demand, competition, resources, a first-release estimate, upkeep and a concrete experiment. Broad consumer fields span multiple lifecycle stages; source availability guides evidence confidence while preserving the original scope.
-3. The first high-effort reasoning pass produces a compact English research blueprint. Check each direction with one targeted GitHub repository search, up to one README and one issue search (up to three excerpts), using two source workers. An evidence editor then turns the blueprint and collected sources into the full bilingual report; a bounded editing pass repairs wording or citations. This reserves deep thinking for the judgment and a separate output budget for the complete readable report.
+2. Use light reasoning to answer the original topic first: overall opportunity, demand drivers, competition, entry conditions and evidence coverage. Then map distinct customer jobs: typically five for a broad field and three for a narrow product. Every direction opens with a plain-language name, customer, need and offered service, followed by demand, competition, resources, a first-release estimate, upkeep and a concrete experiment. Broad consumer fields span multiple lifecycle stages; source availability guides evidence confidence while preserving the original scope.
+3. The first pass produces a compact English research blueprint. Check each direction with one targeted GitHub repository search, up to one README and one issue search (up to three excerpts), using two source workers. An evidence editor then turns the blueprint and collected sources into the full bilingual report; a bounded editing pass repairs wording or citations. Directions, the priority strategy and the market overview have separate, bounded output budgets.
 4. Show source signals separately from research inference. Parent-query search growth stays separate from direction-level demand. Project features establish supply; observed demand needs relevant user-request evidence. Strong demand requires multiple request sources and model review of their relevance. Limited search coverage keeps competition estimates provisional.
 5. Develop the selected direction in depth with a causal mechanism, tradeoff, critical assumption and proposed continue/redirect criteria. Exact cited excerpts and direction IDs are checked. All directions appear in the interactive report, Markdown, JSON and server-rendered HTML. Old single-strategy reports remain readable.
 
@@ -182,7 +182,9 @@ A scan runs up to three first-page queries: commercial alternatives, user proble
 
 The report combines Trends, commercial alternatives and the open-source ecosystem. The **research landscape** adds blue-ocean candidates, growing red oceans, red oceans, quiet oceans and an opportunity watch. This qualitative assessment keeps the measured GitHub quadrant intact. Ads indicate marketing intent; direct user behavior supports demand judgments. Incumbent analysis explains data, distribution, ecosystem or switching barriers. Search ranks and project stars describe their own sample. Open-source directions cite a concrete project and explain the complementary contribution and license check.
 
-Deep reasoning first produces a compact blueprint, then writes bilingual direction and overall sections. Each section is validated and cached. A final review checks source scope, actual capabilities, proposed services and bilingual meaning; oversized passages receive targeted edits. Issue interpretations use only supplied request sources. Admin records the usage of each step.
+Light reasoning produces a compact blueprint; direct generation writes concise bilingual direction, priority and overall sections. Each section is validated and cached. A final review checks source scope, actual capabilities, proposed services and bilingual meaning; oversized passages receive targeted edits. Issue interpretations use only supplied request sources. Admin records the usage of each step.
+
+`GHTRENDS_RESEARCH_THINKING=low` is the default: light thinking for the research blueprint and independent evidence review; direct generation for writing and Issue interpretation. Copy editing starts in direct mode; repeatedly failing fields receive one bounded low-effort repair. Set `off` for direct generation throughout when comparing cost and quality on your own topics. Repeated citation metadata and translated context are omitted from model inputs; stored source evidence stays complete. Admin shows the active policy and reasoning tokens as a component of total output, with older missing breakdowns marked pending.
 
 **Access and research credits**
 

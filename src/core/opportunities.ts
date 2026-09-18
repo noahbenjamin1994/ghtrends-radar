@@ -57,7 +57,7 @@ const overviewCopy = z.object({
 export const overviewSchema = z.object({
   en: overviewCopy,
   zh: overviewCopy,
-  evidence: z.array(evidenceRef).max(6),
+  evidence: z.array(evidenceRef).max(6).default([]),
 });
 export type MarketOverview = z.infer<typeof overviewSchema>;
 export type Opportunity = z.infer<typeof opportunitySchema>;
@@ -72,6 +72,12 @@ export const opportunityMapSchema = z.object({
 });
 export type OpportunityMap = z.infer<typeof opportunityMapSchema>;
 
+export function hasCoverageQuantity(text: string): boolean {
+  return /(?:数百|数千|数万|hundreds|thousands).{0,14}(?:开源|工具|项目|repositories|tools|projects)/i.test(
+    text,
+  );
+}
+
 export function proseRepairs(
   raw: unknown,
   all = false,
@@ -81,13 +87,14 @@ export function proseRepairs(
     fields: { path: string; value: string }[] = [];
   const directionIds = (data.opportunities || [])
     .map((o: any) => o.id)
-    .filter((id: unknown) => typeof id === "string");
+    .filter((id: unknown) => typeof id === "string" && id.includes("-"));
   const visit = (node: unknown, path: string) => {
     if (typeof node === "string") {
       if (
         all ||
         hasNegativeWording(node) ||
         hasRecoveryTimeReference(node) ||
+        hasCoverageQuantity(node) ||
         /\b(?:S[12]|[RI]\d+|W\d+R\d+|D\d+[AIR]\d+)\b/.test(node) ||
         directionIds.some((id: string) => node.includes(id))
       )
@@ -154,6 +161,45 @@ export function applyProseRepairs(
   return result;
 }
 
+/** Recover a nearly verbatim quotation from one unambiguous source span.
+ * Numeric claims and remote text remain unchanged; the returned text is copied
+ * directly from the supplied source. Larger/ambiguous differences stay invalid.
+ */
+export function recoverSourceQuote(
+  quote: string,
+  excerpt: string,
+): string | undefined {
+  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+  const q = norm(quote),
+    source = norm(excerpt);
+  if (q.length < 40 || q.length > 300 || source.includes(q)) return;
+  const start = source.indexOf(q.slice(0, 16));
+  if (start < 0 || source.indexOf(q.slice(0, 16), start + 1) >= 0) return;
+  const end = source.indexOf(q.slice(-16), start + 16);
+  if (end < 0 || source.indexOf(q.slice(-16), end + 1) >= 0) return;
+  const candidate = source.slice(start, end + 16);
+  if (candidate.length > 300 || Math.abs(candidate.length - q.length) > 2)
+    return;
+  if (
+    JSON.stringify(candidate.match(/\d+(?:\.\d+)?/g)) !==
+    JSON.stringify(q.match(/\d+(?:\.\d+)?/g))
+  )
+    return;
+  let row = Array.from({ length: candidate.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= q.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= candidate.length; j++)
+      next[j] = Math.min(
+        next[j - 1]! + 1,
+        row[j]! + 1,
+        row[j - 1]! + Number(q[i - 1] !== candidate[j - 1]),
+      );
+    if (Math.min(...next) > 2) return;
+    row = next;
+  }
+  return row[candidate.length]! <= 2 ? candidate : undefined;
+}
+
 /** Rating provenance follows source scope even when a model overstates its label. */
 export function groundOpportunityRatings(
   raw: unknown,
@@ -197,6 +243,8 @@ export function groundOpportunityRatings(
       norm(excerpt).includes(norm(trimmed))
     )
       ref.quote = trimmed;
+    else if (excerpt)
+      ref.quote = recoverSourceQuote(ref.quote, excerpt) || ref.quote;
   }
   for (const o of result.opportunities) {
     for (const axis of ["demand", "competition"] as const) {

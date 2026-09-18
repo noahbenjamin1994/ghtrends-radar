@@ -412,6 +412,7 @@ export function createApp(engine = new Engine()) {
           auth: auth.enabled,
           ai: engine.research.enabled,
           model: engine.research.model,
+          researchThinking: engine.research.strategyThinking || "off",
           dailyLimit,
           serviceLimit,
           attemptLimit: dailyLimit * 3,
@@ -704,7 +705,9 @@ export function createApp(engine = new Engine()) {
               ALGORITHM_VERSION,
               QUERY_PLAN_VERSION,
               STRATEGY_VERSION,
-              engine.search.enabled ? `google-v2-${engine.search.mode}` : "google-off",
+              engine.search.enabled
+                ? `google-v2-${engine.search.mode}`
+                : "google-off",
             ]),
           )
           .digest("hex");
@@ -870,7 +873,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.16.0/ghtrends-radar-0.16.0.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.0/ghtrends-radar-0.17.0.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>

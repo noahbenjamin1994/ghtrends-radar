@@ -1,3 +1,5 @@
+import { recoverSourceQuote } from "../src/core/opportunities.js";
+import { modelSources } from "../src/providers/research.js";
 import {
   visibleOpportunities,
   groundOpportunityRatings,
@@ -195,7 +197,12 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     let reviews = 0;
     r.json = async (_system, input: any, budget, operation, thinking) => {
       ops.push(operation!);
-      assert.equal(thinking, operation === "strategy");
+      assert.equal(
+        thinking,
+        operation === "strategy" || operation === "strategy-evidence-review"
+          ? "low"
+          : false,
+      );
       assert.ok(budget! >= 8000);
       if (ops.length === 1) {
         const bad = sample();
@@ -286,7 +293,7 @@ test("an invalid second pass preserves the validated first pass; sparse data sta
     assert.equal(b.evidence?.length, 0);
   }));
 
-test("only strategy calls enable high-effort thinking and reasoning text is excluded from the result", async () =>
+test("explicit reasoning levels reach the API while ordinary calls stay disabled and private reasoning is discarded", async () =>
   fixture(async (r, s) => {
     const old = globalThis.fetch;
     const requests: any[] = [];
@@ -295,7 +302,14 @@ test("only strategy calls enable high-effort thinking and reasoning text is excl
       return new Response(
         JSON.stringify({
           model: "deepseek-flash",
-          usage: { prompt_tokens: 100, completion_tokens: 600 },
+          usage: {
+            prompt_tokens: 100,
+            completion_tokens: 600,
+            completion_tokens_details: {
+              reasoning_tokens:
+                requests.at(-1).thinking.type === "enabled" ? 500 : 0,
+            },
+          },
           choices: [
             {
               finish_reason: "stop",
@@ -314,9 +328,18 @@ test("only strategy calls enable high-effort thinking and reasoning text is excl
         ok: true,
       });
       await r.json("JSON", {}, 1800, "plan");
+      await r.json("JSON", {}, 8000, "strategy", "low");
+      assert.equal(requests[2].thinking.type, "enabled");
+      assert.equal(requests[2].reasoning_effort, "low");
       assert.equal(requests[0].thinking.type, "enabled");
       assert.equal(requests[0].reasoning_effort, "high");
       assert.equal(requests[1].thinking.type, "disabled");
+      const measured = s
+        .adminOverview(7, 0, "")
+        .models.find((row) => row.operation === "strategy")!;
+      assert.equal(measured.outputTokens, 1200);
+      assert.equal(measured.reasoningTokens, 1000);
+      assert.equal(measured.reasoningPending, 0);
       assert.ok(
         !JSON.stringify(s.adminOverview(7, 0, "")).includes(
           "private-model-reasoning",
@@ -394,6 +417,14 @@ test("existing implementations reach the critic; corrective editing preserves th
       const result = sample();
       if (op === "strategy") return result;
       assert.ok(input.sources.some((s: ResearchSource) => s.id === "A1R"));
+      if (op === "strategy-evidence-review") {
+        assert.ok(input.requiredCorrections.length);
+        return {
+          edits: [
+            { path: "en.strategy.wedge", value: sample().en.strategy.wedge },
+          ],
+        };
+      }
       result.evidence = [
         { id: "A1R", quote: "Review anchors already survive file splits." },
       ];
@@ -417,7 +448,11 @@ test("existing implementations reach the critic; corrective editing preserves th
       },
     );
     assert.equal(checks, 1);
-    assert.deepEqual(ops, ["strategy", "strategy-review", "strategy-edit"]);
+    assert.deepEqual(ops, [
+      "strategy",
+      "strategy-review",
+      "strategy-evidence-review",
+    ]);
     assert.equal(result.reviewed, true);
     assert.match(result.en.strategy!.angle, /existing review tool/);
     assert.ok(result.sources.some((s) => s.id === "A1R"));
@@ -848,15 +883,15 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
     let checked = false;
     r.json = async (_system, input: any, _budget, operation, thinking) => {
       if (operation === "strategy") {
-        assert.equal(thinking, true);
+        assert.equal(thinking, "low");
         return blueprint;
       }
       if (operation === "strategy-evidence-review") {
-        assert.equal(thinking, true);
+        assert.equal(thinking, "low");
         assert.ok(input.editablePaths.includes("overview.zh.competition"));
         return { edits: [] };
       }
-      assert.equal(thinking, true);
+      assert.equal(thinking, false);
       assert.ok(checked);
       if (operation === "strategy-direction") {
         assert.ok(
@@ -866,7 +901,7 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
         );
         return sample().opportunities.find((o) => o.id === input.candidate.id);
       }
-      assert.equal(operation, "strategy-overall");
+      assert.ok(["strategy-priority", "strategy-overall"].includes(operation!));
       const { opportunities, ...overall } = sample();
       return overall;
     };
@@ -976,7 +1011,7 @@ test("semantic review can edit prose and ratings while source quotes and identif
       id = data.opportunities[0]!.id;
     r.json = async (prompt, input: any, _budget, operation, thinking) => {
       assert.equal(operation, "strategy-evidence-review");
-      assert.equal(thinking, true);
+      assert.equal(thinking, "low");
       assert.ok(prompt.includes("preserve truth conditions"));
       assert.ok(input.editablePaths.includes("overview.zh.competition"));
       assert.ok(!input.editablePaths.includes("overview.evidence.0.quote"));
@@ -1022,8 +1057,8 @@ test("Issue interpretation accepts only real request identities and exact quotes
     };
     r.json = async (_system, input: any, _budget, operation, thinking) => {
       assert.equal(operation, "issue-reading");
-      assert.equal(thinking, true);
-      assert.deepEqual(input.sources, [source]);
+      assert.equal(thinking, false);
+      assert.deepEqual(input.sources, [modelSources([source])[0]]);
       return {
         issueInsights: [
           {
@@ -1078,5 +1113,149 @@ test("the selected open-source direction can provide the strategy's documented p
     strategyProblems(data, sources, seed).some((p) =>
       p.startsWith("Ground the factual premise"),
     ),
+  );
+});
+
+test("ordinary direction IDs stay readable in prose while internal slugs request editing", () => {
+  const data = sample();
+  data.opportunities[0]!.id = "backup";
+  data.en.summary = "A backup service helps teams preserve review history.";
+  assert.ok(!proseRepairs(data).some((f) => f.path === "en.summary"));
+  data.opportunities[0]!.id = "comment-backup";
+  data.en.summary =
+    "Consider comment-backup for teams preserving review history.";
+  assert.ok(proseRepairs(data).some((f) => f.path === "en.summary"));
+});
+
+test("local repair separates supply counts from demand and anchors open-source labels", async () =>
+  fixture(async (r) => {
+    const raw = sample();
+    raw.zh.summary = "数千个开源项目表明用户对记忆工具有持续需求。";
+    raw.opportunities[0]!.route = "opensource";
+    raw.opportunities[0]!.basedOn = [];
+    const quotes = structuredClone(raw.evidence);
+    (r as any).json = async (
+      _p: string,
+      input: any,
+      _budget: number,
+      op: string,
+      thinking: unknown,
+    ) => {
+      assert.equal(op, "strategy-copy");
+      assert.equal(thinking, false);
+      assert.match(
+        input.fields.find((f: any) => f.path === "zh.summary").correction,
+        /actual behavior/,
+      );
+      assert.match(
+        input.fields.find((f: any) => f.path === "opportunities.0.route")
+          .correction,
+        /new tool/,
+      );
+      return {
+        edits: [
+          {
+            path: "zh.summary",
+            value:
+              "已有项目覆盖记忆存储；开发者跨会话核对历史决策的需求，可通过实际任务完成情况验证。",
+          },
+          { path: "opportunities.0.route", value: "product" },
+          { path: "evidence.0.quote", value: "an invented quotation" },
+        ],
+      };
+    };
+    const result = await (r as any).repairStrategyCopy(
+      raw,
+      strategySources(seed, documents),
+    );
+    assert.equal(result.opportunities[0].route, "product");
+    assert.match(result.zh.summary, /任务完成情况/);
+    assert.deepEqual(result.evidence, quotes);
+    assert.equal(raw.opportunities[0]!.route, "opensource");
+  }));
+
+test("research reasoning stays bounded and configurable and source compaction keeps the original evidence immutable", async () => {
+  const old = process.env.GHTRENDS_RESEARCH_THINKING;
+  try {
+    delete process.env.GHTRENDS_RESEARCH_THINKING;
+    await fixture(async (r) => {
+      assert.equal(r.strategyThinking, "low");
+      process.env.GHTRENDS_RESEARCH_THINKING = "low";
+      assert.equal(r.strategyThinking, "low");
+      process.env.GHTRENDS_RESEARCH_THINKING = "off";
+      assert.equal(r.strategyThinking, false);
+      process.env.GHTRENDS_RESEARCH_THINKING = "high";
+      assert.equal(r.strategyThinking, "low");
+    });
+    const original = strategySources(seed, documents);
+    const before = JSON.stringify(original);
+    const compact = modelSources(original);
+    assert.equal(JSON.stringify(original), before);
+    assert.ok(compact.every((s) => !("url" in s)));
+    assert.equal(
+      compact.find((s) => s.id === "S2")?.excerpt,
+      original.find((s) => s.id === "S2")?.excerpt,
+    );
+    assert.ok(
+      original
+        .find((s) => s.id === "S2")
+        ?.excerpt?.includes("Matching projects:"),
+    );
+    assert.equal(
+      compact.find((s) => s.id === "R1")?.excerpt,
+      original.find((s) => s.id === "R1")?.excerpt,
+    );
+  } finally {
+    if (old === undefined) delete process.env.GHTRENDS_RESEARCH_THINKING;
+    else process.env.GHTRENDS_RESEARCH_THINKING = old;
+  }
+});
+
+test("mixed citation and wording corrections preserve the rest of a complete report", async () =>
+  fixture(async (r) => {
+    const good = sample();
+    const bad = structuredClone(good);
+    bad.en.strategy.tradeoff =
+      "This prototype does not include dashboard editing.";
+    bad.evidence[0]!.quote = "A paraphrase that is absent from the source.";
+    const ops: string[] = [];
+    r.json = async (_prompt, input: any, _budget, op) => {
+      ops.push(op!);
+      if (op === "strategy") return good;
+      if (op === "strategy-review") return bad;
+      assert.equal(op, "strategy-copy");
+      assert.ok(input.fields.some((f: any) => f.path === "evidence.0.quote"));
+      return {
+        edits: [
+          { path: "en.strategy.tradeoff", value: good.en.strategy.tradeoff },
+          { path: "evidence.0.quote", value: good.evidence[0]!.quote },
+        ],
+      };
+    };
+    const result = await r.insights(seed, documents);
+    assert.equal(result.reviewed, true);
+    assert.deepEqual(result.evidence, good.evidence);
+    assert.deepEqual(result.opportunities, good.opportunities);
+    assert.deepEqual(ops, ["strategy", "strategy-review", "strategy-copy"]);
+  }));
+
+test("near-verbatim quote recovery copies one exact source span and keeps numeric and ambiguous differences invalid", () => {
+  const source =
+    "联系管理界面：打开云端的通讯录，点击在通讯录页面左下方的更多选项，选择联系人时光机，根据您的需求进行恢复操作。";
+  const quoted = source.replace("左下方", "左下角");
+  assert.equal(recoverSourceQuote(quoted, source), source);
+  assert.equal(recoverSourceQuote(quoted, source + source), undefined);
+  const numeric =
+    "Maintainer notes: exports preserve the original metadata for 40 documents across the configured workspace.";
+  assert.equal(
+    recoverSourceQuote(numeric.replace("40", "80"), numeric),
+    undefined,
+  );
+  assert.equal(
+    recoverSourceQuote(
+      "A fabricated feature unrelated to the observed implementation and its actual scope.",
+      source,
+    ),
+    undefined,
   );
 });
