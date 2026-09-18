@@ -2,7 +2,7 @@ import { researchLandscape } from "../core/landscape.js";
 import { OpportunityMap, TopicOverview } from "./opportunities.js";
 import { visibleOpportunities } from "../core/opportunities.js";
 import { COMPETITION_POLICY } from "../core/competition.js";
-import { IssueReading, LandscapePanel } from "./landscape.js";
+import { IssueReading, LandscapePanel, CompetitorPanel } from "./landscape.js";
 import { reportIssueSignals, selectGapSignals } from "../core/gaps.js";
 import { enableEngagement, track } from "./engagement.js";
 import { AdminView } from "./admin.js";
@@ -817,7 +817,7 @@ export function App() {
                           <small>
                             {t(
                               m.competition
-                                ? "Competition pressure"
+                                ? "Open-source competition"
                                 : "Active projects",
                             )}
                           </small>
@@ -1428,6 +1428,7 @@ function MarketView({
         )}
         {strategy && <a href="#strategy">{l("Strategy", "优先方向")}</a>}
         <a href="#evidence">{l("Evidence", "趋势证据")}</a>
+        <a href="#competitors">{l("Competitors", "同行")}</a>
         <a href="#projects">{l("Projects", "相关项目")}</a>
         <a href="#method">{l("Research scope", "研究范围")}</a>
       </nav>
@@ -1526,7 +1527,7 @@ function MarketView({
           </small>
         </div>
         <div>
-          <span>{l("Direct alternatives", "直接替代项目")}</span>
+          <span>{l("Open-source alternatives", "同类开源项目")}</span>
           <strong>
             {m.supply.error ? "—" : number(m.competition?.direct ?? 0)}
             <em>{l("projects", "个")}</em>
@@ -1536,7 +1537,7 @@ function MarketView({
           </small>
         </div>
         <div>
-          <span>{l("Competition pressure", "开源竞争压力")}</span>
+          <span>{l("Open-source competition", "开源竞争程度")}</span>
           <strong>
             {competitionPressure(m)}
             <em>/ 100</em>
@@ -1562,6 +1563,7 @@ function MarketView({
         />
       )}
       <LandscapePanel market={m} locale={locale} />
+      <CompetitorPanel market={m} locale={locale} />
       {m.brief && <OpportunityMap key={m.id} brief={m.brief} locale={locale} />}
       {strategy ? (
         <section className="strategy-section" id="strategy">
@@ -2699,7 +2701,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.1/ghtrends-radar-0.17.1.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.2/ghtrends-radar-0.17.2.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}

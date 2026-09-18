@@ -1,4 +1,6 @@
 export const zh: Record<string, string> = {
+  "Open-source competition": "开源竞争程度",
+  "Open-source alternatives": "同类开源项目",
   "Refining same-intent project searches": "正在补充同用途的项目检索",
   "Choose one software workflow to compare.": "选择具体软件工作流继续比较。",
   "Original search filters shown below.": "原始筛选条件见下方来源。",

@@ -69,7 +69,7 @@ export function LandscapePanel({
         <div>
           <div className="eyebrow">
             {zh
-              ? "趋势 × 商业竞品 × 开源生态"
+              ? "趋势 × 商业同行 × 开源项目"
               : "TRENDS × COMPETITORS × OPEN SOURCE"}
           </div>
           <h3>
@@ -102,31 +102,6 @@ export function LandscapePanel({
           </div>
         ))}
       </div>
-      {!!landscape.leaders.length && (
-        <div className="incumbent-list">
-          <h4>
-            {zh
-              ? "已有玩家与小团队的进入门槛"
-              : "Existing players and entry requirements"}
-          </h4>
-          {landscape.leaders.map((x) => (
-            <article key={x.name}>
-              <h5>{x.name}</h5>
-              <div>
-                <p>{x[locale].position}</p>
-                <p>
-                  <strong>{zh ? "进入门槛" : "Barrier"}</strong>
-                  {x[locale].barrier}
-                </p>
-                <p>
-                  <strong>{zh ? "可探索的切口" : "Opening to test"}</strong>
-                  {x[locale].opening}
-                </p>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
       <div className="strategy-sources">
         {refs.map((r) => {
           const s = sources.find((s) => s.id === r.id);
@@ -144,6 +119,21 @@ export function LandscapePanel({
           ) : null;
         })}
       </div>
+    </section>
+  );
+}
+
+function SearchEvidence({
+  market: m,
+  locale,
+}: {
+  market: Market;
+  locale: "en" | "zh";
+}) {
+  const zh = locale === "zh";
+  return (
+    <>
+      {" "}
       {m.web && (
         <details className="web-evidence">
           <summary>
@@ -206,6 +196,309 @@ export function LandscapePanel({
           ))}
         </details>
       )}
+    </>
+  );
+}
+
+export function CompetitorPanel({
+  market: m,
+  locale,
+}: {
+  market: Market;
+  locale: "en" | "zh";
+}) {
+  const zh = locale === "zh",
+    l = (en: string, cn: string) => (zh ? cn : en);
+  const peers = researchLandscape(m) ? m.brief?.landscape?.leaders || [] : [];
+  const directProjects = [
+    ...new Map(
+      m.supply.repositories
+        .filter((r) => r.relevance?.role === "direct" && !r.archived)
+        .map((r) => [r.name.toLowerCase(), r]),
+    ).values(),
+  ];
+  const projects = directProjects.slice(0, 3);
+  const recentlyUpdated = directProjects.filter((r) => {
+    const days = (Date.parse(m.asOf) - Date.parse(r.pushedAt)) / 86400000;
+    return Number.isFinite(days) && days >= -1 && days <= 90;
+  }).length;
+  const ads =
+    m.web?.queries.flatMap((q) =>
+      q.results
+        .filter((r) => r.kind === "ad")
+        .map((r) => ({
+          ...r,
+          query: q.query,
+          date: q.fetchedAt || m.web!.fetchedAt,
+        })),
+    ) || [];
+  const refs = (ids: string[]) =>
+    [...new Set(ids)].flatMap(
+      (id) => m.brief?.sources.find((s) => s.id === id) || [],
+    );
+  const sourceLinks = (ids: string[]) => (
+    <div className="peer-sources">
+      {refs(ids).map((s) => (
+        <a key={s.id} href={s.url} target="_blank" rel="noreferrer">
+          {s.label}
+          {s.fetchedAt ? ` · ${s.fetchedAt.slice(0, 10)}` : ""}
+          <ArrowUpRight size={12} />
+        </a>
+      ))}
+    </div>
+  );
+  return (
+    <section className="competitor-section" id="competitors">
+      <div className="report-section-heading">
+        <div>
+          <div className="eyebrow">
+            {l("WHO ELSE SERVES THIS NEED", "谁也在解决这个问题")}
+          </div>
+          <h3>{l("Get to know the competition", "看看同行都在做什么")}</h3>
+        </div>
+      </div>
+      <p className="research-caption">
+        {l(
+          "Compare open-source projects, commercial offers and observed ads. Each source answers a different question.",
+          "分开看开源项目、商业服务和广告，再判断自己适合从哪做起。",
+        )}
+      </p>
+      <div className="peer-block">
+        <h4>
+          <span>01</span>
+          {l("Open-source projects", "开源项目")}
+        </h4>
+        <p className="research-caption">
+          {l(
+            "Project history, recent updates and community activity help you assess maturity and ecosystem reach.",
+            "项目做了多久、最近是否更新、社区积累如何，能帮助判断成熟度和生态优势。",
+          )}
+        </p>
+        <div className="peer-open-stats">
+          <div>
+            <strong>
+              {m.supply.error ? "—" : (m.competition?.direct ?? "—")}
+            </strong>
+            <span>{l("similar projects reviewed", "已审核的同类项目")}</span>
+          </div>
+          <div>
+            <strong>{m.supply.error ? "—" : recentlyUpdated}</strong>
+            <span>
+              {l(
+                "similar projects updated within 90 days",
+                "近 90 天更新的同类项目",
+              )}
+            </span>
+          </div>
+          <div>
+            <strong>{m.competition?.sampled ?? "—"}</strong>
+            <span>
+              {l("GitHub projects in this sample", "本次查看的 GitHub 项目")}
+            </span>
+          </div>
+        </div>
+        <p className="research-caption">
+          {l(
+            "Maturity considers project age, maintenance, stars and forks. Community activity describes developer attention and reuse.",
+            "成熟度结合项目年限、维护情况、Star 与 Fork 评估；社区数据反映开发者关注和代码复用。",
+          )}
+        </p>
+        {projects.map((r) => (
+          <article className="peer-project" key={r.name}>
+            <div>
+              <a href={r.url} target="_blank" rel="noreferrer">
+                <strong>{r.name}</strong>
+                <ArrowUpRight size={13} />
+              </a>
+              <p>{r.description}</p>
+            </div>
+            <div className="peer-project-facts">
+              <span>
+                ★ {r.stars.toLocaleString()} · {r.forks.toLocaleString()} Fork
+              </span>
+              <span>
+                {l("Created", "创建")} {r.createdAt.slice(0, 10)}
+              </span>
+              <span>
+                {l("Updated", "更新")} {r.pushedAt.slice(0, 10)}
+              </span>
+              <span>
+                {r.license || l("Check repository license", "许可见项目页")}
+              </span>
+            </div>
+          </article>
+        ))}
+        <a className="peer-more" href="#projects">
+          {l("See the full project comparison", "查看完整项目对比")} ↗
+        </a>
+      </div>
+      <div className="peer-block">
+        <h4>
+          <span>02</span>
+          {l("Commercial competitors & related offers", "商业同行与相关方案")}
+        </h4>
+        <p className="research-caption">
+          {l(
+            "Source-backed offers, with pricing tied to the quoted plan and collection date. Possible openings are research suggestions.",
+            "根据来源整理具体产品和服务；收费以引用的方案与采集时间为准，切入建议供进一步验证。",
+          )}
+        </p>
+        {peers.length ? (
+          peers.map((x) => (
+            <article className="peer-card" key={x.name}>
+              <header>
+                <h5>{x.name}</h5>
+                <span>
+                  {x.category === "commercial"
+                    ? l("Commercial service", "商业服务")
+                    : x.category === "official"
+                      ? l("Official service", "官方服务")
+                      : x.category === "opensource"
+                        ? l("Open-source tool", "开源工具")
+                        : l("Related offer", "相关方案")}
+                </span>
+              </header>
+              <p className="peer-offer">{x[locale].position}</p>
+              <dl>
+                <div>
+                  <dt>{l("Who it serves", "服务谁")}</dt>
+                  <dd>
+                    {x.audience?.[locale] ||
+                      l(
+                        "Check the product page for its intended users.",
+                        "查看产品介绍，确认目标用户。",
+                      )}
+                  </dd>
+                  {x.audience && sourceLinks([x.audience.evidence.id])}
+                </div>
+                <div>
+                  <dt>{l("Pricing & quotes", "收费与报价")}</dt>
+                  <dd>
+                    {x.pricing?.[locale] ||
+                      l(
+                        "Check the product website for current plans and billing.",
+                        "查看官网，确认当前方案和收费方式。",
+                      )}
+                  </dd>
+                  {x.pricing && (
+                    <>
+                      <p className="research-caption">
+                        {l(
+                          "Check the quoted plan, currency and eligibility on the source page.",
+                          "请按来源核对方案、币种与适用条件。",
+                        )}
+                      </p>
+                      {sourceLinks([x.pricing.evidence.id])}
+                    </>
+                  )}
+                </div>
+                <div>
+                  <dt>
+                    {l("Existing advantage", "现有优势")}
+                    <small>{l("Research assessment", "研究判断")}</small>
+                  </dt>
+                  <dd>{x[locale].barrier}</dd>
+                </div>
+                <div>
+                  <dt>
+                    {l("Where you could start", "你可以从哪做起")}
+                    <small>{l("Research suggestion", "研究建议")}</small>
+                  </dt>
+                  <dd>{x[locale].opening}</dd>
+                </div>
+              </dl>
+              {sourceLinks(x.evidence.map((r) => r.id))}
+            </article>
+          ))
+        ) : (
+          <p className="peer-empty">
+            {l(
+              "Commercial offers are ready for a closer review. Use the search sources below or update this research to build the comparison.",
+              "商业同行待进一步核对。可展开下方搜索来源，或更新研究来补充对比。",
+            )}
+          </p>
+        )}
+      </div>
+      <div className="peer-block">
+        <h4>
+          <span>03</span>
+          {l("Competitors appearing in ads", "广告里的同行")}
+        </h4>
+        <p className="research-caption">
+          {l(
+            "These are ads captured for specific searches. The landing-page website identifies the destination; the advertiser's business identity can be checked there.",
+            "这里记录具体搜索中采集到的广告。先看落地页网站，再核对广告主的公司身份。",
+          )}
+        </p>
+        {ads.length ? (
+          ads.map((ad, i) => (
+            <article className="peer-ad" key={ad.query + ad.url + i}>
+              <span className="peer-ad-site">
+                {l("Landing-page website", "投放网站")} ·{" "}
+                {new URL(ad.url).hostname}
+              </span>
+              <a href={ad.url} target="_blank" rel="noreferrer">
+                <h5>
+                  {ad.title}
+                  <ArrowUpRight size={15} />
+                </h5>
+              </a>
+              <p>
+                {ad.excerpt ||
+                  l(
+                    "Open the landing page for the offer details.",
+                    "打开落地页查看方案详情。",
+                  )}
+              </p>
+              <dl>
+                <div>
+                  <dt>{l("Search keyword", "出现的关键词")}</dt>
+                  <dd>{ad.query}</dd>
+                </div>
+                <div>
+                  <dt>{l("Region / language / date", "地区 / 语言 / 时间")}</dt>
+                  <dd>
+                    {m.web!.region} · {m.web!.language} · {ad.date.slice(0, 10)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{l("Landing page", "落地页")}</dt>
+                  <dd>
+                    <a href={ad.url} target="_blank" rel="noreferrer">
+                      {ad.url}
+                    </a>
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          ))
+        ) : (
+          <p className="peer-empty">
+            {m.web?.queries.some((q) => q.state === "ready")
+              ? l(
+                  "This search sample recorded 0 ads. Check other times or regions to explore further placements.",
+                  "本次搜索样本记录了 0 条广告。可结合其他时间、地区继续查看投放线索。",
+                )
+              : l(
+                  "Ad observations will appear here after search collection completes.",
+                  "搜索采集完成后，这里展示观察到的广告。",
+                )}
+          </p>
+        )}
+        <p className="research-caption">
+          {m.web?.provider === "google-mobile"
+            ? l(
+                "Collected from a lightweight search page. ",
+                "当前采集使用轻量搜索页面。",
+              )
+            : ""}
+          {l(
+            "Coverage follows the captured page. Spend, clicks and conversions require data from the advertiser's account.",
+            "广告覆盖以实际采集页面为准；投放金额、点击量与转化数据需由广告账户提供。",
+          )}
+        </p>
+      </div>
+      <SearchEvidence market={m} locale={locale} />
     </section>
   );
 }

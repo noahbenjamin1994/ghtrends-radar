@@ -61,7 +61,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.1/ghtrends-radar-0.17.1.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.2/ghtrends-radar-0.17.2.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
@@ -173,6 +173,8 @@ ghtrends ui
 默认 `GHTRENDS_SEARCH_MODE=direct`，复用 `GOOGLE_TRENDS_PROXY` 及备用线路，通过轻量手机版页面与匹配的浏览器连接特征采集 Google。Docker 内置 Python 传输组件；源码/npm 安装可运行 `python3 -m venv .venv-search`、`.venv-search/bin/pip install curl_cffi==0.16.3`，再将 `GHTRENDS_SEARCH_PYTHON` 设为该环境的 Python 路径。`GOOGLE_SEARCH_PROXY`、`GOOGLE_SEARCH_PROXY_FALLBACK` 可配置独立线路。每次搜索只取一页；Decodo 7000 端口采用轮换出口并保留地区，Trends 保持粘性会话。搜索仅发送固定的同意偏好，消耗已有住宅流量额度。可选 `api` 模式使用 `DECODO_SCRAPER_TOKEN` 与独立服务额度；`off` 可关闭网页采集。
 
 每次研究最多检索 3 组首页结果：商业竞品、用户问题、开源资产。成功结果缓存 6 小时，串行队列与验证触发后的线路冷却（轮换网关 1 分钟，固定线路 15 分钟）限制恢复尝试。报告保存查询词、地区、采集日期、摘要、链接和自然结果／广告标记。全球研究的网页部分标记为美国搜索样本。管理员可分别查看搜索调用、缓存复用、延迟和错误；直接采集的 HTTP 流量计入住宅用量。手机版页面记录当次实际展示的广告位置；广告列表为空时，投放活动仍需继续核实。凭据由后端保管。
+
+报告分开呈现开源项目、商业同行与广告线索。开源项目展示数量、近期维护、创建时间及社区数据；同行展示服务人群、收费与报价、现有优势和可探索的切入点。服务人群与收费字段各附来源原文，回收报价保留其付款方向、机型及条件。广告展示投放网站、原文、落地页、查询词和地区；公司身份、投放金额、点击量与转化需补充相应证据。供模型读取的自然结果优先覆盖不同网站，再补同站资料；每组保留至多四条自然来源和两条广告来源。
 
 报告围绕 **趋势 × 商业竞品 × 开源生态** 给出综合研判，保留蓝海候选、增长型红海、红海、静海与机会观察。综合研判包含研究推断，原有 GitHub 象限保留其测量口径。广告提供商业投放意向，真实需求继续结合用户行为判断。头部优势具体解释为渠道、数据、生态、迁移成本等门槛。开源方向引用具体项目，说明可补充的能力与许可证核对步骤。
 

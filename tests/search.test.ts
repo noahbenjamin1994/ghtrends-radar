@@ -379,3 +379,164 @@ test("research oceans preserve measured data and treat ads, sparse coverage and 
   ];
   assert.ok(landscapeProblems({ landscape: l }, sources).length > 0);
 });
+
+test("competitor facts require product-linked quotes and preserve quoted prices", () => {
+  const offer: ResearchSource = {
+    id: "W3",
+    kind: "search",
+    placement: "organic",
+    label: "Transfer Pro",
+    url: "https://tools.example/pricing",
+    excerpt:
+      "Transfer Pro serves repair shops. Plans start at $29 per month, billed yearly.",
+  };
+  const l = landscape();
+  l.leaders = [
+    {
+      name: "Transfer Pro",
+      category: "commercial",
+      en: {
+        position: "Transfers phone data for repair shops.",
+        barrier: "Shops reuse saved device profiles.",
+        opening: "Explore a repair-ticket integration.",
+      },
+      zh: {
+        position: "为维修店提供手机数据迁移服务。",
+        barrier: "店员可复用已有设备配置。",
+        opening: "可探索与维修工单的对接。",
+      },
+      audience: {
+        en: "Repair shops",
+        zh: "手机维修店",
+        evidence: { id: "W3", quote: "Transfer Pro serves repair shops." },
+      },
+      pricing: {
+        en: "From $29 per month, billed yearly.",
+        zh: "每月 29 美元起，按年付费。",
+        evidence: {
+          id: "W3",
+          quote: "Plans start at $29 per month, billed yearly.",
+        },
+      },
+      evidence: [{ id: "W3", quote: offer.excerpt! }],
+    },
+  ];
+  assert.deepEqual(
+    landscapeProblems({ landscape: l }, [...sources, offer]),
+    [],
+  );
+  const fabricated = structuredClone(l);
+  fabricated.leaders[0]!.pricing!.zh = "每月 19 美元起，按年付费。";
+  assert.ok(
+    landscapeProblems({ landscape: fabricated }, [...sources, offer]).some(
+      (p) => p.includes("amounts"),
+    ),
+  );
+  const unrelated = structuredClone(l);
+  unrelated.leaders[0]!.evidence = [{ id: "W2", quote: sources[1]!.excerpt! }];
+  assert.ok(
+    landscapeProblems({ landscape: unrelated }, [...sources, offer]).some((p) =>
+      p.includes("identify this peer"),
+    ),
+  );
+  const missing = structuredClone(l);
+  missing.leaders[0]!.pricing!.evidence.quote = "The monthly price is $29.";
+  assert.ok(
+    landscapeProblems({ landscape: missing }, [...sources, offer]).some((p) =>
+      p.includes("exact"),
+    ),
+  );
+});
+
+test("search-only competitor facts remain optional for saved reports", () => {
+  assert.deepEqual(landscapeProblems({ landscape: landscape() }, sources), []);
+  const l = landscape();
+  l.leaders = [
+    {
+      name: "Transfer Tool",
+      en: {
+        position: "Transfers photos between phones.",
+        barrier: "An established phone workflow.",
+        opening: "Explore a local adapter for shops.",
+      },
+      zh: {
+        position: "在手机之间迁移照片。",
+        barrier: "已有成熟的手机迁移流程。",
+        opening: "可为门店探索本地适配器。",
+      },
+      evidence: [{ id: "W2", quote: sources[1]!.excerpt! }],
+    },
+  ];
+  assert.deepEqual(landscapeProblems({ landscape: l }, sources), []);
+});
+
+test("visible ad cards keep their own budget after a full organic result list", () => {
+  const organic = Array.from({ length: 12 }, (_, i) =>
+    mobile
+      .match(/<div class="zMzFAb">[\s\S]*<\/div>/)![0]
+      .replaceAll("tools.example", `tools${i}.example`),
+  ).join("");
+  const ad = mobile
+    .match(/<div class="zMzFAb">[\s\S]*<\/div>/)![0]
+    .replace("Check <b>", "<span>Sponsored</span> Check <b>")
+    .replaceAll("tools.example", "advertiser.example");
+  const rows = parseGooglePage(`<html><body>${organic}${ad}</body></html>`);
+  assert.equal(rows.filter((r) => r.kind === "organic").length, 10);
+  assert.equal(rows.filter((r) => r.kind === "ad").length, 1);
+  assert.equal(
+    rows.find((r) => r.kind === "ad")?.url,
+    "https://advertiser.example/compare",
+  );
+});
+
+test("model evidence includes independent competitors instead of repeating one brand's pages", () => {
+  const result = (url: string) => ({
+    title: url,
+    url,
+    excerpt: "A phone repair service.",
+    kind: "organic" as const,
+  });
+  const web = {
+    provider: "google-mobile" as const,
+    region: "US",
+    language: "en",
+    fetchedAt: "2026-09-18",
+    state: "ready" as const,
+    queries: [
+      {
+        query: "phone services",
+        intent: "competition" as const,
+        state: "ready" as const,
+        results: [
+          result("https://www.brand.example/one"),
+          result("https://m.brand.example/two"),
+          result("https://support.brand.example/three"),
+          result("https://www.brand.example/four"),
+          result("https://shop.example/offer"),
+          result("https://repair.example/prices"),
+          result("https://another.example/offer"),
+          { ...result("https://ad.example/buy"), kind: "ad" as const },
+        ],
+      },
+    ],
+  };
+  const before = JSON.stringify(web);
+  const rows = searchSources(web);
+  assert.deepEqual(
+    rows.map((r) => r.url),
+    [
+      "https://www.brand.example/one",
+      "https://shop.example/offer",
+      "https://repair.example/prices",
+      "https://another.example/offer",
+      "https://ad.example/buy",
+    ],
+  );
+  assert.equal(rows.at(-1)?.placement, "ad");
+  assert.equal(JSON.stringify(web), before);
+  web.queries[0]!.results = [
+    result("https://github.com/one/tool"),
+    result("https://github.com/two/tool"),
+  ];
+  assert.equal(searchSources(web).length, 2);
+});

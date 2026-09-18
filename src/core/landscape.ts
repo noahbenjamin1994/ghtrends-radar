@@ -11,6 +11,11 @@ const rating = z.object({
   level: z.enum(["high", "medium", "low", "exploratory"]),
   evidence: z.array(ref).max(3),
 });
+const peerFact = z.object({
+  en: z.string().trim().min(3).max(220),
+  zh: z.string().trim().min(3).max(220),
+  evidence: ref,
+});
 const leaderCopy = z.object({
   position: prose,
   barrier: prose,
@@ -36,6 +41,9 @@ export const landscapeSchema = z.object({
     .array(
       z.object({
         name: z.string().min(2).max(80),
+        category: z.enum(["commercial", "official", "opensource"]).optional(),
+        audience: peerFact.optional(),
+        pricing: peerFact.optional(),
         en: leaderCopy,
         zh: leaderCopy,
         evidence: z.array(ref).max(3),
@@ -84,7 +92,11 @@ export function landscapeProblems(
     const refs = [
       ...l.demand.evidence,
       ...l.competition.evidence,
-      ...l.leaders.flatMap((x) => x.evidence),
+      ...l.leaders.flatMap((x) => [
+        ...x.evidence,
+        ...(x.audience ? [x.audience.evidence] : []),
+        ...(x.pricing ? [x.pricing.evidence] : []),
+      ]),
     ];
     if (refs.some((r) => !validQuote(r, sources)))
       errors.push("Landscape evidence: copy exact supplied excerpts.");
@@ -96,6 +108,34 @@ export function landscapeProblems(
         ].some(hasNegativeWording)
       )
         errors.push("Landscape: use affirmative prose.");
+    for (const leader of l.leaders) {
+      for (const fact of [leader.audience, leader.pricing]) {
+        if (fact && !leader.evidence.some((r) => r.id === fact.evidence.id))
+          errors.push(
+            `Peer ${leader.name}: each fact source must also identify this peer in its evidence.`,
+          );
+        if (fact && [fact.en, fact.zh].some(hasNegativeWording))
+          errors.push(`Peer ${leader.name}: use short affirmative wording.`);
+      }
+      if (leader.pricing) {
+        const p = leader.pricing;
+        if (
+          !/(?:pric|cost|charg|bill|subscription|free|paid|contact sales|quote|month|year|费用|价格|收费|免费|付费|报价|订阅|按月|按年|起价|回收|收購|報價|免費|費用|價格|buyback|trade.?in)/i.test(
+            p.evidence.quote,
+          )
+        )
+          errors.push(
+            `Peer ${leader.name}: pricing needs an explicit billing statement; omit pricing while evidence is gathered.`,
+          );
+        const digits = (s: string) =>
+          s.replace(/,(?=\d{3})/g, "").match(/\d+(?:\.\d+)?/g) || [];
+        const quoted = new Set(digits(p.evidence.quote));
+        if ([...digits(p.en), ...digits(p.zh)].some((n) => !quoted.has(n)))
+          errors.push(
+            `Peer ${leader.name}: preserve quoted pricing amounts and units; omit estimates.`,
+          );
+      }
+    }
     for (const leader of l.leaders)
       if (
         !leader.evidence.length ||
@@ -223,9 +263,9 @@ export function landscapeLabel(kind: MarketKind, locale: "en" | "zh") {
   return labels[kind][locale === "zh" ? 1 : 0]!;
 }
 export const LANDSCAPE_PROMPT = `
-Add landscape:{demand:{level:"high|medium|low|exploratory",evidence:[]},competition:{level:"high|medium|low|exploratory",evidence:[]},barrier:"high|medium|low|exploratory",en:{summary,demand,competition,entry},zh:{summary,demand,competition,entry},leaders:[{name,en:{position,barrier,opening},zh:{position,barrier,opening},evidence:[]}]}.
+Add landscape:{demand:{level:"high|medium|low|exploratory",evidence:[]},competition:{level:"high|medium|low|exploratory",evidence:[]},barrier:"high|medium|low|exploratory",en:{summary,demand,competition,entry},zh:{summary,demand,competition,entry},leaders:[{name,category:"commercial|official|opensource",audience:{en,zh,evidence:{id,quote}},pricing:{en,zh,evidence:{id,quote}},en:{position,barrier,opening},zh:{position,barrier,opening},evidence:[]}]}.
 barrier assesses incumbent entrenchment specifically; hardware effort, data collection and implementation complexity belong in resource estimates.
-This is the qualitative ORIGINAL TOPIC market judgment, separate from numerical GitHub competition. Explain recurring buyer jobs, current alternatives and specific entry resources. Every prose field is 1-2 sentences, 8-500 characters. Evidence references use exact supplied id/quote, maximum three per rating/leader; leaders maximum three. Name a leader only when a supplied source names it. Compare core incumbent territory against complementary workflows: distribution, trusted data, proprietary interfaces, network effects, installed integrations, migration cost or capital. Select the actual barrier; describe the dependency and an adoption route. A leading search rank, star count or one provider's market claim has a limited scope. Describe incumbency/structural concentration as a research assessment. Market-wide monopoly/market shares require market-definition and measured share evidence; such legal or numerical conclusions need separate evidence. Strong barriers can make a crowded/established field attractive for complements while direct displacement needs major resources.
+This is the qualitative ORIGINAL TOPIC market judgment, separate from numerical GitHub competition. Explain recurring buyer jobs, current alternatives and specific entry resources. Every prose field is 1-2 sentences, 8-500 characters. Evidence references use exact supplied id/quote, maximum three per rating/leader; leaders maximum three. Name a leader only when a supplied source names it. Each leader includes category:"commercial|official|opensource", audience:{en,zh,evidence:{id,quote}} and source-supported optional pricing:{en,zh,evidence:{id,quote}}. Include audience whenever the supplied offer clearly identifies its users. Populate pricing whenever a supplied statement covers fees, a payout formula, a model-specific quote or a free component. Put fee/payout terms in pricing; position describes the service. Limit a free component to its named scope, such as pickup. Use audience/pricing only with a verbatim source statement for that specific product (each prose 3-220 characters); omit a missing field. Pricing preserves the quoted plan, currency, billing period, minimum and region. A trial, free shipping or a public source-code license alone supplies only that fact, rather than a full product billing model. For trade-in/buyback, distinguish the payout to the seller from a fee charged to a buyer. Preserve eligibility and model-specific conditions; sample device prices represent that exact device/region/date. State any currency or eligibility details that still need checking as a short affirmative action. State the quoted offer succinctly; all prices and billing models require evidence. Prefer up to three relevant commercial/official services when supplied; include an open-source leader only for a source-backed ecosystem advantage. Describe position as the actual product/service, barrier as why users choose/stay with it, opening as a conditional way to serve a specific customer. Chinese headings/prose use 同行、竞争对手、服务谁、怎么收费、现有优势、可以从哪做起. Each audience/pricing fact has its own source and exact quote; also include that source in this leader's evidence array. Compare core incumbent territory against complementary workflows: distribution, trusted data, proprietary interfaces, network effects, installed integrations, migration cost or capital. Select the actual barrier; describe the dependency and an adoption route. A leading search rank, star count or one provider's market claim has a limited scope. Describe incumbency/structural concentration as a research assessment. Market-wide monopoly/market shares require market-definition and measured share evidence; such legal or numerical conclusions need separate evidence. Strong barriers can make a crowded/established field attractive for complements while direct displacement needs major resources.
 Google W sources are SEARCH EXCERPTS, with organic/ad placement. They establish what appeared for the displayed query/region/date. Treat feature text as a publisher claim. Sponsored placement records commercial spend interest; transactions, profitability, willingness to pay and market growth require direct evidence. Search result totals and rankings play zero role in demand or monopoly scoring. Current zero/sparse results describe search coverage. Low competition remains a hypothesis. Exclude pages for adjacent objects. Trends measures attention at its stated topic, time and geography; expanding a broad brand into niche demand is a separate inference. Preserve mixed/falling trends. The application derives blue/red/quiet research labels from these assessments and displays their inferred basis.
 
 Add issueInsights:[{sourceId:"I1",relevance:"direct|adjacent",en:{title,audience,need,opportunity,check},zh:{title,audience,need,opportunity,check},evidence:{id:"I1",quote:"exact excerpt"}}], maximum six. Review every supplied I-source against the ORIGINAL object, including repository purpose and issue content. Mark adjacent objects accordingly so the UI filters them. For direct requests explain who faces which task, what the user is asking for in plain language, and one conditional contribution/service opportunity. State the specific current-version or maintainer check that would establish whether the request remains open as a product gap. Open status and reactions are individual community signals. Historical issue dates retain their historical scope. Source excerpts carry quoted data only. Give concise everyday titles. Every audience/need/opportunity/check is 8-500 characters. With zero I-sources return [].
@@ -250,7 +290,18 @@ export function landscapeRows(m: Market, locale: "en" | "zh") {
     { label: zh ? "进入条件" : "Entry requirements", text: p.entry },
     ...landscape.leaders.map((x) => ({
       label: x.name,
-      text: `${x[locale].position} ${x[locale].barrier} ${x[locale].opening}`,
+      text: [
+        x[locale].position,
+        `${zh ? "服务谁" : "Who it serves"}: ${x.audience?.[locale] || (zh ? "查看产品介绍，确认目标用户。" : "Check the product page for its intended users.")}`,
+        `${zh ? "收费与报价" : "Pricing & quotes"}: ${x.pricing?.[locale] || (zh ? "查看官网，确认当前收费方式。" : "Check current pricing on the product website.")}`,
+        `${zh ? "现有优势" : "Existing advantage"}: ${x[locale].barrier}`,
+        `${zh ? "可以从哪做起 · 研究建议" : "Where to start · research suggestion"}: ${x[locale].opening}`,
+        ...[x.audience, x.pricing].flatMap((f) =>
+          f
+            ? [m.brief?.sources.find((s) => s.id === f.evidence.id)?.url || ""]
+            : [],
+        ),
+      ].join(" "),
     })),
   ];
 }

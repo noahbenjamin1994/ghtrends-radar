@@ -185,7 +185,10 @@ export function parseGooglePage(html: string): SearchResult[] {
     )
   )
     throw new Error("search_format");
-  return output.slice(0, 12);
+  return [
+    ...output.filter((r) => r.kind === "organic").slice(0, 10),
+    ...output.filter((r) => r.kind === "ad").slice(0, 4),
+  ];
 }
 
 type DirectResponse = {
@@ -265,24 +268,46 @@ export function searchProxy(raw: string): string {
 }
 export function searchSources(web?: WebEvidence): ResearchSource[] {
   return (
-    web?.queries.flatMap((q, i) =>
-      q.results
-        .filter(
-          (r, j, all) =>
-            all.slice(0, j).filter((x) => x.kind === r.kind).length <
-            (r.kind === "ad" ? 2 : 4),
+    web?.queries.flatMap((q, i) => {
+      // A single brand's help pages otherwise occupy the entire model budget.
+      // Keep independent websites first; GitHub repositories remain distinct.
+      const organic = q.results.filter((r) => r.kind === "organic");
+      const selected: SearchResult[] = [],
+        sites: string[] = [];
+      for (const r of organic) {
+        const url = new URL(r.url);
+        const host = url.hostname.replace(/^(www|m)\./, "");
+        const site =
+          host === "github.com"
+            ? host + url.pathname.split("/").slice(0, 3).join("/")
+            : host;
+        if (
+          sites.some(
+            (s) =>
+              site === s || site.endsWith("." + s) || s.endsWith("." + site),
+          )
         )
-        .map((r, j) => ({
-          id: `W${i + 1}R${j + 1}`,
-          kind: "search" as const,
-          label: r.title,
-          url: r.url,
-          fetchedAt: q.fetchedAt || web.fetchedAt,
-          searchIntent: q.intent,
-          placement: r.kind,
-          excerpt: `Google search excerpt. Query: ${q.query}. Region: ${web.region}. Language: ${web.language}. Placement: ${r.kind}. Title: ${r.title}. Snippet: ${r.excerpt}`,
-        })),
-    ) || []
+          continue;
+        sites.push(site);
+        selected.push(r);
+        if (selected.length === 4) break;
+      }
+      for (const r of organic) {
+        if (selected.length === 4) break;
+        if (!selected.includes(r)) selected.push(r);
+      }
+      selected.push(...q.results.filter((r) => r.kind === "ad").slice(0, 2));
+      return selected.map((r, j) => ({
+        id: `W${i + 1}R${j + 1}`,
+        kind: "search" as const,
+        label: r.title,
+        url: r.url,
+        fetchedAt: q.fetchedAt || web!.fetchedAt,
+        searchIntent: q.intent,
+        placement: r.kind,
+        excerpt: `Google search excerpt. Query: ${q.query}. Region: ${web!.region}. Language: ${web!.language}. Placement: ${r.kind}. Title: ${r.title}. Snippet: ${r.excerpt}`,
+      }));
+    }) || []
   );
 }
 export class GoogleSearch {
@@ -336,11 +361,11 @@ export class GoogleSearch {
       ? topic.plan.webQueries
       : [
           {
-            query: `${base} ${language === "en" ? "alternatives services" : "竞品 服务"}`,
+            query: `${base} ${language === "en" ? "services pricing" : "服务 价格"}`,
             intent: "competition",
           },
           {
-            query: `${base} ${language === "en" ? "user problems reviews" : "用户 体验 问题"}`,
+            query: `${base} ${language === "en" ? "user problems reviews" : "使用体验 求助"}`,
             intent: "demand",
           },
           { query: `${topic.keyword} open source tools`, intent: "opensource" },

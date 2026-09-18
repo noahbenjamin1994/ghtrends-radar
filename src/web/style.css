@@ -5597,3 +5597,196 @@ footer small {
     font-size: 21px;
   }
 }
+
+/* Familiar peer comparisons, with each fact next to its source. */
+.competitor-section {
+  margin: 40px 0;
+  padding: 20px 0 32px;
+  scroll-margin-top: 90px;
+}
+.competitor-section h3 {
+  font-size: clamp(24px, 2.5vw, 32px);
+  letter-spacing: -0.03em;
+  margin: 10px 0;
+}
+.peer-block {
+  border-top: 1px solid #e7e7e2;
+  padding: 30px 0 12px;
+  margin-top: 30px;
+}
+.peer-block > h4 {
+  font-size: 21px;
+  font-weight: 550;
+  margin: 0 0 10px;
+}
+.peer-block > h4 > span {
+  font-size: 12px;
+  color: #96978f;
+  margin-right: 16px;
+  font-weight: 400;
+}
+.peer-open-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 64px;
+  margin: 24px 0;
+}
+.peer-open-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.peer-open-stats strong {
+  font-size: 30px;
+  font-weight: 550;
+}
+.peer-open-stats span {
+  font-size: 12px;
+  color: #6f746b;
+}
+.peer-project {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 24px;
+  padding: 22px 0;
+  border-bottom: 1px solid #eee;
+}
+.peer-project a,
+.peer-sources a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.peer-project a {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.peer-project p {
+  color: #666d65;
+  font-size: 13px;
+  line-height: 1.8;
+  margin: 8px 0 0;
+}
+.peer-project-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  color: #72796d;
+}
+.peer-more {
+  display: inline-block;
+  margin-top: 20px;
+  font-size: 13px;
+}
+.peer-card,
+.peer-ad {
+  background: #f8f8f6;
+  padding: 28px;
+  margin: 20px 0;
+  border-radius: 10px;
+}
+.peer-card header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+}
+.peer-card h5,
+.peer-ad h5 {
+  font-size: 19px;
+  font-weight: 550;
+  line-height: 1.5;
+  margin: 0;
+}
+.peer-card header > span,
+.peer-ad-site {
+  font-size: 11px;
+  color: #73776e;
+}
+.peer-offer,
+.peer-ad > p {
+  font-size: 14px;
+  color: #565e53;
+  line-height: 1.85;
+  margin: 10px 0 24px;
+}
+.peer-card dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px 36px;
+  margin: 0 0 24px;
+}
+.peer-card dt,
+.peer-ad dt {
+  font-size: 13px;
+  font-weight: 550;
+  margin-bottom: 7px;
+}
+.peer-card dt small {
+  font-size: 10px;
+  color: #7c8177;
+  font-weight: 400;
+  margin-left: 8px;
+}
+.peer-card dd,
+.peer-ad dd {
+  font-size: 14px;
+  color: #596153;
+  line-height: 1.85;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.peer-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 11px;
+  color: #71776a;
+}
+.peer-card dl .peer-sources {
+  margin-top: 8px;
+}
+.peer-ad h5 {
+  margin-top: 10px;
+}
+.peer-ad h5 svg {
+  margin-left: 6px;
+}
+.peer-ad dl {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+.peer-empty {
+  font-size: 14px;
+  line-height: 1.9;
+  padding: 20px 24px;
+  background: #f8f8f6;
+  border-radius: 8px;
+  color: #636b5d;
+}
+@media (max-width: 720px) {
+  .peer-project,
+  .peer-card dl {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .peer-project-facts {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+  }
+  .peer-card,
+  .peer-ad {
+    padding: 22px 20px;
+  }
+  .peer-card header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .peer-open-stats {
+    gap: 24px;
+  }
+}

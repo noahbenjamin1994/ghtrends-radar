@@ -88,7 +88,7 @@ export function marketCard(m: Market, url: string, locale: Locale = "en") {
 <text x="76" y="427" fill="#20201e" font-size="${value.length > 8 ? 25 : 44}" font-weight="600">${xml(value)}</text>
 <text x="76" y="462" fill="#74716c" font-size="15">${xml(t("Search growth · 8 weeks vs prior 8"))}</text>
 <text x="397" y="427" fill="#20201e" font-size="44" font-weight="600">${m.competition ? competitionPressure(m) + " / 100" : m.supply.error ? "—" : (m.supply.complete ? "" : "≥") + m.supply.total.toLocaleString("en-US")}</text>
-<text x="397" y="462" fill="#74716c" font-size="15">${xml(t(m.competition ? "Competition pressure" : "Matching active GitHub projects"))}</text>
+<text x="397" y="462" fill="#74716c" font-size="15">${xml(t(m.competition ? "Open-source competition" : "Matching active GitHub projects"))}</text>
 <line x1="730" x2="730" y1="156" y2="492" stroke="${presentation.color}" stroke-opacity=".16"/>
 <text x="770" y="200" fill="#78726c" font-size="15">${xml(qualification)}</text>
 <text fill="${presentation.color}" font-size="64" font-weight="700" letter-spacing="-2">${textLines(verdictLines, 767, verdictLines.length === 3 ? 280 : 310, 76)}</text>

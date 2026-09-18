@@ -90,6 +90,10 @@ export class Engine {
       existing.version === ALGORITHM_VERSION &&
       (!ai || existing.brief?.strategyVersion === STRATEGY_VERSION) &&
       (!ai || !this.search.enabled || existing.web?.state === "ready") &&
+      (!ai || existing.topic.plan?.version === topic.plan?.version) &&
+      (!ai ||
+        JSON.stringify(existing.topic.plan?.webQueries) ===
+          JSON.stringify(topic.plan?.webQueries)) &&
       existing.topic.query === topic.query &&
       JSON.stringify(existing.topic.queries) ===
         JSON.stringify(topic.queries) &&

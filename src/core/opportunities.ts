@@ -107,9 +107,11 @@ export function proseRepairs(
     visit(data[lang], lang);
     visit(data.overview?.[lang], `overview.${lang}`);
     visit(data.landscape?.[lang], `landscape.${lang}`);
-    data.landscape?.leaders?.forEach((x: any, i: number) =>
-      visit(x[lang], `landscape.leaders.${i}.${lang}`),
-    );
+    data.landscape?.leaders?.forEach((x: any, i: number) => {
+      visit(x[lang], `landscape.leaders.${i}.${lang}`);
+      visit(x.audience?.[lang], `landscape.leaders.${i}.audience.${lang}`);
+      visit(x.pricing?.[lang], `landscape.leaders.${i}.pricing.${lang}`);
+    });
     data.issueInsights?.forEach((x: any, i: number) =>
       visit(x[lang], `issueInsights.${i}.${lang}`),
     );
@@ -220,9 +222,11 @@ export function groundOpportunityRatings(
     ...(result.overview?.evidence || []),
     ...((result as any).landscape?.demand?.evidence || []),
     ...((result as any).landscape?.competition?.evidence || []),
-    ...((result as any).landscape?.leaders?.flatMap(
-      (x: any) => x.evidence || [],
-    ) || []),
+    ...((result as any).landscape?.leaders?.flatMap((x: any) => [
+      ...(x.evidence || []),
+      ...(x.audience ? [x.audience.evidence] : []),
+      ...(x.pricing ? [x.pricing.evidence] : []),
+    ]) || []),
     ...((result as any).issueInsights
       ?.map((x: any) => x.evidence)
       .filter(Boolean) || []),

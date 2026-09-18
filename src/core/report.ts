@@ -54,8 +54,8 @@ export function marketMarkdown(
     a.demandNote,
     ...(m.competition
       ? [
-          `${t("Competition pressure")}: **${competitionPressure(m)} / 100** · ${t("pressure." + m.competition.level)}`,
-          `${t("Direct alternatives")}: ${m.competition.direct} · ${t("Within {sample} inspected projects").replace("{sample}", String(m.competition.sampled))}`,
+          `${t("Open-source competition")}: **${competitionPressure(m)} / 100** · ${t("pressure." + m.competition.level)}`,
+          `${t("Open-source alternatives")}: ${m.competition.direct} · ${t("Within {sample} inspected projects").replace("{sample}", String(m.competition.sampled))}`,
           `${t("Direction basis")}: ${t("basis." + (m.metrics.directionBasis || "recent-windows"))}`,
         ]
       : []),
@@ -254,7 +254,7 @@ export function marketMarkdown(
             `### ${cell(q.query)}`,
             ...q.results.map(
               (r) =>
-                `- ${r.kind === "ad" ? (locale === "zh" ? "广告" : "Ad") : locale === "zh" ? "自然结果" : "Organic"}: [${cell(r.title)}](${r.url}) — ${cell(r.excerpt)}`,
+                `- ${r.kind === "ad" ? (locale === "zh" ? "广告" : "Ad") : locale === "zh" ? "自然结果" : "Organic"}: [${cell(r.title)}](${r.url}) — ${cell(r.excerpt)}${r.kind === "ad" ? ` · ${locale === "zh" ? "投放网站" : "Landing-page website"}: ${new URL(r.url).hostname}` : ""}`,
             ),
           ]),
         ]
