@@ -543,10 +543,19 @@ export async function runDeepResearch(
       corrections = review.corrections.length
         ? review.corrections.slice(0, 6).map((c) => c.text)
         : ["Resolve source support and scope before completing this brief."];
-      const allowed = new Set(deepEditableFields(result).map((f) => f.path));
+      const allowed = deepEditableFields(result).map((f) => f.path);
       repairFields = [
-        ...new Set(review.corrections.flatMap((c) => c.paths)),
-      ].filter((path) => allowed.has(path));
+        ...new Set(
+          review.corrections
+            .flatMap((c) => c.paths)
+            .flatMap((path) => {
+              const field = allowed.find(
+                (f) => path === f || path.startsWith(f + "."),
+              );
+              return field ? [field] : [];
+            }),
+        ),
+      ];
       priorReview = { result, corrections };
       if (!repairFields.length) break;
       continue;

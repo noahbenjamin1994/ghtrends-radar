@@ -472,7 +472,7 @@ test("source checkpoints support bounded recovery with direct writing and light 
             ? []
             : [
                 {
-                  field: "plan.experiment",
+                  field: "plan.experiment.zh",
                   basis: "E2",
                   repair:
                     "Tie the proposed sample to the editor workflow. " +
