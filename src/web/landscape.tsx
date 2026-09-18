@@ -1,3 +1,4 @@
+import { searchCollectionMessage } from "../core/evidence.js";
 import { ArrowUpRight } from "lucide-react";
 import { landscapeLabel, researchLandscape } from "../core/landscape.js";
 import type { Brief, Gap, Market } from "../core/types.js";
@@ -138,8 +139,10 @@ function SearchEvidence({
         <details className="web-evidence">
           <summary>
             {zh ? "查看 Google 搜索证据" : "Inspect Google search evidence"} ·{" "}
-            {m.web.queries.reduce((n, q) => n + q.results.length, 0)}{" "}
-            {zh ? "条结果" : "results"}
+            {m.web.queries.filter((q) => q.state === "ready").length}/
+            {m.web.queries.length} {zh ? "组已采集" : "queries collected"}
+            {m.web.queries.some((q) => q.state === "ready") &&
+              ` · ${m.web.queries.reduce((n, q) => n + q.results.length, 0)} ${zh ? "条结果" : "results"}`}
           </summary>
           <p className="research-caption">
             Google · {m.web.region} · {m.web.language} ·{" "}
@@ -148,13 +151,9 @@ function SearchEvidence({
               ? "搜索结果为地域样本；广告仅覆盖当次页面展示的位置，反映商业投放意向。购买与持续使用需要行为证据。"
               : "A regional search sample with ads visible on the collected page. Ads signal marketing intent; purchases and sustained use need behavioral evidence."}
           </p>
-          {m.web.state === "setup" || m.web.state === "pending" ? (
-            <p>
-              {zh
-                ? "网页证据采集准备中；当前研判结合已有来源与领域推演。"
-                : "Web evidence collection is being prepared; this judgment uses available sources and domain inference."}
-            </p>
-          ) : null}
+          {m.web.state !== "ready" && (
+            <p role="status">{searchCollectionMessage(m.web, locale)}</p>
+          )}
           {m.web.queries.map((q) => (
             <div className="web-query" key={q.query}>
               <h5>
@@ -167,9 +166,11 @@ function SearchEvidence({
                   <ArrowUpRight size={12} />
                 </a>
               </h5>
-              {q.state === "pending" && (
+              {q.state !== "ready" && (
                 <p>
-                  {zh ? "此组证据待采集" : "This query is awaiting collection"}
+                  {zh
+                    ? "采集已暂停 · 可更新研究后重试"
+                    : "Collection stopped · update research to retry"}
                 </p>
               )}
               {q.results.map((r) => (
@@ -412,10 +413,17 @@ export function CompetitorPanel({
           ))
         ) : (
           <p className="peer-empty">
-            {l(
-              "Commercial offers are ready for a closer review. Use the search sources below or update this research to build the comparison.",
-              "商业同行待进一步核对。可展开下方搜索来源，或更新研究来补充对比。",
-            )}
+            {m.aiError
+              ? l(
+                  "The AI review needs another pass. Choose Update research to rebuild the comparison from collected sources.",
+                  "AI 解读需要重新生成。点击「更新研究」，根据采集来源补充同行对比。",
+                )
+              : m.web?.state !== "ready"
+                ? searchCollectionMessage(m.web, locale)
+                : l(
+                    "The collected sources need a closer product-level review. Open the search evidence below to inspect the offers.",
+                    "当前来源需要进一步核对具体产品。展开下方搜索证据，可查看相关方案。",
+                  )}
           </p>
         )}
       </div>
@@ -480,8 +488,8 @@ export function CompetitorPanel({
                   "本次搜索样本记录了 0 条广告。可结合其他时间、地区继续查看投放线索。",
                 )
               : l(
-                  "Ad observations will appear here after search collection completes.",
-                  "搜索采集完成后，这里展示观察到的广告。",
+                  "Ad collection needs a retry. Choose Update research to capture a new search sample.",
+                  "广告采集需要重试。点击「更新研究」可重新采集搜索样本。",
                 )}
           </p>
         )}

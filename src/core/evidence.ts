@@ -1,6 +1,47 @@
 import type { DemandEvidence, InterestPoint, Market } from "./types.js";
+import type { WebEvidence } from "../providers/search.js";
 
 const WEEK = 7 * 86400000;
+
+export function searchCollectionMessage(
+  web: WebEvidence | undefined,
+  locale: "en" | "zh",
+) {
+  const zh = locale === "zh";
+  if (!web || web.state === "setup")
+    return zh
+      ? "网页搜索需要管理员配置采集服务。"
+      : "Web search requires a configured collection service.";
+  if (web.state === "ready") return "";
+  const challenge = web.queries.some((q) =>
+    /challenge|http_429/.test(q.error || ""),
+  );
+  const reason = challenge
+    ? zh
+      ? "Google 要求访问验证，本轮搜索已暂停。"
+      : "Google requested access verification. This search attempt has stopped."
+    : zh
+      ? "本轮网页采集已结束，部分搜索证据待补充。"
+      : "This collection attempt has ended with gaps in search coverage.";
+  return (
+    reason +
+    (zh
+      ? "点击「更新研究」可重试；成功采集的结果会保留。"
+      : "Choose Update research to retry; successful search results are retained.")
+  );
+}
+
+export function researchWarnings(m: Market, searchExpected = false): string[] {
+  return [
+    m.demand.error,
+    m.demand.collectionError,
+    m.supply.error,
+    m.aiError,
+    searchExpected && m.web?.state !== "ready"
+      ? "Web search collection needs a retry; this attempt's research credit is returned."
+      : undefined,
+  ].filter((x): x is string => !!x);
+}
 
 export function sourceEvidenceIsFresh(
   market: Pick<Market, "demand" | "supply">,

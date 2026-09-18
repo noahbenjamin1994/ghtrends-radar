@@ -311,3 +311,44 @@ test("AI research remains available during source cooldown within attempt limits
       401,
     );
   }));
+
+test("search failures return credits and a retry never reopens an incomplete cached scan", async () =>
+  hosted(async ({ engine, get, post }) => {
+    (engine.research as any).enabled = true;
+    Object.defineProperty(engine.search, "enabled", { value: true });
+    let calls = 0;
+    engine.scan = async () => {
+      const m = structuredClone(seed);
+      m.id = (++calls).toString(16).padStart(16, "0");
+      m.asOf =
+        m.demand.fetchedAt =
+        m.supply.fetchedAt =
+          new Date().toISOString();
+      delete m.demand.error;
+      delete m.demand.collectionError;
+      delete m.supply.error;
+      delete m.aiError;
+      m.web = {
+        provider: "google-mobile",
+        region: "US",
+        language: "en",
+        fetchedAt: m.asOf,
+        state: calls === 1 ? "failed" : "ready",
+        queries: [],
+      };
+      engine.store.saveMarket(m, false, "alice");
+      return m;
+    };
+    let r = await (await post("/api/scan", { topic: "AI4S" })).json();
+    let job = await (await get("/api/jobs/" + r.id)).json();
+    assert.equal(job.credit, "returned");
+    assert.equal(engine.store.usage("alice"), 0);
+    r = await (await post("/api/scan", { topic: "AI4S" })).json();
+    job = await (await get("/api/jobs/" + r.id)).json();
+    assert.equal(job.credit, "used");
+    assert.equal(calls, 2);
+    assert.equal(engine.store.usage("alice"), 1);
+    r = await (await post("/api/scan", { topic: "AI4S" })).json();
+    assert.equal(r.credit, "free");
+    assert.equal(calls, 2);
+  }));

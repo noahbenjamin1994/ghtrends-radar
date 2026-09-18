@@ -77,6 +77,46 @@ export function validQuote(
       s.id === ref.id && s.excerpt && norm(s.excerpt).includes(norm(ref.quote)),
   );
 }
+const billingStatement =
+  /(?:pric|cost|charg|bill|subscription|free|paid|contact sales|quote|month|year|费用|价格|收费|免费|付费|报价|订阅|按月|按年|起价|回收|收購|報價|免費|費用|價格|buyback|trade.?in)/i;
+const pricingDigits = (s: string): string[] =>
+  s.replace(/,(?=\d{3})/g, "").match(/\d+(?:\.\d+)?/g) || [];
+const pricingSupported = (p: z.infer<typeof peerFact>) =>
+  billingStatement.test(p.evidence.quote) &&
+  [...pricingDigits(p.en), ...pricingDigits(p.zh)].every((n) =>
+    pricingDigits(p.evidence.quote).includes(n),
+  );
+
+/** Optional facts can be withheld independently of the validated report.
+ * Normalize a singleton reference array without changing its source or text.
+ * Missing/unsupported prices remain a source-check prompt in the interface.
+ */
+export function groundCompetitorFacts(raw: any, sources: ResearchSource[]) {
+  const value = structuredClone(raw);
+  if (!Array.isArray(value?.landscape?.leaders)) return value;
+  for (const leader of value.landscape.leaders) {
+    if (!leader || typeof leader !== "object") continue;
+    for (const key of ["audience", "pricing"] as const) {
+      const fact = leader[key];
+      if (!fact) {
+        delete leader[key];
+        continue;
+      }
+      if (Array.isArray(fact.evidence) && fact.evidence.length === 1)
+        fact.evidence = fact.evidence[0];
+      const parsed = peerFact.safeParse(fact);
+      if (
+        !parsed.success ||
+        !validQuote(parsed.data.evidence, sources) ||
+        !Array.isArray(leader.evidence) ||
+        !leader.evidence.some((r: any) => r?.id === parsed.data.evidence.id) ||
+        (key === "pricing" && !pricingSupported(parsed.data))
+      )
+        delete leader[key];
+    }
+  }
+  return value;
+}
 export function landscapeProblems(
   raw: any,
   sources: ResearchSource[],
@@ -119,18 +159,16 @@ export function landscapeProblems(
       }
       if (leader.pricing) {
         const p = leader.pricing;
-        if (
-          !/(?:pric|cost|charg|bill|subscription|free|paid|contact sales|quote|month|year|费用|价格|收费|免费|付费|报价|订阅|按月|按年|起价|回收|收購|報價|免費|費用|價格|buyback|trade.?in)/i.test(
-            p.evidence.quote,
-          )
-        )
+        if (!billingStatement.test(p.evidence.quote))
           errors.push(
             `Peer ${leader.name}: pricing needs an explicit billing statement; omit pricing while evidence is gathered.`,
           );
-        const digits = (s: string) =>
-          s.replace(/,(?=\d{3})/g, "").match(/\d+(?:\.\d+)?/g) || [];
-        const quoted = new Set(digits(p.evidence.quote));
-        if ([...digits(p.en), ...digits(p.zh)].some((n) => !quoted.has(n)))
+        const quoted = new Set(pricingDigits(p.evidence.quote));
+        if (
+          [...pricingDigits(p.en), ...pricingDigits(p.zh)].some(
+            (n) => !quoted.has(n),
+          )
+        )
           errors.push(
             `Peer ${leader.name}: preserve quoted pricing amounts and units; omit estimates.`,
           );

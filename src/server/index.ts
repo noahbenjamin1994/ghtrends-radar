@@ -25,7 +25,7 @@ import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
 import { marketMarkdown } from "../core/report.js";
 import type { Market } from "../core/types.js";
 import { renderDocument } from "./html.js";
-import { sourceEvidenceIsFresh } from "../core/evidence.js";
+import { sourceEvidenceIsFresh, researchWarnings } from "../core/evidence.js";
 import { requestLocale, localeUrl, type Locale } from "../core/i18n.js";
 interface Job {
   id: string;
@@ -229,12 +229,11 @@ export function createApp(engine = new Engine()) {
               }),
           );
           job.state = "complete";
-          const success = ![
-            job.market.demand.error,
-            job.market.demand.collectionError,
-            job.market.supply.error,
-            job.market.aiError,
-          ].some(Boolean);
+          const warnings = researchWarnings(
+            job.market,
+            engine.research.enabled && engine.search.enabled,
+          );
+          const success = warnings.length === 0;
           engine.store.settleUsage(job.id, success);
           job.credit =
             auth.hosted && job.owner ? (success ? "used" : "returned") : "free";
@@ -243,12 +242,7 @@ export function createApp(engine = new Engine()) {
 
           engine.store.updateRun(job.id, "complete", {
             reportId: job.market.id,
-            warnings: [
-              job.market.demand.error,
-              job.market.demand.collectionError,
-              job.market.supply.error,
-              job.market.aiError,
-            ].filter((x): x is string => !!x),
+            warnings,
           });
           delete job.progress?.preview;
         } catch (e) {
@@ -718,6 +712,10 @@ export function createApp(engine = new Engine()) {
           : null;
       if (
         saved &&
+        researchWarnings(
+          saved,
+          engine.research.enabled && engine.search.enabled,
+        ).length === 0 &&
         sourceEvidenceIsFresh(saved) &&
         Date.now() - Date.parse(saved.asOf) < 86400000
       )
@@ -873,7 +871,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.2/ghtrends-radar-0.17.2.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.3/ghtrends-radar-0.17.3.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>

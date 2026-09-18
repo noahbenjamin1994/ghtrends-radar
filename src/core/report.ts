@@ -1,3 +1,4 @@
+import { searchCollectionMessage } from "./evidence.js";
 import { landscapeRows, researchLandscape } from "./landscape.js";
 import { reportIssueSignals } from "./gaps.js";
 import {
@@ -246,6 +247,7 @@ export function marketMarkdown(
           `## ${locale === "zh" ? "Google 网页搜索证据" : "Google web search evidence"}`,
           "",
           `${m.web.region} · ${m.web.language} · ${m.web.fetchedAt.slice(0, 10)}`,
+          searchCollectionMessage(m.web, locale),
           locale === "zh"
             ? "搜索结果为地域样本。广告反映商业投放意向，购买与持续使用需要行为证据。"
             : "A regional search sample. Ads signal marketing intent; purchases and sustained use need behavioral evidence.",

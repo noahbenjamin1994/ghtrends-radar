@@ -1,3 +1,4 @@
+import { searchCollectionMessage } from "../core/evidence.js";
 import { landscapeRows, researchLandscape } from "../core/landscape.js";
 import {
   visibleOpportunities,
@@ -197,7 +198,7 @@ export function renderDocument(
           return `<article><h3>${link(g.url, p?.title || g.title)}</h3>${p ? list([p.audience, p.need, p.opportunity, p.check]) : `<p>${escapeHtml(g.excerpt)}</p>`}<p>${escapeHtml(g.repo)}${g.createdAt ? ` · ${escapeHtml(g.createdAt.slice(0, 10))}` : ""}</p></article>`;
         })
         .join("")}</section>
-      ${m.web?.queries.length ? `<section><h2>${locale === "zh" ? "Google 网页证据" : "Google web evidence"}</h2><p>${escapeHtml(m.web.region)} · ${escapeHtml(m.web.language)} · ${escapeHtml(m.web.fetchedAt.slice(0, 10))}</p>${m.web.queries.map((q) => `<h3>${escapeHtml(q.query)}</h3>${q.results.map((r) => `<p>${r.kind === "ad" ? (locale === "zh" ? "广告" : "Ad") : locale === "zh" ? "自然结果" : "Organic"} · ${link(r.url, r.title)}${r.kind === "ad" ? ` · ${escapeHtml(new URL(r.url).hostname)}` : ""}</p><p>${escapeHtml(r.excerpt)}</p>`).join("")}`).join("")}</section>` : ""}
+      ${m.web?.queries.length ? `<section><h2>${locale === "zh" ? "Google 网页证据" : "Google web evidence"}</h2><p>${escapeHtml(m.web.region)} · ${escapeHtml(m.web.language)} · ${escapeHtml(m.web.fetchedAt.slice(0, 10))}</p><p>${escapeHtml(searchCollectionMessage(m.web, locale))}</p>${m.web.queries.map((q) => `<h3>${escapeHtml(q.query)}</h3>${q.results.map((r) => `<p>${r.kind === "ad" ? (locale === "zh" ? "广告" : "Ad") : locale === "zh" ? "自然结果" : "Organic"} · ${link(r.url, r.title)}${r.kind === "ad" ? ` · ${escapeHtml(new URL(r.url).hostname)}` : ""}</p><p>${escapeHtml(r.excerpt)}</p>`).join("")}`).join("")}</section>` : ""}
       <section><h2>${e("Use and share the evidence")}</h2><p>${link(`/report/${m.id}`, "Permanent report")} · ${link(`/api/reports/${m.id}?format=md&v=2`, "Markdown")} · ${link(`/api/reports/${m.id}`, "JSON")} · ${link(`/api/cards/${m.id}.png?v=2`, "PNG card")}</p><p>${link(SOURCE, "Use the open-source CLI and MCP server on GitHub")}</p></section>`;
   } else if (status === 404) {
     content = `<h1>${e("Page not found.")}</h1><p>${e("This report or page is unavailable.")} ${link("/", "Explore the radar")}</p>`;

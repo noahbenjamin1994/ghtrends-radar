@@ -1,3 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { CompetitorPanel } from "../src/web/landscape.js";
+import { searchCollectionMessage } from "../src/core/evidence.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
@@ -15,6 +19,7 @@ import { Store } from "../src/core/store.js";
 import { marketGapSignals } from "../src/core/gaps.js";
 import {
   landscapeProblems,
+  groundCompetitorFacts,
   researchLandscape,
   type Landscape,
 } from "../src/core/landscape.js";
@@ -129,7 +134,7 @@ test("direct search reuses residential routes, caches results, records traffic a
     assert.equal(calls, 1);
     fail = true;
     topic.plan.webQueries[0].query = "another sample";
-    assert.equal((await search.collect(topic, "US")).state, "pending");
+    assert.equal((await search.collect(topic, "US")).state, "failed");
     assert.equal(calls, 3);
     topic.plan.webQueries[0].query = "third sample";
     await search.collect(topic, "US");
@@ -227,7 +232,7 @@ test("search caches successful queries and caps attempts after a provider failur
       "US",
     );
     assert.equal(calls, 4);
-    assert.equal(failed.state, "pending");
+    assert.equal(failed.state, "failed");
     assert.ok(failed.queries.every((q) => !q.results.length));
     assert.ok(!JSON.stringify(failed).includes("test-protected-token"));
   } finally {
@@ -539,4 +544,178 @@ test("model evidence includes independent competitors instead of repeating one b
     result("https://github.com/two/tool"),
   ];
   assert.equal(searchSources(web).length, 2);
+});
+
+test("rotating search retries a fresh exit within a three-request budget and preserves terminal errors", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-retry-")),
+    store = new Store(dir);
+  const keys = [
+    "GHTRENDS_SEARCH_MODE",
+    "GOOGLE_SEARCH_PROXY",
+    "GOOGLE_SEARCH_PROXY_FALLBACK",
+  ];
+  const env = keys.map((k) => process.env[k]);
+  Object.assign(process.env, {
+    GHTRENDS_SEARCH_MODE: "direct",
+    GOOGLE_SEARCH_PROXY:
+      "http://user-country-us-session-one:secret@gate.decodo.com:7000",
+    GOOGLE_SEARCH_PROXY_FALLBACK:
+      "http://user-country-us-session-two:secret@gate.decodo.com:7000",
+  });
+  let calls = 0;
+  const topic = {
+    ...seed.topic,
+    keyword: "AI for Science",
+    plan: { input: "AI4S", model: "curated" },
+  } as any;
+  const search = new GoogleSearch(store, async (request) => {
+    calls++;
+    assert.ok(request.query.startsWith("AI for Science"));
+    assert.ok(!request.proxy.includes("session-"));
+    return calls < 3 ? { status: 302 } : { status: 200, html: mobile };
+  });
+  try {
+    const recovered = await search.collect(topic, "US");
+    assert.equal(recovered.state, "ready");
+    assert.equal(calls, 5); // first query 3 attempts; two other queries 1 each
+    let failures = 0;
+    const blocked = new GoogleSearch(store, async () => {
+      failures++;
+      return { status: 302 };
+    });
+    const result = await blocked.collect(
+      { ...topic, keyword: "Other research category" },
+      "US",
+    );
+    assert.equal(result.state, "failed");
+    assert.equal(
+      failures,
+      3,
+      "one exhausted pool pauses all remaining queries",
+    );
+    assert.ok(
+      result.queries.every((q) => q.error === "search_challenge" && q.retryAt),
+    );
+    assert.ok(!JSON.stringify(result).includes("secret"));
+  } finally {
+    keys.forEach((k, i) =>
+      env[i] === undefined ? delete process.env[k] : (process.env[k] = env[i]),
+    );
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("saved failed searches render stopped states instead of pending work or an empty market", () => {
+  const m = structuredClone(seed);
+  m.web = {
+    provider: "google-mobile",
+    region: "US",
+    language: "en",
+    fetchedAt: "2026-09-18",
+    state: "failed",
+    queries: [
+      {
+        query: "AI for Science services",
+        intent: "competition",
+        state: "failed",
+        error: "search_challenge",
+        results: [],
+      },
+    ],
+  };
+  m.aiError = "AI review needs a retry.";
+  const html = renderToStaticMarkup(
+    createElement(CompetitorPanel, { market: m, locale: "zh" }),
+  );
+  assert.ok(html.includes("Google 要求访问验证"));
+  assert.ok(html.includes("AI 解读需要重新生成"));
+  assert.ok(html.includes("0/1"));
+  assert.ok(!html.includes("0 条结果"));
+  assert.ok(!html.includes("采集准备中"));
+  m.web.state = "pending"; // old snapshots have lost the provider error
+  delete m.web.queries[0]!.error;
+  assert.ok(searchCollectionMessage(m.web, "zh").includes("已结束"));
+  m.web.state = "ready";
+  m.web.queries[0]!.state = "ready";
+  assert.equal(searchCollectionMessage(m.web, "en"), "");
+});
+
+test("optional competitor facts recover singleton references and isolate unsupported prices", () => {
+  const l = landscape();
+  l.leaders = [
+    {
+      name: "Tool",
+      category: "opensource",
+      en: { position: copy.summary, barrier: copy.entry, opening: copy.entry },
+      zh: { position: l.zh.summary, barrier: l.zh.entry, opening: l.zh.entry },
+      evidence: [{ id: "W2", quote: sources[1]!.excerpt! }],
+    },
+  ];
+  const raw: any = { landscape: l };
+  raw.landscape.leaders[0].audience = {
+    en: "Photo transfer users",
+    zh: "迁移照片的手机用户",
+    evidence: [{ id: "W2", quote: sources[1]!.excerpt! }],
+  };
+  raw.landscape.leaders[0].pricing = {
+    en: "Free to use",
+    zh: "免费使用",
+    evidence: [{ id: "W2", quote: sources[1]!.excerpt! }],
+  };
+  const nullable = structuredClone(raw);
+  nullable.landscape.leaders[0].pricing = null;
+  assert.equal(
+    groundCompetitorFacts(nullable, sources).landscape.leaders[0].pricing,
+    undefined,
+  );
+  const before = JSON.stringify(raw);
+  const grounded = groundCompetitorFacts(raw, sources);
+  assert.equal(grounded.landscape.leaders[0].audience.evidence.id, "W2");
+  assert.equal(grounded.landscape.leaders[0].pricing, undefined);
+  assert.deepEqual(landscapeProblems(grounded, sources), []);
+  assert.equal(JSON.stringify(raw), before);
+  raw.landscape.leaders[0].audience.evidence.push({
+    id: "W1",
+    quote: sources[0]!.excerpt!,
+  });
+  assert.equal(
+    groundCompetitorFacts(raw, sources).landscape.leaders[0].audience,
+    undefined,
+    "ambiguous arrays stay out",
+  );
+});
+
+test("competition evidence retains billing pages after four independent news sources", () => {
+  const web = {
+    provider: "google-mobile" as const,
+    region: "US",
+    language: "en",
+    fetchedAt: "2026-09-18",
+    state: "ready" as const,
+    queries: [
+      {
+        query: "scientific research services pricing",
+        intent: "competition" as const,
+        state: "ready" as const,
+        results: [
+          ...Array.from({ length: 5 }, (_, i) => ({
+            title: "Research news",
+            url: `https://news${i}.example/article`,
+            excerpt: "Research news.",
+            kind: "organic" as const,
+          })),
+          {
+            title: "Research plans",
+            url: "https://tool.example/pricing",
+            excerpt: "Plans from $10 per month.",
+            kind: "organic" as const,
+          },
+        ],
+      },
+    ],
+  };
+  const sources = searchSources(web);
+  assert.equal(sources.length, 5);
+  assert.ok(sources.some((s) => s.url === "https://tool.example/pricing"));
 });

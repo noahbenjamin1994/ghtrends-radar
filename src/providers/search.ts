@@ -29,13 +29,24 @@ export interface WebEvidence {
   region: string;
   language: string;
   fetchedAt: string;
-  state: "ready" | "partial" | "pending" | "setup";
+  state: "ready" | "partial" | "failed" | "pending" | "setup";
   queries: (SearchQuery & {
-    state: "ready" | "pending";
+    state: "ready" | "failed" | "pending";
+    error?: string;
+    retryAt?: string;
     fetchedAt?: string;
     results: SearchResult[];
   })[];
 }
+const searchFailure = (error: unknown, retryAt?: string) =>
+  Object.assign(
+    new Error(
+      error instanceof Error && /^search_[a-z0-9_]+$/.test(error.message)
+        ? error.message
+        : "search_transport",
+    ),
+    { retryAt },
+  );
 // Links are rendered, never fetched by this provider. Reject dangerous schemes,
 // credentials and local destinations before they reach reports or model sources.
 export function publicSearchUrl(raw: unknown): string | undefined {
@@ -296,6 +307,19 @@ export function searchSources(web?: WebEvidence): ResearchSource[] {
         if (selected.length === 4) break;
         if (!selected.includes(r)) selected.push(r);
       }
+      // Pricing pages often rank below news. Preserve a small extra budget for
+      // the evidence editor to compare real offers and validate their scope.
+      if (q.intent === "competition")
+        for (const r of organic) {
+          if (selected.length >= 6) break;
+          if (
+            !selected.includes(r) &&
+            /pricing|\bplans\b|价格|报价/i.test(
+              r.title + " " + new URL(r.url).pathname,
+            )
+          )
+            selected.push(r);
+        }
       selected.push(...q.results.filter((r) => r.kind === "ad").slice(0, 2));
       return selected.map((r, j) => ({
         id: `W${i + 1}R${j + 1}`,
@@ -356,7 +380,11 @@ export class GoogleSearch {
       ? "zh-CN"
       : "en";
     const region = geo || "US";
-    const base = topic.plan?.input || topic.keyword;
+    // Curated categories already expand aliases (AI4S -> AI for Science).
+    const base =
+      topic.plan?.model === "curated"
+        ? topic.keyword
+        : topic.plan?.input || topic.keyword;
     const planned = topic.plan?.webQueries?.length
       ? topic.plan.webQueries
       : [
@@ -393,23 +421,26 @@ export class GoogleSearch {
     const results = await Promise.allSettled(
       queries.map((q) => this.search(q.query, region, language)),
     );
-    web.queries = queries.map((q, i) => ({
-      ...q,
-      state: results[i]!.status === "fulfilled" ? "ready" : "pending",
-      results:
-        results[i]!.status === "fulfilled" ? results[i]!.value.results : [],
-      fetchedAt:
-        results[i]!.status === "fulfilled"
-          ? results[i]!.value.fetchedAt
-          : undefined,
-    }));
+    web.queries = queries.map((q, i) => {
+      const result = results[i]!;
+      if (result.status === "fulfilled")
+        return { ...q, state: "ready", ...result.value };
+      const failure = searchFailure(result.reason, result.reason?.retryAt);
+      return {
+        ...q,
+        state: "failed",
+        results: [],
+        error: failure.message,
+        retryAt: failure.retryAt,
+      };
+    });
     const count = web.queries.filter((q) => q.state === "ready").length;
     web.state =
       count === queries.length && count > 0
         ? "ready"
         : count
           ? "partial"
-          : "pending";
+          : "failed";
     return web;
   }
   private search(
@@ -462,8 +493,14 @@ export class GoogleSearch {
           this.lastRequest = Date.now();
         }
       }
-      if (this.store.get("google-search:cooldown:" + identity))
-        throw new Error("search_cooldown");
+      const cooling = this.store.get<{ error: string; retryAt: string }>(
+        "google-search:cooldown:" + identity,
+      );
+      if (cooling)
+        throw searchFailure(
+          new Error(cooling.error || "search_cooldown"),
+          cooling.retryAt,
+        );
       const started = Date.now();
       const call: ProviderCall = {
         provider: "search",
@@ -529,12 +566,15 @@ export class GoogleSearch {
           e instanceof Error && /^search_[a-z0-9_]+$/.test(e.message)
             ? e.message
             : "search_transport";
+        const delay =
+          call.status === 401 || call.status === 403 ? 5 * 60000 : 60000;
+        const retryAt = new Date(Date.now() + delay).toISOString();
         this.store.set(
           "google-search:cooldown:" + identity,
-          true,
-          call.status === 401 || call.status === 403 ? 5 * 60000 : 60000,
+          { error: call.error, retryAt },
+          delay,
         );
-        throw new Error(call.error);
+        throw searchFailure(new Error(call.error), retryAt);
       } finally {
         call.durationMs = Date.now() - started;
         this.store.recordCall(call);
@@ -557,14 +597,40 @@ export class GoogleSearch {
       process.env.GOOGLE_SEARCH_PROXY || process.env.GOOGLE_TRENDS_PROXY,
       process.env.GOOGLE_SEARCH_PROXY_FALLBACK ||
         process.env.GOOGLE_TRENDS_PROXY_FALLBACK,
-    ].filter((p, i, a): p is string => !!p && a.indexOf(p) === i);
-    for (const [i, proxy] of routes.entries()) {
+    ]
+      .filter((p): p is string => !!p)
+      .map(searchProxy)
+      .filter((p, i, a) => a.indexOf(p) === i);
+    // A rotating gateway assigns a fresh exit per request. Budget at most three
+    // attempts, including the configured fallback; never retry a fixed exit.
+    const attempts = routes.map((proxy, i) => ({ proxy, i }));
+    const rotatingRoute = attempts.find(({ proxy }) => {
+      const u = new URL(proxy);
+      return u.hostname === "gate.decodo.com" && u.port === "7000";
+    });
+    while (rotatingRoute && attempts.length < 3) attempts.push(rotatingRoute);
+    let failure = searchFailure(new Error("search_cooldown"));
+    const exhausted = new Map<
+      string,
+      { error: string; retryAt: string; delay: number }
+    >();
+    for (const [attempt, { proxy, i }] of attempts.entries()) {
       const identity = createHash("sha256")
           .update(proxy)
           .digest("hex")
           .slice(0, 24),
         cooldown = "google-search:direct-cooldown:" + identity;
-      if (this.store.get(cooldown)) continue;
+      const cooling = this.store.get<{ error: string; retryAt: string }>(
+        cooldown,
+      );
+      if (cooling) {
+        failure = searchFailure(
+          new Error(cooling.error || "search_cooldown"),
+          cooling.retryAt,
+        );
+        continue;
+      }
+      if (attempt) await new Promise((r) => setTimeout(r, 750));
       const started = Date.now(),
         call: ProviderCall = {
           provider: "search",
@@ -604,17 +670,27 @@ export class GoogleSearch {
           e instanceof Error && /^search_[a-z0-9_]+$/.test(e.message)
             ? e.message
             : "search_transport";
-        if (call.error === "search_challenge") call.status = 429;
-        this.store.set(
-          cooldown,
-          true,
-          call.status === 429 && !rotating ? 15 * 60000 : 60000,
-        );
+        const delay =
+          (call.status === 429 || call.error === "search_challenge") &&
+          !rotating
+            ? 15 * 60000
+            : 60000;
+        const retryAt = new Date(Date.now() + delay).toISOString();
+        failure = searchFailure(new Error(call.error), retryAt);
+        exhausted.set(cooldown, { error: call.error, retryAt, delay });
+        // Credentials/payment/runtime errors require configuration recovery.
+        if (
+          [401, 402, 407].includes(call.status || 0) ||
+          call.error === "search_runtime"
+        )
+          break;
       } finally {
         call.durationMs = Date.now() - started;
         this.store.recordCall(call);
       }
     }
-    throw new Error("search_cooldown");
+    for (const [key, value] of exhausted)
+      this.store.set(key, value, value.delay);
+    throw failure;
   }
 }
