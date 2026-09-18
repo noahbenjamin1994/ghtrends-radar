@@ -997,7 +997,7 @@ export function AdminView({ account }: { account: Account | null }) {
                   ? data.configuration.search.mode === "direct"
                     ? l(
                         "Residential proxy · Google with DuckDuckGo fallback",
-                        "住宅代理 · Google 优先，DuckDuckGo 自动补位",
+                        "住宅代理 · Google 最多两次，DuckDuckGo 自动补位",
                       )
                     : l("Managed search API", "托管搜索 API")
                   : l("Awaiting configuration", "等待配置")}{" "}

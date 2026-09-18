@@ -25,6 +25,9 @@ def main():
         raise ValueError("language")
     if urlsplit(proxy).scheme not in ("http", "https"):
         raise ValueError("proxy")
+    timeout_ms = data.get("timeoutMs", 18000)
+    if not isinstance(timeout_ms, int) or not 1000 <= timeout_ms <= 18000:
+        raise ValueError("timeout")
     chunks, size = [], 0
 
     def receive(chunk):
@@ -57,7 +60,7 @@ def main():
     with requests.Session() as session:
         response = session.get(
             endpoint, params=params, headers=headers, cookies=cookies,
-            proxy=proxy, impersonate=profile, timeout=18,
+            proxy=proxy, impersonate=profile, timeout=timeout_ms / 1000,
             allow_redirects=False, content_callback=receive,
         )
         print(json.dumps({

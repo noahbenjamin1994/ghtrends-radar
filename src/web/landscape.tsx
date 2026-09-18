@@ -1,8 +1,9 @@
+import { adSample } from "./ad-sample.js";
 import {
   searchCollectionMessage,
   searchEngineLabel,
   searchQueryUrl,
-  adSampleQueries,
+  adCollectionMessage,
 } from "../core/evidence.js";
 import { ArrowUpRight } from "lucide-react";
 import { landscapeLabel, researchLandscape } from "../core/landscape.js";
@@ -256,6 +257,7 @@ export function CompetitorPanel({
           ...r,
           query: q.query,
           date: q.fetchedAt || m.web!.fetchedAt,
+          region: q.region || m.web!.region,
         })),
     ) || [];
   const refs = (ids: string[]) =>
@@ -491,7 +493,7 @@ export function CompetitorPanel({
                 <div>
                   <dt>{l("Region / language / date", "地区 / 语言 / 时间")}</dt>
                   <dd>
-                    {m.web!.region} · {m.web!.language} · {ad.date.slice(0, 10)}
+                    {ad.region} · {m.web!.language} · {ad.date.slice(0, 10)}
                   </dd>
                 </div>
                 <div>
@@ -506,25 +508,83 @@ export function CompetitorPanel({
             </article>
           ))
         ) : (
-          <p className="peer-empty">
-            {adSampleQueries(m.web).length > 0
-              ? l(
-                  "The collected Google pages recorded 0 ads. Check other times or regions to explore further placements.",
-                  "本次采集到的 Google 页面记录了 0 条广告。可结合其他时间、地区继续查看投放线索。",
-                )
-              : m.web?.queries.some(
-                    (q) => q.state === "ready" && q.engine === "duckduckgo",
-                  )
-                ? l(
-                    "The fallback search covers organic results. Google ad placements remain a separate collection task.",
-                    "备用搜索已补充自然结果；Google 广告位留待后续采集核对。",
-                  )
-                : l(
-                    "Ad collection needs a retry. Choose Update research to capture a new search sample.",
-                    "广告采集需要重试。点击「更新研究」可重新采集搜索样本。",
-                  )}
-          </p>
+          <p className="peer-empty">{adCollectionMessage(m.web, locale)}</p>
         )}
+        <div className="peer-sources">
+          {m.web?.queries
+            .filter((q) => q.intent === "competition")
+            .slice(0, 1)
+            .map((q) => (
+              <a
+                key={q.query}
+                href={`https://www.google.com/search?${new URLSearchParams({ q: q.query, hl: m.web!.language, gl: m.web!.region.toLowerCase() })}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {l("Check this keyword on Google", "在 Google 核对这个关键词")}
+                <ArrowUpRight size={12} />
+              </a>
+            ))}
+          <a
+            href={`https://adstransparency.google.com/?${new URLSearchParams({ platform: "SEARCH", region: m.web?.region || m.geo || "US" })}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {l(
+              "Check advertisers in Google's ad library",
+              "到 Google 广告库核对同行投放",
+            )}
+            <ArrowUpRight size={12} />
+          </a>
+        </div>
+        <p className="research-caption">
+          {l(
+            "Search the ad library by competitor name or website to check creatives and advertiser identity. Keyword appearances come from search-page observations.",
+            "在广告库输入同行名称或官网，可核对广告素材和广告主身份；关键词曝光以搜索页面记录为准。",
+          )}
+        </p>
+        <details className="ad-example">
+          <summary>
+            {l(
+              "What an ad signal looks like · real CRM example",
+              "广告线索长什么样？查看 CRM 实测示例",
+            )}
+          </summary>
+          <p className="research-caption">
+            {l(
+              "Independent feature example, kept separate from this topic's evidence and scores. Observed in a browser on",
+              "独立功能示例，与当前主题的证据和评分分别展示。浏览器实测时间：",
+            )}{" "}
+            {adSample.fetchedAt.slice(0, 16).replace("T", " ")} UTC ·{" "}
+            {l("Query", "查询词")}：{adSample.query} ·{" "}
+            {l(
+              "Requested region: US; actual location: to verify",
+              "目标地区 US；实际定位待核对",
+            )}{" "}
+            · EN
+          </p>
+          <div className="ad-example-grid">
+            {adSample.results.map((ad) => (
+              <article className="peer-ad" key={ad.url}>
+                <span className="peer-ad-site">
+                  {l("Displayed brand", "广告展示品牌")} · {ad.advertiser}
+                </span>
+                <h5>{ad.title}</h5>
+                <p>{ad.excerpt}</p>
+                <a href={ad.url} target="_blank" rel="noreferrer">
+                  {l("Landing page", "落地页")} · {new URL(ad.url).hostname}
+                  <ArrowUpRight size={12} />
+                </a>
+              </article>
+            ))}
+          </div>
+          <p className="research-caption">
+            {l(
+              "Captured from Google's Sponsored results group. Ads vary by time, location and browsing context. The brand shown in an ad is checked separately from the payer's legal identity.",
+              "采自 Google 的 Sponsored results 广告区。广告随时间、地区与浏览环境变化；展示品牌与付款公司的身份分别核对。",
+            )}
+          </p>
+        </details>
         <p className="research-caption">
           {m.web?.provider === "google-mobile" ||
           m.web?.provider === "multi-search"

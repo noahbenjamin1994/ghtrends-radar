@@ -5790,3 +5790,35 @@ footer small {
     gap: 24px;
   }
 }
+
+.ad-example {
+  margin-top: 24px;
+  border-top: 1px solid #e8e9e5;
+  padding-top: 20px;
+}
+.ad-example summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 550;
+}
+.ad-example-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.ad-example-grid .peer-ad {
+  margin: 8px 0;
+  min-width: 0;
+}
+.ad-example-grid a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .ad-example-grid {
+    grid-template-columns: 1fr;
+  }
+}

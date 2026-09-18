@@ -1,4 +1,8 @@
-import { searchCollectionMessage, searchEngineLabel } from "./evidence.js";
+import {
+  adCollectionMessage,
+  searchCollectionMessage,
+  searchEngineLabel,
+} from "./evidence.js";
 import { landscapeRows, researchLandscape } from "./landscape.js";
 import { reportIssueSignals } from "./gaps.js";
 import {
@@ -248,6 +252,7 @@ export function marketMarkdown(
           "",
           `${m.web.region} · ${m.web.language} · ${m.web.fetchedAt.slice(0, 10)}`,
           searchCollectionMessage(m.web, locale),
+          adCollectionMessage(m.web, locale),
           locale === "zh"
             ? "搜索结果为地域样本。广告反映商业投放意向，购买与持续使用需要行为证据。"
             : "A regional search sample. Ads signal marketing intent; purchases and sustained use need behavioral evidence.",

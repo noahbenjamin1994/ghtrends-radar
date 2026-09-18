@@ -16,10 +16,32 @@ export function adSampleQueries(web?: WebEvidence) {
     web?.queries.filter(
       (q) =>
         q.state === "ready" &&
-        (q.adCoverage === "visible-placements" ||
-          (!q.adCoverage && q.engine !== "duckduckgo")),
+        ((q.adCoverage === "visible-placements" &&
+          (web.provider === "decodo-google" || Number(web.version) >= 4)) ||
+          (!q.adCoverage && web.provider === "decodo-google")),
     ) || []
   );
+}
+export function adCollectionMessage(
+  web: WebEvidence | undefined,
+  locale: "en" | "zh",
+) {
+  const zh = locale === "zh";
+  if (web?.queries.some((q) => q.results.some((r) => r.kind === "ad")))
+    return zh
+      ? "以下为本次搜索实际展示的广告，范围以关键词、地区与采集时间为准。"
+      : "These ads appeared in the captured search sample at its stated query, region and time.";
+  if (adSampleQueries(web).length)
+    return zh
+      ? "本次搜索页面的广告记录为 0 条。其他时间与地区的投放情况可继续核对。"
+      : "This captured search sample contains 0 ads. Other times and regions can be checked separately.";
+  if (web?.queries.some((q) => q.state === "ready"))
+    return zh
+      ? "本轮已采集自然搜索结果。完整广告位覆盖待补充，可打开 Google 搜索与广告透明度中心进一步核对。"
+      : "Organic search results are collected. Full ad-slot coverage needs a separate check in Google Search and the Ads Transparency Center.";
+  return zh
+    ? "广告证据待采集。可更新研究，或打开 Google 搜索与广告透明度中心核对。"
+    : "Ad evidence awaits collection. Update research or check Google Search and the Ads Transparency Center.";
 }
 export function searchEvidenceIsFresh(web?: WebEvidence, now = Date.now()) {
   return (

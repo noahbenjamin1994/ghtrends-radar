@@ -2,6 +2,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CompetitorPanel } from "../src/web/landscape.js";
 import {
+  adCollectionMessage,
+  adSampleQueries,
   searchCollectionMessage,
   searchEvidenceIsFresh,
 } from "../src/core/evidence.js";
@@ -36,6 +38,47 @@ const seed: Market = JSON.parse(
 )[0];
 const mobile = `<html><body><form><input name="q"></form><div class="zMzFAb"><a class="fuLhoc" href="/url?q=https%3A%2F%2Ftools.example%2Fcompare%3Futm_source%3Dgoogle&amp;sa=U"><span class="CVA68e">Compare phones</span></a><div class="taTFJ"><span class="FrIlee">Check <b>model compatibility</b> before purchase.</span></div></div></body></html>`;
 const duck = `<html><body><form><input name="q"></form><table><tr><td><a class='result-link' href='//duckduckgo.com/l/?uddg=https%3A%2F%2Ftools.example%2Fpricing%3Futm_source%3Dddg'>Phone transfer pricing</a></td></tr><tr><td class='result-snippet'>Repair shop plans start at <b>$20</b> per month.</td></tr><tr><td class='link-text'>tools.example</td></tr></table></body></html>`;
+test("current sponsored group markup yields ads without relabeling neighboring organic results", () => {
+  // Structural reduction of the CRM browser sample, 2026-09-18. Tracking and
+  // account attributes removed. A group label alone is not an ad-card boundary.
+  const html = `<body><span>Sponsored results</span><div data-text-ad="1"><a class="sVXRqc" href="https://www.hubspot.com/crm/e010a?gclid=tracking"><div role="heading" aria-level="3">HubSpot Free CRM Software | Sales, Marketing &amp; Service CRM</div></a><div class="p4wth">Work faster, smarter and more effectively with HubSpot Smart CRM.</div></div>${mobile}<div data-text-ad="1"><a href="/aclk?adurl="><h3>Unresolved tracking destination</h3></a></div></body>`;
+  const rows = parseGooglePage(html);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0]!.kind, "organic");
+  assert.equal(rows[1]!.kind, "ad");
+  assert.equal(rows[1]!.url, "https://www.hubspot.com/crm/e010a");
+  assert.match(rows[1]!.excerpt, /HubSpot Smart CRM/);
+  assert.throws(
+    () =>
+      parseGooglePage(
+        "<body><span>Sponsored results</span><a href='https://organic.example'><h3>Article about ads</h3></a></body>",
+      ),
+    /search_format/,
+  );
+});
+
+test("limited mobile coverage and fallback never imply a complete zero-ad sample, including legacy reports", () => {
+  const web: any = {
+    provider: "multi-search",
+    queries: [
+      { state: "ready", engine: "google", adCoverage: "limited", results: [] },
+    ],
+  };
+  assert.equal(adSampleQueries(web).length, 0);
+  assert.match(adCollectionMessage(web, "zh"), /完整广告位覆盖待补充/);
+  web.provider = "google-mobile";
+  delete web.queries[0].adCoverage;
+  assert.equal(adSampleQueries(web).length, 0);
+  web.queries[0].adCoverage = "visible-placements";
+  web.provider = "multi-search";
+  web.version = "3";
+  assert.equal(adSampleQueries(web).length, 0);
+  web.provider = "decodo-google";
+  assert.equal(adSampleQueries(web).length, 1);
+  assert.match(adCollectionMessage(web, "zh"), /0 条/);
+  web.queries[0].results = [{ kind: "ad" }];
+  assert.match(adCollectionMessage(web, "zh"), /实际展示/);
+});
 test("DuckDuckGo lightweight parser retains snippets, rejects challenges and skips ads or unsafe links", () => {
   assert.deepEqual(parseDuckDuckGoPage(duck), [
     {
@@ -194,10 +237,10 @@ test("direct search reuses residential routes, caches results, records traffic a
     fail = true;
     topic.plan.webQueries[0].query = "another sample";
     assert.equal((await search.collect(topic, "US")).state, "failed");
-    assert.equal(calls, 4);
+    assert.equal(calls, 5);
     topic.plan.webQueries[0].query = "third sample";
     await search.collect(topic, "US");
-    assert.equal(calls, 4);
+    assert.equal(calls, 5);
     assert.ok(!JSON.stringify(search.status()).includes("secret"));
   } finally {
     for (const [k, v] of Object.entries(saved))
@@ -605,7 +648,7 @@ test("model evidence includes independent competitors instead of repeating one b
   assert.equal(searchSources(web).length, 2);
 });
 
-test("independent fallback recovers challenges within a three-request budget and keeps engine cooldowns", async () => {
+test("independent fallback recovers challenges within a four-request budget and keeps engine cooldowns", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-retry-")),
     store = new Store(dir);
   const keys = [
@@ -632,12 +675,12 @@ test("independent fallback recovers challenges within a three-request budget and
     assert.ok(request.query.startsWith("AI for Science"));
     assert.ok(!request.proxy.includes("session-"));
     if (request.engine === "google") return { status: 302 };
-    return calls === 2 ? { status: 202 } : { status: 200, html: duck };
+    return calls === 3 ? { status: 202 } : { status: 200, html: duck };
   });
   try {
     const recovered = await search.collect(topic, "US");
     assert.equal(recovered.state, "ready");
-    assert.equal(calls, 5); // Google paused; DDG retries once, then serves later queries.
+    assert.equal(calls, 6); // Two Google exits; DDG retry, then two later queries.
     assert.ok(
       recovered.queries.every(
         (q) =>
@@ -648,7 +691,7 @@ test("independent fallback recovers challenges within a three-request budget and
     );
     const at = recovered.queries[0]!.fetchedAt;
     assert.equal((await search.collect(topic, "US")).queries[0]!.fetchedAt, at);
-    assert.equal(calls, 5);
+    assert.equal(calls, 6);
     let failures = 0;
     const blocked = new GoogleSearch(store, async () => {
       failures++;
@@ -886,7 +929,7 @@ test("fallback cache expires early, shared cooldowns survive instances and prima
     assert.deepEqual(calls, ["google", "duckduckgo"]);
     assert.equal(a.queries[0]!.fetchedAt, b.queries[0]!.fetchedAt);
     const cache = db
-      .prepare("select expires from cache where key like 'web-search:v3:%'")
+      .prepare("select expires from cache where key like 'web-search:v4:%'")
       .get() as any;
     assert.ok(
       cache.expires - Date.now() > 29 * 60000 &&
@@ -918,10 +961,10 @@ test("fallback cache expires early, shared cooldowns survive instances and prima
     const recovered = await search.collect(topic, "US");
     assert.equal(recovered.queries[0]!.engine, "google");
     assert.equal(recovered.queries[0]!.fallbackReason, undefined);
-    assert.equal(recovered.queries[0]!.adCoverage, "visible-placements");
+    assert.equal(recovered.queries[0]!.adCoverage, "limited");
     const refreshed = db
       .prepare(
-        "select expires from cache where expires>0 and key like 'web-search:v3:%'",
+        "select expires from cache where expires>0 and key like 'web-search:v4:%'",
       )
       .get() as any;
     assert.ok(
@@ -957,7 +1000,7 @@ test("proxy authentication failure pauses both engines on that route and can use
     const search = new GoogleSearch(store, async (input) => {
       calls++;
       return input.proxy.includes("backup.example")
-        ? { status: 200, html: duck }
+        ? { status: 200, html: input.engine === "google" ? mobile : duck }
         : { status: 407 };
     });
     const web = await search.collect(
@@ -972,8 +1015,8 @@ test("proxy authentication failure pauses both engines on that route and can use
     );
     assert.equal(web.state, "ready");
     assert.equal(calls, 2);
-    assert.equal(web.queries[0]!.engine, "duckduckgo");
-    assert.equal(web.queries[0]!.fallbackReason, "search_http_407");
+    assert.equal(web.queries[0]!.engine, "google");
+    assert.equal(web.queries[0]!.fallbackReason, undefined);
     assert.ok(!JSON.stringify(web).includes("secret"));
   } finally {
     keys.forEach((k, i) =>
@@ -1035,4 +1078,129 @@ test("report reuse follows per-query freshness and resumes primary collection af
     false,
   );
   assert.equal(searchEvidenceIsFresh({ ...web, queries: [] }, now), false);
+});
+
+test("a fresh Google exit recovers before fallback and does not poison later queries", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-primary-retry-")),
+    store = new Store(dir);
+  const keys = [
+    "GHTRENDS_SEARCH_MODE",
+    "GOOGLE_SEARCH_PROXY",
+    "GOOGLE_SEARCH_PROXY_FALLBACK",
+  ];
+  const env = keys.map((k) => process.env[k]);
+  Object.assign(process.env, {
+    GHTRENDS_SEARCH_MODE: "direct",
+    GOOGLE_SEARCH_PROXY:
+      "http://user-country-us-session-one:secret@gate.decodo.com:7000",
+    GOOGLE_SEARCH_PROXY_FALLBACK: "",
+  });
+  const requests: any[] = [];
+  try {
+    const search = new GoogleSearch(store, async (input) => {
+      requests.push(input);
+      return requests.length === 1
+        ? { status: 429, bytes: 321 }
+        : { status: 200, html: mobile, bytes: 1234 };
+    });
+    const result = await search.collect(
+      {
+        ...seed.topic,
+        plan: {
+          input: "CRM",
+          webQueries: [
+            { query: "crm software", intent: "competition" },
+            { query: "crm user reviews", intent: "demand" },
+          ],
+        },
+      } as any,
+      "US",
+    );
+    assert.equal(result.state, "ready");
+    assert.deepEqual(
+      requests.map((r) => r.engine),
+      ["google", "google", "google"],
+    );
+    assert.ok(
+      requests.every(
+        (r) =>
+          r.proxy.includes("country-us") &&
+          !r.proxy.includes("session-") &&
+          r.region === "US" &&
+          r.timeoutMs <= 18000,
+      ),
+    );
+    assert.ok(
+      result.queries.every(
+        (q) => q.engine === "google" && q.fallbackReason === undefined,
+      ),
+    );
+    const db = new DatabaseSync(join(dir, "ghtrends.sqlite"));
+    assert.equal(
+      db
+        .prepare(
+          "select count(*) n from cache where key like 'web-search:cooldown:google:%'",
+        )
+        .get()!.n,
+      0,
+    );
+    assert.equal(
+      db.prepare("select status from provider_calls order by id limit 1").get()!
+        .status,
+      429,
+    );
+    db.close();
+  } finally {
+    keys.forEach((k, i) =>
+      env[i] === undefined ? delete process.env[k] : (process.env[k] = env[i]),
+    );
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("direct collection observes a shared time budget instead of starting another full retry", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-budget-")),
+    store = new Store(dir);
+  const keys = [
+    "GHTRENDS_SEARCH_MODE",
+    "GOOGLE_SEARCH_PROXY",
+    "GOOGLE_SEARCH_PROXY_FALLBACK",
+  ];
+  const env = keys.map((k) => process.env[k]);
+  Object.assign(process.env, {
+    GHTRENDS_SEARCH_MODE: "direct",
+    GOOGLE_SEARCH_PROXY: "http://user:secret@gate.decodo.com:7000",
+    GOOGLE_SEARCH_PROXY_FALLBACK: "",
+  });
+  const clock = Date.now;
+  let offset = 0,
+    calls = 0;
+  Date.now = () => clock() + offset;
+  try {
+    const result = await new GoogleSearch(store, async () => {
+      calls++;
+      offset += 45000;
+      return { status: 429 };
+    }).collect(
+      {
+        ...seed.topic,
+        plan: {
+          input: "CRM",
+          webQueries: [{ query: "crm software", intent: "competition" }],
+        },
+      } as any,
+      "US",
+    );
+    assert.equal(calls, 1);
+    assert.equal(result.state, "failed");
+    assert.equal(result.queries[0]!.error, "search_http_429");
+  } finally {
+    Date.now = clock;
+    keys.forEach((k, i) =>
+      env[i] === undefined ? delete process.env[k] : (process.env[k] = env[i]),
+    );
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

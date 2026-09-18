@@ -17,14 +17,14 @@ export const searchQuerySchema = z.object({
   intent: z.enum(["competition", "demand", "opensource"]),
 });
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
-export const SEARCH_VERSION = "3";
+export const SEARCH_VERSION = "4";
 export type SearchEngine = "google" | "duckduckgo";
 interface SearchPage {
   results: SearchResult[];
   fetchedAt: string;
   engine: SearchEngine;
   region?: string;
-  adCoverage: "visible-placements" | "organic-only";
+  adCoverage: "visible-placements" | "limited" | "organic-only";
   fallbackReason?: string;
 }
 export interface SearchResult {
@@ -200,12 +200,15 @@ export function parseGooglePage(html: string): SearchResult[] {
     throw new Error("search_challenge");
   const output: SearchResult[] = [],
     seen = new Set<string>();
-  $("div.zMzFAb").each((_, block) => {
+  $("div.zMzFAb,[data-text-ad]").each((_, block) => {
     const card = $(block),
-      heading = card.find("a.fuLhoc").has(".CVA68e").first();
+      modernAd = card.is("[data-text-ad]"),
+      heading = modernAd
+        ? card.find("a[href]").has('h3,[role="heading"]').first()
+        : card.find("a.fuLhoc").has(".CVA68e").first();
     if (!heading.length) return;
     const title = heading
-      .find(".CVA68e")
+      .find(modernAd ? 'h3,[role="heading"]' : ".CVA68e")
       .first()
       .text()
       .replace(/\s+/g, " ")
@@ -218,10 +221,12 @@ export function parseGooglePage(html: string): SearchResult[] {
     } catch {
       return;
     }
-    let ad = card.find("[data-text-ad]").length > 0;
+    let ad = modernAd || card.find("[data-text-ad]").length > 0;
     card.find("span").each((_, node) => {
       if (
-        /^(Sponsored|Ad|Ads|广告|贊助|赞助商广告)$/i.test($(node).text().trim())
+        /^(Sponsored(?: results)?|Ad|Ads|广告|贊助|赞助商广告)$/i.test(
+          $(node).text().trim(),
+        )
       )
         ad = true;
     });
@@ -255,7 +260,7 @@ export function parseGooglePage(html: string): SearchResult[] {
       url,
       kind,
       excerpt: card
-        .find(".taTFJ .FrIlee")
+        .find(modernAd ? ".p4wth" : ".taTFJ .FrIlee")
         .text()
         .replace(/\s+/g, " ")
         .trim()
@@ -292,6 +297,7 @@ export type SearchTransport = (input: {
   language: string;
   proxy: string;
   cookies: Record<string, string>;
+  timeoutMs?: number;
 }) => Promise<DirectResponse>;
 const directRequest: SearchTransport = (input) =>
   new Promise((resolve, reject) => {
@@ -329,7 +335,10 @@ const directRequest: SearchTransport = (input) =>
         }
       }
     };
-    const timer = setTimeout(() => finish(new Error("search_timeout")), 22000);
+    const timer = setTimeout(
+      () => finish(new Error("search_timeout")),
+      (input.timeoutMs || 18000) + 1000,
+    );
     child.once("error", () => finish(new Error("search_runtime")));
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
@@ -450,6 +459,9 @@ export class GoogleSearch {
       maxQueries: 3,
       cacheHours: 6,
       fallbackCacheMinutes: 30,
+      primaryAttempts: this.mode === "api" ? 1 : 2,
+      directQueryBudgetMs: 45000,
+      adCoverage: this.mode === "api" ? "visible-placements" : "limited",
     };
   }
   async collect(topic: Topic, geo: string): Promise<WebEvidence> {
@@ -691,21 +703,26 @@ export class GoogleSearch {
       .filter((p, i, a) => a.indexOf(p) === i);
     const first = routes[0];
     if (!first) throw new Error("search_proxy");
-    // One primary request, then an independent index. A final fallback attempt
-    // uses a configured second route or a fresh rotating exit, never a fixed IP twice.
-    const attempts: { engine: SearchEngine; proxy: string; route: number }[] = [
-      { engine: "google", proxy: first, route: 0 },
-      { engine: "duckduckgo", proxy: first, route: 0 },
-    ];
+    // Give Google one fresh-exit retry, retaining the rotating pool's country.
+    // Then use an independent index, with its own bounded retry/cooldown.
     const rotating =
       new URL(first).hostname === "gate.decodo.com" &&
       new URL(first).port === "7000";
-    if (routes[1] || rotating)
-      attempts.push({
-        engine: "duckduckgo",
-        proxy: routes[1] || first,
-        route: routes[1] ? 1 : 0,
+    const candidates = [{ proxy: first, route: 0 }];
+    if (rotating || routes[1])
+      candidates.push({
+        proxy: rotating ? first : routes[1]!,
+        route: rotating ? 0 : 1,
       });
+    const attempts = (["google", "duckduckgo"] as const).flatMap((engine) =>
+      candidates.map((candidate) => ({ engine, ...candidate })),
+    );
+    // A separate configured route can recover a primary proxy-account error.
+    if (rotating && routes[1]) {
+      attempts[1] = { engine: "google", proxy: routes[1], route: 1 };
+      attempts[3] = { engine: "duckduckgo", proxy: routes[1], route: 1 };
+    }
+    const deadline = Date.now() + 45000;
     let failure = searchFailure(new Error("search_cooldown")),
       primaryError: string | undefined;
     const exhausted = new Map<
@@ -727,6 +744,8 @@ export class GoogleSearch {
         continue;
       }
       if (attempt) await new Promise((r) => setTimeout(r, 750));
+      const timeoutMs = Math.min(18000, deadline - Date.now());
+      if (timeoutMs < 1000) break;
       const started = Date.now(),
         call: ProviderCall = {
           provider: "search",
@@ -743,6 +762,7 @@ export class GoogleSearch {
           language,
           proxy,
           cookies: engine === "google" ? { CONSENT: "YES+" } : {},
+          timeoutMs,
         });
         call.status = raw.status;
         if (Number.isSafeInteger(raw.bytes) && raw.bytes! >= 0)
@@ -771,8 +791,7 @@ export class GoogleSearch {
               ? raw.region
               : region,
           fetchedAt: new Date().toISOString(),
-          adCoverage:
-            engine === "google" ? "visible-placements" : "organic-only",
+          adCoverage: engine === "google" ? "limited" : "organic-only",
           ...(engine === "duckduckgo" ? { fallbackReason: primaryError } : {}),
         };
       } catch (e) {
@@ -799,12 +818,8 @@ export class GoogleSearch {
       } finally {
         call.durationMs = Date.now() - started;
         this.store.recordCall(call);
-        // Persist primary failures even when the fallback succeeds. Fallback
-        // retries in this query remain eligible until its budget is exhausted.
-        if (engine === "google") {
-          const value = exhausted.get(cooldown);
-          if (value) this.store.set(cooldown, value, value.delay);
-        }
+        // Persist after this query's retry budget, so a transient failure never
+        // suppresses its own fresh-exit retry. Later queries share the cooldown.
       }
     }
     for (const [key, value] of exhausted)
