@@ -10,7 +10,9 @@ import { api } from "./api.js";
 import { t, locale, localUrl, loginUrl } from "./i18n.js";
 import type { MarketKind } from "../core/types.js";
 import { Loading, Empty } from "./components.js";
+import { DeepHistory, type DeepStatus } from "./deep.js";
 export interface Account {
+  deep?: DeepStatus;
   hosted: boolean;
   engagementEnabled: boolean;
   authAvailable: boolean;
@@ -136,6 +138,7 @@ export function HistoryView({
           {t("Saved projects")}
         </button>
       </nav>
+      {tab === "reports" && <DeepHistory account={account} />}
       {error && (
         <p role="alert" className="error-banner">
           {t(error)}

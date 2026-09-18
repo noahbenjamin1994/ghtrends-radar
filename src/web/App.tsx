@@ -1,4 +1,5 @@
 import { ScopeReview } from "./preflight.js";
+import { DeepResearchView } from "./deep.js";
 import {
   inspectInput,
   type PreflightResult,
@@ -421,7 +422,7 @@ export function App() {
   const active =
     route === "/admin"
       ? "admin"
-      : route.startsWith("/history")
+      : route.startsWith("/history") || route.startsWith("/research/")
         ? "history"
         : route.startsWith("/compare")
           ? "compare"
@@ -1088,6 +1089,8 @@ export function App() {
             onScan={scan}
             account={account}
           />
+        ) : route.startsWith("/research/") ? (
+          <DeepResearchView id={route.slice(10)} account={account} />
         ) : route.startsWith("/repo/") ? (
           <RepoView
             account={account}

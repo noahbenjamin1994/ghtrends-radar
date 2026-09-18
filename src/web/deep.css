@@ -1,0 +1,408 @@
+.deep-start {
+  margin-top: 32px;
+  border-top: 1px solid var(--line, #deded9);
+  padding-top: 24px;
+}
+.deep-start > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 600;
+  list-style: none;
+}
+.deep-start-body {
+  padding-top: 22px;
+}
+.deep-start-body > p {
+  max-width: 780px;
+  color: var(--muted, #62665f);
+  line-height: 1.8;
+}
+.deep-question-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 24px 0;
+}
+.deep-question-options button {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  padding: 17px 18px;
+  border: 1px solid #deded9;
+  background: #fff;
+  border-radius: 10px;
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+  min-width: 0;
+}
+.deep-question-options button[aria-pressed="true"] {
+  border-color: #245a48;
+  background: #f0f6f2;
+}
+.deep-question-options button > span {
+  display: flex;
+  flex-shrink: 0;
+  width: 16px;
+}
+.deep-radio {
+  width: 15px;
+  height: 15px;
+  border: 1px solid #acb5af;
+  border-radius: 50%;
+}
+.deep-context {
+  display: grid;
+  gap: 9px;
+  font-size: 14px;
+}
+.deep-context input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid #d8ddd8;
+  border-radius: 8px;
+  font: inherit;
+  color: inherit;
+  background: #fff;
+}
+.deep-start-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  margin-top: 24px;
+}
+.deep-start-footer > div {
+  max-width: 650px;
+}
+.deep-start-footer p,
+.deep-start-footer span {
+  font-size: 13px;
+  color: #656b65;
+  line-height: 1.8;
+}
+.deep-start-footer .button {
+  flex-shrink: 0;
+}
+.deep-page {
+  max-width: 1040px;
+  margin: 30px auto 100px;
+}
+.deep-breadcrumb {
+  display: flex;
+  gap: 14px;
+  font-size: 14px;
+  margin-bottom: 40px;
+  color: #686e69;
+}
+.deep-heading .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.deep-heading h1 {
+  font-size: clamp(30px, 4.5vw, 54px);
+  font-weight: 600;
+  line-height: 1.23;
+  letter-spacing: -0.035em;
+  margin: 18px 0;
+}
+.deep-heading > p {
+  font-size: 22px;
+  line-height: 1.6;
+}
+.deep-record {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  color: #737a73;
+  font-size: 13px;
+  margin: 24px 0 36px;
+}
+.deep-answer {
+  padding: 42px;
+  background: #eff5ef;
+  border-radius: 18px;
+  margin: 36px 0;
+}
+.deep-answer h2 {
+  font-size: clamp(26px, 3.5vw, 38px);
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 18px 0;
+}
+.deep-answer p {
+  font-size: 19px;
+  line-height: 1.9;
+  margin-bottom: 0;
+  max-width: 850px;
+}
+.deep-findings > article {
+  padding: 32px 0;
+  border-bottom: 1px solid #e5e7e2;
+}
+.deep-finding-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: #738074;
+  font-size: 13px;
+}
+.deep-finding-label small {
+  white-space: nowrap;
+}
+.deep-findings h3 {
+  font-size: 24px;
+  line-height: 1.45;
+  margin: 16px 0;
+}
+.deep-findings article > p {
+  font-size: 17px;
+  line-height: 1.9;
+  max-width: 850px;
+}
+.deep-citation {
+  margin-top: 15px;
+  font-size: 14px;
+}
+.deep-citation summary {
+  cursor: pointer;
+  color: #4a6654;
+  line-height: 1.65;
+}
+.deep-citation blockquote {
+  border-left: 2px solid #b7c7b6;
+  margin: 16px 0;
+  padding: 0 18px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+.deep-citation a {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.deep-citation small {
+  margin-left: 16px;
+  color: #737a73;
+}
+.deep-plan,
+.deep-checks {
+  margin-top: 48px;
+}
+.deep-plan h2,
+.deep-checks h2 {
+  font-size: 28px;
+  line-height: 1.5;
+}
+.deep-plan dl {
+  margin: 26px 0;
+}
+.deep-plan dl > div {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 22px;
+  padding: 20px 0;
+  border-top: 1px solid #e6e8e3;
+}
+.deep-plan dt {
+  font-weight: 600;
+}
+.deep-plan dd {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.8;
+}
+.deep-checks li {
+  margin: 14px 0;
+  line-height: 1.85;
+}
+.deep-progress,
+.deep-partial {
+  padding: 28px 32px;
+  background: #f5f5f2;
+  border-radius: 14px;
+  margin: 30px 0;
+}
+.deep-progress p,
+.deep-partial p {
+  line-height: 1.8;
+}
+.deep-progress ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding-left: 20px;
+  font-size: 14px;
+  color: #7b847b;
+}
+.deep-progress li[aria-current] {
+  color: #245a48;
+  font-weight: 600;
+}
+.deep-partial h2 {
+  font-size: 24px;
+  line-height: 1.5;
+}
+.deep-evidence {
+  margin-top: 45px;
+  padding-top: 24px;
+  border-top: 1px solid #deded9;
+}
+.deep-evidence > summary {
+  font-size: 20px;
+  cursor: pointer;
+}
+.deep-evidence p {
+  color: #70776f;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.deep-source-list {
+  display: grid;
+  gap: 16px;
+  margin: 24px 0;
+}
+.deep-source-list > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.deep-source-list a {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.deep-source-list a svg {
+  flex-shrink: 0;
+}
+.deep-source-list small {
+  color: #788075;
+}
+.deep-export {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 28px;
+  margin-top: 32px;
+  border-top: 1px solid #deded9;
+  color: #737a73;
+  font-size: 14px;
+}
+.deep-export > div {
+  display: flex;
+  gap: 10px;
+}
+.deep-history {
+  margin: 28px 0 38px;
+  padding: 24px 0;
+  border-bottom: 1px solid #deded9;
+}
+.deep-history-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.deep-history-heading h2 {
+  font-size: 24px;
+}
+.deep-history-heading span {
+  font-size: 14px;
+  color: #667160;
+}
+.deep-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 0;
+  border-top: 1px solid #e5e7e2;
+  color: inherit;
+  text-decoration: none;
+}
+.deep-history-row > div {
+  display: grid;
+  gap: 8px;
+}
+.deep-history-row strong {
+  font-size: 18px;
+  font-weight: 500;
+}
+.deep-history-row span {
+  font-size: 13px;
+  color: #6d756b;
+}
+@media (max-width: 700px) {
+  .deep-question-options {
+    grid-template-columns: 1fr;
+  }
+  .deep-start-footer,
+  .deep-export,
+  .deep-history-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .deep-page {
+    margin-top: 10px;
+  }
+  .deep-heading > p {
+    font-size: 19px;
+  }
+  .deep-answer {
+    padding: 26px 22px;
+  }
+  .deep-answer p {
+    font-size: 17px;
+  }
+  .deep-plan dl > div {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .deep-progress,
+  .deep-partial {
+    padding: 23px;
+  }
+  .deep-progress ol {
+    display: grid;
+    gap: 13px;
+  }
+  .deep-finding-label {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .deep-export > div {
+    flex-wrap: wrap;
+  }
+  .deep-citation small {
+    display: block;
+    margin: 8px 0;
+  }
+  .deep-start-footer .button {
+    white-space: normal;
+    line-height: 1.6;
+  }
+}
+
+.deep-delete {
+  display: block;
+  margin: 24px 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: #70776f;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}

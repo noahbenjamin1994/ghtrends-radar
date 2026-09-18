@@ -1,0 +1,383 @@
+import { z } from "zod";
+import { profileSchema } from "./fit.js";
+import { hasNegativeWording } from "./i18n.js";
+import { evidenceRef, recoverSourceQuote } from "./opportunities.js";
+import { validQuote } from "./landscape.js";
+import type { ResearchSource } from "./types.js";
+import type { WebEvidence, SearchQuery } from "../providers/search.js";
+import type { DocumentRead } from "../providers/documents.js";
+
+export const DEEP_VERSION = "1";
+export const deepQuestions = {
+  competitors: [
+    "Where is the opening among existing products?",
+    "现有同行之间，还有什么切入空间？",
+  ],
+  scope: [
+    "What should my first release deliver?",
+    "首版应该交付什么，投入多少？",
+  ],
+  opensource: [
+    "What can I build on open source?",
+    "借助开源项目，可以做出什么？",
+  ],
+  audience: [
+    "Where can I find the first users?",
+    "第一批适合验证的用户在哪里？",
+  ],
+} as const;
+export const deepRequestSchema = z
+  .object({
+    reportId: z.string().regex(/^[a-f0-9]{16}$/),
+    directionId: z.string().regex(/^[a-z][a-z0-9-]{1,40}$/),
+    question: z.enum(["competitors", "scope", "opensource", "audience"]),
+    context: z
+      .string()
+      .trim()
+      .max(400)
+      .regex(/^[^\x00-\x1f<>]*$/)
+      .default(""),
+    profile: profileSchema.optional(),
+    requestKey: z.string().uuid(),
+  })
+  .strict();
+export type DeepRequest = z.infer<typeof deepRequestSchema>;
+const copy = z
+  .object({
+    en: z.string().trim().min(8).max(500),
+    zh: z.string().trim().min(5).max(240),
+  })
+  .strip();
+export const deepBriefSchema = z
+  .object({
+    headline: copy,
+    answer: copy,
+    findings: z
+      .array(
+        z
+          .object({
+            area: z.enum(["audience", "competitors", "opensource", "scope"]),
+            subject: z
+              .object({
+                en: z.string().trim().min(2).max(100),
+                zh: z.string().trim().min(2).max(60),
+              })
+              .strip(),
+            statement: copy,
+            basis: z.enum(["observed", "inferred"]),
+            evidence: z
+              .array(evidenceRef.extend({ quote: z.string().min(8).max(500) }))
+              .max(2),
+          })
+          .strip(),
+      )
+      .min(4)
+      .max(6),
+    plan: z
+      .object({
+        deliverable: copy,
+        resources: copy,
+        effort: copy,
+        maintenance: copy,
+        experiment: copy,
+        continueIf: copy,
+        changeIf: copy,
+      })
+      .strip(),
+    checks: z.array(copy).max(3),
+  })
+  .strip();
+export type DeepBrief = z.infer<typeof deepBriefSchema>;
+export function normalizeDeepBrief(
+  raw: unknown,
+  sources: ResearchSource[] = [],
+): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const value = structuredClone(raw) as any;
+  if (value.checks === undefined && Array.isArray(value.plan?.checks)) {
+    value.checks = value.plan.checks;
+    delete value.plan.checks;
+  }
+  for (const finding of Array.isArray(value.findings) ? value.findings : []) {
+    for (const ref of Array.isArray(finding?.evidence)
+      ? finding.evidence
+      : []) {
+      const source = sources.find((s) => s.id === ref?.id);
+      if (source?.excerpt && typeof ref?.quote === "string") {
+        const recovered = recoverSourceQuote(ref.quote, source.excerpt);
+        if (recovered) ref.quote = recovered;
+      }
+    }
+  }
+  const readable = (node: unknown, key = ""): unknown => {
+    if (typeof node === "string" && (key === "en" || key === "zh")) {
+      let prose =
+        key === "zh"
+          ? node
+              .replace(/不可变的?/g, "写入后保持原样的")
+              .replace(/模型无关/g, "模型可替换")
+          : node;
+      prose = prose
+        .replace(/[（(](E\d+)[）)]/g, (whole, id) =>
+          sources.some((s) => s.id === id) ? "" : whole,
+        )
+        .replace(/ {2,}/g, " ")
+        .trim();
+      return prose;
+    }
+    if (Array.isArray(node)) return node.map((v) => readable(v));
+    if (node && typeof node === "object")
+      return Object.fromEntries(
+        Object.entries(node).map(([k, v]) => [k, readable(v, k)]),
+      );
+    return node;
+  };
+  return readable(value);
+}
+export function deepCopyRepairs(raw: unknown) {
+  const fields: { path: string; value: string; maxCharacters: number }[] = [];
+  const visit = (v: unknown, path: string) => {
+    const prose =
+      /^(?:headline|answer|findings\.\d+\.(?:subject|statement)|plan\.(?:deliverable|resources|effort|maintenance|experiment|continueIf|changeIf)|checks\.\d+)\.(en|zh)$/.exec(
+        path,
+      );
+    const maxCharacters = path.includes(".subject.")
+      ? prose?.[1] === "zh"
+        ? 60
+        : 100
+      : prose?.[1] === "zh"
+        ? 240
+        : 500;
+    if (
+      typeof v === "string" &&
+      prose &&
+      (hasNegativeWording(v) || v.length > maxCharacters)
+    )
+      fields.push({ path, value: v, maxCharacters });
+    else if (v && typeof v === "object")
+      for (const [k, child] of Object.entries(v))
+        visit(child, path ? `${path}.${k}` : k);
+  };
+  visit(raw, "");
+  return fields;
+}
+export interface DeepEvidence {
+  collectionFinished?: boolean;
+  collectedAt: string;
+  queries: SearchQuery[];
+  githubQuery: string;
+  web?: WebEvidence;
+  sources: ResearchSource[];
+  reads: DocumentRead[];
+}
+export interface DeepTask {
+  id: string;
+  owner: string;
+  request: DeepRequest;
+  title: { en: string; zh: string };
+  geo: string;
+  version: string;
+  model: string;
+  created: string;
+  updated: string;
+  state: "queued" | "running" | "complete" | "partial";
+  stage:
+    | "queued"
+    | "planning"
+    | "sources"
+    | "writing"
+    | "reviewing"
+    | "complete"
+    | "partial";
+  attempts: number;
+  credit: "reserved" | "used" | "returned" | "own-keys";
+  evidence?: DeepEvidence;
+  result?: DeepBrief;
+  problem?: "sources" | "model" | "interrupted";
+}
+export type DeepTaskView = Omit<DeepTask, "owner">;
+export interface DeepAllowance {
+  limit: number | null;
+  remaining: number | null;
+  reserved: number;
+  used: number;
+}
+export const deepAreaLabels = {
+  audience: ["People & their need", "人群与需求"],
+  competitors: ["Other products", "同行与切入空间"],
+  opensource: ["Open-source foundation", "可以复用的开源基础"],
+  scope: ["First release", "首版交付"],
+} as const;
+export const deepPlanLabels = {
+  deliverable: ["Build this first", "先交付什么"],
+  resources: ["People, data & access", "人员、资料与权限"],
+  effort: ["Effort estimate", "投入估算"],
+  maintenance: ["Ongoing work", "后续维护"],
+  experiment: ["Your first experiment", "第一个验证实验"],
+  continueIf: ["Invest further when", "继续投入的条件"],
+  changeIf: ["Change direction when", "调整方向的条件"],
+} as const;
+
+/** Exact quotes anchor claims. Semantic support is checked separately by the reviewer. */
+export function deepProblems(
+  raw: unknown,
+  sources: ResearchSource[],
+): string[] {
+  const parsed = deepBriefSchema.safeParse(raw);
+  if (!parsed.success)
+    return parsed.error.issues
+      .slice(0, 8)
+      .map((i) => `${i.path.join(".")}: ${i.message}`);
+  const result = parsed.data,
+    problems: string[] = [];
+  for (const [path, value] of [
+    ["plan.effort", result.plan.effort],
+    ["answer", result.answer],
+  ] as const) {
+    if (/人[日天]|person[- ]days?/i.test(value.en + value.zh))
+      problems.push(
+        `${path}: express estimated effort as one total person-hour range, with an explicit scope assumption. Keep the answer focused on the selected question; detailed estimates belong in plan.effort.`,
+      );
+  }
+  for (const area of Object.keys(deepAreaLabels))
+    if (!result.findings.some((f) => f.area === area))
+      problems.push(`Include the ${area} finding; label hypotheses inferred.`);
+  for (const [i, f] of result.findings.entries()) {
+    if (f.basis === "observed" && !f.evidence.length)
+      problems.push(
+        `findings.${i}: cite an exact source quote for the observed fact.`,
+      );
+    if (f.evidence.some((ref) => !validQuote(ref, sources)))
+      problems.push(
+        `findings.${i}: use an exact supplied excerpt and its source ID.`,
+      );
+  }
+  const checkCopy = (v: unknown, path: string) => {
+    if (
+      typeof v === "string" &&
+      /\.(en|zh)$/.test(path) &&
+      hasNegativeWording(v)
+    )
+      problems.push(
+        `${path}: express this affirmatively, preserving its uncertainty and action: ${JSON.stringify(v)}`,
+      );
+    else if (v && typeof v === "object")
+      for (const [k, child] of Object.entries(v))
+        checkCopy(child, path ? `${path}.${k}` : k);
+  };
+  checkCopy(result, "");
+  return problems;
+}
+
+export function deepDeliveryReady(
+  result: DeepBrief,
+  evidence: DeepEvidence,
+  question: DeepRequest["question"],
+) {
+  const observed = result.findings.filter((f) => f.basis === "observed");
+  const cited = evidence.sources.filter((s) =>
+    observed.some((f) => f.evidence.some((r) => r.id === s.id)),
+  );
+  const originals = cited.filter(
+    (s) => !!s.documentType || s.kind === "project" || s.kind === "request",
+  );
+  if (new Set(cited.map((s) => s.url)).size < 2 || !originals.length)
+    return false;
+  const focused = observed.filter((f) =>
+    question === "scope"
+      ? ["scope", "opensource", "competitors"].includes(f.area)
+      : f.area === question,
+  );
+  if (!focused.length) return false;
+  const focusedSources = evidence.sources.filter((s) =>
+    focused.some((f) => f.evidence.some((r) => r.id === s.id)),
+  );
+  if (
+    question === "audience" &&
+    !focusedSources.some((s) => s.kind === "request")
+  )
+    return false;
+  if (
+    question === "opensource" &&
+    !focusedSources.some((s) => s.documentType === "license")
+  )
+    return false;
+  if (
+    question === "competitors" &&
+    !focusedSources.some(
+      (s) => s.documentType === "page" || s.kind === "project",
+    )
+  )
+    return false;
+  return true;
+}
+
+export function deepMarkdown(task: DeepTaskView, lang: "en" | "zh") {
+  const l = (pair: readonly [string, string]) => pair[lang === "zh" ? 1 : 0];
+  const literal = (s: string) =>
+    s.replace(/[\\`*_{}\[\]<>#!|]/g, "\\$&").replace(/\r?\n/g, " ");
+  const lines = [
+    `# ${literal(task.title[lang])}`,
+    "",
+    l(deepQuestions[task.request.question]),
+    "",
+    task.updated,
+    "",
+  ];
+  if (task.result) {
+    const b = task.result;
+    lines.push(
+      `## ${literal(b.headline[lang])}`,
+      "",
+      literal(b.answer[lang]),
+      "",
+    );
+    for (const f of b.findings) {
+      lines.push(
+        `### ${l(deepAreaLabels[f.area])}`,
+        "",
+        `${literal(f.subject[lang])} · ${l(f.basis === "observed" ? ["Source evidence", "来源证据"] : ["Research inference", "研究推断"])}`,
+        "",
+        literal(f.statement[lang]),
+        "",
+      );
+      for (const ref of f.evidence) {
+        const s = task.evidence?.sources.find((s) => s.id === ref.id);
+        if (s)
+          lines.push(
+            `> ${literal(ref.quote)}`,
+            "",
+            `[${literal(s.label)}](${s.url.replace(/[()\s]/g, encodeURIComponent)})`,
+            "",
+          );
+      }
+    }
+    for (const [key, label] of Object.entries(deepPlanLabels))
+      lines.push(
+        `### ${l(label)}`,
+        "",
+        literal(b.plan[key as keyof typeof b.plan][lang]),
+        "",
+      );
+    if (b.checks.length)
+      lines.push(
+        `### ${l(["Checks before committing", "投入前再核对"])}`,
+        "",
+        ...b.checks.map((c) => `- ${literal(c[lang])}`),
+        "",
+      );
+  }
+  lines.push(
+    `## ${l(["Research record", "研究记录"])}`,
+    "",
+    `${l(["Status", "状态"])}: ${task.state} · ${l(["Credit", "次数"])}: ${task.credit}`,
+    "",
+    `${l(["Sources collected", "来源采集"])}: ${task.evidence?.collectedAt || task.created}`,
+    "",
+  );
+  for (const s of task.evidence?.sources || [])
+    lines.push(
+      `- [${literal(s.label)}](${s.url.replace(/[()\s]/g, encodeURIComponent)}) · ${s.fetchedAt || ""}`,
+    );
+  return lines.join("\n");
+}

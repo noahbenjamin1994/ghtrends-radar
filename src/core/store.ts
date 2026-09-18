@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { resolveTopic } from "./topics.js";
 import type { Market, Repo } from "./types.js";
+import type { DeepTask, DeepAllowance } from "./deep.js";
 import {
   operationContext,
   tokenCount,
@@ -48,6 +49,9 @@ export class Store {
       CREATE INDEX IF NOT EXISTS provider_calls_started ON provider_calls(started DESC);
       CREATE INDEX IF NOT EXISTS provider_calls_run ON provider_calls(run_id);
       CREATE INDEX IF NOT EXISTS provider_calls_user ON provider_calls(user_id,started);
+      CREATE TABLE IF NOT EXISTS deep_tasks(id TEXT PRIMARY KEY,owner TEXT NOT NULL,request_key TEXT NOT NULL,fingerprint TEXT NOT NULL,state TEXT NOT NULL,created TEXT NOT NULL,updated TEXT NOT NULL,payload TEXT NOT NULL,UNIQUE(owner,request_key));
+      CREATE INDEX IF NOT EXISTS deep_tasks_owner ON deep_tasks(owner,created DESC);
+      CREATE TABLE IF NOT EXISTS deep_trials(owner TEXT PRIMARY KEY,task_id TEXT NOT NULL UNIQUE,state TEXT NOT NULL);
     `);
     const runColumns = this.db
       .prepare("PRAGMA table_info(scan_runs)")
@@ -89,6 +93,279 @@ export class Store {
         Math.floor(Number(process.env.GHTRENDS_LOG_RETENTION_DAYS) || 30),
       ),
     );
+  }
+  deepTask(id: string, owner: string): DeepTask | null {
+    const row = this.db
+      .prepare(
+        "SELECT payload FROM deep_tasks WHERE id=? AND owner=? AND state!='deleted'",
+      )
+      .get(id, owner) as { payload: string } | undefined;
+    return row ? JSON.parse(row.payload) : null;
+  }
+  deepRequest(owner: string, key: string): DeepTask | null {
+    const row = this.db
+      .prepare(
+        "SELECT payload FROM deep_tasks WHERE owner=? AND request_key=? AND state!='deleted'",
+      )
+      .get(owner, key) as { payload: string } | undefined;
+    return row ? JSON.parse(row.payload) : null;
+  }
+  deepHistory(owner: string): DeepTask[] {
+    return (
+      this.db
+        .prepare(
+          "SELECT payload FROM deep_tasks WHERE owner=? AND state!='deleted' ORDER BY created DESC LIMIT 100",
+        )
+        .all(owner) as { payload: string }[]
+    ).map((r) => JSON.parse(r.payload));
+  }
+  removeDeepTask(id: string, owner: string) {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const task = this.deepTask(id, owner);
+      if (!task)
+        throw Object.assign(new Error("deep_missing"), { status: 404 });
+      if (["queued", "running"].includes(task.state))
+        throw Object.assign(new Error("deep_active"), { status: 409 });
+      // Keep only idempotency/attempt metadata; the lifetime receipt remains bound to this task.
+      this.db
+        .prepare(
+          "UPDATE deep_tasks SET state='deleted',fingerprint='',payload=? WHERE id=? AND owner=?",
+        )
+        .run(JSON.stringify({ attempts: task.attempts }), id, owner);
+      this.db
+        .prepare(
+          "UPDATE scan_runs SET input='Deleted research',report_id=NULL,error=NULL,warnings='[]' WHERE id=? AND user_id=?",
+        )
+        .run(id, owner);
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+  deepPending(): DeepTask[] {
+    return (
+      this.db
+        .prepare(
+          "SELECT payload FROM deep_tasks WHERE state IN ('queued','running') ORDER BY created",
+        )
+        .all() as { payload: string }[]
+    ).map((r) => JSON.parse(r.payload));
+  }
+  deepAllowance(owner: string, hosted: boolean): DeepAllowance {
+    if (!hosted) return { limit: null, remaining: null, reserved: 0, used: 0 };
+    const row = this.db
+      .prepare("SELECT state FROM deep_trials WHERE owner=?")
+      .get(owner) as { state: string } | undefined;
+    return {
+      limit: 1,
+      remaining: row ? 0 : 1,
+      reserved: Number(row?.state === "reserved"),
+      used: Number(row?.state === "used"),
+    };
+  }
+  /** The request identity, private task and lifetime trial reserve commit together. */
+  createDeepTask(
+    task: DeepTask,
+    fingerprint: string,
+    hosted: boolean,
+    dailyCapacity = 20,
+  ): { task: DeepTask; created: boolean } {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const existing = this.db
+        .prepare(
+          "SELECT fingerprint,payload,state FROM deep_tasks WHERE owner=? AND request_key=?",
+        )
+        .get(task.owner, task.request.requestKey) as
+        { fingerprint: string; payload: string; state: string } | undefined;
+      if (existing) {
+        if (existing.state === "deleted")
+          throw Object.assign(new Error("deep_removed"), { status: 404 });
+        if (existing.fingerprint !== fingerprint)
+          throw Object.assign(new Error("deep_request_changed"), {
+            status: 409,
+          });
+        this.db.exec("COMMIT");
+        return { task: JSON.parse(existing.payload), created: false };
+      }
+      this.checkDeepCapacity(task.owner, dailyCapacity);
+      this.reserveDeepTrial(task, hosted);
+      this.db
+        .prepare("INSERT INTO deep_tasks VALUES(?,?,?,?,?,?,?,?)")
+        .run(
+          task.id,
+          task.owner,
+          task.request.requestKey,
+          fingerprint,
+          task.state,
+          task.created,
+          task.updated,
+          JSON.stringify(task),
+        );
+      this.startRun({
+        id: task.id,
+        kind: "deep",
+        userId: task.owner,
+        input: task.title.en,
+        geo: task.geo,
+        background: false,
+        created: task.created,
+      });
+      this.db.exec("COMMIT");
+      return { task, created: true };
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+  private checkDeepCapacity(owner: string, dailyCapacity: number) {
+    if (
+      this.db
+        .prepare(
+          "SELECT 1 FROM deep_tasks WHERE owner=? AND state IN ('queued','running')",
+        )
+        .get(owner)
+    )
+      throw Object.assign(new Error("deep_active"), { status: 409 });
+    const day = new Date().toISOString().slice(0, 10);
+    const count = this.db
+      .prepare("SELECT COUNT(*) AS n FROM deep_tasks WHERE created>=?")
+      .get(day) as { n: number };
+    const own = this.db
+      .prepare(
+        "SELECT COALESCE(SUM(json_extract(payload,'$.attempts')),0) AS n FROM deep_tasks WHERE owner=? AND updated>=?",
+      )
+      .get(owner, day) as { n: number };
+    if (
+      count.n >= dailyCapacity ||
+      own.n >= 3 ||
+      this.deepPending().length >= 20
+    )
+      throw Object.assign(new Error("deep_capacity"), { status: 429 });
+  }
+  private reserveDeepTrial(task: DeepTask, hosted: boolean) {
+    if (!hosted) {
+      task.credit = "own-keys";
+      return;
+    }
+    if (
+      this.db.prepare("SELECT 1 FROM deep_trials WHERE owner=?").get(task.owner)
+    )
+      throw Object.assign(new Error("deep_trial_used"), { status: 409 });
+    this.db
+      .prepare("INSERT INTO deep_trials VALUES(?,?,'reserved')")
+      .run(task.owner, task.id);
+    task.credit = "reserved";
+  }
+  retryDeepTask(
+    id: string,
+    owner: string,
+    hosted: boolean,
+    dailyCapacity = 20,
+  ): DeepTask {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const task = this.deepTask(id, owner);
+      if (!task)
+        throw Object.assign(new Error("deep_missing"), { status: 404 });
+      if (task.state !== "partial") {
+        this.db.exec("COMMIT");
+        return task;
+      }
+      if (task.attempts >= 3)
+        throw Object.assign(new Error("deep_attempts"), { status: 429 });
+      this.checkDeepCapacity(owner, dailyCapacity);
+      this.reserveDeepTrial(task, hosted);
+      task.state = "queued";
+      task.stage = "queued";
+      task.attempts++;
+      this.writeDeepTask(task);
+      this.updateRun(id, "queued");
+      this.db.exec("COMMIT");
+      return task;
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+  private writeDeepTask(task: DeepTask) {
+    task.updated = new Date().toISOString();
+    this.db
+      .prepare(
+        "UPDATE deep_tasks SET state=?,updated=?,payload=? WHERE id=? AND owner=?",
+      )
+      .run(task.state, task.updated, JSON.stringify(task), task.id, task.owner);
+  }
+  checkpointDeepTask(task: DeepTask) {
+    const current = this.deepTask(task.id, task.owner);
+    if (
+      !current ||
+      current.state !== "running" ||
+      current.attempts !== task.attempts
+    )
+      throw new Error("deep_checkpoint_state");
+    task.state = "running";
+    task.credit = current.credit;
+    this.writeDeepTask(task);
+  }
+  claimDeepTask(id: string, owner: string): DeepTask | null {
+    const task = this.deepTask(id, owner);
+    if (!task || task.state !== "queued") return null;
+    task.state = "running";
+    this.writeDeepTask(task);
+    this.updateRun(id, "running");
+    return task;
+  }
+  finishDeepTask(task: DeepTask, complete: boolean) {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const current = this.deepTask(task.id, task.owner);
+      if (
+        !current ||
+        !["queued", "running"].includes(current.state) ||
+        current.attempts !== task.attempts
+      ) {
+        this.db.exec("COMMIT");
+        return;
+      }
+      task.state = complete ? "complete" : "partial";
+      task.stage = task.state;
+      if (current.credit === "reserved") {
+        if (complete) {
+          const receipt = this.db
+            .prepare(
+              "UPDATE deep_trials SET state='used' WHERE owner=? AND task_id=? AND state='reserved'",
+            )
+            .run(task.owner, task.id);
+          if (receipt.changes !== 1) throw new Error("deep_credit_binding");
+          task.credit = "used";
+        } else {
+          this.db
+            .prepare(
+              "DELETE FROM deep_trials WHERE owner=? AND task_id=? AND state='reserved'",
+            )
+            .run(task.owner, task.id);
+          task.credit = "returned";
+        }
+      } else task.credit = current.credit;
+      this.writeDeepTask(task);
+      this.updateRun(task.id, complete ? "complete" : "failed", {
+        reportId: task.request.reportId,
+        error: complete ? undefined : `deep_${task.problem || "model"}`,
+      });
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+  interruptDeepTasks() {
+    for (const task of this.deepPending()) {
+      task.problem = "interrupted";
+      this.finishDeepTask(task, false);
+    }
   }
   pruneOperations() {
     this.lastPruned = Date.now();

@@ -147,7 +147,7 @@ ghtrends scan --topic mcp-servers --trends-file demand.json --json
 | Persistent history and watchlist              | —                           | Per account, across devices | Local SQLite workspace            |
 | Input normalization and brief                 | View existing public briefs | Server DeepSeek key         | Optional own DeepSeek key         |
 | Private reports and opt-in public links       | —                           | Yes                         | Access limited to your deployment |
-| Personal direction ranking                   | —                           | Free, with request limits   | Own DeepSeek key                  |
+| Personal direction ranking                    | —                           | Free, with request limits   | Own DeepSeek key                  |
 
 **One codebase.** Self-hosting needs no login provider and no external database. Hosted mode requires sign-in for resource-consuming research and stores user/report ownership, history, watchlists, sessions and daily usage in SQLite. Single instance with a persistent data volume; back up with SQLite's backup API or while stopped, rather than copying a live WAL database file alone.
 
@@ -176,6 +176,14 @@ The model proposes one primary Trends phrase, up to two genuine synonyms, and bo
 Sparse source coverage produces a **domain hypothesis**; document-grounded recommendations are labeled **source-led hypotheses**. Both represent research proposals. The interface shows source progress and preliminary measurements while the strategy develops. AI-enabled scans can proceed with available evidence during Trends cooldown, within the same account and attempt limits. A compact reasoning blueprint is followed by separately validated bilingual directions and an overall judgment; direction writing runs with two requests at a time. Completed sections are cached. Strategy generation, direction/overall writing and corrective editing are recorded separately in admin usage. Provider reasoning text stays outside stored reports. Results use a six-hour strategy cache; deeper analysis adds latency and model usage.
 
 `PUBLIC_URL` may include a directory, for example `https://example.com/radar`. The same build supports both directory hosting and a local root URL. Forward that prefix unchanged to the server and configure the matching Logto callback.
+
+**Focused research preview**
+
+Set `GHTRENDS_DEEP_RESEARCH=1` with a research model key to try the private, selected-direction workflow. Open a report direction and choose one question: compare other products, scope a first release, build on open source, or find the first users. Optional personal-fit conditions travel with the task. Targeted searches, current project requests and original documents support a compact bilingual decision brief. Facts, proposals, resource estimates and source quotes stay distinct.
+
+Hosted accounts receive one introductory focused-research credit for the account's lifetime. Starting a task reserves it; complete delivery uses it; partial delivery or a restart returns it. This balance is separate from daily standard research. Self-hosted tasks use the operator's provider keys. Requests are idempotent and tasks survive navigation and restarts; a partial task can resume up to three total attempts. Account attempts are capped at three per UTC day; `GHTRENDS_DEEP_DAILY_REQUESTS` sets daily new-task capacity (default 20). Reading and exporting consume zero research credits. Private history supports Markdown/JSON export and content deletion; minimal usage records retain attempt counts and used-credit status. The preview remains separately configurable while quality and cost evaluation proceeds; purchasing research packs is a later milestone.
+
+Drafting and wording repair use disabled thinking. Wording edits affect requested fields only; exact quotes and a separate source review check the decision brief. Original-source gaps remain visible alongside saved evidence, with the introductory credit returned. All collected excerpts and optional background are research inputs to the configured model.
 
 **Original text and licenses**
 

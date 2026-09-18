@@ -97,7 +97,7 @@ interface AdminData {
     warnings: string | null;
     estimated_usd: number | null;
     background: number;
-    kind?: "scan" | "preflight" | "fit";
+    kind?: "scan" | "preflight" | "fit" | "deep";
   }[];
   users: {
     id: string;
@@ -855,11 +855,13 @@ export function AdminView({ account }: { account: Account | null }) {
                         r.user_id ||
                         l("Local workspace", "本地工作区")}{" "}
                     ·{" "}
-                    {r.kind === "fit"
-                      ? l("Personal direction fit", "个人方向筛选")
-                      : r.kind === "preflight"
-                        ? l("Scope preparation", "输入预检")
-                        : l("Research", "研究")}{" "}
+                    {r.kind === "deep"
+                      ? l("Focused research", "专项研究")
+                      : r.kind === "fit"
+                        ? l("Personal direction fit", "个人方向筛选")
+                        : r.kind === "preflight"
+                          ? l("Scope preparation", "输入预检")
+                          : l("Research", "研究")}{" "}
                     · {date(r.created)}
                     {r.started && r.finished
                       ? ` · ${((Date.parse(r.finished) - Date.parse(r.started)) / 1000).toFixed(1)}s`

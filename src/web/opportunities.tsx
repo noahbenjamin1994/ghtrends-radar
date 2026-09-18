@@ -9,6 +9,7 @@ import {
 import type { Brief, Market } from "../core/types.js";
 import { fitLabel, type SavedFit } from "../core/fit.js";
 import { FitReason, PersonalFit } from "./fit.js";
+import { DeepStart } from "./deep.js";
 
 export function TopicOverview({
   brief,
@@ -351,6 +352,12 @@ export function OpportunityMap({
             "项目文档支持功能判断，Issue 记录个体诉求；更广泛的需求与采用仍属于研究假设。工期与实验门槛均为建议估算。",
           )}
         </p>
+        <DeepStart
+          key={selected.id}
+          reportId={market.id}
+          directionId={selected.id}
+          profile={fit?.profile}
+        />
       </article>
     </section>
   );

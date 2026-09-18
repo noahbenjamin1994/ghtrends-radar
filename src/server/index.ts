@@ -12,6 +12,7 @@ import { operationContext } from "../core/operations.js";
 import sharp from "sharp";
 import { installAuth } from "./auth.js";
 import { installFitRoutes } from "./fit.js";
+import { installDeepRoutes } from "./deep.js";
 import { marketCard } from "../core/card.js";
 import { isIP } from "node:net";
 import { randomUUID, createHash } from "node:crypto";
@@ -125,6 +126,16 @@ export function createApp(engine = new Engine()) {
   let processing = false,
     nextBackgroundAt = 0;
   let backgroundTimer: ReturnType<typeof setTimeout> | undefined;
+  const deep = installDeepRoutes(app, engine, auth, {
+    available: () => !processing,
+    ownerBusy: (owner) =>
+      activeResearch.has(owner) ||
+      [...jobs.values()].some(
+        (j) => j.owner === owner && ["queued", "running"].includes(j.state),
+      ),
+    released: () => void processJobs(),
+  });
+  app.locals.stopDeepResearch = deep.stop;
   const clientIP = (q: express.Request) => {
     const trusted = process.env.GHTRENDS_CLIENT_IP_HEADER;
     const header = trusted ? q.get(trusted) : undefined;
@@ -133,6 +144,7 @@ export function createApp(engine = new Engine()) {
   const reserve = (user: string, id: string, kind: string) => {
     if (!auth.hosted) return;
     if (
+      deep.hasActive(user) ||
       activeResearch.has(user) ||
       [...jobs.values()].some(
         (j) => j.owner === user && ["queued", "running"].includes(j.state),
@@ -206,7 +218,7 @@ export function createApp(engine = new Engine()) {
     }
   };
   async function processJobs() {
-    if (processing) return;
+    if (processing || deep.running) return;
     processing = true;
     try {
       while (true) {
@@ -217,6 +229,14 @@ export function createApp(engine = new Engine()) {
               Number(!!a.refresh) - Number(!!b.refresh) ||
               a.created - b.created,
           )[0];
+        const nextDeep = engine.store
+          .deepPending()
+          .find((t) => t.state === "queued");
+        if (
+          nextDeep &&
+          (!job || job.refresh || Date.parse(nextDeep.created) <= job.created)
+        )
+          break;
         if (!job) break;
         if (job.refresh && Date.now() < nextBackgroundAt) {
           clearTimeout(backgroundTimer);
@@ -278,6 +298,7 @@ export function createApp(engine = new Engine()) {
       }
     } finally {
       processing = false;
+      void deep.kick();
     }
   }
   const safe =
@@ -373,6 +394,7 @@ export function createApp(engine = new Engine()) {
       hosted: auth.hosted,
       authAvailable: auth.enabled,
       aiAvailable: engine.research.enabled,
+      deep: deep.status(user?.id),
       user: user ? { name: user.name, isAdmin: auth.isAdmin(user) } : null,
       csrf: user?.csrf || "",
       dailyLimit,
@@ -410,16 +432,26 @@ export function createApp(engine = new Engine()) {
         ...engine.store.adminOverview(days, page, state),
         proxyUsage: await proxyUsage.overview(days),
         version: ALGORITHM_VERSION,
-        queue: [...jobs.values()]
-          .filter((j) => j.state === "queued" || j.state === "running")
-          .map((j) => ({
-            id: j.id,
-            input: j.input || j.topic,
-            state: j.state,
-            stage: j.progress?.stage,
-            background: !!j.refresh,
-            created: j.created,
+        queue: [
+          ...[...jobs.values()]
+            .filter((j) => j.state === "queued" || j.state === "running")
+            .map((j) => ({
+              id: j.id,
+              input: j.input || j.topic,
+              state: j.state,
+              stage: j.progress?.stage,
+              background: !!j.refresh,
+              created: j.created,
+            })),
+          ...engine.store.deepPending().map((task) => ({
+            id: task.id,
+            input: task.title.en,
+            state: task.state,
+            stage: task.stage,
+            background: false,
+            created: Date.parse(task.created),
           })),
+        ],
         configuration: {
           mode: auth.hosted ? "hosted" : "self-hosted",
           auth: auth.enabled,
@@ -1209,7 +1241,10 @@ export function createApp(engine = new Engine()) {
           "/watch",
           "/history",
           "/admin",
-        ].includes(path) || repository;
+        ].includes(path) ||
+        repository ||
+        (!!/^\/research\/[a-f0-9-]{36}$/.test(path) &&
+          !!engine.store.deepTask(path.slice(10), auth.user(q)?.id || ""));
       const status = m || known ? 200 : 404;
       const markets = dashboardMarkets(geo);
       const html = renderDocument(readFileSync(file, "utf8"), {
@@ -1221,6 +1256,7 @@ export function createApp(engine = new Engine()) {
         markets,
         status,
         noindex:
+          path.startsWith("/research/") ||
           repository ||
           !!(m && !engine.store.isPublic(m.id)) ||
           ["/compare", "/watch", "/history", "/admin"].includes(path) ||
@@ -1271,6 +1307,7 @@ export function createApp(engine = new Engine()) {
   });
   root.use(basePath, app);
   root.locals.stopCollector = app.locals.stopCollector;
+  root.locals.stopDeepResearch = app.locals.stopDeepResearch;
   return root;
 }
 export async function startServer(
@@ -1284,6 +1321,7 @@ export async function startServer(
   );
   const stop = () => {
     app.locals.stopCollector?.();
+    app.locals.stopDeepResearch?.();
     server.close(() => {
       void engine.close().then(() => process.exit(0));
     });

@@ -91,6 +91,9 @@ export function renderDocument(
     "/admin": "Operations · ghtrends",
     "/history": "Your research history · ghtrends",
   };
+  if (path.startsWith("/research/"))
+    titles[path] =
+      locale === "zh" ? "专项研究 · ghtrends" : "Focused research · ghtrends";
   const reportTitle =
     assessment?.narrative.kind === "ai" && assessment.narrative.headline
       ? assessment.narrative.headline

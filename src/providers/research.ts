@@ -382,7 +382,12 @@ export class Research {
             response_format: { type: "json_object" },
             max_tokens: maxTokens,
             messages: [
-              { role: "system", content: system },
+              {
+                role: "system",
+                content: /\bjson\b/i.test(system)
+                  ? system
+                  : `${system}\nReturn a JSON object.`,
+              },
               { role: "user", content: JSON.stringify(input) },
             ],
           }),
