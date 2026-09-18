@@ -11,6 +11,7 @@ import express from "express";
 import { operationContext } from "../core/operations.js";
 import sharp from "sharp";
 import { installAuth } from "./auth.js";
+import { installFitRoutes } from "./fit.js";
 import { marketCard } from "../core/card.js";
 import { isIP } from "node:net";
 import { randomUUID, createHash } from "node:crypto";
@@ -81,6 +82,7 @@ export function createApp(engine = new Engine()) {
     r.set("Cache-Control", "no-store").vary("Cookie");
     next();
   });
+  installFitRoutes(app, engine, auth);
   const dailyLimit = Math.max(
     1,
     Math.floor(Number(process.env.GHTRENDS_DAILY_SCANS)) || 10,
@@ -1118,7 +1120,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.18.0/ghtrends-radar-0.18.0.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.19.0/ghtrends-radar-0.19.0.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>

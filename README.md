@@ -57,7 +57,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.18.0/ghtrends-radar-0.18.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.19.0/ghtrends-radar-0.19.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -147,6 +147,7 @@ ghtrends scan --topic mcp-servers --trends-file demand.json --json
 | Persistent history and watchlist              | —                           | Per account, across devices | Local SQLite workspace            |
 | Input normalization and brief                 | View existing public briefs | Server DeepSeek key         | Optional own DeepSeek key         |
 | Private reports and opt-in public links       | —                           | Yes                         | Access limited to your deployment |
+| Personal direction ranking                   | —                           | Free, with request limits   | Own DeepSeek key                  |
 
 **One codebase.** Self-hosting needs no login provider and no external database. Hosted mode requires sign-in for resource-consuming research and stores user/report ownership, history, watchlists, sessions and daily usage in SQLite. Single instance with a persistent data volume; back up with SQLite's backup API or while stopped, rather than copying a live WAL database file alone.
 
@@ -161,6 +162,8 @@ ghtrends ui
 ```
 
 The model proposes one primary Trends phrase, up to two genuine synonyms, and bounded GitHub topic/phrase queries. It also reviews project roles using quoted repository metadata; deterministic code calculates pressure and search direction. Ambiguous acronyms request clarification. It then maps **3–5 distinct opportunity directions** in English and Chinese, with one prioritized strategy to test. Market metrics remain a separate, deterministic layer. Use public research inputs: queries and bounded public-source excerpts go to DeepSeek, Google, DuckDuckGo and GitHub as needed. Collected evidence remains readable during model recovery.
+
+**Find the directions that fit you.** On a report with researched directions, choose your experience, available time and goal. The model ranks the existing directions and explains the fit plus a small first step for each. This uses zero research credits and shares the scope-preparation request budget. The selected profile and recommendations stay private, are restored on return, and are retained for 30 days; Markdown export is available. Public reports and their demand/competition evidence keep their original content. The configured research model receives the profile and relevant report proposals; use research-appropriate context. Generation uses disabled thinking and bounded, targeted repairs; admin records it as personal direction ranking.
 
 **The strategy process**
 

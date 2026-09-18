@@ -1,4 +1,16 @@
 export const zh: Record<string, string> = {
+  "Choose your experience, time and goal to continue.":
+    "选择经验、时间与目标，继续整理建议。",
+  "Choose a report with researched directions to continue.":
+    "选择一份包含细分方向的研究报告，继续筛选。",
+  "Open a report in your research history to continue.":
+    "请从个人研究历史打开报告，继续查看。",
+  "Configure the research model to tailor these directions.":
+    "配置研究模型后，即可按个人条件整理方向。",
+  "Your recommendations are being prepared. Continue when they are ready.":
+    "方向建议正在整理，完成后即可继续。",
+  "Your profile is saved on this page. Try preparing the recommendations again.":
+    "页面已保留你的条件，可以再次整理方向建议。",
   "Continue preparing your research at the shown time.":
     "可在显示的时间继续整理研究范围。",
   "Fresh research uses 1 credit": "全新研究使用 1 次额度",

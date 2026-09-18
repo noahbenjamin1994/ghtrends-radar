@@ -61,7 +61,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.18.0/ghtrends-radar-0.18.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.19.0/ghtrends-radar-0.19.0.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
@@ -153,6 +153,7 @@ ghtrends scan --topic mcp-servers --trends-file demand.json --json
 | 历史与关注列表                     | —              | 按账户保存，跨设备可用 | 本地 SQLite 工作区       |
 | 输入标准化、简报                   | 阅读已公开简报 | 使用后端 DeepSeek Key  | 可选填写自己的 Key       |
 | 私有报告、主动分享                 | —              | 支持                   | 由自己的部署访问范围决定 |
+| 按个人条件筛选方向                 | —              | 免费，受请求频率控制   | 填写自己的 DeepSeek Key |
 
 **一套代码，两种运行模式。** 自托管不要求 Logto，也不要求外部数据库。托管版将账户与报告归属、历史、关注列表、会话、每日额度存入 SQLite，单实例配持久化目录。备份使用 SQLite 备份接口或停机复制，不能只复制运行中的主文件而忽略 WAL。
 
@@ -167,6 +168,8 @@ ghtrends ui
 ```
 
 模型基于项目元数据原文核对角色；竞争压力与搜索方向由确定性代码计算。模型生成一个 Trends 主词、最多两个同义表达，以及受约束的 GitHub 主题与短语。歧义缩写会要求选择含义；随后整理中英文 **3–5 个细分方向**，并深入分析优先方向。市场指标与策略推演分层呈现。输入应限于公开研究内容；查询与限量的公开来源摘录会按需发送给 DeepSeek、Google、DuckDuckGo、GitHub。模型恢复期间，已采集的报告仍可阅读。
+
+**按我的情况筛选。** 在已有细分方向的报告中，选择经验、时间和目标，AI 会重排现有方向，并逐项解释匹配原因与第一步行动。筛选消耗 0 次研究额度，与范围预检共用请求预算。个人条件与筛选建议单独私有保存，回访时自动恢复，保留 30 天，支持 Markdown 导出；公开报告、需求与竞争证据沿用原记录。配置的研究模型会接收这些条件及相关方向建议，请填写适合研究使用的背景。筛选关闭 thinking，格式与措辞按需局部修复；管理员可单独查看这类任务与消耗。
 
 ### 网页搜索（可选）
 

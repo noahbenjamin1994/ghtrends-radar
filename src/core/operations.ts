@@ -26,7 +26,7 @@ export interface ProviderCall {
 }
 export interface RunRecord {
   id: string;
-  kind?: "scan" | "preflight";
+  kind?: "scan" | "preflight" | "fit";
   userId?: string;
   input: string;
   geo: string;

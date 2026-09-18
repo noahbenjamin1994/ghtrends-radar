@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowUpRight, Check, ChevronRight } from "lucide-react";
 import {
   visibleOpportunities,
@@ -6,7 +6,9 @@ import {
   opportunityRoute,
   overviewRows,
 } from "../core/opportunities.js";
-import type { Brief } from "../core/types.js";
+import type { Brief, Market } from "../core/types.js";
+import { fitLabel, type SavedFit } from "../core/fit.js";
+import { FitReason, PersonalFit } from "./fit.js";
 
 export function TopicOverview({
   brief,
@@ -75,15 +77,21 @@ export function TopicOverview({
 }
 
 export function OpportunityMap({
-  brief,
+  market,
   locale,
 }: {
-  brief: Brief;
+  market: Market;
   locale: "en" | "zh";
 }) {
+  const brief = market.brief!;
   const map = visibleOpportunities(brief);
   const [choice, setChoice] = useState(map?.recommendedId);
+  const [fit, setFit] = useState<SavedFit | null>(null);
+  useEffect(() => {
+    setChoice(fit?.directions[0]?.id || map?.recommendedId);
+  }, [fit, map?.recommendedId]);
   if (!map) return null;
+  const recommendedId = fit?.directions[0]?.id || map.recommendedId;
   const l = (en: string, zh: string) => (locale === "zh" ? zh : en);
   const label = (
     kind: "effort" | "demand" | "competition" | "basis",
@@ -97,9 +105,11 @@ export function OpportunityMap({
     ...selected.demand.evidence,
     ...selected.competition.evidence,
   ].filter((r, i, all) => all.findIndex((a) => a.id === r.id) === i);
-  const directions = [...map.opportunities].sort(
-    (a, b) =>
-      Number(b.id === map.recommendedId) - Number(a.id === map.recommendedId),
+  const directions = [...map.opportunities].sort((a, b) =>
+    fit
+      ? fit.directions.findIndex((d) => d.id === a.id) -
+        fit.directions.findIndex((d) => d.id === b.id)
+      : Number(b.id === map.recommendedId) - Number(a.id === map.recommendedId),
   );
   return (
     <section className="opportunity-map" id="opportunities">
@@ -116,10 +126,7 @@ export function OpportunityMap({
       </div>
       <p className="opportunity-selection">
         {l("First to explore: ", "优先探索：")}
-        {
-          map.opportunities.find((o) => o.id === map.recommendedId)![locale]
-            .title
-        }
+        {map.opportunities.find((o) => o.id === recommendedId)![locale].title}
         {l(
           ". Select a direction below to compare what it takes.",
           "。点选下方方向，对比投入与机会。",
@@ -127,18 +134,31 @@ export function OpportunityMap({
       </p>
       <details className="opportunity-priority">
         <summary>
-          {l(
-            "Why this order, and who each direction suits",
-            "排序理由与适合的人群",
-          )}
+          {fit
+            ? l("The report's original ranking", "原报告的排序理由")
+            : l(
+                "Why this order, and who each direction suits",
+                "排序理由与适合的人群",
+              )}
         </summary>
         <p className="opportunity-selection">{map.selection[locale]}</p>
       </details>
+      <PersonalFit
+        market={market}
+        locale={locale}
+        result={fit}
+        onResult={setFit}
+      />
       <p className="footnote">
-        {l(
-          "Priority assumes a solo developer or small team. Ratings combine cited signals and research inference; resources describe the scoped first release.",
-          "优先顺序面向独立开发者或小团队。各方向依据引用信号与研究推断评估，资源等级对应下方首版范围。",
-        )}
+        {fit
+          ? l(
+              "The order reflects your situation. Demand, competition and resources retain the original report's evidence and scope.",
+              "顺序结合你的个人条件调整。需求、竞争与资源投入沿用原报告的证据和范围。",
+            )
+          : l(
+              "Priority assumes a solo developer or small team. Ratings combine cited signals and research inference; resources describe the scoped first release.",
+              "优先顺序面向独立开发者或小团队。各方向依据引用信号与研究推断评估，资源等级对应下方首版范围。",
+            )}
       </p>
       <div
         className="opportunity-comparison"
@@ -176,10 +196,12 @@ export function OpportunityMap({
                     {o[locale].service}
                   </span>
                 )}
-                {o.id === map.recommendedId && (
+                {o.id === recommendedId && (
                   <small>
                     <Check size={12} />
-                    {l("First to explore", "建议优先")}
+                    {fit
+                      ? fitLabel(fit.directions[0]!.fit, locale)
+                      : l("First to explore", "建议优先")}
                   </small>
                 )}
               </span>
@@ -216,6 +238,9 @@ export function OpportunityMap({
       >
         <div className="eyebrow">{l("DIRECTION IN FOCUS", "方向详情")}</div>
         <h4 id="opportunity-title">{p.title}</h4>
+        {fit && (
+          <FitReason result={fit} directionId={selected.id} locale={locale} />
+        )}
         {!!selected.basedOn?.length && (
           <div className="strategy-sources">
             {selected.basedOn.map((ref) => {
