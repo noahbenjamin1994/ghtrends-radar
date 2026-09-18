@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { Engine, type ScanProgress } from "../core/engine.js";
 import { ProxyUsageClient } from "../providers/proxy-usage.js";
 import { QUERY_PLAN_VERSION } from "../providers/research.js";
+import { SEARCH_VERSION } from "../providers/search.js";
 import { STRATEGY_VERSION } from "../core/strategy.js";
 import {
   TOPICS,
@@ -25,7 +26,11 @@ import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
 import { marketMarkdown } from "../core/report.js";
 import type { Market } from "../core/types.js";
 import { renderDocument } from "./html.js";
-import { sourceEvidenceIsFresh, researchWarnings } from "../core/evidence.js";
+import {
+  sourceEvidenceIsFresh,
+  researchWarnings,
+  searchEvidenceIsFresh,
+} from "../core/evidence.js";
 import { requestLocale, localeUrl, type Locale } from "../core/i18n.js";
 interface Job {
   id: string;
@@ -700,7 +705,7 @@ export function createApp(engine = new Engine()) {
               QUERY_PLAN_VERSION,
               STRATEGY_VERSION,
               engine.search.enabled
-                ? `google-v2-${engine.search.mode}`
+                ? `web-v${SEARCH_VERSION}-${engine.search.mode}`
                 : "google-off",
             ]),
           )
@@ -716,6 +721,8 @@ export function createApp(engine = new Engine()) {
           saved,
           engine.research.enabled && engine.search.enabled,
         ).length === 0 &&
+        (!(engine.research.enabled && engine.search.enabled) ||
+          searchEvidenceIsFresh(saved.web)) &&
         sourceEvidenceIsFresh(saved) &&
         Date.now() - Date.parse(saved.asOf) < 86400000
       )
@@ -871,7 +878,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.3/ghtrends-radar-0.17.3.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.4/ghtrends-radar-0.17.4.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>

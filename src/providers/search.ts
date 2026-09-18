@@ -17,6 +17,16 @@ export const searchQuerySchema = z.object({
   intent: z.enum(["competition", "demand", "opensource"]),
 });
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
+export const SEARCH_VERSION = "3";
+export type SearchEngine = "google" | "duckduckgo";
+interface SearchPage {
+  results: SearchResult[];
+  fetchedAt: string;
+  engine: SearchEngine;
+  region?: string;
+  adCoverage: "visible-placements" | "organic-only";
+  fallbackReason?: string;
+}
 export interface SearchResult {
   title: string;
   url: string;
@@ -24,7 +34,8 @@ export interface SearchResult {
   kind: "organic" | "ad";
 }
 export interface WebEvidence {
-  provider: "decodo-google" | "google-mobile";
+  provider: "decodo-google" | "google-mobile" | "multi-search";
+  version?: string;
   adCoverage?: "visible-placements";
   region: string;
   language: string;
@@ -35,8 +46,72 @@ export interface WebEvidence {
     error?: string;
     retryAt?: string;
     fetchedAt?: string;
+    engine?: SearchEngine;
+    region?: string;
+    adCoverage?: SearchPage["adCoverage"];
+    fallbackReason?: string;
     results: SearchResult[];
   })[];
+}
+
+// Parse only the result rows in the lightweight page. A challenge, a new layout,
+// or a tracking/ad link is never evidence of an empty market or an organic hit.
+export function parseDuckDuckGoPage(html: string): SearchResult[] {
+  if (html.length > 1_000_000) throw new Error("search_size");
+  const $ = load(html);
+  $("script,style,noscript").remove();
+  const text = $("body").text();
+  if (
+    $("#challenge-form,form[action*='anomaly.js']").length ||
+    /bots use DuckDuckGo|complete the following challenge/i.test(text)
+  )
+    throw new Error("search_challenge");
+  const output: SearchResult[] = [],
+    seen = new Set<string>();
+  $("a.result-link").each((_, node) => {
+    const heading = $(node),
+      title = heading.text().replace(/\s+/g, " ").trim();
+    let target: URL;
+    try {
+      target = new URL(
+        heading.attr("href") || "",
+        "https://lite.duckduckgo.com",
+      );
+      if (/(^|\.)duckduckgo\.com$/.test(target.hostname)) {
+        if (target.pathname !== "/l/" || target.searchParams.has("ad_domain"))
+          return;
+        target = new URL(target.searchParams.get("uddg") || "");
+      }
+    } catch {
+      return;
+    }
+    if (/(^|\.)(duckduckgo\.com|bing\.com)$/.test(target.hostname)) return;
+    const url = publicSearchUrl(target.href);
+    if (!url || !title || seen.has(url)) return;
+    seen.add(url);
+    const rows = heading.closest("tr").nextUntil("tr:has(a.result-link)");
+    output.push({
+      title: title.slice(0, 240),
+      url,
+      kind: "organic",
+      excerpt: rows
+        .find(".result-snippet")
+        .first()
+        .text()
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 1200),
+    });
+  });
+  if (
+    !output.length &&
+    !(
+      /No results found|No more results|没有找到结果/i.test(text) &&
+      $("form input[name=q]").length
+    )
+  )
+    throw new Error("search_format");
+  return output.slice(0, 10);
 }
 const searchFailure = (error: unknown, retryAt?: string) =>
   Object.assign(
@@ -208,8 +283,10 @@ type DirectResponse = {
   html?: string;
   cookies?: Record<string, string>;
   error?: string;
+  region?: string;
 };
 export type SearchTransport = (input: {
+  engine: SearchEngine;
   query: string;
   region: string;
   language: string;
@@ -252,7 +329,7 @@ const directRequest: SearchTransport = (input) =>
         }
       }
     };
-    const timer = setTimeout(() => finish(new Error("search_timeout")), 30000);
+    const timer = setTimeout(() => finish(new Error("search_timeout")), 22000);
     child.once("error", () => finish(new Error("search_runtime")));
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
@@ -329,7 +406,7 @@ export function searchSources(web?: WebEvidence): ResearchSource[] {
         fetchedAt: q.fetchedAt || web!.fetchedAt,
         searchIntent: q.intent,
         placement: r.kind,
-        excerpt: `Google search excerpt. Query: ${q.query}. Region: ${web!.region}. Language: ${web!.language}. Placement: ${r.kind}. Title: ${r.title}. Snippet: ${r.excerpt}`,
+        excerpt: `${q.engine === "duckduckgo" ? "DuckDuckGo" : "Google"} search excerpt. Query: ${q.query}. Search market: ${q.region || web!.region}. Language: ${web!.language}. Placement: ${r.kind}. Title: ${r.title}. Snippet: ${r.excerpt}`,
       }));
     }) || []
   );
@@ -337,10 +414,7 @@ export function searchSources(web?: WebEvidence): ResearchSource[] {
 export class GoogleSearch {
   private queue = Promise.resolve();
   private lastRequest = 0;
-  private pending = new Map<
-    string,
-    Promise<{ results: SearchResult[]; fetchedAt: string }>
-  >();
+  private pending = new Map<string, Promise<SearchPage>>();
   constructor(
     private store: Store,
     private transport: SearchTransport = directRequest,
@@ -369,10 +443,13 @@ export class GoogleSearch {
   status() {
     return {
       configured: this.enabled,
-      provider: this.mode === "api" ? "decodo-google" : "google-mobile",
+      provider: this.mode === "api" ? "decodo-google" : "multi-search",
+      version: SEARCH_VERSION,
+      engines: this.mode === "api" ? ["google"] : ["google", "duckduckgo"],
       mode: this.mode,
       maxQueries: 3,
       cacheHours: 6,
+      fallbackCacheMinutes: 30,
     };
   }
   async collect(topic: Topic, geo: string): Promise<WebEvidence> {
@@ -409,8 +486,8 @@ export class GoogleSearch {
       ).values(),
     ].slice(0, 3);
     const web: WebEvidence = {
-      provider: this.mode === "api" ? "decodo-google" : "google-mobile",
-      adCoverage: "visible-placements",
+      provider: this.mode === "api" ? "decodo-google" : "multi-search",
+      version: SEARCH_VERSION,
       region,
       language,
       fetchedAt: new Date().toISOString(),
@@ -447,30 +524,32 @@ export class GoogleSearch {
     query: string,
     region: string,
     language: string,
-  ): Promise<{ results: SearchResult[]; fetchedAt: string }> {
+  ): Promise<SearchPage> {
     const identity = createHash("sha256")
       .update(
         this.mode === "api"
           ? process.env.DECODO_SCRAPER_TOKEN || ""
-          : (process.env.GOOGLE_SEARCH_PROXY ||
-              process.env.GOOGLE_TRENDS_PROXY ||
-              "") + "direct-v1",
+          : JSON.stringify([
+              process.env.GOOGLE_SEARCH_PROXY ||
+                process.env.GOOGLE_TRENDS_PROXY ||
+                "",
+              process.env.GOOGLE_SEARCH_PROXY_FALLBACK ||
+                process.env.GOOGLE_TRENDS_PROXY_FALLBACK ||
+                "",
+            ]),
       )
       .digest("hex")
       .slice(0, 12);
     const key =
-      "google-search:v2:" +
+      `web-search:v${SEARCH_VERSION}:` +
       createHash("sha256")
         .update(JSON.stringify([query, region, language, identity]))
         .digest("hex");
-    const cached = this.store.get<{
-      results: SearchResult[];
-      fetchedAt: string;
-    }>(key);
+    const cached = this.store.get<SearchPage>(key);
     if (cached) {
       this.store.recordCall({
         provider: "search",
-        operation: "google-serp",
+        operation: `${cached.engine}-serp`,
         cached: true,
         costUsd: 0,
         durationMs: 0,
@@ -485,9 +564,13 @@ export class GoogleSearch {
         const wait = 1500 - (Date.now() - this.lastRequest);
         if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
         try {
-          const results = await this.direct(query, region, language);
-          const page = { results, fetchedAt: new Date().toISOString() };
-          this.store.set(key, page, 6 * 3600000);
+          const page = await this.direct(query, region, language);
+          // Give the primary source another chance after a short fallback cache.
+          this.store.set(
+            key,
+            page,
+            page.engine === "google" ? 6 * 3600000 : 30 * 60000,
+          );
           return page;
         } finally {
           this.lastRequest = Date.now();
@@ -558,7 +641,12 @@ export class GoogleSearch {
         const result = parseSearchResults(
           JSON.parse(Buffer.concat(chunks).toString("utf8")),
         );
-        const page = { results: result, fetchedAt: new Date().toISOString() };
+        const page: SearchPage = {
+          results: result,
+          fetchedAt: new Date().toISOString(),
+          engine: "google",
+          adCoverage: "visible-placements",
+        };
         this.store.set(key, page, 6 * 3600000);
         return page;
       } catch (e) {
@@ -592,7 +680,7 @@ export class GoogleSearch {
     query: string,
     region: string,
     language: string,
-  ): Promise<SearchResult[]> {
+  ): Promise<SearchPage> {
     const routes = [
       process.env.GOOGLE_SEARCH_PROXY || process.env.GOOGLE_TRENDS_PROXY,
       process.env.GOOGLE_SEARCH_PROXY_FALLBACK ||
@@ -601,56 +689,60 @@ export class GoogleSearch {
       .filter((p): p is string => !!p)
       .map(searchProxy)
       .filter((p, i, a) => a.indexOf(p) === i);
-    // A rotating gateway assigns a fresh exit per request. Budget at most three
-    // attempts, including the configured fallback; never retry a fixed exit.
-    const attempts = routes.map((proxy, i) => ({ proxy, i }));
-    const rotatingRoute = attempts.find(({ proxy }) => {
-      const u = new URL(proxy);
-      return u.hostname === "gate.decodo.com" && u.port === "7000";
-    });
-    while (rotatingRoute && attempts.length < 3) attempts.push(rotatingRoute);
-    let failure = searchFailure(new Error("search_cooldown"));
+    const first = routes[0];
+    if (!first) throw new Error("search_proxy");
+    // One primary request, then an independent index. A final fallback attempt
+    // uses a configured second route or a fresh rotating exit, never a fixed IP twice.
+    const attempts: { engine: SearchEngine; proxy: string; route: number }[] = [
+      { engine: "google", proxy: first, route: 0 },
+      { engine: "duckduckgo", proxy: first, route: 0 },
+    ];
+    const rotating =
+      new URL(first).hostname === "gate.decodo.com" &&
+      new URL(first).port === "7000";
+    if (routes[1] || rotating)
+      attempts.push({
+        engine: "duckduckgo",
+        proxy: routes[1] || first,
+        route: routes[1] ? 1 : 0,
+      });
+    let failure = searchFailure(new Error("search_cooldown")),
+      primaryError: string | undefined;
     const exhausted = new Map<
       string,
       { error: string; retryAt: string; delay: number }
     >();
-    for (const [attempt, { proxy, i }] of attempts.entries()) {
+    for (const [attempt, { engine, proxy, route }] of attempts.entries()) {
       const identity = createHash("sha256")
           .update(proxy)
           .digest("hex")
           .slice(0, 24),
-        cooldown = "google-search:direct-cooldown:" + identity;
+        cooldown = `web-search:cooldown:${engine}:${identity}`;
       const cooling = this.store.get<{ error: string; retryAt: string }>(
         cooldown,
       );
       if (cooling) {
-        failure = searchFailure(
-          new Error(cooling.error || "search_cooldown"),
-          cooling.retryAt,
-        );
+        failure = searchFailure(new Error(cooling.error), cooling.retryAt);
+        if (engine === "google") primaryError = failure.message;
         continue;
       }
       if (attempt) await new Promise((r) => setTimeout(r, 750));
       const started = Date.now(),
         call: ProviderCall = {
           provider: "search",
-          operation: "google-serp",
+          operation: `${engine}-serp`,
           started: new Date(started).toISOString(),
           durationMs: 0,
-          proxyRoute: i === 0 ? "primary" : "backup",
+          proxyRoute: route === 0 ? "primary" : "backup",
         };
-      let rotating = false;
       try {
-        const configured = new URL(proxy);
-        rotating =
-          configured.hostname === "gate.decodo.com" &&
-          configured.port === "7000";
         const raw = await this.transport({
+          engine,
           query,
           region,
           language,
-          proxy: searchProxy(proxy),
-          cookies: { CONSENT: "YES+" },
+          proxy,
+          cookies: engine === "google" ? { CONSENT: "YES+" } : {},
         });
         call.status = raw.status;
         if (Number.isSafeInteger(raw.bytes) && raw.bytes! >= 0)
@@ -658,35 +750,61 @@ export class GoogleSearch {
         if (raw.error) throw new Error("search_transport");
         if (raw.status !== 200)
           throw new Error(
-            raw.status === 302
+            [202, 302, 303].includes(raw.status || 0)
               ? "search_challenge"
               : `search_http_${raw.status}`,
           );
         if (typeof raw.html !== "string") throw new Error("search_format");
-        const results = parseGooglePage(raw.html);
-        return results;
+        const results =
+          engine === "google"
+            ? parseGooglePage(raw.html)
+            : parseDuckDuckGoPage(raw.html);
+        // Clear transient failures for a route that subsequently succeeded.
+        exhausted.delete(cooldown);
+        for (const [key, value] of exhausted)
+          this.store.set(key, value, value.delay);
+        return {
+          results,
+          engine,
+          region:
+            raw.region && /^(?:[A-Z]{2}|GLOBAL)$/.test(raw.region)
+              ? raw.region
+              : region,
+          fetchedAt: new Date().toISOString(),
+          adCoverage:
+            engine === "google" ? "visible-placements" : "organic-only",
+          ...(engine === "duckduckgo" ? { fallbackReason: primaryError } : {}),
+        };
       } catch (e) {
-        call.error =
-          e instanceof Error && /^search_[a-z0-9_]+$/.test(e.message)
-            ? e.message
-            : "search_transport";
+        call.error = searchFailure(e).message;
+        if (engine === "google") primaryError = call.error;
         const delay =
-          (call.status === 429 || call.error === "search_challenge") &&
-          !rotating
-            ? 15 * 60000
+          call.error === "search_challenge" || call.status === 429
+            ? 5 * 60000
             : 60000;
         const retryAt = new Date(Date.now() + delay).toISOString();
         failure = searchFailure(new Error(call.error), retryAt);
         exhausted.set(cooldown, { error: call.error, retryAt, delay });
-        // Credentials/payment/runtime errors require configuration recovery.
-        if (
-          [401, 402, 407].includes(call.status || 0) ||
-          call.error === "search_runtime"
-        )
-          break;
+        if (call.error === "search_runtime") break;
+        // An account/proxy error affects every engine on this route. Try a
+        // separately configured route, while pausing this one across engines.
+        if ([401, 402, 407].includes(call.status || 0)) {
+          for (const affected of ["google", "duckduckgo"])
+            this.store.set(
+              `web-search:cooldown:${affected}:${identity}`,
+              { error: call.error, retryAt },
+              delay,
+            );
+        }
       } finally {
         call.durationMs = Date.now() - started;
         this.store.recordCall(call);
+        // Persist primary failures even when the fallback succeeds. Fallback
+        // retries in this query remain eligible until its budget is exhausted.
+        if (engine === "google") {
+          const value = exhausted.get(cooldown);
+          if (value) this.store.set(cooldown, value, value.delay);
+        }
       }
     }
     for (const [key, value] of exhausted)

@@ -1,7 +1,13 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CompetitorPanel } from "../src/web/landscape.js";
-import { searchCollectionMessage } from "../src/core/evidence.js";
+import {
+  searchCollectionMessage,
+  searchEvidenceIsFresh,
+} from "../src/core/evidence.js";
+import { marketMarkdown } from "../src/core/report.js";
+import { renderDocument } from "../src/server/html.js";
+import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
@@ -11,6 +17,7 @@ import {
   GoogleSearch,
   parseSearchResults,
   parseGooglePage,
+  parseDuckDuckGoPage,
   searchProxy,
   publicSearchUrl,
   searchSources,
@@ -28,6 +35,58 @@ const seed: Market = JSON.parse(
   readFileSync(new URL("../public/seed.json", import.meta.url), "utf8"),
 )[0];
 const mobile = `<html><body><form><input name="q"></form><div class="zMzFAb"><a class="fuLhoc" href="/url?q=https%3A%2F%2Ftools.example%2Fcompare%3Futm_source%3Dgoogle&amp;sa=U"><span class="CVA68e">Compare phones</span></a><div class="taTFJ"><span class="FrIlee">Check <b>model compatibility</b> before purchase.</span></div></div></body></html>`;
+const duck = `<html><body><form><input name="q"></form><table><tr><td><a class='result-link' href='//duckduckgo.com/l/?uddg=https%3A%2F%2Ftools.example%2Fpricing%3Futm_source%3Dddg'>Phone transfer pricing</a></td></tr><tr><td class='result-snippet'>Repair shop plans start at <b>$20</b> per month.</td></tr><tr><td class='link-text'>tools.example</td></tr></table></body></html>`;
+test("DuckDuckGo lightweight parser retains snippets, rejects challenges and skips ads or unsafe links", () => {
+  assert.deepEqual(parseDuckDuckGoPage(duck), [
+    {
+      title: "Phone transfer pricing",
+      url: "https://tools.example/pricing",
+      kind: "organic",
+      excerpt: "Repair shop plans start at $20 per month.",
+    },
+  ]);
+  for (const html of [
+    "<form id='challenge-form'></form>",
+    "<form action='/anomaly.js'>verification</form>",
+  ])
+    assert.throws(() => parseDuckDuckGoPage(html), /search_challenge/);
+  assert.throws(
+    () => parseDuckDuckGoPage("<html>new layout</html>"),
+    /search_format/,
+  );
+  assert.deepEqual(
+    parseDuckDuckGoPage('<form><input name="q"></form>No results found'),
+    [],
+  );
+  for (const target of [
+    "javascript:alert(1)",
+    "http://127.0.0.1/",
+    "https://user:secret@example.org/",
+    "https://duckduckgo.com/y.js?ad_provider=test",
+    "https://www.bing.com/aclick?a=1",
+  ])
+    assert.throws(
+      () =>
+        parseDuckDuckGoPage(
+          duck.replace(
+            /https%3A%2F%2Ftools.example%2Fpricing%3Futm_source%3Dddg/,
+            encodeURIComponent(target),
+          ),
+        ),
+      /search_format/,
+    );
+  const extra = duck
+    .replace("Phone transfer pricing", "Another tool")
+    .replace("tools.example", "second.example");
+  const rows = parseDuckDuckGoPage(
+    duck.replace(
+      "</table>",
+      extra.match(/<table>(.*)<\/table>/)![1] + "</table>",
+    ),
+  );
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0]!.excerpt, "Repair shop plans start at $20 per month.");
+});
 test("mobile Google parsing keeps snippets, unwraps links and recognizes actual sponsored labels", () => {
   const rows = parseGooglePage(mobile);
   assert.deepEqual(rows, [
@@ -128,17 +187,17 @@ test("direct search reuses residential routes, caches results, records traffic a
     },
   } as any;
   try {
-    assert.equal((await search.collect(topic, "US")).provider, "google-mobile");
+    assert.equal((await search.collect(topic, "US")).provider, "multi-search");
     assert.equal(calls, 1);
     await search.collect(topic, "US");
     assert.equal(calls, 1);
     fail = true;
     topic.plan.webQueries[0].query = "another sample";
     assert.equal((await search.collect(topic, "US")).state, "failed");
-    assert.equal(calls, 3);
+    assert.equal(calls, 4);
     topic.plan.webQueries[0].query = "third sample";
     await search.collect(topic, "US");
-    assert.equal(calls, 3);
+    assert.equal(calls, 4);
     assert.ok(!JSON.stringify(search.status()).includes("secret"));
   } finally {
     for (const [k, v] of Object.entries(saved))
@@ -546,7 +605,7 @@ test("model evidence includes independent competitors instead of repeating one b
   assert.equal(searchSources(web).length, 2);
 });
 
-test("rotating search retries a fresh exit within a three-request budget and preserves terminal errors", async () => {
+test("independent fallback recovers challenges within a three-request budget and keeps engine cooldowns", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-retry-")),
     store = new Store(dir);
   const keys = [
@@ -572,12 +631,24 @@ test("rotating search retries a fresh exit within a three-request budget and pre
     calls++;
     assert.ok(request.query.startsWith("AI for Science"));
     assert.ok(!request.proxy.includes("session-"));
-    return calls < 3 ? { status: 302 } : { status: 200, html: mobile };
+    if (request.engine === "google") return { status: 302 };
+    return calls === 2 ? { status: 202 } : { status: 200, html: duck };
   });
   try {
     const recovered = await search.collect(topic, "US");
     assert.equal(recovered.state, "ready");
-    assert.equal(calls, 5); // first query 3 attempts; two other queries 1 each
+    assert.equal(calls, 5); // Google paused; DDG retries once, then serves later queries.
+    assert.ok(
+      recovered.queries.every(
+        (q) =>
+          q.engine === "duckduckgo" &&
+          q.adCoverage === "organic-only" &&
+          q.fallbackReason === "search_challenge",
+      ),
+    );
+    const at = recovered.queries[0]!.fetchedAt;
+    assert.equal((await search.collect(topic, "US")).queries[0]!.fetchedAt, at);
+    assert.equal(calls, 5);
     let failures = 0;
     const blocked = new GoogleSearch(store, async () => {
       failures++;
@@ -590,8 +661,8 @@ test("rotating search retries a fresh exit within a three-request budget and pre
     assert.equal(result.state, "failed");
     assert.equal(
       failures,
-      3,
-      "one exhausted pool pauses all remaining queries",
+      2,
+      "Google is cooling; two DDG attempts exhaust the remaining pool",
     );
     assert.ok(
       result.queries.every((q) => q.error === "search_challenge" && q.retryAt),
@@ -718,4 +789,250 @@ test("competition evidence retains billing pages after four independent news sou
   const sources = searchSources(web);
   assert.equal(sources.length, 5);
   assert.ok(sources.some((s) => s.url === "https://tool.example/pricing"));
+});
+
+test("fallback provenance reaches model sources and UI while ad coverage remains explicit", () => {
+  const m = structuredClone(seed);
+  m.web = {
+    provider: "multi-search",
+    version: "3",
+    region: "US",
+    language: "en",
+    fetchedAt: "2026-09-18T13:00:00Z",
+    state: "ready",
+    queries: [
+      {
+        query: "phone transfer pricing",
+        intent: "competition",
+        state: "ready",
+        engine: "duckduckgo",
+        adCoverage: "organic-only",
+        fetchedAt: "2026-09-18T12:00:00Z",
+        fallbackReason: "search_challenge",
+        results: parseDuckDuckGoPage(duck),
+      },
+    ],
+  };
+  const sources = searchSources(m.web);
+  assert.ok(sources[0]!.excerpt!.startsWith("DuckDuckGo search excerpt"));
+  assert.equal(sources[0]!.fetchedAt, "2026-09-18T12:00:00Z");
+  for (const locale of ["zh", "en"] as const) {
+    const html = renderToStaticMarkup(
+      createElement(CompetitorPanel, { market: m, locale }),
+    );
+    assert.ok(html.includes("DuckDuckGo"));
+    assert.ok(html.includes("2026-09-18 12:00 UTC"));
+    assert.ok(html.includes("https://duckduckgo.com/?q="));
+    assert.ok(!html.includes("0 条广告"));
+    assert.ok(!html.includes("0 ads"));
+    assert.ok(!html.includes("Inspect Google search evidence"));
+    assert.ok(searchCollectionMessage(m.web, locale).includes("DuckDuckGo"));
+    const markdown = marketMarkdown(m, "https://ghtrends.dev/radar", locale);
+    assert.ok(markdown.includes("DuckDuckGo · 2026-09-18T12:00:00Z"));
+    const document = renderDocument(
+      '<html><head></head><body><div id="root"></div></body></html>',
+      {
+        base: "https://ghtrends.dev/radar",
+        path: `/report/${m.id}`,
+        geo: "US",
+        market: m,
+        markets: [],
+        status: 200,
+        locale,
+      },
+    );
+    assert.ok(document.includes("DuckDuckGo · 2026-09-18T12:00:00Z"));
+  }
+});
+
+test("fallback cache expires early, shared cooldowns survive instances and primary recovery keeps its own TTL", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-recovery-")),
+    store = new Store(dir);
+  const keys = [
+    "GHTRENDS_SEARCH_MODE",
+    "GOOGLE_SEARCH_PROXY",
+    "GOOGLE_SEARCH_PROXY_FALLBACK",
+  ];
+  const env = keys.map((k) => process.env[k]);
+  Object.assign(process.env, {
+    GHTRENDS_SEARCH_MODE: "direct",
+    GOOGLE_SEARCH_PROXY: "http://user:secret@proxy.example:7000",
+    GOOGLE_SEARCH_PROXY_FALLBACK: "",
+  });
+  const db = new DatabaseSync(join(dir, "ghtrends.sqlite"));
+  const topic = {
+    ...seed.topic,
+    plan: {
+      input: "tools",
+      webQueries: [{ query: "tools pricing", intent: "competition" }],
+    },
+  } as any;
+  let calls: string[] = [],
+    primaryReady = false;
+  const transport = async (input: any) => {
+    calls.push(input.engine);
+    return input.engine === "google"
+      ? primaryReady
+        ? { status: 200, html: mobile, bytes: 1000 }
+        : { status: 302, bytes: 500 }
+      : { status: 200, html: duck, bytes: 600 };
+  };
+  try {
+    const search = new GoogleSearch(store, transport);
+    const [a, b] = await Promise.all([
+      search.collect(topic, "US"),
+      search.collect(topic, "US"),
+    ]);
+    assert.deepEqual(calls, ["google", "duckduckgo"]);
+    assert.equal(a.queries[0]!.fetchedAt, b.queries[0]!.fetchedAt);
+    const cache = db
+      .prepare("select expires from cache where key like 'web-search:v3:%'")
+      .get() as any;
+    assert.ok(
+      cache.expires - Date.now() > 29 * 60000 &&
+        cache.expires - Date.now() <= 30 * 60000,
+    );
+    assert.equal(
+      db
+        .prepare(
+          "select count(*) n from provider_calls where operation='google-serp' and status=302",
+        )
+        .get()!.n,
+      1,
+    );
+    await new GoogleSearch(store, transport).collect(
+      {
+        ...topic,
+        plan: {
+          ...topic.plan,
+          webQueries: [{ query: "tools reviews", intent: "demand" }],
+        },
+      },
+      "US",
+    );
+    assert.deepEqual(calls, ["google", "duckduckgo", "duckduckgo"]);
+    db.prepare(
+      "update cache set expires=0 where key like 'web-search:%'",
+    ).run();
+    primaryReady = true;
+    const recovered = await search.collect(topic, "US");
+    assert.equal(recovered.queries[0]!.engine, "google");
+    assert.equal(recovered.queries[0]!.fallbackReason, undefined);
+    assert.equal(recovered.queries[0]!.adCoverage, "visible-placements");
+    const refreshed = db
+      .prepare(
+        "select expires from cache where expires>0 and key like 'web-search:v3:%'",
+      )
+      .get() as any;
+    assert.ok(
+      refreshed.expires - Date.now() > 359 * 60000 &&
+        refreshed.expires - Date.now() <= 360 * 60000,
+    );
+  } finally {
+    keys.forEach((k, i) =>
+      env[i] === undefined ? delete process.env[k] : (process.env[k] = env[i]),
+    );
+    db.close();
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("proxy authentication failure pauses both engines on that route and can use a configured backup", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-auth-")),
+    store = new Store(dir);
+  const keys = [
+    "GHTRENDS_SEARCH_MODE",
+    "GOOGLE_SEARCH_PROXY",
+    "GOOGLE_SEARCH_PROXY_FALLBACK",
+  ];
+  const env = keys.map((k) => process.env[k]);
+  Object.assign(process.env, {
+    GHTRENDS_SEARCH_MODE: "direct",
+    GOOGLE_SEARCH_PROXY: "http://user:secret@proxy.example:7000",
+    GOOGLE_SEARCH_PROXY_FALLBACK: "http://backup:secret@backup.example:7000",
+  });
+  let calls = 0;
+  try {
+    const search = new GoogleSearch(store, async (input) => {
+      calls++;
+      return input.proxy.includes("backup.example")
+        ? { status: 200, html: duck }
+        : { status: 407 };
+    });
+    const web = await search.collect(
+      {
+        ...seed.topic,
+        plan: {
+          input: "sample",
+          webQueries: [{ query: "sample pricing", intent: "competition" }],
+        },
+      } as any,
+      "US",
+    );
+    assert.equal(web.state, "ready");
+    assert.equal(calls, 2);
+    assert.equal(web.queries[0]!.engine, "duckduckgo");
+    assert.equal(web.queries[0]!.fallbackReason, "search_http_407");
+    assert.ok(!JSON.stringify(web).includes("secret"));
+  } finally {
+    keys.forEach((k, i) =>
+      env[i] === undefined ? delete process.env[k] : (process.env[k] = env[i]),
+    );
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("report reuse follows per-query freshness and resumes primary collection after fallback expiry", () => {
+  const now = Date.parse("2026-09-18T13:00:00Z");
+  const web = {
+    provider: "multi-search" as const,
+    region: "US",
+    language: "en",
+    fetchedAt: new Date(now).toISOString(),
+    state: "ready" as const,
+    queries: [
+      {
+        query: "tools pricing",
+        intent: "competition" as const,
+        state: "ready" as const,
+        engine: "duckduckgo" as const,
+        fetchedAt: new Date(now - 29 * 60000).toISOString(),
+        results: [],
+      },
+    ],
+  };
+  assert.equal(searchEvidenceIsFresh(web, now), true);
+  assert.equal(searchEvidenceIsFresh(web, now + 60000), false);
+  assert.equal(
+    searchEvidenceIsFresh(
+      { ...web, queries: [{ ...web.queries[0]!, engine: "google" }] },
+      now + 60000,
+    ),
+    true,
+  );
+  assert.equal(
+    searchEvidenceIsFresh(
+      { ...web, queries: [{ ...web.queries[0]!, fetchedAt: "invalid" }] },
+      now,
+    ),
+    false,
+  );
+  assert.equal(
+    searchEvidenceIsFresh(
+      {
+        ...web,
+        queries: [
+          {
+            ...web.queries[0]!,
+            fetchedAt: new Date(now + 120000).toISOString(),
+          },
+        ],
+      },
+      now,
+    ),
+    false,
+  );
+  assert.equal(searchEvidenceIsFresh({ ...web, queries: [] }, now), false);
 });

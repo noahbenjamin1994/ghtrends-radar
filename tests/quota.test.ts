@@ -334,7 +334,14 @@ test("search failures return credits and a retry never reopens an incomplete cac
         language: "en",
         fetchedAt: m.asOf,
         state: calls === 1 ? "failed" : "ready",
-        queries: [],
+        queries: [
+          {
+            query: "sample pricing",
+            intent: "competition",
+            state: calls === 1 ? "failed" : "ready",
+            results: [],
+          },
+        ],
       };
       engine.store.saveMarket(m, false, "alice");
       return m;

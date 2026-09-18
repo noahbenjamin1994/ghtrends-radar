@@ -1,4 +1,9 @@
-import { searchCollectionMessage } from "../core/evidence.js";
+import {
+  searchCollectionMessage,
+  searchEngineLabel,
+  searchQueryUrl,
+  adSampleQueries,
+} from "../core/evidence.js";
 import { ArrowUpRight } from "lucide-react";
 import { landscapeLabel, researchLandscape } from "../core/landscape.js";
 import type { Brief, Gap, Market } from "../core/types.js";
@@ -138,27 +143,27 @@ function SearchEvidence({
       {m.web && (
         <details className="web-evidence">
           <summary>
-            {zh ? "查看 Google 搜索证据" : "Inspect Google search evidence"} ·{" "}
+            {zh ? "查看网页搜索证据" : "Inspect web search evidence"} ·{" "}
             {m.web.queries.filter((q) => q.state === "ready").length}/
             {m.web.queries.length} {zh ? "组已采集" : "queries collected"}
             {m.web.queries.some((q) => q.state === "ready") &&
               ` · ${m.web.queries.reduce((n, q) => n + q.results.length, 0)} ${zh ? "条结果" : "results"}`}
           </summary>
           <p className="research-caption">
-            Google · {m.web.region} · {m.web.language} ·{" "}
-            {m.web.fetchedAt.slice(0, 10)}.{" "}
+            {zh ? "目标地区" : "Requested region"} · {m.web.region} ·{" "}
+            {m.web.language} · {m.web.fetchedAt.slice(0, 10)}.{" "}
             {zh
               ? "搜索结果为地域样本；广告仅覆盖当次页面展示的位置，反映商业投放意向。购买与持续使用需要行为证据。"
               : "A regional search sample with ads visible on the collected page. Ads signal marketing intent; purchases and sustained use need behavioral evidence."}
           </p>
-          {m.web.state !== "ready" && (
+          {searchCollectionMessage(m.web, locale) && (
             <p role="status">{searchCollectionMessage(m.web, locale)}</p>
           )}
           {m.web.queries.map((q) => (
             <div className="web-query" key={q.query}>
               <h5>
                 <a
-                  href={`https://www.google.com/search?${new URLSearchParams({ q: q.query, hl: m.web!.language, gl: m.web!.region.toLowerCase() })}`}
+                  href={searchQueryUrl(q, m.web!)}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -166,6 +171,26 @@ function SearchEvidence({
                   <ArrowUpRight size={12} />
                 </a>
               </h5>
+              {q.state === "ready" && (
+                <p className="research-caption">
+                  {searchEngineLabel(q)} ·{" "}
+                  {q.region === "GLOBAL"
+                    ? zh
+                      ? "全球"
+                      : "Global"
+                    : q.region || m.web!.region}{" "}
+                  ·{" "}
+                  {(q.fetchedAt || m.web!.fetchedAt)
+                    .replace("T", " ")
+                    .slice(0, 16)}{" "}
+                  UTC
+                  {q.engine === "duckduckgo"
+                    ? zh
+                      ? " · 备用搜索 · 自然结果"
+                      : " · Fallback · Organic results"
+                    : ""}
+                </p>
+              )}
               {q.state !== "ready" && (
                 <p>
                   {zh
@@ -482,19 +507,27 @@ export function CompetitorPanel({
           ))
         ) : (
           <p className="peer-empty">
-            {m.web?.queries.some((q) => q.state === "ready")
+            {adSampleQueries(m.web).length > 0
               ? l(
-                  "This search sample recorded 0 ads. Check other times or regions to explore further placements.",
-                  "本次搜索样本记录了 0 条广告。可结合其他时间、地区继续查看投放线索。",
+                  "The collected Google pages recorded 0 ads. Check other times or regions to explore further placements.",
+                  "本次采集到的 Google 页面记录了 0 条广告。可结合其他时间、地区继续查看投放线索。",
                 )
-              : l(
-                  "Ad collection needs a retry. Choose Update research to capture a new search sample.",
-                  "广告采集需要重试。点击「更新研究」可重新采集搜索样本。",
-                )}
+              : m.web?.queries.some(
+                    (q) => q.state === "ready" && q.engine === "duckduckgo",
+                  )
+                ? l(
+                    "The fallback search covers organic results. Google ad placements remain a separate collection task.",
+                    "备用搜索已补充自然结果；Google 广告位留待后续采集核对。",
+                  )
+                : l(
+                    "Ad collection needs a retry. Choose Update research to capture a new search sample.",
+                    "广告采集需要重试。点击「更新研究」可重新采集搜索样本。",
+                  )}
           </p>
         )}
         <p className="research-caption">
-          {m.web?.provider === "google-mobile"
+          {m.web?.provider === "google-mobile" ||
+          m.web?.provider === "multi-search"
             ? l(
                 "Collected from a lightweight search page. ",
                 "当前采集使用轻量搜索页面。",

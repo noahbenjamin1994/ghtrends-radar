@@ -4,13 +4,21 @@ import { fileURLToPath } from "node:url";
 import { Store } from "./store.js";
 import { GitHub } from "../providers/github.js";
 import { Trends } from "../providers/trends.js";
-import { GoogleSearch, searchSources } from "../providers/search.js";
+import {
+  GoogleSearch,
+  searchSources,
+  SEARCH_VERSION,
+} from "../providers/search.js";
 import { marketGapSignals } from "./gaps.js";
 import { Research } from "../providers/research.js";
 import { resolveTopic, validateGeo, validateRepo, TOPICS } from "./topics.js";
 import { importDemand } from "./import.js";
 import { analyze, ALGORITHM_VERSION } from "./analyze.js";
-import { sourceEvidenceIsFresh, completeWeeklySeries } from "./evidence.js";
+import {
+  sourceEvidenceIsFresh,
+  completeWeeklySeries,
+  searchEvidenceIsFresh,
+} from "./evidence.js";
 import { STRATEGY_VERSION } from "./strategy.js";
 import type { Market, DemandEvidence, SupplyEvidence, Topic } from "./types.js";
 export interface ScanProgress {
@@ -89,7 +97,10 @@ export class Engine {
       existing &&
       existing.version === ALGORITHM_VERSION &&
       (!ai || existing.brief?.strategyVersion === STRATEGY_VERSION) &&
-      (!ai || !this.search.enabled || existing.web?.state === "ready") &&
+      (!ai ||
+        !this.search.enabled ||
+        (searchEvidenceIsFresh(existing.web) &&
+          existing.web?.version === SEARCH_VERSION)) &&
       (!ai || existing.topic.plan?.version === topic.plan?.version) &&
       (!ai ||
         JSON.stringify(existing.topic.plan?.webQueries) ===

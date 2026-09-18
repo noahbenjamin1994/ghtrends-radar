@@ -991,23 +991,23 @@ export function AdminView({ account }: { account: Account | null }) {
                 {l("Per account attempts", "每人采集尝试")}{" "}
                 {data.configuration.attemptLimit}
               </dd>
-              <dt>{l("Google web search", "Google 网页搜索")}</dt>
+              <dt>{l("Web search", "网页搜索")}</dt>
               <dd>
                 {data.configuration.search?.configured
                   ? data.configuration.search.mode === "direct"
                     ? l(
-                        "Residential proxy · lightweight pages",
-                        "住宅代理 · 轻量页面",
+                        "Residential proxy · Google with DuckDuckGo fallback",
+                        "住宅代理 · Google 优先，DuckDuckGo 自动补位",
                       )
                     : l("Managed search API", "托管搜索 API")
                   : l("Awaiting configuration", "等待配置")}{" "}
                 ·{" "}
                 {l(
                   data.configuration.search?.mode === "direct"
-                    ? "Up to 3 queries; 6-hour cache; uses residential traffic"
+                    ? "Up to 3 queries; Google cache 6h, fallback 30min; uses residential traffic"
                     : "Up to 3 queries; 6-hour cache; managed service balance",
                   data.configuration.search?.mode === "direct"
-                    ? "最多 3 组查询，缓存 6 小时；使用住宅流量"
+                    ? "最多 3 组查询；Google 缓存 6 小时，备用来源 30 分钟；使用住宅流量"
                     : "最多 3 组查询，缓存 6 小时；使用托管服务额度",
                 )}
               </dd>

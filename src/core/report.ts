@@ -1,4 +1,4 @@
-import { searchCollectionMessage } from "./evidence.js";
+import { searchCollectionMessage, searchEngineLabel } from "./evidence.js";
 import { landscapeRows, researchLandscape } from "./landscape.js";
 import { reportIssueSignals } from "./gaps.js";
 import {
@@ -244,7 +244,7 @@ export function marketMarkdown(
     ...(m.web
       ? [
           "",
-          `## ${locale === "zh" ? "Google 网页搜索证据" : "Google web search evidence"}`,
+          `## ${locale === "zh" ? "网页搜索证据" : "Web search evidence"}`,
           "",
           `${m.web.region} · ${m.web.language} · ${m.web.fetchedAt.slice(0, 10)}`,
           searchCollectionMessage(m.web, locale),
@@ -254,6 +254,11 @@ export function marketMarkdown(
           ...m.web.queries.flatMap((q) => [
             "",
             `### ${cell(q.query)}`,
+            q.state === "ready"
+              ? `${searchEngineLabel(q)} · ${q.fetchedAt || m.web!.fetchedAt} · ${q.region || m.web!.region}${q.engine === "duckduckgo" ? (locale === "zh" ? " · 备用搜索 · 自然结果" : " · Fallback · Organic results") : ""}`
+              : locale === "zh"
+                ? "采集已暂停 · 可更新研究后重试"
+                : "Collection stopped · update research to retry",
             ...q.results.map(
               (r) =>
                 `- ${r.kind === "ad" ? (locale === "zh" ? "广告" : "Ad") : locale === "zh" ? "自然结果" : "Organic"}: [${cell(r.title)}](${r.url}) — ${cell(r.excerpt)}${r.kind === "ad" ? ` · ${locale === "zh" ? "投放网站" : "Landing-page website"}: ${new URL(r.url).hostname}` : ""}`,

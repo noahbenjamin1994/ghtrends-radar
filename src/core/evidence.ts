@@ -2,6 +2,41 @@ import type { DemandEvidence, InterestPoint, Market } from "./types.js";
 import type { WebEvidence } from "../providers/search.js";
 
 const WEEK = 7 * 86400000;
+type WebQuery = WebEvidence["queries"][number];
+export function searchEngineLabel(query: WebQuery) {
+  return query.engine === "duckduckgo" ? "DuckDuckGo" : "Google";
+}
+export function searchQueryUrl(query: WebQuery, web: WebEvidence) {
+  return query.engine === "duckduckgo"
+    ? `https://duckduckgo.com/?${new URLSearchParams({ q: query.query })}`
+    : `https://www.google.com/search?${new URLSearchParams({ q: query.query, hl: web.language, gl: web.region.toLowerCase() })}`;
+}
+export function adSampleQueries(web?: WebEvidence) {
+  return (
+    web?.queries.filter(
+      (q) =>
+        q.state === "ready" &&
+        (q.adCoverage === "visible-placements" ||
+          (!q.adCoverage && q.engine !== "duckduckgo")),
+    ) || []
+  );
+}
+export function searchEvidenceIsFresh(web?: WebEvidence, now = Date.now()) {
+  return (
+    !!web &&
+    web.state === "ready" &&
+    web.queries.length > 0 &&
+    web.queries.every((q) => {
+      const age = now - Date.parse(q.fetchedAt || web.fetchedAt);
+      return (
+        q.state === "ready" &&
+        Number.isFinite(age) &&
+        age >= -60000 &&
+        age < (q.engine === "duckduckgo" ? 30 * 60000 : 6 * 3600000)
+      );
+    })
+  );
+}
 
 export function searchCollectionMessage(
   web: WebEvidence | undefined,
@@ -12,14 +47,24 @@ export function searchCollectionMessage(
     return zh
       ? "网页搜索需要管理员配置采集服务。"
       : "Web search requires a configured collection service.";
-  if (web.state === "ready") return "";
+  const fallback = web.queries.some(
+    (q) => q.state === "ready" && q.engine === "duckduckgo",
+  );
+  if (web.state === "ready")
+    return fallback
+      ? zh
+        ? "已由 DuckDuckGo 补充网页证据；每组查询标注实际来源与采集时间。"
+        : "DuckDuckGo supplied fallback web evidence. Each query identifies its source and collection time."
+      : "";
   const challenge = web.queries.some((q) =>
     /challenge|http_429/.test(q.error || ""),
   );
   const reason = challenge
     ? zh
-      ? "Google 要求访问验证，本轮搜索已暂停。"
-      : "Google requested access verification. This search attempt has stopped."
+      ? web.provider === "multi-search"
+        ? "搜索服务要求访问验证，本轮采集已暂停。"
+        : "Google 要求访问验证，本轮搜索已暂停。"
+      : "Search access verification paused this collection attempt."
     : zh
       ? "本轮网页采集已结束，部分搜索证据待补充。"
       : "This collection attempt has ended with gaps in search coverage.";
