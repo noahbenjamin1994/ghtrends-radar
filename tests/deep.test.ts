@@ -14,6 +14,7 @@ import {
   deepProblems,
   deepDeliveryReady,
   deepMarkdown,
+  deepEffortText,
   type DeepTask,
   type DeepBrief,
 } from "../src/core/deep.js";
@@ -51,6 +52,10 @@ function brief(): DeepBrief {
         area,
         subject: copy("Draft comments", "草稿评审意见"),
         statement: copy(),
+        implication: copy(
+          "Offer a paragraph-mapping prototype to test with the editor.",
+          "给编辑试用段落映射原型，观察评审意见的保留情况。",
+        ),
         basis: i < 2 ? "observed" : "inferred",
         evidence:
           i < 2
@@ -72,7 +77,19 @@ function brief(): DeepBrief {
         "experiment",
         "continueIf",
         "changeIf",
-      ].map((k) => [k, copy()]),
+      ].map((k) => [
+        k,
+        k === "effort"
+          ? {
+              hoursMin: 12,
+              hoursMax: 20,
+              assumption: copy(
+                "Assume one developer and three existing document examples.",
+                "假设一名开发者已有三个文档样例。",
+              ),
+            }
+          : copy(),
+      ]),
     ),
     checks: [],
   });
@@ -251,6 +268,25 @@ test("delivery requires exact source support, original material and question-spe
   assert.equal(deepDeliveryReady(b, evidence, "scope"), true);
   assert.equal(deepDeliveryReady(b, evidence, "audience"), true);
   assert.equal(deepDeliveryReady(b, evidence, "opensource"), false);
+  const proposedScope = structuredClone(b);
+  proposedScope.findings[3]!.evidence = [{ id: "E3", quote: source.excerpt! }];
+  const snippetEvidence = {
+    ...evidence,
+    sources: [
+      { ...source, kind: "search" as const, documentType: undefined },
+      { ...request, kind: "search" as const, documentType: undefined },
+      { ...source, id: "E3", url: "https://example.com/release" },
+    ],
+  };
+  assert.equal(deepDeliveryReady(b, snippetEvidence, "scope"), false);
+  assert.equal(
+    deepDeliveryReady(proposedScope, snippetEvidence, "scope"),
+    true,
+  );
+  assert.equal(
+    deepDeliveryReady(proposedScope, snippetEvidence, "competitors"),
+    false,
+  );
   const fabricated = structuredClone(b);
   fabricated.findings[0]!.evidence[0]!.quote =
     "Hundreds of users pay every month.";
@@ -266,29 +302,67 @@ test("delivery requires exact source support, original material and question-spe
   );
   const t = task();
   const effort = structuredClone(b);
-  effort.plan.effort = copy(
-    "Assume 8 person-days across two weeks at 10 hours per week.",
-    "假设两周投入 8 人日，每周 10 小时。",
-  );
+  effort.plan.effort.hoursMin = 21;
   assert.ok(
     deepProblems(effort, evidence.sources).some((p) =>
-      p.startsWith("plan.effort: express estimated effort"),
+      p.startsWith("plan.effort: hoursMax"),
     ),
   );
-  effort.plan.effort = copy(
-    "Estimate 12–20 person-hours for a three-example prototype.",
-    "以三个样例的原型为范围，估计投入 12–20 人时。",
-  );
+  effort.plan.effort.hoursMin = 12;
   assert.deepEqual(deepProblems(effort, evidence.sources), []);
+  assert.match(deepEffortText(effort.plan.effort, "en"), /^12–20 person-hours/);
+  assert.match(deepEffortText(effort.plan.effort, "zh"), /^12–20 人时/);
   t.evidence = evidence;
   t.result = b;
   const md = deepMarkdown(t, "zh");
   assert.match(md, /来源证据/);
   assert.match(md, /继续投入的条件/);
+  assert.match(md, /对你的意义/);
+  assert.match(md, /12–20 人时/);
   assert.match(md, /https:\/\/example.com\/docs/);
 });
 
-test("source checkpoints support a model-only recovery and a bounded review repair with thinking disabled", async () => {
+test("daily attempts count their execution day and admitted tasks can recover when new-task capacity is full", (t) => {
+  const firstDay = Date.parse("2026-09-18T12:00:00Z");
+  t.mock.timers.enable({ apis: ["Date"], now: firstDay });
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-days-"));
+  const s = new Store(dir);
+  try {
+    const a = task();
+    s.createDeepTask(a, "first", true, 1);
+    s.finishDeepTask(s.claimDeepTask(a.id, a.owner)!, false);
+    s.retryDeepTask(a.id, a.owner, true, 1);
+    s.finishDeepTask(s.claimDeepTask(a.id, a.owner)!, false);
+    assert.throws(
+      () => s.createDeepTask(task("bob"), "capacity", true, 1),
+      /deep_capacity/,
+    );
+    t.mock.timers.setTime(firstDay + 86400000);
+    s.retryDeepTask(a.id, a.owner, true, 1);
+    s.finishDeepTask(s.claimDeepTask(a.id, a.owner)!, false);
+    assert.deepEqual(s.deepTask(a.id, a.owner)!.attemptDays, [
+      "2026-09-18",
+      "2026-09-18",
+      "2026-09-19",
+    ]);
+    s.removeDeepTask(a.id, a.owner);
+    for (let i = 0; i < 2; i++) {
+      const next = task();
+      s.createDeepTask(next, "today-" + i, true);
+      s.finishDeepTask(s.claimDeepTask(next.id, next.owner)!, false);
+    }
+    assert.throws(
+      () => s.createDeepTask(task(), "fourth-today", true),
+      /deep_capacity/,
+    );
+  } finally {
+    s.close();
+    rmSync(dir, { recursive: true, force: true });
+    t.mock.timers.reset();
+  }
+});
+
+test("source checkpoints support bounded recovery with direct writing and light semantic review", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-provider-")),
     env = { ...process.env };
   process.env.DEEPSEEK_API_KEY = "unit-test-only";
@@ -312,7 +386,10 @@ test("source checkpoints support a model-only recovery and a bounded review repa
     throw new Error("a model retry should reuse evidence");
   };
   e.research.json = async (_system, _input, _tokens, operation, thinking) => {
-    assert.equal(thinking, false);
+    assert.equal(
+      thinking,
+      operation === "strategy-deep-review" ? "low" : false,
+    );
     calls++;
     if (operation === "strategy-deep-review")
       return {
@@ -321,7 +398,15 @@ test("source checkpoints support a model-only recovery and a bounded review repa
           calls > 2
             ? []
             : [
-                "Tie the proposed sample to the editor workflow. Verify the cited source and the proposed action. Verify the cited source and the proposed action. Verify the cited source and the proposed action. Verify the cited source and the proposed action. Verify the cited source and the proposed action. Verify the cited source and the proposed action. Verify the cited source and the proposed action. Verify the cited source and the proposed action. Verify the cited source and the proposed action. ",
+                {
+                  field: "plan.experiment",
+                  basis: "E2",
+                  repair:
+                    "Tie the proposed sample to the editor workflow. " +
+                    "Verify the cited source and the proposed action. ".repeat(
+                      9,
+                    ),
+                },
               ],
       };
     return brief();
@@ -541,6 +626,13 @@ test("prose-only repair preserves source IDs and quotes, while structural and ne
   assert.deepEqual(repairs, [
     { path: "answer.zh", value: verbose.answer.zh, maxCharacters: 240 },
   ]);
+  const numbered = brief();
+  numbered.answer.zh = "先邀请 E2 中提出请求的作者体验段落映射原型。";
+  assert.deepEqual(
+    deepCopyRepairs(numbered, [source, request]).map((f) => f.path),
+    ["answer.zh"],
+  );
+  assert.equal(numbered.findings[0]!.evidence[0]!.id, "E2");
   const legalSource = {
     ...source,
     id: "license",
@@ -649,6 +741,10 @@ test("a broad issue match stays outside selected-project research and license ev
     if (op === "strategy-deep-review") return { ready: true, corrections: [] };
     const payload = input as any;
     assert.deepEqual(payload.knownProjects, ["Example/Drafts"]);
+    assert.equal(payload.direction.en.delivery, undefined);
+    assert.equal(payload.direction.en.resources, undefined);
+    assert.equal(payload.direction.en.experiment, undefined);
+    assert.match(payload.direction.status, /proposed direction/);
     assert.ok(payload.sources.some((s: any) => s.id === "E2"));
     assert.ok(
       payload.sources.every((s: any) => s.id !== "E4" && s.id !== "E5"),

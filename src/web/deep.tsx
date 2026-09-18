@@ -10,6 +10,7 @@ import {
   deepAreaLabels,
   deepPlanLabels,
   deepQuestions,
+  deepEffortText,
   type DeepAllowance,
   type DeepTaskView,
   type DeepRequest,
@@ -462,6 +463,17 @@ export function DeepResearchView({
                     </details>
                   ) : null;
                 })}
+                {f.implication && (
+                  <div className="deep-implication">
+                    <span>
+                      {l(
+                        "What this suggests · research inference",
+                        "对你的意义 · 研究推断",
+                      )}
+                    </span>
+                    <p>{f.implication[locale]}</p>
+                  </div>
+                )}
               </article>
             ))}
           </section>
@@ -480,7 +492,11 @@ export function DeepResearchView({
                 <div key={key}>
                   <dt>{label(text)}</dt>
                   <dd>
-                    {result.plan[key as keyof typeof result.plan][locale]}
+                    {key === "effort"
+                      ? deepEffortText(result.plan.effort, locale)
+                      : result.plan[
+                          key as Exclude<keyof typeof result.plan, "effort">
+                        ][locale]}
                   </dd>
                 </div>
               ))}

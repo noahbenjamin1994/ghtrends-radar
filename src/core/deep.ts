@@ -7,7 +7,7 @@ import type { ResearchSource } from "./types.js";
 import type { WebEvidence, SearchQuery } from "../providers/search.js";
 import type { DocumentRead } from "../providers/documents.js";
 
-export const DEEP_VERSION = "1";
+export const DEEP_VERSION = "2";
 export const deepQuestions = {
   competitors: [
     "Where is the opening among existing products?",
@@ -64,10 +64,11 @@ export const deepBriefSchema = z
               })
               .strip(),
             statement: copy,
+            implication: copy,
             basis: z.enum(["observed", "inferred"]),
             evidence: z
               .array(evidenceRef.extend({ quote: z.string().min(8).max(500) }))
-              .max(2),
+              .max(3),
           })
           .strip(),
       )
@@ -77,7 +78,13 @@ export const deepBriefSchema = z
       .object({
         deliverable: copy,
         resources: copy,
-        effort: copy,
+        effort: z
+          .object({
+            hoursMin: z.number().int().min(1).max(2000),
+            hoursMax: z.number().int().min(1).max(2000),
+            assumption: copy,
+          })
+          .strip(),
         maintenance: copy,
         experiment: copy,
         continueIf: copy,
@@ -88,6 +95,19 @@ export const deepBriefSchema = z
   })
   .strip();
 export type DeepBrief = z.infer<typeof deepBriefSchema>;
+export function deepEffortText(
+  effort: DeepBrief["plan"]["effort"],
+  lang: "en" | "zh",
+) {
+  // Stored preview-v1 reports remain readable; new generation uses numeric hours.
+  if (!("hoursMin" in effort))
+    return (effort as { en: string; zh: string })[lang];
+  const range =
+    effort.hoursMin === effort.hoursMax
+      ? String(effort.hoursMin)
+      : `${effort.hoursMin}–${effort.hoursMax}`;
+  return `${range} ${lang === "zh" ? "人时" : "person-hours"} · ${effort.assumption[lang]}`;
+}
 export function normalizeDeepBrief(
   raw: unknown,
   sources: ResearchSource[] = [],
@@ -134,11 +154,11 @@ export function normalizeDeepBrief(
   };
   return readable(value);
 }
-export function deepCopyRepairs(raw: unknown) {
+export function deepCopyRepairs(raw: unknown, sources: ResearchSource[] = []) {
   const fields: { path: string; value: string; maxCharacters: number }[] = [];
   const visit = (v: unknown, path: string) => {
     const prose =
-      /^(?:headline|answer|findings\.\d+\.(?:subject|statement)|plan\.(?:deliverable|resources|effort|maintenance|experiment|continueIf|changeIf)|checks\.\d+)\.(en|zh)$/.exec(
+      /^(?:headline|answer|findings\.\d+\.(?:subject|statement|implication)|plan\.(?:deliverable|resources|effort\.assumption|maintenance|experiment|continueIf|changeIf)|checks\.\d+)\.(en|zh)$/.exec(
         path,
       );
     const maxCharacters = path.includes(".subject.")
@@ -151,7 +171,12 @@ export function deepCopyRepairs(raw: unknown) {
     if (
       typeof v === "string" &&
       prose &&
-      (hasNegativeWording(v) || v.length > maxCharacters)
+      (hasNegativeWording(v) ||
+        v.length > maxCharacters ||
+        /\bknownProjects\b/.test(v) ||
+        (v.match(/\bE\d+\b/g) || []).some((id) =>
+          sources.some((s) => s.id === id),
+        ))
     )
       fields.push({ path, value: v, maxCharacters });
     else if (v && typeof v === "object")
@@ -190,6 +215,7 @@ export interface DeepTask {
     | "complete"
     | "partial";
   attempts: number;
+  attemptDays?: string[];
   credit: "reserved" | "used" | "returned" | "own-keys";
   evidence?: DeepEvidence;
   result?: DeepBrief;
@@ -230,8 +256,12 @@ export function deepProblems(
       .map((i) => `${i.path.join(".")}: ${i.message}`);
   const result = parsed.data,
     problems: string[] = [];
+  if (result.plan.effort.hoursMax < result.plan.effort.hoursMin)
+    problems.push(
+      "plan.effort: hoursMax must be at least hoursMin; use one coherent total effort range.",
+    );
   for (const [path, value] of [
-    ["plan.effort", result.plan.effort],
+    ["plan.effort.assumption", result.plan.effort.assumption],
     ["answer", result.answer],
   ] as const) {
     if (/人[日天]|person[- ]days?/i.test(value.en + value.zh))
@@ -247,10 +277,11 @@ export function deepProblems(
       problems.push(
         `findings.${i}: cite an exact source quote for the observed fact.`,
       );
-    if (f.evidence.some((ref) => !validQuote(ref, sources)))
-      problems.push(
-        `findings.${i}: use an exact supplied excerpt and its source ID.`,
-      );
+    for (const [j, ref] of f.evidence.entries())
+      if (!validQuote(ref, sources))
+        problems.push(
+          `findings.${i}.evidence.${j}.quote: replace this quote with one exact, contiguous span from source ${ref.id}; preserve source markup. Current quote: ${JSON.stringify(ref.quote)}. Adjust the statement only if the corrected evidence changes its support.`,
+        );
   }
   const checkCopy = (v: unknown, path: string) => {
     if (
@@ -278,8 +309,12 @@ export function deepDeliveryReady(
   const cited = evidence.sources.filter((s) =>
     observed.some((f) => f.evidence.some((r) => r.id === s.id)),
   );
-  const originals = cited.filter(
-    (s) => !!s.documentType || s.kind === "project" || s.kind === "request",
+  // A proposed scope can legitimately cite original documentation. Its
+  // inferred label describes the judgment, rather than downgrading the source.
+  const originals = evidence.sources.filter(
+    (s) =>
+      (!!s.documentType || s.kind === "project" || s.kind === "request") &&
+      result.findings.some((f) => f.evidence.some((r) => r.id === s.id)),
   );
   if (new Set(cited.map((s) => s.url)).size < 2 || !originals.length)
     return false;
@@ -351,12 +386,23 @@ export function deepMarkdown(task: DeepTaskView, lang: "en" | "zh") {
             "",
           );
       }
+      if (f.implication)
+        lines.push(
+          `**${l(["What this suggests", "对你的意义"])} · ${l(["Research inference", "研究推断"])}**`,
+          "",
+          literal(f.implication[lang]),
+          "",
+        );
     }
     for (const [key, label] of Object.entries(deepPlanLabels))
       lines.push(
         `### ${l(label)}`,
         "",
-        literal(b.plan[key as keyof typeof b.plan][lang]),
+        literal(
+          key === "effort"
+            ? deepEffortText(b.plan.effort, lang)
+            : b.plan[key as Exclude<keyof typeof b.plan, "effort">][lang],
+        ),
         "",
       );
     if (b.checks.length)

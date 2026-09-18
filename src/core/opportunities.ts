@@ -174,6 +174,43 @@ export function recoverSourceQuote(
   const norm = (s: string) => s.replace(/\s+/g, " ").trim();
   const q = norm(quote),
     source = norm(excerpt);
+  // A model may quote the visible label of a Markdown link. Map that exact
+  // visible text back to its original source span, retaining the link markup.
+  if (q.length >= 8 && q.length <= 500 && !source.includes(q)) {
+    const chars: string[] = [],
+      starts: number[] = [],
+      ends: number[] = [];
+    const append = (start: number, end: number) => {
+      for (let i = start; i < end; i++) {
+        chars.push(source[i]!);
+        starts.push(i);
+        ends.push(i + 1);
+      }
+    };
+    let cursor = 0;
+    for (const match of source.matchAll(
+      /\[([^\]\n]+)\]\(https?:\/\/[^\s)]+\)/g,
+    )) {
+      append(cursor, match.index);
+      const labelStart = chars.length;
+      append(match.index + 1, match.index + 1 + match[1]!.length);
+      starts[labelStart] = match.index;
+      ends[ends.length - 1] = match.index + match[0].length;
+      cursor = match.index + match[0].length;
+    }
+    if (cursor) {
+      append(cursor, source.length);
+      const visible = chars.join(""),
+        start = visible.indexOf(q);
+      if (start >= 0 && visible.indexOf(q, start + 1) < 0) {
+        const candidate = source.slice(
+          starts[start],
+          ends[start + q.length - 1],
+        );
+        if (candidate.length <= 500) return candidate;
+      }
+    }
+  }
   if (q.length < 40 || q.length > 300 || source.includes(q)) return;
   const start = source.indexOf(q.slice(0, 16));
   if (start < 0 || source.indexOf(q.slice(0, 16), start + 1) >= 0) return;

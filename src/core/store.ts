@@ -132,7 +132,14 @@ export class Store {
         .prepare(
           "UPDATE deep_tasks SET state='deleted',fingerprint='',payload=? WHERE id=? AND owner=?",
         )
-        .run(JSON.stringify({ attempts: task.attempts }), id, owner);
+        .run(
+          JSON.stringify({
+            attempts: task.attempts,
+            attemptDays: task.attemptDays,
+          }),
+          id,
+          owner,
+        );
       this.db
         .prepare(
           "UPDATE scan_runs SET input='Deleted research',report_id=NULL,error=NULL,warnings='[]' WHERE id=? AND user_id=?",
@@ -192,6 +199,7 @@ export class Store {
       }
       this.checkDeepCapacity(task.owner, dailyCapacity);
       this.reserveDeepTrial(task, hosted);
+      task.attemptDays = [new Date().toISOString().slice(0, 10)];
       this.db
         .prepare("INSERT INTO deep_tasks VALUES(?,?,?,?,?,?,?,?)")
         .run(
@@ -220,7 +228,11 @@ export class Store {
       throw e;
     }
   }
-  private checkDeepCapacity(owner: string, dailyCapacity: number) {
+  private checkDeepCapacity(
+    owner: string,
+    dailyCapacity: number,
+    retry = false,
+  ) {
     if (
       this.db
         .prepare(
@@ -235,11 +247,15 @@ export class Store {
       .get(day) as { n: number };
     const own = this.db
       .prepare(
-        "SELECT COALESCE(SUM(json_extract(payload,'$.attempts')),0) AS n FROM deep_tasks WHERE owner=? AND updated>=?",
+        `SELECT COALESCE(SUM(CASE
+          WHEN json_type(payload,'$.attemptDays')='array'
+          THEN (SELECT COUNT(*) FROM json_each(json_extract(payload,'$.attemptDays')) WHERE value=?)
+          WHEN updated>=? THEN COALESCE(json_extract(payload,'$.attempts'),1)
+          ELSE 0 END),0) AS n FROM deep_tasks WHERE owner=?`,
       )
-      .get(owner, day) as { n: number };
+      .get(day, day, owner) as { n: number };
     if (
-      count.n >= dailyCapacity ||
+      (!retry && count.n >= dailyCapacity) ||
       own.n >= 3 ||
       this.deepPending().length >= 20
     )
@@ -276,8 +292,13 @@ export class Store {
       }
       if (task.attempts >= 3)
         throw Object.assign(new Error("deep_attempts"), { status: 429 });
-      this.checkDeepCapacity(owner, dailyCapacity);
+      this.checkDeepCapacity(owner, dailyCapacity, true);
       this.reserveDeepTrial(task, hosted);
+      task.attemptDays = [
+        ...(task.attemptDays ||
+          Array(task.attempts).fill(task.updated.slice(0, 10))),
+        new Date().toISOString().slice(0, 10),
+      ];
       task.state = "queued";
       task.stage = "queued";
       task.attempts++;

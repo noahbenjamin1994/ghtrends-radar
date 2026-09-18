@@ -1280,6 +1280,26 @@ test("mixed citation and wording corrections preserve the rest of a complete rep
   }));
 
 test("near-verbatim quote recovery copies one exact source span and keeps numeric and ambiguous differences invalid", () => {
+  const linked = "- [Astro](https://astro.build) — static site generator";
+  assert.equal(
+    recoverSourceQuote("Astro — static site generator", linked),
+    linked.slice(2),
+  );
+  assert.equal(
+    recoverSourceQuote("Astro — static site generator", `${linked}\n${linked}`),
+    undefined,
+  );
+  assert.equal(
+    recoverSourceQuote("Astro 5 — static site generator", linked),
+    undefined,
+  );
+  assert.equal(
+    recoverSourceQuote(
+      "Pick Vue 3 and Astro",
+      "Pick [Vue 3](https://vuejs.org) and [Astro](https://astro.build)",
+    ),
+    "Pick [Vue 3](https://vuejs.org) and [Astro](https://astro.build)",
+  );
   const source =
     "联系管理界面：打开云端的通讯录，点击在通讯录页面左下方的更多选项，选择联系人时光机，根据您的需求进行恢复操作。";
   const quoted = source.replace("左下方", "左下角");
