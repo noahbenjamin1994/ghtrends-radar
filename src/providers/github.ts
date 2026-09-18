@@ -1,4 +1,5 @@
 import { selectGapSignals } from "../core/gaps.js";
+import { createHash } from "node:crypto";
 import type { ProviderCall } from "../core/operations.js";
 import { githubToken } from "./github-auth.js";
 import { Store } from "../core/store.js";
@@ -11,7 +12,60 @@ import type {
   Topic,
   Gap,
   ResearchSource,
+  RequestEvidence,
 } from "../core/types.js";
+interface GitHubIssue {
+  title: string;
+  html_url: string;
+  body?: string;
+  state?: string;
+  state_reason?: string;
+  created_at?: string;
+  updated_at?: string;
+  closed_at?: string;
+  reactions?: { total_count: number };
+  comments?: number;
+  user?: { id?: number; type?: string };
+  pull_request?: unknown;
+}
+function requestEvidence(
+  issue: GitHubIssue,
+  observedAt?: string,
+): RequestEvidence {
+  const date = (value?: string) =>
+    value && Number.isFinite(Date.parse(value))
+      ? new Date(value).toISOString()
+      : undefined;
+  const count = (value?: number) =>
+    Number.isSafeInteger(value) && value! >= 0 ? value : undefined;
+  return Object.fromEntries(
+    Object.entries({
+      state: ["open", "closed"].includes(issue.state || "")
+        ? issue.state
+        : undefined,
+      stateReason: ["completed", "not_planned", "reopened"].includes(
+        issue.state_reason || "",
+      )
+        ? issue.state_reason
+        : undefined,
+      createdAt: date(issue.created_at),
+      updatedAt: date(issue.updated_at),
+      closedAt: date(issue.closed_at),
+      observedAt: date(observedAt),
+      reactions: count(issue.reactions?.total_count),
+      comments: count(issue.comments),
+      authorKey:
+        Number.isSafeInteger(issue.user?.id) &&
+        issue.user!.id! > 0 &&
+        issue.user?.type !== "Bot"
+          ? createHash("sha256")
+              .update("github:" + issue.user!.id)
+              .digest("hex")
+              .slice(0, 24)
+          : undefined,
+    }).filter(([, value]) => value !== undefined),
+  );
+}
 export class ProviderError extends Error {
   constructor(
     message: string,
@@ -87,6 +141,7 @@ export class GitHub {
       }
       const data = (await response.json()) as T;
       this.store.set("github:" + path, data, ttl);
+      this.store.set("github-observed:" + path, stamp(), ttl);
       return data;
     } catch (e) {
       call.error ||= "network_error";
@@ -95,6 +150,9 @@ export class GitHub {
       call.durationMs = Date.now() - started;
       this.store.recordCall(call);
     }
+  }
+  observedAt(path: string) {
+    return this.store.get<string>("github-observed:" + path) || undefined;
   }
   base(r: any): Repo {
     if (r.private)
@@ -362,20 +420,14 @@ export class GitHub {
           }));
           try {
             const q = `${direction.query} is:issue is:open`;
-            const data = await this.get<{
-              items: {
-                html_url: string;
-                title: string;
-                body?: string;
-                created_at: string;
-                updated_at: string;
-                reactions?: { total_count: number };
-              }[];
-            }>(
+            const path =
               "/search/issues?" +
-                new URLSearchParams({ q, per_page: "3", sort: "updated" }),
+              new URLSearchParams({ q, per_page: "3", sort: "updated" });
+            const data = await this.get<{ items: GitHubIssue[] }>(
+              path,
               21600000,
             );
+            const observedAt = this.observedAt(path);
             for (const [i, issue] of data.items.slice(0, 3).entries()) {
               if (
                 !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+$/.test(
@@ -389,8 +441,9 @@ export class GitHub {
                 kind: "request",
                 label: issue.title.slice(0, 150),
                 url: issue.html_url,
-                fetchedAt: stamp(),
-                excerpt: `Individual issue signal for phrase ${direction.query}; task relevance needs review. Created: ${issue.created_at}. Updated: ${issue.updated_at}. Reactions: ${issue.reactions?.total_count ?? 0}. Title: ${issue.title.slice(0, 300)}.\n${(
+                fetchedAt: observedAt,
+                request: requestEvidence(issue, observedAt),
+                excerpt: `Individual issue signal for phrase ${direction.query}; task relevance needs review. State: ${issue.state || "pending"}. Created: ${issue.created_at}. Updated: ${issue.updated_at}. Reactions: ${issue.reactions?.total_count ?? 0}. Title: ${issue.title.slice(0, 300)}.\n${(
                   issue.body || ""
                 )
                   .replace(/<!--[\s\S]*?-->/g, "")
@@ -470,12 +523,13 @@ export class GitHub {
     const documents = await Promise.allSettled([
       ...selected.map(async (repo, i): Promise<ResearchSource> => {
         const name = validateRepo(repo.name);
+        const path = `/repos/${name}/readme`;
         const doc = await this.get<{
           encoding?: string;
           content?: string;
           html_url?: string;
           size?: number;
-        }>(`/repos/${name}/readme`, 86400000);
+        }>(path, 86400000);
         if (
           doc.encoding !== "base64" ||
           !doc.content ||
@@ -495,9 +549,35 @@ export class GitHub {
           kind: "project",
           label: `${name} · README`,
           url: url.href,
+          fetchedAt: this.observedAt(path),
           excerpt:
             `Project: ${name}. Reviewed role: ${repo.relevance?.role || "pending"}. Maintainer documentation:\n` +
             clean(Buffer.from(doc.content, "base64").toString("utf8"), 7000),
+        };
+      }),
+      ...selected.map(async (repo, i): Promise<ResearchSource> => {
+        const name = validateRepo(repo.name),
+          path = `/repos/${name}/releases/latest`;
+        const release = await this.get<{
+          tag_name?: string;
+          html_url?: string;
+          published_at?: string;
+          body?: string;
+        }>(path, 14400000);
+        const url = new URL(release.html_url || "https://github.com/");
+        if (
+          !release.tag_name ||
+          url.origin !== "https://github.com" ||
+          !url.pathname.startsWith(`/${name}/releases/tag/`)
+        )
+          throw new Error("Release source pending");
+        return {
+          id: `V${i + 1}`,
+          kind: "project",
+          label: `${name} · ${release.tag_name.slice(0, 100)}`,
+          url: url.href,
+          fetchedAt: this.observedAt(path),
+          excerpt: `Maintainer's latest published release: ${release.tag_name.slice(0, 100)}. Published: ${release.published_at || "date pending"}. Match each requested capability against these release notes.\n${clean(release.body || "", 2200)}`,
         };
       }),
       ...gaps.slice(0, 3).map(async (gap, i): Promise<ResearchSource> => {
@@ -507,19 +587,17 @@ export class GitHub {
           );
         if (!match) throw new Error("Issue source pending");
         const name = validateRepo(match[1]!);
-        const issue = await this.get<{
-          title: string;
-          body?: string;
-          state: string;
-          created_at?: string;
-          updated_at?: string;
-        }>(`/repos/${name}/issues/${match[2]}`, 21600000);
+        const path = `/repos/${name}/issues/${match[2]}`;
+        const issue = await this.get<GitHubIssue>(path, 21600000);
+        const observedAt = this.observedAt(path);
         return {
           id: `I${i + 1}`,
           kind: "request",
           label: gap.title,
           url: gap.url,
-          excerpt: `Individual issue request: ${issue.title}. State: ${issue.state}. Created: ${issue.created_at || gap.createdAt}. Updated: ${issue.updated_at || gap.updatedAt}.\n${clean(issue.body || gap.excerpt, 1800)}`,
+          fetchedAt: observedAt,
+          request: requestEvidence(issue, observedAt),
+          excerpt: `Individual issue request: ${issue.title}. State: ${issue.state}. State reason: ${issue.state_reason || "pending"}. Created: ${issue.created_at || gap.createdAt}. Updated: ${issue.updated_at || gap.updatedAt}.\n${clean(issue.body || gap.excerpt, 1800)}`,
         };
       }),
     ]);
@@ -533,41 +611,61 @@ export class GitHub {
       .slice(0, 5)
       .map((r) => `repo:${r.name}`)
       .join(" ");
-    const query = `${scope} is:issue is:open reactions:>=2`;
-    try {
-      const data = await this.get<{ items: any[] }>(
-        `/search/issues?q=${encodeURIComponent(query)}&sort=reactions&order=desc&per_page=30`,
-        21600000,
-      );
-      return selectGapSignals(
-        data.items.map((i) => {
-          const body = String(i.body || "").slice(0, 10000),
-            text = (i.title + " " + body).toLowerCase();
-          const label: Gap["label"] = /alternative|replacement|instead of/.test(
-            text,
-          )
-            ? "alternative"
-            : /feature|support|request|enhancement/.test(text)
-              ? "feature-request"
-              : "friction";
-          return {
-            title: i.title,
-            url: i.html_url,
-            repo: i.repository_url.split("/").slice(-2).join("/"),
-            reactions: i.reactions?.total_count || 0,
-            createdAt: i.created_at,
-            updatedAt: i.updated_at,
-            state: i.state,
-            label,
-            excerpt: body
-              .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-              .replace(/[#*_`]/g, "")
-              .slice(0, 260),
-          };
-        }),
-      );
-    } catch {
-      return [];
-    }
+    const recent = new Date(Date.now() - 90 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+    const paths = [
+      `/search/issues?q=${encodeURIComponent(`${scope} is:issue is:open reactions:>=2`)}&sort=reactions&order=desc&per_page=30`,
+      `/search/issues?q=${encodeURIComponent(`${scope} is:issue is:open updated:>=${recent}`)}&sort=updated&order=desc&per_page=30`,
+    ];
+    const pages = await Promise.allSettled(
+      paths.map(async (path) => {
+        const data = await this.get<{ items: GitHubIssue[] }>(path, 21600000);
+        return data.items
+          .filter((i) => !i.pull_request)
+          .flatMap((i): Gap[] => {
+            const match =
+              /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/issues\/\d+$/.exec(
+                i.html_url || "",
+              );
+            if (
+              !match ||
+              !repos
+                .slice(0, 5)
+                .some((r) => r.name.toLowerCase() === match[1]!.toLowerCase())
+            )
+              return [];
+            const evidence = requestEvidence(i, this.observedAt(path)),
+              body = String(i.body || "").slice(0, 10000),
+              text = (i.title + " " + body).toLowerCase();
+            const label: Gap["label"] =
+              /alternative|replacement|instead of/.test(text)
+                ? "alternative"
+                : /feature|support|request|enhancement/.test(text)
+                  ? "feature-request"
+                  : "friction";
+            return [
+              {
+                ...evidence,
+                title: i.title,
+                url: i.html_url,
+                repo: match[1]!,
+                reactions: evidence.reactions ?? 0,
+                createdAt: evidence.createdAt || "",
+                updatedAt: evidence.updatedAt || "",
+                state: evidence.state || "",
+                label,
+                excerpt: body
+                  .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+                  .replace(/[#*_`]/g, "")
+                  .slice(0, 260),
+              },
+            ];
+          });
+      }),
+    );
+    return selectGapSignals(
+      pages.flatMap((p) => (p.status === "fulfilled" ? p.value : [])),
+    ).slice(0, 12);
   }
 }

@@ -1,8 +1,14 @@
+import { ScopeReview } from "./preflight.js";
+import {
+  inspectInput,
+  type PreflightResult,
+  type ResearchScope,
+} from "../core/preflight.js";
 import { researchLandscape } from "../core/landscape.js";
 import { OpportunityMap, TopicOverview } from "./opportunities.js";
 import { visibleOpportunities } from "../core/opportunities.js";
 import { COMPETITION_POLICY } from "../core/competition.js";
-import { IssueReading, LandscapePanel, CompetitorPanel } from "./landscape.js";
+import { RequestCard, LandscapePanel, CompetitorPanel } from "./landscape.js";
 import { reportIssueSignals, selectGapSignals } from "../core/gaps.js";
 import { enableEngagement, track } from "./engagement.js";
 import { AdminView } from "./admin.js";
@@ -16,7 +22,7 @@ import {
   type Account,
 } from "./account.js";
 import { t, locale, localUrl, loginUrl, switchLanguage } from "./i18n.js";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -89,6 +95,14 @@ export function App() {
     [mobileMenu, setMobileMenu] = useState(false);
   const [account, setAccount] = useState<Account | null>(null);
   const [creditNotice, setCreditNotice] = useState("");
+  const preparationVersion = useRef(0);
+  const [preparing, setPreparing] = useState(false);
+  const [preflight, setPreflight] = useState<PreflightResult | null>(null);
+  const [preparationContext, setPreparationContext] = useState<{
+    keyword?: string;
+    geo: string;
+  }>({ geo: "" });
+  const [pollError, setPollError] = useState("");
   const [choices, setChoices] = useState<{ label: string; query: string }[]>(
     [],
   );
@@ -231,6 +245,15 @@ export function App() {
   };
   const scan = async (input: string, demandKeyword?: string, region = geo) => {
     if (!input.trim()) return;
+    const version = ++preparationVersion.current;
+    setPreparationContext({
+      keyword: demandKeyword || keyword.trim() || undefined,
+      geo: region,
+    });
+    const local = inspectInput(input);
+    setPreflight(local);
+    setScanError("");
+    if (local) return;
     if (!account?.user) {
       sessionStorage.setItem(
         "ghtrends:draft",
@@ -245,16 +268,53 @@ export function App() {
     }
     setCreditNotice("");
     setChoices([]);
+    setPreparing(true);
+    const context = {
+      keyword: demandKeyword || keyword.trim() || undefined,
+      geo: region,
+    };
+    setPreparationContext(context);
+    try {
+      const result = await api<PreflightResult>("/api/preflight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: input, ...context }),
+      });
+      if (version === preparationVersion.current) setPreflight(result);
+    } catch (e) {
+      if (version === preparationVersion.current)
+        setScanError((e as Error).message);
+    } finally {
+      if (version === preparationVersion.current) setPreparing(false);
+    }
+  };
+  const editResearchScope = (scope: ResearchScope) => {
+    ++preparationVersion.current;
+    setPreflight(null);
+    setQuery(scope.input);
+    setKeyword(scope.keyword || "");
+    setGeo(scope.geo);
+    navigate(scope.geo ? "/?geo=" + encodeURIComponent(scope.geo) : "/");
+    requestAnimationFrame(() =>
+      document
+        .querySelector<HTMLInputElement>(".search-form input, form input")
+        ?.focus(),
+    );
+  };
+  const beginResearch = async (scope: ResearchScope) => {
+    setPreflight(null);
     setScanning(true);
     setScanError("");
+    setPollError("");
     try {
       const d = await api<any>("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          topic: input,
-          geo: region,
-          keyword: demandKeyword || keyword.trim() || undefined,
+          topic: scope.input,
+          geo: scope.geo,
+          keyword: scope.keyword,
+          preflightId: scope.id,
         }),
       });
       if (d.state === "complete") {
@@ -268,8 +328,17 @@ export function App() {
         sessionStorage.setItem("ghtrends:job", d.id);
       }
     } catch (e) {
-      setScanError((e as Error).message);
+      const error = e as Error & {
+        status?: number;
+        guidance?: PreflightResult;
+        scope?: ResearchScope;
+      };
       setScanning(false);
+      if (error.guidance || error.scope)
+        setPreflight(error.guidance || error.scope || null);
+      else if (error.status === 409)
+        await scan(scope.input, scope.keyword, scope.geo);
+      else setScanError(error.message);
     }
   };
   useEffect(() => {
@@ -280,6 +349,7 @@ export function App() {
       try {
         const d = await api<any>("/api/jobs/" + job.id);
         if (stop) return;
+        setPollError("");
         if (d.state === "complete") {
           if (d.credit === "returned")
             setCreditNotice(
@@ -308,10 +378,17 @@ export function App() {
         timer = setTimeout(poll, 3000);
       } catch (e) {
         if (!stop) {
-          setScanError((e as Error).message);
-          sessionStorage.removeItem("ghtrends:job");
-          setJob(null);
-          setScanning(false);
+          if ([401, 403, 404].includes((e as any).status)) {
+            setScanError((e as Error).message);
+            sessionStorage.removeItem("ghtrends:job");
+            setJob(null);
+            setScanning(false);
+          } else {
+            setPollError(
+              "Reconnecting to your research. Your task continues on the server.",
+            );
+            timer = setTimeout(poll, 5000);
+          }
         }
       }
     };
@@ -583,12 +660,20 @@ export function App() {
                   <Search size={18} />
                   <input
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onChange={(e) => {
+                      ++preparationVersion.current;
+                      setPreparing(false);
+                      setQuery(e.target.value);
+                      setPreflight(null);
+                    }}
                     placeholder={t("Explore a topic, e.g. agent memory")}
                     aria-label={t("Search or scan a topic")}
                     maxLength={300}
                   />
-                  <button disabled={scanning || !query.trim()} type="submit">
+                  <button
+                    disabled={scanning || preparing || !query.trim()}
+                    type="submit"
+                  >
                     {t(
                       account?.hosted
                         ? account.user
@@ -600,6 +685,22 @@ export function App() {
                   </button>
                 </form>
               </div>
+              <ScopeReview
+                result={preflight}
+                preparing={preparing}
+                hosted={!!account?.hosted}
+                onChoose={(query) => {
+                  setQuery(query);
+                  void scan(
+                    query,
+                    preparationContext.keyword,
+                    preparationContext.geo,
+                  );
+                }}
+                onConfirm={(scope) => void beginResearch(scope)}
+                onEdit={editResearchScope}
+                onClose={() => setPreflight(null)}
+              />
               <div className="search-options">
                 <label className="select-field">
                   <Globe2 size={15} />
@@ -607,6 +708,9 @@ export function App() {
                     value={geo}
                     onChange={(e) => {
                       const value = e.target.value;
+                      ++preparationVersion.current;
+                      setPreparing(false);
+                      setPreflight(null);
                       setGeo(value);
                       const url = new URL(location.href);
                       if (value) url.searchParams.set("geo", value);
@@ -633,7 +737,12 @@ export function App() {
                     {t("Demand keyword")}
                     <input
                       value={keyword}
-                      onChange={(e) => setKeyword(e.target.value)}
+                      onChange={(e) => {
+                        ++preparationVersion.current;
+                        setPreparing(false);
+                        setPreflight(null);
+                        setKeyword(e.target.value);
+                      }}
                       maxLength={100}
                       placeholder={t("Optional — e.g. AI agent memory")}
                     />
@@ -1047,6 +1156,26 @@ export function App() {
         </div>
         <small>{t("Not affiliated with GitHub, Inc.")}</small>
       </footer>
+      {path.split("?")[0] !== "/" && (preparing || preflight) && (
+        <div className="scope-overlay">
+          <ScopeReview
+            result={preflight}
+            preparing={preparing}
+            hosted={!!account?.hosted}
+            onChoose={(query) => {
+              setQuery(query);
+              void scan(
+                query,
+                preparationContext.keyword,
+                preparationContext.geo,
+              );
+            }}
+            onConfirm={(scope) => void beginResearch(scope)}
+            onEdit={editResearchScope}
+            onClose={() => setPreflight(null)}
+          />
+        </div>
+      )}
       {(scanning || scanError) && (
         <div className="scan-status" role={scanError ? "alert" : "status"}>
           {scanError ? (
@@ -1103,6 +1232,7 @@ export function App() {
                     )}
                   </p>
                 )}
+                {pollError && <p>{t(pollError)}</p>}
                 <div className="scan-facts">
                   {job?.progress?.supplyCount !== undefined && (
                     <span>
@@ -1243,6 +1373,9 @@ function MarketView({
   const share = location.origin + localUrl("/report/" + m.id);
   const demandPoints = completeWeeklySeries(m.demand, m.asOf).points;
   const gapSignals = reportIssueSignals(m);
+  const requestAuthors = new Set(
+    gapSignals.flatMap((g) => (g.authorKey ? [g.authorKey] : [])),
+  );
   return (
     <div className="detail-page report-page">
       <button className="back-link" onClick={() => navigate("/")}>
@@ -1913,7 +2046,7 @@ function MarketView({
       <section className="panel">
         <div className="panel-title">
           <div>
-            <h3>{t("Listen to what’s missing")}</h3>
+            <h3>{l("User requests and progress", "用户的问题与进展")}</h3>
             <p>
               {l(
                 "Public requests from relevant projects. Review the original report and current version.",
@@ -1924,45 +2057,41 @@ function MarketView({
           <span className="method-tag">
             {gapSignals.length}
             {t("signals")}
+            {requestAuthors.size > 0 &&
+              ` · ${requestAuthors.size} ${l("identified authors", "位已识别发起者")}`}
           </span>
         </div>
         {gapSignals.length ? (
-          <div className="gap-grid gap-grid-research">
-            {gapSignals.slice(0, 6).map((g) => (
-              <a
-                className="gap-card"
-                href={g.url}
-                target="_blank"
-                rel="noreferrer"
-                key={g.url}
-              >
-                <div className="gap-card-meta">
-                  <span className="gap-label">
-                    {g.reactions == null
-                      ? locale === "zh"
-                        ? "社区请求"
-                        : "Community request"
-                      : t(g.label.replaceAll("-", " "))}
-                  </span>
-                  {g.reactions != null && <span>↑ {g.reactions}</span>}
+          <>
+            <div className="gap-grid gap-grid-research">
+              {gapSignals.slice(0, 3).map((g) => (
+                <RequestCard
+                  key={g.url}
+                  gap={g}
+                  brief={m.brief}
+                  locale={locale}
+                />
+              ))}
+            </div>
+            {gapSignals.length > 3 && (
+              <details className="request-more">
+                <summary>
+                  {l("View more requests", "查看更多请求")} ·{" "}
+                  {gapSignals.length - 3}
+                </summary>
+                <div className="gap-grid gap-grid-research">
+                  {gapSignals.slice(3).map((g) => (
+                    <RequestCard
+                      key={g.url}
+                      gap={g}
+                      brief={m.brief}
+                      locale={locale}
+                    />
+                  ))}
                 </div>
-                <h4>
-                  {m.brief?.issueInsights?.find(
-                    (i) =>
-                      i.relevance === "direct" &&
-                      m.brief?.sources.find((s) => s.id === i.sourceId)?.url ===
-                        g.url,
-                  )?.[locale].title || g.title}
-                  <ArrowUpRight size={15} />
-                </h4>
-                <IssueReading gap={g} brief={m.brief} locale={locale} />
-                <small>
-                  {g.repo}
-                  {g.createdAt ? ` · ${g.createdAt.slice(0, 10)}` : ""}
-                </small>
-              </a>
-            ))}
-          </div>
+              </details>
+            )}
+          </>
         ) : (
           <p className="muted">
             {t(
@@ -2701,7 +2830,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.5/ghtrends-radar-0.17.5.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.18.0/ghtrends-radar-0.18.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}

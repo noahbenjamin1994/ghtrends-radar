@@ -135,6 +135,116 @@ test("repository reviews preserve individually valid evidence and reject conflic
   }
 });
 
+test("named-entity planning separates synonyms from buyer intent and preserves the original supply scope", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-query-scope-"));
+  const store = new Store(dir),
+    old = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = "unit-test-only";
+  try {
+    const research = new Research(store);
+    const base = {
+      slug: "tmux",
+      name: "tmux",
+      scope: "category",
+      intent: "Opportunities around tmux",
+      entity: { name: "tmux", aliases: [] },
+      trends: ["tmux", "terminal multiplexer", "tmux alternatives"],
+      githubTopics: ["tmux", "terminal-multiplexer"],
+      githubTopicGroups: [],
+      githubTerms: ["tmux", "terminal multiplexer"],
+      explanation: {
+        en: "Research the named product and its ecosystem.",
+        zh: "研究指定产品及其生态。",
+      },
+      ambiguity: null,
+      choices: null,
+    };
+    let result: any = base;
+    research.json = async () => result;
+    const plan = await research.plan("tmux");
+    assert.deepEqual(plan.plan?.trends, ["tmux"]);
+    assert.deepEqual(plan.queries, [
+      "topic:tmux",
+      '"tmux" in:name,description',
+    ]);
+    assert.deepEqual(plan.plan?.entity, { name: "tmux", aliases: [] });
+    result = {
+      ...base,
+      entity: { name: "7-Zip", aliases: ["7zip"] },
+      trends: ["7zip", "file archiver"],
+      githubTopics: ["file-archiver"],
+      githubTerms: ["compression utility"],
+    };
+    assert.deepEqual((await research.plan("7-Zip")).queries, [
+      '"7zip" in:name,description',
+    ]);
+    result = {
+      ...base,
+      entity: { name: "Bun", aliases: [] },
+      trends: ["Bun", "Bunny"],
+      githubTopics: ["bun", "bunny"],
+      githubTerms: [],
+    };
+    assert.deepEqual((await research.plan("Bun")).queries, ["topic:bun"]);
+    result = {
+      ...base,
+      entity: { name: "123apps", aliases: [] },
+      trends: ["online file converter"],
+      githubTopics: ["file-converter"],
+    };
+    await assert.rejects(research.plan("123apps"), /original search phrase/);
+    // An explicit demand override can differ from the original supply object.
+    const overridden = await research.plan("123apps", "online file converter");
+    assert.deepEqual(overridden.plan?.trends, ["online file converter"]);
+    assert.deepEqual(overridden.queries, ['"123apps" in:name,description']);
+    result = {
+      ...base,
+      trends: ["tmux alternatives"],
+      githubTerms: ["tmux alternatives"],
+    };
+    assert.deepEqual((await research.plan("tmux alternatives")).plan?.trends, [
+      "tmux alternatives",
+    ]);
+    result = { ...base, entity: { name: 'tmux" OR stars:0', aliases: [] } };
+    await assert.rejects(
+      research.plan("entity injection"),
+      /could not be validated/,
+    );
+    result = { ...base, entity: { name: "___", aliases: [] } };
+    await assert.rejects(
+      research.plan("entity punctuation"),
+      /could not be validated/,
+    );
+    result = {
+      ...base,
+      entity: {
+        name: "12306",
+        aliases: ["中国铁路12306", "铁路12306", "China Railway 12306"],
+      },
+      trends: ["12306"],
+      githubTopics: ["12306"],
+      githubTerms: ["12306"],
+    };
+    assert.equal((await research.plan("12306")).keyword, "12306");
+    result = {
+      ...base,
+      entity: null,
+      trends: ["apple juice", "100% apple juice"],
+      githubTopics: ["apple-juice"],
+      githubTerms: ["apple juice"],
+    };
+    assert.deepEqual((await research.plan("Apple fruit juice")).plan?.trends, [
+      "apple juice",
+      "100% apple juice",
+    ]);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+    if (old === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = old;
+  }
+});
+
 test("AI plans are bounded, validated, cached, and distinguish ambiguous inputs", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-research-")),
     store = new Store(dir),
@@ -206,7 +316,7 @@ test("AI plans are bounded, validated, cached, and distinguish ambiguous inputs"
     result = { unrecognized: true };
     await assert.rejects(
       research.plan("unrecognizable token"),
-      /Could not identify/,
+      /Add a product/,
     );
     result = { ...plan, githubTopics: ["ai4s OR stars:0"] };
     await assert.rejects(
@@ -239,7 +349,7 @@ test("AI plans are bounded, validated, cached, and distinguish ambiguous inputs"
     );
     await assert.rejects(
       research.plan("rsi"),
-      (e: any) => e.status === 422 && e.choices.length === 2,
+      (e: any) => e.status === 422 && e.choices.length === 3,
     );
     const callsBeforeKnown = calls;
     assert.deepEqual((await research.plan("vibe coding")).plan?.trends, [

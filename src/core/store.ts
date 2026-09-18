@@ -49,6 +49,13 @@ export class Store {
       CREATE INDEX IF NOT EXISTS provider_calls_run ON provider_calls(run_id);
       CREATE INDEX IF NOT EXISTS provider_calls_user ON provider_calls(user_id,started);
     `);
+    const runColumns = this.db
+      .prepare("PRAGMA table_info(scan_runs)")
+      .all() as { name: string }[];
+    if (!runColumns.some((c) => c.name === "kind"))
+      this.db.exec(
+        "ALTER TABLE scan_runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'scan'",
+      );
     const columns = this.db
       .prepare("PRAGMA table_info(provider_calls)")
       .all() as { name: string }[];
@@ -156,7 +163,7 @@ export class Store {
   startRun(r: RunRecord) {
     this.db
       .prepare(
-        "INSERT INTO scan_runs(id,user_id,input,geo,background,created,state) VALUES(?,?,?,?,?,?,'queued')",
+        "INSERT INTO scan_runs(id,user_id,input,geo,background,created,kind,state) VALUES(?,?,?,?,?,?,?,'queued')",
       )
       .run(
         r.id,
@@ -165,6 +172,7 @@ export class Store {
         r.geo,
         Number(r.background),
         r.created,
+        r.kind || "scan",
       );
   }
   updateRun(
@@ -227,7 +235,7 @@ export class Store {
           .all(engagementDay),
         scans: this.db
           .prepare(
-            "SELECT state,COUNT(*) AS count FROM scan_runs WHERE background=0 AND created>=? GROUP BY state",
+            "SELECT state,COUNT(*) AS count FROM scan_runs WHERE background=0 AND kind='scan' AND created>=? GROUP BY state",
           )
           .all(since),
       },
@@ -285,7 +293,7 @@ export class Store {
         .all(since),
       users: this.db
         .prepare(
-          "SELECT u.id,u.name,u.created,(SELECT COUNT(*) FROM user_reports WHERE user_id=u.id) AS reports,(SELECT COUNT(*) FROM scan_runs WHERE user_id=u.id AND created>=?) AS scans,(SELECT SUM(cost_usd) FROM provider_calls WHERE user_id=u.id AND started>=?) AS estimatedUsd FROM users u ORDER BY scans DESC,u.created DESC LIMIT 100",
+          "SELECT u.id,u.name,u.created,(SELECT COUNT(*) FROM user_reports WHERE user_id=u.id) AS reports,(SELECT COUNT(*) FROM scan_runs WHERE user_id=u.id AND kind='scan' AND created>=?) AS scans,(SELECT SUM(cost_usd) FROM provider_calls WHERE user_id=u.id AND started>=?) AS estimatedUsd FROM users u ORDER BY scans DESC,u.created DESC LIMIT 100",
         )
         .all(since, since),
       runCount: (
@@ -451,6 +459,47 @@ export class Store {
       )
       .get(user, day, limit);
     return !!row;
+  }
+  /** A separate, durable budget for inexpensive preparation requests. */
+  consumePreparationBudget(
+    user: string,
+    now = Date.now(),
+  ): { allowed: boolean; retryAt?: string } {
+    const limits = [
+      { key: `user-minute:${user}`, window: 60000, limit: 10 },
+      { key: `user-day:${user}`, window: 86400000, limit: 60 },
+      { key: "service-day", window: 86400000, limit: 1000 },
+    ].map((b) => ({
+      ...b,
+      key: `preflight-budget:${Math.floor(now / b.window)}:${b.key}`,
+    }));
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const counters = limits.map((b) => ({
+        ...b,
+        count: this.get<number>(b.key) || 0,
+      }));
+      const exhausted = counters.filter((b) => b.count >= b.limit);
+      if (exhausted.length) {
+        this.db.exec("ROLLBACK");
+        return {
+          allowed: false,
+          retryAt: new Date(
+            Math.max(
+              ...exhausted.map(
+                (b) => (Math.floor(now / b.window) + 1) * b.window,
+              ),
+            ),
+          ).toISOString(),
+        };
+      }
+      for (const b of counters) this.set(b.key, b.count + 1, b.window);
+      this.db.exec("COMMIT");
+      return { allowed: true };
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
   allowance(user: string, limit: number) {
     const used = this.usage(user);

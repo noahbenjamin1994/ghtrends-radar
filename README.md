@@ -57,7 +57,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.5/ghtrends-radar-0.17.5.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.18.0/ghtrends-radar-0.18.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -164,7 +164,7 @@ The model proposes one primary Trends phrase, up to two genuine synonyms, and bo
 
 **The strategy process**
 
-1. Select up to four relevant project READMEs across distinct user jobs and three individual issue excerpts. Historical reports also filter adjacent-object Issues at display time. The model explains each relevant request in plain language: audience, need, a possible contribution and the current-version check. Broad fields retain their full original scope alongside open-source directions.
+1. Select up to four relevant project READMEs across distinct user jobs, their latest published release notes, and three individual issue excerpts. Historical reports also filter adjacent-object Issues at display time. Request cards show who needs what, a possible contribution, source dates and the latest observed status. Expand a card to read the current workaround, desired outcome, verification step and original quote. Completed requests point to existing progress. Recent requests appear alongside highly discussed ones; repeated links and identical requests from the same identified author are merged. Broad fields retain their full original scope alongside open-source directions.
 2. Use light reasoning to answer the original topic first: overall opportunity, demand drivers, competition, entry conditions and evidence coverage. Then map distinct customer jobs: typically five for a broad field and three for a narrow product. Every direction opens with a plain-language name, customer, need and offered service, followed by demand, competition, resources, a first-release estimate, upkeep and a concrete experiment. Broad consumer fields span multiple lifecycle stages; source availability guides evidence confidence while preserving the original scope.
 3. The first pass produces a compact English research blueprint. Check each direction with one targeted GitHub repository search, up to one README and one issue search (up to three excerpts), using two source workers. An evidence editor then turns the blueprint and collected sources into the full bilingual report; a bounded editing pass repairs wording or citations. Directions, the priority strategy and the market overview have separate, bounded output budgets.
 4. Show source signals separately from research inference. Parent-query search growth stays separate from direction-level demand. Project features establish supply; observed demand needs relevant user-request evidence. Strong demand requires multiple request sources and model review of their relevance. Limited search coverage keeps competition estimates provisional.
@@ -199,6 +199,8 @@ Light reasoning produces a compact blueprint; direct generation writes concise b
 A fresh scan, project analysis, or comparison uses one credit. Cached results are free. The header, research form, and account menu show the balance and reset time in your timezone. A credit is reserved while research runs; collection issues and interrupted work return it exactly once, including after a server restart. Project and comparison collection starts through an explicit action protected by the session and CSRF token; opening a saved page reads cached evidence.
 
 `GHTRENDS_DAILY_REQUESTS` bounds hosted collection attempts across accounts (default 200/day, including returned credits). Each account can attempt up to three times its daily credit allowance. One fresh research job per account runs at a time. Admin shows today's reserved, used and returned credits, the service budget, and the Trends connection/recovery status. `GOOGLE_TRENDS_PROXY` supports authenticated HTTP(S) proxies; `GHTRENDS_TRENDS_PROXY_REGION` supplies a safe region label. Proxy credentials stay server-side, and provider recovery windows apply to the fixed route.
+
+Before collection, the web app prepares a research scope for confirmation. Greetings and placeholder text receive immediate guidance; ambiguous terms offer specific meanings. Scope preparation is free and has its own request budget. Confirmed scopes are bound to the account, input, region and search phrase for ten minutes. A temporary model outage offers an original-phrase scope for explicit confirmation. Brief connection interruptions keep the research task open and reconnect automatically. Administrators can identify preparation requests separately from research runs.
 
 For a public hosted instance configure `GHTRENDS_HOSTED=1`, HTTPS `PUBLIC_URL`, `LOGTO_ENDPOINT`, `LOGTO_APP_ID`, `LOGTO_APP_SECRET` and optionally `GHTRENDS_DAILY_SCANS` (default 10). Create a Traditional Logto application with `${PUBLIC_URL}/auth/callback` as its redirect. Keep GitHub/DeepSeek credentials in server secrets, never `VITE_*` or browser storage. OIDC uses PKCE, nonce/state and signed-token validation; the browser gets an HttpOnly, Secure session cookie. Personal mutations also require CSRF validation.
 

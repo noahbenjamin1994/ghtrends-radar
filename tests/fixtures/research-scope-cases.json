@@ -1,0 +1,68 @@
+[
+  {
+    "input": "tmux",
+    "expected": "ready",
+    "require": ["tmux"],
+    "exclude": ["alternatives|plugin"]
+  },
+  {
+    "input": "7-Zip",
+    "expected": "ready",
+    "require": ["7[ -]?zip"],
+    "exclude": ["alternatives"]
+  },
+  {
+    "input": "123apps",
+    "expected": "ready",
+    "require": ["123[ ]?apps"],
+    "exclude": ["alternatives"]
+  },
+  {
+    "input": "小米手机",
+    "expected": "ready",
+    "require": ["xiaomi|小米"],
+    "exclude": ["redmi|回收|维修"]
+  },
+  {
+    "input": "小猫语言翻译器",
+    "expected": "ready",
+    "require": ["cat|meow"],
+    "exclude": ["animal sound|machine learning"]
+  },
+  {
+    "input": "Bun",
+    "expected": "ready",
+    "require": ["bun"],
+    "exclude": ["alternatives|plugins"]
+  },
+  {
+    "input": "OpenTofu",
+    "expected": "ready",
+    "require": ["opentofu"],
+    "exclude": ["alternatives|terraform"]
+  },
+  {
+    "input": "Tailscale",
+    "expected": "ready",
+    "require": ["tailscale"],
+    "exclude": ["alternatives|self.hosted"]
+  },
+  {
+    "input": "JupyterLab",
+    "expected": "ready",
+    "require": ["jupyter[ ]?lab"],
+    "exclude": ["extensions"]
+  },
+  {
+    "input": "Homebrew package manager",
+    "expected": "ready",
+    "require": ["homebrew"],
+    "exclude": ["formula"]
+  },
+  { "input": "Hi insurance", "expected": "ready", "exclude": ["california"] },
+  {
+    "input": "self hosted password manager",
+    "expected": "ready",
+    "require": ["self.hosted", "password"]
+  }
+]

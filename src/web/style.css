@@ -5525,6 +5525,91 @@ footer small {
   font-size: 12px;
   line-height: 1.7;
 }
+.request-card .gap-label,
+.request-card .gap-card-meta {
+  font: 12px/1.5 var(--display);
+  letter-spacing: 0;
+}
+.request-card h4 a {
+  color: #202522;
+  text-decoration: none;
+}
+.request-card h4 a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.request-card p {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  font: 14px/1.8 var(--display);
+}
+.request-state {
+  display: inline-flex;
+  padding: 4px 9px;
+  margin-bottom: 18px;
+  border-radius: 6px;
+  background: #edf5f1;
+  color: #316450;
+  font-size: 12px;
+}
+.request-closed {
+  background: #ededeb;
+  color: #64645f;
+}
+.request-quote summary,
+.request-more > summary {
+  cursor: pointer;
+  color: #525a54;
+  font-size: 13px;
+  padding-block: 12px;
+}
+.request-quote blockquote {
+  margin: 8px 0 12px;
+  padding: 12px 16px;
+  background: #fff;
+  border-left: 3px solid #c7dacf;
+  font: 14px/1.8 var(--display);
+  overflow-wrap: anywhere;
+}
+.request-release {
+  display: block;
+  margin-top: 18px;
+  font-size: 12px;
+  color: #416553;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.request-card .request-meta {
+  display: grid;
+  gap: 8px;
+  width: auto;
+  margin: 22px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid #e4e6e3;
+}
+.request-card .request-meta > span {
+  font: 12px/1.6 var(--display);
+  color: #747872;
+}
+.request-card .request-meta > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font: 12px/1.6 var(--display);
+  color: #747872;
+}
+.request-more {
+  margin-top: 18px;
+}
+.request-details {
+  display: grid;
+  gap: 16px;
+  padding-block: 12px;
+}
+.request-more > summary {
+  margin-bottom: 12px;
+}
 @media (max-width: 760px) {
   .gap-grid-research {
     grid-template-columns: minmax(0, 1fr);
@@ -5820,5 +5905,106 @@ footer small {
 @media (max-width: 720px) {
   .ad-example-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* A compact review of the scope before any research credit is reserved. */
+.scope-review {
+  text-align: left;
+  margin: 20px 0;
+  padding: 24px;
+  border: 1px solid var(--border, #e7e7e7);
+  border-radius: 16px;
+  background: #fafafa;
+  color: #202020;
+  outline-offset: 4px;
+}
+.scope-review-heading,
+.scope-review-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.scope-review h3 {
+  font-size: 22px;
+  line-height: 1.4;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.scope-review p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #606060;
+  margin: 12px 0;
+}
+.scope-review .eyebrow {
+  margin: 0;
+}
+.scope-review small,
+.scope-review-actions > span {
+  color: #606060;
+  font-size: 13px;
+}
+.scope-review-actions > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.scope-review-actions {
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+.scope-review-actions > span {
+  flex-basis: 100%;
+}
+.scope-queries {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.scope-queries > span {
+  color: #707070;
+  margin-right: 4px;
+}
+.scope-queries b {
+  font-weight: 500;
+  padding: 5px 9px;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  background: white;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.scope-overlay {
+  position: fixed;
+  bottom: 20px;
+  right: 24px;
+  width: min(560px, calc(100vw - 32px));
+  z-index: 90;
+  max-height: 85vh;
+  overflow: auto;
+  box-shadow: 0 8px 40px #00000010;
+  border-radius: 16px;
+}
+.scope-overlay .scope-review {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .scope-review {
+    padding: 18px;
+  }
+  .scope-review-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .scope-review-actions .button {
+    justify-content: center;
+  }
+  .scope-overlay {
+    right: 16px;
+    bottom: 16px;
   }
 }

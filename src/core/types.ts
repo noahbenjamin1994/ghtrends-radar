@@ -19,6 +19,7 @@ export interface QueryPlan {
   model: string;
   version: string;
   intent: string;
+  entity?: { name: string; aliases: string[] };
   trends: string[];
   githubTopics: string[];
   githubTopicGroups?: string[][];
@@ -71,6 +72,18 @@ export interface ResearchSource {
   url: string;
   excerpt?: string;
   fetchedAt?: string;
+  request?: RequestEvidence;
+}
+export interface RequestEvidence {
+  state?: string;
+  stateReason?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  closedAt?: string;
+  observedAt?: string;
+  reactions?: number;
+  comments?: number;
+  authorKey?: string;
 }
 export interface InterestPoint {
   date: string;
@@ -210,7 +223,7 @@ export interface DemandWindow {
   baselineStart: string;
   baselineEnd: string;
 }
-export interface Gap {
+export interface Gap extends RequestEvidence {
   title: string;
   url: string;
   repo: string;

@@ -405,9 +405,9 @@ export function opportunityProblems(
 export function visibleOpportunities(
   brief?: Brief,
 ): OpportunityMap | undefined {
-  if (!brief || !["2", "3", "4"].includes(brief.strategyVersion || "")) return;
+  if (!brief || !["2", "3", "4", "5"].includes(brief.strategyVersion || "")) return;
   if (
-    ["3", "4"].includes(brief.strategyVersion || "") &&
+    ["3", "4", "5"].includes(brief.strategyVersion || "") &&
     (!overviewSchema.safeParse(brief.overview).success ||
       !z
         .array(clearOpportunitySchema)

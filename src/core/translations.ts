@@ -1,4 +1,31 @@
 export const zh: Record<string, string> = {
+  "Continue preparing your research at the shown time.":
+    "可在显示的时间继续整理研究范围。",
+  "Fresh research uses 1 credit": "全新研究使用 1 次额度",
+  "Uses your configured data sources": "使用你配置的数据来源",
+  "Your research scope": "本次研究范围",
+  "Preparing your research scope": "正在整理研究范围",
+  "A little context helps": "补充一点背景",
+  "Close research scope": "收起研究范围",
+  "Organizing your topic and search phrases · 0 research credits used":
+    "正在整理研究对象和搜索词 · 研究次数保留",
+  "Search phrases": "搜索词",
+  "Scope preparation is free": "范围整理免费",
+  "Confirm and research": "确认并开始研究",
+  "Edit research topic": "修改研究对象",
+  "Using your original wording. Confirm to collect evidence, or edit your research topic.":
+    "将使用你的原词采集证据。可以确认开始，或修改研究对象。",
+  "Reconnecting to your research. Your task continues on the server.":
+    "正在恢复连接，研究任务在服务器继续进行。",
+  "Prepare this research scope again to continue.":
+    "重新整理本次研究范围后即可继续。",
+  "Your research scope is being prepared. Continue when it is ready.":
+    "正在整理你的研究范围，完成后即可继续。",
+  "Take a short pause, then continue preparing your research.":
+    "稍作休息后，可以继续整理研究范围。",
+  "Choose a search phrase of up to 100 characters.":
+    "请输入 100 字以内的搜索词。",
+
   "Open-source competition": "开源竞争程度",
   "Open-source alternatives": "同类开源项目",
   "Refining same-intent project searches": "正在补充同用途的项目检索",

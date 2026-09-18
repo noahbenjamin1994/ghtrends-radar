@@ -1,4 +1,10 @@
 import { appPath, basePathFromUrl } from "../core/paths.js";
+import {
+  inspectInput,
+  inputGuidance,
+  type PreflightResult,
+  type ResearchScope,
+} from "../core/preflight.js";
 import { ENGAGEMENT_EVENTS, type EngagementEvent } from "../core/engagement.js";
 import { marketGapSignals, selectGapSignals } from "../core/gaps.js";
 import express from "express";
@@ -24,7 +30,7 @@ import {
 } from "../core/topics.js";
 import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
 import { marketMarkdown } from "../core/report.js";
-import type { Market } from "../core/types.js";
+import type { Market, Topic } from "../core/types.js";
 import { renderDocument } from "./html.js";
 import {
   sourceEvidenceIsFresh,
@@ -49,6 +55,7 @@ interface Job {
   clarification?: { en: string; zh: string };
   credit?: "reserved" | "used" | "returned" | "free";
   cacheKey?: string;
+  preparedTopic?: Topic;
 }
 export function createApp(engine = new Engine()) {
   const proxyUsage = new ProxyUsageClient(engine.store);
@@ -92,6 +99,10 @@ export function createApp(engine = new Engine()) {
           TOPICS.some((t) => t.slug === m.topic.slug),
       );
   const jobs = new Map<string, Job>();
+  const preparations = new Map<
+    string,
+    { key: string; promise: Promise<PreflightResult> }
+  >();
   const localeFor = (q: express.Request): Locale =>
     requestLocale(q.query.lang, q.get("cookie"), q.get("accept-language"));
   const baseURL = (q: express.Request) =>
@@ -227,6 +238,7 @@ export function createApp(engine = new Engine()) {
                 // benefit from cached, source-backed project-role review.
                 owner: job.owner,
                 private: auth.hosted && !!job.owner,
+                preparedTopic: job.preparedTopic,
                 onProgress: (progress) => {
                   job.progress = { ...job.progress, ...progress };
                   engine.store.set("job:" + job.id, job, 3600000);
@@ -645,29 +657,196 @@ export function createApp(engine = new Engine()) {
       return r.type("png").send(bytes);
     }),
   );
+  const preparationInput = (q: express.Request) => {
+    if (
+      typeof q.body?.topic !== "string" ||
+      !q.body.topic.trim() ||
+      q.body.topic.length > 300 ||
+      /[\x00-\x1f<>]/.test(q.body.topic)
+    )
+      throw Object.assign(
+        new Error("Enter a topic between 1 and 300 characters."),
+        { status: 400 },
+      );
+    if (
+      q.body.keyword !== undefined &&
+      (typeof q.body.keyword !== "string" ||
+        q.body.keyword.length > 100 ||
+        /[\x00-\x1f<>]/.test(q.body.keyword))
+    )
+      throw Object.assign(
+        new Error("Choose a search phrase of up to 100 characters."),
+        { status: 400 },
+      );
+    return {
+      input: q.body.topic.trim(),
+      keyword: q.body.keyword?.trim() || undefined,
+      geo: validateGeo(q.body.geo ?? ""),
+    };
+  };
+  const prepare = async (
+    owner: string,
+    input: string,
+    keyword: string | undefined,
+    geo: string,
+  ): Promise<PreflightResult> => {
+    const guidance = inspectInput(input);
+    if (guidance) return guidance;
+    const key =
+      "preflight:" +
+      createHash("sha256")
+        .update(
+          JSON.stringify([owner, input, keyword, geo, QUERY_PLAN_VERSION]),
+        )
+        .digest("hex");
+    const cached = engine.store.get<PreflightResult>(key);
+    if (cached) return cached;
+    const running = preparations.get(owner);
+    if (running?.key === key) return running.promise;
+    if (running)
+      throw Object.assign(
+        new Error(
+          "Your research scope is being prepared. Continue when it is ready.",
+        ),
+        { status: 429, retryAfter: 3 },
+      );
+    const budget = engine.store.consumePreparationBudget(owner);
+    if (!budget.allowed)
+      throw Object.assign(
+        new Error("Continue preparing your research at the shown time."),
+        {
+          status: 429,
+          retryAt: budget.retryAt,
+          retryAfter: Math.max(
+            1,
+            Math.ceil((Date.parse(budget.retryAt!) - Date.now()) / 1000),
+          ),
+        },
+      );
+    const id = randomUUID();
+    engine.store.startRun({
+      id,
+      kind: "preflight",
+      userId: owner,
+      input,
+      geo,
+      background: false,
+      created: new Date().toISOString(),
+    });
+    engine.store.updateRun(id, "running");
+    const promise = (async (): Promise<PreflightResult> => {
+      let topic: Topic,
+        fallback = false;
+      try {
+        topic = await operationContext.run({ runId: id, userId: owner }, () =>
+          engine.research.plan(input, keyword, geo),
+        );
+        engine.store.updateRun(id, "complete");
+      } catch (error) {
+        const e = error as Error & {
+          status?: number;
+          guidance?: PreflightResult;
+          choices?: { label: string; query: string }[];
+          clarification?: { en: string; zh: string };
+        };
+        if (e.status === 422) {
+          const result = e.guidance || {
+            status: "clarify" as const,
+            message: e.clarification || inputGuidance.message,
+            choices: e.choices || [],
+          };
+          engine.store.updateRun(id, "complete");
+          engine.store.set(key, result, 600000);
+          return result;
+        }
+        engine.store.updateRun(id, "failed", { error: e.message });
+        // Explicit confirmation keeps a service outage from becoming an input rejection.
+        // Literal phrases are quoted and bounded; they never become query operators.
+        const literal = input
+          .normalize("NFKC")
+          .replace(/[^\p{L}\p{N} .+/#()&-]/gu, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!literal || literal.length > 70) return inputGuidance;
+        const slug =
+          "research-" +
+          createHash("sha256").update(input).digest("hex").slice(0, 16);
+        topic = {
+          slug,
+          scope: "field",
+          name: input,
+          keyword: keyword || literal,
+          query: `"${literal}" in:name,description`,
+          description: input,
+          aliases: [],
+          color: "#79c9ff",
+          plan: {
+            input,
+            model: "literal",
+            version: QUERY_PLAN_VERSION,
+            intent: input,
+            trends: [keyword || literal],
+            githubTopics: [],
+            githubTerms: [literal],
+            explanation: {
+              en: "Start with your original phrase. You can refine the search terms as more context becomes available.",
+              zh: "先使用你输入的原词研究，可结合结果继续调整搜索词。",
+            },
+          },
+        };
+        fallback = true;
+      }
+      const result: ResearchScope = {
+        status: "ready",
+        id,
+        input,
+        keyword,
+        geo,
+        topic,
+        fallback,
+      };
+      engine.store.set("prepared-scope:" + id, { owner, result }, 600000);
+      engine.store.set(key, result, fallback ? 30000 : 600000);
+      return result;
+    })();
+    preparations.set(owner, { key, promise });
+    try {
+      return await promise;
+    } finally {
+      preparations.delete(owner);
+    }
+  };
+  app.post(
+    "/api/preflight",
+    safe(async (q, r) => {
+      const user = auth.protect(q);
+      const { input, keyword, geo } = preparationInput(q);
+      return r.json(await prepare(user.id, input, keyword, geo));
+    }),
+  );
   app.post(
     "/api/scan",
-    safe((q, r) => {
-      if (typeof q.body?.topic !== "string")
-        return r.status(400).json({ error: "A topic is required." });
-      const user = auth.protect(q),
-        input = q.body.topic.trim();
-      if (!input || input.length > 300 || /[\x00-\x1f<>]/.test(input))
-        return r
-          .status(400)
-          .json({ error: "Enter a topic between 1 and 300 characters." });
-      const keyword =
-        typeof q.body.keyword === "string" ? q.body.keyword.trim() : undefined;
-      if (keyword && (keyword.length > 100 || /[\x00-\x1f<>]/.test(keyword)))
-        return r.status(400).json({ error: "Invalid demand keyword." });
-      const topic = engine.research.enabled
-          ? { slug: input, keyword }
-          : resolveTopic(input, keyword),
-        geo = validateGeo(q.body.geo ?? "");
-      const existing =
-        !auth.hosted && !engine.research.enabled
-          ? engine.store.market(topic.slug, geo, topic.keyword)
-          : null;
+    safe(async (q, r) => {
+      const user = auth.protect(q);
+      const { input, keyword, geo } = preparationInput(q);
+      const guidance = inspectInput(input);
+      if (guidance)
+        return r.status(422).json({
+          error: guidance.message.en,
+          guidance,
+          clarification: guidance.message,
+          choices: guidance.choices,
+        });
+      let existing: Market | null = null;
+      if (!auth.hosted && !engine.research.enabled) {
+        try {
+          const resolved = resolveTopic(input, keyword);
+          existing =
+            engine.store.market(resolved.slug, geo, resolved.keyword) || null;
+        } catch {
+          /* Preparation can recover using the original phrase. */
+        }
+      }
       if (
         existing &&
         existing.version === ALGORITHM_VERSION &&
@@ -748,11 +927,72 @@ export function createApp(engine = new Engine()) {
           .status(429)
           .json({ error: "The scan queue is full. Please try again shortly." });
       for (const [id, j] of jobs)
-        if (Date.now() - j.created > 3600000) jobs.delete(id);
+        if (
+          Date.now() - j.created > 3600000 &&
+          ["complete", "failed"].includes(j.state)
+        )
+          jobs.delete(id);
+      let prepared: PreflightResult;
+      if (q.body.preflightId !== undefined) {
+        if (
+          typeof q.body.preflightId !== "string" ||
+          !/^[a-f0-9-]{36}$/.test(q.body.preflightId)
+        )
+          return r
+            .status(400)
+            .json({ error: "Prepare this research scope again to continue." });
+        const savedScope = engine.store.get<{
+          owner: string;
+          result: ResearchScope;
+        }>("prepared-scope:" + q.body.preflightId);
+        if (
+          !savedScope ||
+          savedScope.owner !== user.id ||
+          savedScope.result.input !== input ||
+          savedScope.result.geo !== geo ||
+          savedScope.result.keyword !== keyword
+        )
+          return r
+            .status(409)
+            .json({ error: "Prepare this research scope again to continue." });
+        prepared = savedScope.result;
+      } else prepared = await prepare(user.id, input, keyword, geo);
+      if (prepared.status !== "ready")
+        return r.status(422).json({
+          error: prepared.message.en,
+          guidance: prepared,
+          clarification: prepared.message,
+          choices: prepared.choices,
+        });
+      if (prepared.fallback && !q.body.preflightId)
+        return r.status(409).json({
+          error:
+            "Review the original search phrase and confirm your research scope.",
+          scope: prepared,
+        });
+      // A second request may have finished preparing while this one awaited the model.
+      for (const pending of jobs.values())
+        if (
+          pending.owner === user.id &&
+          pending.input === input &&
+          pending.geo === geo &&
+          pending.keyword === keyword &&
+          ["queued", "running"].includes(pending.state)
+        )
+          return r.status(202).json(pending);
+      if (
+        [...jobs.values()].filter((j) =>
+          ["queued", "running"].includes(j.state),
+        ).length >= 12
+      )
+        return r
+          .status(429)
+          .json({ error: "The scan queue is full. Please try again shortly." });
       const job: Job = {
         id: randomUUID(),
         state: "queued",
         topic: input,
+        preparedTopic: prepared.topic,
         input,
         owner: user.id,
         geo,
@@ -878,7 +1118,7 @@ export function createApp(engine = new Engine()) {
   app.get("/ghtrends.tgz", (_q, r) =>
     r.redirect(
       302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.17.5/ghtrends-radar-0.17.5.tgz",
+      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.18.0/ghtrends-radar-0.18.0.tgz",
     ),
   );
   app.get("/sitemap.xml", (q, r) =>
@@ -1009,7 +1249,13 @@ export function createApp(engine = new Engine()) {
           : status && [401, 403, 404, 422, 429, 503].includes(status)
             ? status
             : 502,
-      ).json({ error: error.message, retryAt: (error as any).retryAt });
+      ).json({
+        error: error.message,
+        retryAt: (error as any).retryAt,
+        guidance: (error as any).guidance,
+        clarification: (error as any).clarification,
+        choices: (error as any).choices,
+      });
     },
   );
   if (!basePath) return app;

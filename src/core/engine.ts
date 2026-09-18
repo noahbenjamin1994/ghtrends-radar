@@ -1,3 +1,4 @@
+import { requireResearchInput } from "./preflight.js";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -9,7 +10,7 @@ import {
   searchSources,
   SEARCH_VERSION,
 } from "../providers/search.js";
-import { marketGapSignals } from "./gaps.js";
+import { marketGapSignals, mergeRequestEvidence } from "./gaps.js";
 import { Research } from "../providers/research.js";
 import { resolveTopic, validateGeo, validateRepo, TOPICS } from "./topics.js";
 import { importDemand } from "./import.js";
@@ -77,17 +78,21 @@ export class Engine {
       ai?: boolean;
       owner?: string;
       private?: boolean;
+      preparedTopic?: Topic;
     } = {},
   ): Promise<Market> {
+    requireResearchInput(input);
     const ai = options.ai !== false && this.research.enabled && !options.demand;
     if (ai) options.onProgress?.({ stage: "interpreting" });
-    const topic = ai
-        ? await this.research.plan(
-            input,
-            options.keyword,
-            validateGeo(options.geo ?? ""),
-          )
-        : resolveTopic(input, options.keyword),
+    const topic =
+        options.preparedTopic ??
+        (ai
+          ? await this.research.plan(
+              input,
+              options.keyword,
+              validateGeo(options.geo ?? ""),
+            )
+          : resolveTopic(input, options.keyword)),
       geo = validateGeo(options.geo ?? "");
     const existing = this.store.market(topic.slug, geo, topic.keyword);
     if (
@@ -205,6 +210,7 @@ export class Engine {
           selectedProjects,
           market.gaps,
         );
+        market.gaps = mergeRequestEvidence(market.gaps, documents);
         const projectNames = [
           ...new Set(
             searchSources(web)

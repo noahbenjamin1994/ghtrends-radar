@@ -1,3 +1,4 @@
+import { resolveTopic } from "../src/core/topics.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
@@ -276,6 +277,7 @@ test("partial project evidence returns its credit while keeping the useful resul
 test("AI research remains available during source cooldown within attempt limits and returns partial-evidence credits", async () =>
   hosted(async ({ engine, get, post }) => {
     (engine.research as any).enabled = true;
+    engine.research.plan = async (input) => resolveTopic(input);
     engine.store.set(
       "trends:cooldown:v1",
       { until: Date.now() + 60000 },

@@ -1,3 +1,4 @@
+import { requireResearchInput, inputGuidance } from "../core/preflight.js";
 import { searchQuerySchema, searchSources } from "./search.js";
 import {
   issueInsightSchema,
@@ -53,7 +54,14 @@ const term = z
   .trim()
   .min(2)
   .max(70)
-  .regex(/^[\p{L}\p{N}][\p{L}\p{N} .+/#()&-]*$/u);
+  .regex(/^[\p{L}\p{N}][\p{L}\p{N} .+/#()%&-]*$/u);
+const entityName = z
+  .string()
+  .trim()
+  .min(1)
+  .max(70)
+  .regex(/^[\p{L}\p{N}_][\p{L}\p{N}_ .+/#()&-]*$/u)
+  .regex(/[\p{L}\p{N}]/u);
 const planSchema = z
   .object({
     slug: z
@@ -63,6 +71,13 @@ const planSchema = z
     name: z.string().min(2).max(80),
     scope: z.enum(["category", "field"]).default("category"),
     intent: z.string().min(1).max(300),
+    entity: z
+      .object({
+        name: entityName,
+        aliases: z.array(entityName).max(2).default([]),
+      })
+      .nullable()
+      .optional(),
     trends: z.array(term).min(1).max(3),
     githubTopics: z
       .array(
@@ -89,7 +104,7 @@ const planSchema = z
     githubTerms: z.array(term).max(2),
     webQueries: z.array(searchQuerySchema).max(3).default([]),
     explanation: bilingual,
-    needsClarification: z.boolean(),
+    needsClarification: z.boolean().default(false),
     ambiguity: bilingual.optional(),
     choices: z
       .array(z.object({ label: z.string().max(100), query: term }))
@@ -114,7 +129,7 @@ const paragraph = z.object({
   nextSteps: z.array(z.string().min(1).max(220)).min(1).max(3),
 });
 const briefSchema = z.object({ en: paragraph, zh: paragraph });
-export const QUERY_PLAN_VERSION = "14";
+export const QUERY_PLAN_VERSION = "16";
 export function parseModelJson(text: string): any {
   try {
     return JSON.parse(text);
@@ -159,6 +174,8 @@ export function modelSources(sources: ResearchSource[]) {
       placement,
       excerpt,
       url,
+      request,
+      fetchedAt,
     }) => ({
       id,
       label,
@@ -167,6 +184,8 @@ export function modelSources(sources: ResearchSource[]) {
       searchIntent,
       placement,
       excerpt,
+      ...(request ? { request } : {}),
+      ...(fetchedAt ? { observedAt: fetchedAt } : {}),
       ...(kind === "search" ? { url } : {}),
       ...(url?.match(/^https:\/\/github\.com\/([^/]+\/[^/#?]+)/)
         ? { project: url.match(/^https:\/\/github\.com\/([^/]+\/[^/#?]+)/)![1] }
@@ -226,7 +245,9 @@ export class Research {
               ? 240000
               : operation.startsWith("strategy")
                 ? 120000
-                : 25000,
+                : operation === "plan"
+                  ? 7500
+                  : 25000,
           ),
         },
       );
@@ -290,45 +311,7 @@ export class Research {
       throw new Error("Enter a topic between 1 and 300 characters.");
     if (keyword && (keyword.length > 100 || /[\x00-\x1f<>]/.test(keyword)))
       throw new Error("Invalid demand keyword.");
-    const meanings: Record<string, { label: string; query: string }[]> = {
-      "harness engineering": [
-        {
-          label: "AI agent harness / AI 智能体运行框架",
-          query: "AI agent harness",
-        },
-        {
-          label: "Software test harness / 软件测试脚手架",
-          query: "software test harness",
-        },
-        {
-          label: "Wiring harness design / 线束设计",
-          query: "wiring harness design",
-        },
-      ],
-      rsi: [
-        {
-          label: "Recursive self-improvement / 递归自改进",
-          query: "recursive self improvement",
-        },
-        {
-          label: "Relative strength index / 相对强弱指数",
-          query: "relative strength index",
-        },
-      ],
-    };
-    const choices = meanings[input.trim().toLowerCase().replaceAll("-", " ")];
-    if (choices)
-      throw Object.assign(
-        new Error("Choose the meaning you want to research."),
-        {
-          status: 422,
-          choices,
-          clarification: {
-            en: "This term has several meanings. Which one are you researching?",
-            zh: "这个词有多个含义，请选择你想研究的方向。",
-          },
-        },
-      );
+    requireResearchInput(input);
     if (!this.enabled) return resolveTopic(input, keyword);
     let known: Topic | undefined;
     try {
@@ -393,16 +376,18 @@ Use affirmative wording for all user-visible prose: measured facts, current stat
 
 Choose exactly one response shape:
 1. Recognized, unambiguous topic:
-{"slug":"lowercase-hyphenated-id","name":"Short English name","scope":"category","intent":"Opportunities to build a product or offer a service around the original input","trends":["primary search phrase"],"githubTopics":[],"githubTopicGroups":[],"githubTerms":[],"explanation":{"en":"Why these queries match","zh":"中文说明"},"needsClarification":false,"choices":[]}
+{"slug":"lowercase-hyphenated-id","name":"Short English name","scope":"category","intent":"Opportunities around the original object","entity":null,"trends":["primary search phrase"],"githubTopics":[],"githubTopicGroups":[],"githubTerms":[],"webQueries":[{"query":"specific buyer search","intent":"competition"},{"query":"specific user problem","intent":"demand"},{"query":"relevant open source","intent":"opensource"}],"explanation":{"en":"Why these queries match","zh":"中文说明"},"needsClarification":false,"choices":[]}
 2. A genuinely ambiguous term with at least two established meanings:
 {"needsClarification":true,"ambiguity":{"en":"Ask which meaning","zh":"询问具体含义"},"choices":[{"label":"Established meaning / 中文含义","query":"specific research phrase"},{"label":"Another established meaning / 中文含义","query":"another specific phrase"}]}
 3. Unrecognizable text, gibberish, or an unknown name without context:
 {"unrecognized":true}
-Do not invent meanings or offer unrelated example categories. Do not assume one meaning while admitting ambiguity in the explanation. Clarification choices must be objects (2-3 total), each with label and query.
+Judge whether a research object is clear, independently of market size or commercial promise. Niche, early, physical-product and unconventional ideas qualify when their object is clear. Preserve numeric brands (360, 1688, 12306), programming names (C++, C#, n8n), and named products. A clear category or task alongside an unfamiliar name supplies context: preserve that wording and investigate its identity. A greeting alongside a product/task still contains a research object. Unknown isolated names may need one context question. Do not invent meanings or offer unrelated example categories. Do not assume one meaning while admitting ambiguity in the explanation. Clarification choices must be objects (2-3 total), each with label and query. Region controls the data sample; it preserves the input's meaning and brand.
 
 For shape 1:
 - scope: category for a concrete software product or tool category; field for broad disciplines, umbrella practices spanning distinct user tasks, and physical-product or offline markets whose alternatives extend beyond software. Examples of field: AI for Science, machine learning, biotechnology, vibe coding, Christmas decorations, coffee shops. A field report analyzes the original field overall and explores diverse customer jobs, including consumer and professional services where relevant. Preserve the original intent and search phrases.
 - trends: 1-3 genuine interchangeable search phrases. An explicit keywordOverride is binding; return ONLY that keyword if provided. For worldwide/non-Chinese regions use the established English category first, even for Chinese input. Expand known acronyms. Do not invent a literal translation if no established term exists.
+- entity: for a named product, brand, framework or library, return {name:"canonical name",aliases:["established alternate spelling"]}; otherwise null. The name is the original named entity, not a parent category. For 小米手机 use entity:{name:"Xiaomi",aliases:["小米"]} and trends:["Xiaomi phones","Xiaomi smartphones"]. For tmux use entity:{name:"tmux",aliases:[]} and trends:["tmux"]. For 123apps use entity:{name:"123apps",aliases:[]} and trends:["123apps"]. Retain that entity in every GitHub query and every Trends phrase, including ecosystem searches. Keep subbrands, neighboring products and wider categories for separately scoped report directions.
+- Trends synonyms describe the SAME object at the SAME breadth. Pricing, alternatives, reviews, plugins, tutorials, projects and specific use cases belong to webQueries; include them in Trends only when the user explicitly requested that intent. A single precise term is preferred over speculative synonyms. For product names, the established product name is the primary query; expanding it into its market changes the object.
 - Keep the user's modifiers and specificity in EVERY query. Related categories are not synonyms. One precise term is enough. "vibe coding" differs from "AI coding assistant"; "agent skills" differs from "agent capabilities"; AI agent harnesses differ from software test harnesses. Do not remove "AI" or "self hosted" from a specialized category.
 - Preserve the user's product intent. Use the shortest familiar category phrases. Platform and implementation labels require an explicit user requirement. "translator" leaves the platform and implementation open. For "小猫语言翻译器", use trends:["cat translator","meow translator"], githubTopics:["cat-translator","meow-translator"], githubTopicGroups:[], githubTerms:["cat translator","meow translator"]. The same principle applies to other translation products. Animal sound classification is a separate research field.
 - githubTopics: at most 3 lowercase hyphenated GitHub labels, each querying the intended category by itself. Never add a generic parent topic just to increase results.
@@ -419,12 +404,12 @@ Never infer popularity, growth or measurements. Never broaden scope in order to 
       },
     );
     if (raw?.unrecognized === true)
-      throw Object.assign(
-        new Error(
-          "Could not identify a research topic. Try a specific tool category or describe the problem.",
-        ),
-        { status: 422 },
-      );
+      throw Object.assign(new Error(inputGuidance.message.en), {
+        status: 422,
+        guidance: inputGuidance,
+        clarification: inputGuidance.message,
+        choices: [],
+      });
     if (raw?.needsClarification === true) {
       const clarified = z
         .object({
@@ -457,6 +442,17 @@ Never infer popularity, growth or measurements. Never broaden scope in order to 
       );
     }
     const bounded = { ...raw };
+    if (bounded.entity && Array.isArray(bounded.entity.aliases))
+      bounded.entity = {
+        ...bounded.entity,
+        aliases: bounded.entity.aliases.slice(0, 2),
+      };
+    // Optional clarification fields are irrelevant to an otherwise complete,
+    // unambiguous plan; models sometimes emit null for these empty fields.
+    if (bounded.needsClarification !== true) {
+      delete bounded.ambiguity;
+      bounded.choices = [];
+    }
     for (const [field, max] of Object.entries({
       trends: 3,
       githubTopics: 3,
@@ -468,8 +464,16 @@ Never infer popularity, growth or measurements. Never broaden scope in order to 
     }
     const checked = planSchema.safeParse(bounded);
     if (!checked.success)
-      throw new Error(
-        "The AI query plan could not be validated. Please refine the input.",
+      throw Object.assign(
+        new Error(
+          "The AI query plan could not be validated. Please refine the input.",
+        ),
+        {
+          fields: checked.error.issues.map((i) => ({
+            path: i.path.join("."),
+            code: i.code,
+          })),
+        },
       );
     const p = checked.data;
     if (p.needsClarification)
@@ -477,12 +481,52 @@ Never infer popularity, growth or measurements. Never broaden scope in order to 
         new Error("Choose the meaning you want to research."),
         { status: 422, choices: p.choices, clarification: p.ambiguity },
       );
-    const primary = keyword?.trim() || p.trends[0]!;
+    const compact = (value: string) =>
+      value
+        .normalize("NFKC")
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]/gu, "");
+    const anchors = p.entity
+      ? [p.entity.name, ...p.entity.aliases].map(compact)
+      : [];
+    const sameEntity = (value: string) =>
+      !anchors.length ||
+      anchors.some((anchor) =>
+        anchor.length <= 3 && /^[a-z0-9]+$/.test(anchor)
+          ? value
+              .toLowerCase()
+              .split(/[^\p{L}\p{N}]+/u)
+              .includes(anchor)
+          : compact(value).includes(anchor),
+      );
+    // Search intent is useful for evidence discovery, while Trends compares the
+    // original object. Preserve intent qualifiers explicitly supplied by users.
+    const intentTerms =
+      /\b(?:alternatives?|pricing|reviews?|plugins?|extensions?|tutorials?|projects?|kits?|ecosystem|providers?)\b|替代|价格|评测|教程|插件/giu;
+    const inputIntents = new Set(
+      (input.match(intentTerms) || []).map((v) =>
+        v.toLowerCase().replace(/s$/, ""),
+      ),
+    );
+    const sameIntent = (value: string) =>
+      (value.match(intentTerms) || []).every((v) =>
+        inputIntents.has(v.toLowerCase().replace(/s$/, "")),
+      );
+    const validTrends = p.trends.filter(
+      (value) => sameEntity(value) && sameIntent(value),
+    );
+    // A failed entity match asks the caller to recover with the original phrase;
+    // never silently turn a named product into its parent market.
+    if (!keyword && validTrends.length === 0)
+      throw new Error(
+        "Review the original search phrase and confirm your research scope.",
+      );
+    const primary = keyword?.trim() || validTrends[0]!;
     const trends = keyword
       ? [primary]
       : [
           primary,
-          ...p.trends.filter(
+          ...validTrends.filter(
             (term) => term.toLowerCase() !== primary.toLowerCase(),
           ),
         ]
@@ -493,11 +537,17 @@ Never infer popularity, growth or measurements. Never broaden scope in order to 
               ) === index,
           )
           .slice(0, 3);
-    const topics = [...new Set(p.githubTopics)],
-      terms = [...new Set(p.githubTerms)];
+    const topics = [...new Set(p.githubTopics)].filter(sameEntity),
+      terms = [...new Set(p.githubTerms)].filter(sameEntity),
+      groups = p.githubTopicGroups.filter((group) => group.some(sameEntity));
+    if (topics.length + terms.length + groups.length === 0) {
+      // Prefer a literal query about the user-confirmed entity over a generic
+      // GitHub topic. The caller's Trends override stays independent of supply.
+      terms.push(validTrends[0] || p.entity!.name);
+    }
     const queries = [
-      ...(p.githubTopicGroups.length
-        ? p.githubTopicGroups.map((group) =>
+      ...(groups.length
+        ? groups.map((group) =>
             [...new Set(group)].map((t) => `topic:${t}`).join(" "),
           )
         : topics.map((t) => `topic:${t}`)
@@ -509,9 +559,10 @@ Never infer popularity, growth or measurements. Never broaden scope in order to 
       model: this.model,
       version: QUERY_PLAN_VERSION,
       intent: p.intent,
+      ...(p.entity ? { entity: p.entity } : {}),
       trends,
-      githubTopicGroups: p.githubTopicGroups,
-      githubTopics: p.githubTopicGroups.length ? [] : topics,
+      githubTopicGroups: groups,
+      githubTopics: groups.length ? [] : topics,
       githubTerms: terms,
       webQueries: p.webQueries,
       explanation: {

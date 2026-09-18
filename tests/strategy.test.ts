@@ -398,7 +398,7 @@ test("document enrichment is bounded, keeps useful partial results and uses veri
     assert.equal(sources.length, 2);
     assert.ok(sources.every((d) => d.url.startsWith("https://github.com/")));
     assert.ok(!sources[0]!.excerpt!.includes("hidden()"));
-    assert.equal(paths.length, 4);
+    assert.equal(paths.length, 7);
   }));
 
 test("existing implementations reach the critic; corrective editing preserves the improved idea", async () =>
@@ -736,7 +736,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "4");
+    assert.equal(brief.strategyVersion, "5");
     const legacy = {
       ...brief,
       strategyVersion: "2",

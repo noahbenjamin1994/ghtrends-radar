@@ -14,6 +14,9 @@ import {
   marketGapSignals,
   reportIssueSignals,
   selectGapSignals,
+  issueReading,
+  requestStatus,
+  requestAction,
 } from "../core/gaps.js";
 import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
 import { marketAssessment, competitionPressure } from "../core/assessment.js";
@@ -194,12 +197,17 @@ export function renderDocument(
         m,
       )
         .map((g) => {
-          const p = m.brief?.issueInsights?.find(
-            (i) =>
-              i.relevance === "direct" &&
-              m.brief?.sources.find((s) => s.id === i.sourceId)?.url === g.url,
-          )?.[locale];
-          return `<article><h3>${link(g.url, p?.title || g.title)}</h3>${p ? list([p.audience, p.need, p.opportunity, p.check]) : `<p>${escapeHtml(g.excerpt)}</p>`}<p>${escapeHtml(g.repo)}${g.createdAt ? ` · ${escapeHtml(g.createdAt.slice(0, 10))}` : ""}</p></article>`;
+          const reading = issueReading(m.brief, g.url),
+            p = reading?.[locale];
+          const dates = [
+            [locale === "zh" ? "发布" : "Posted", g.createdAt],
+            [locale === "zh" ? "更新" : "Updated", g.updatedAt],
+            [locale === "zh" ? "采集" : "Collected", g.observedAt],
+          ]
+            .filter(([, value]) => value)
+            .map(([label, value]) => `${label}: ${value!.slice(0, 10)}`)
+            .join(" · ");
+          return `<article><h3>${link(g.url, p?.title || g.title)}</h3><p>${escapeHtml(requestStatus(g, locale))}</p>${p ? list([p.audience, p.need, p.currentSolution, p.desiredOutcome, requestAction(g, p.opportunity, locale), p.check].filter((x): x is string => !!x)) + `<blockquote>${escapeHtml(reading!.evidence.quote)}</blockquote>` : `<p>${escapeHtml(g.excerpt)}</p>`}<p>${escapeHtml(g.repo)} · ${escapeHtml(dates)}</p></article>`;
         })
         .join("")}</section>
       ${m.web?.queries.length ? `<section><h2>${locale === "zh" ? "网页搜索证据" : "Web search evidence"}</h2><p>${escapeHtml(m.web.region)} · ${escapeHtml(m.web.language)} · ${escapeHtml(m.web.fetchedAt.slice(0, 10))}</p><p>${escapeHtml(searchCollectionMessage(m.web, locale))}</p><p>${escapeHtml(adCollectionMessage(m.web, locale))}</p>${m.web.queries.map((q) => `<h3>${escapeHtml(q.query)}</h3><p>${q.state === "ready" ? escapeHtml(searchEngineLabel(q) + " · " + (q.fetchedAt || m.web!.fetchedAt) + " · " + (q.region || m.web!.region)) : locale === "zh" ? "采集已暂停 · 可更新研究后重试" : "Collection stopped · update research to retry"}</p>${q.results.map((r) => `<p>${r.kind === "ad" ? (locale === "zh" ? "广告" : "Ad") : locale === "zh" ? "自然结果" : "Organic"} · ${link(r.url, r.title)}${r.kind === "ad" ? ` · ${escapeHtml(new URL(r.url).hostname)}` : ""}</p><p>${escapeHtml(r.excerpt)}</p>`).join("")}`).join("")}</section>` : ""}

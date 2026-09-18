@@ -4,7 +4,12 @@ import {
   searchEngineLabel,
 } from "./evidence.js";
 import { landscapeRows, researchLandscape } from "./landscape.js";
-import { reportIssueSignals } from "./gaps.js";
+import {
+  reportIssueSignals,
+  issueReading,
+  requestStatus,
+  requestAction,
+} from "./gaps.js";
 import {
   visibleOpportunities,
   opportunityRows,
@@ -223,23 +228,30 @@ export function marketMarkdown(
           "",
         ]
       : []),
-    `## ${t("Open demand signals")}`,
+    `## ${locale === "zh" ? "用户的问题与进展" : "User requests and progress"}`,
     "",
     ...reportIssueSignals(m).flatMap((g) => {
-      const insight = m.brief?.issueInsights?.find(
-        (i) =>
-          i.relevance === "direct" &&
-          m.brief?.sources.find((s) => s.id === i.sourceId)?.url === g.url,
-      )?.[locale];
+      const reading = issueReading(m.brief, g.url),
+        insight = reading?.[locale];
       return [
-        `- [${cell(insight?.title || g.title)}](${g.url}) (${[g.reactions == null ? undefined : `↑ ${g.reactions}`, g.state, g.repo, g.createdAt?.slice(0, 10)].filter(Boolean).join("; ")})`,
+        `- [${cell(insight?.title || g.title)}](${g.url}) (${[g.reactions == null ? undefined : `↑ ${g.reactions}`, requestStatus(g, locale), g.repo].filter(Boolean).join("; ")})`,
+        ...[
+          [locale === "zh" ? "发布" : "Posted", g.createdAt],
+          [locale === "zh" ? "更新" : "Updated", g.updatedAt],
+          [locale === "zh" ? "采集" : "Collected", g.observedAt],
+        ]
+          .filter(([, value]) => value)
+          .map(([label, value]) => `${label}: ${value!.slice(0, 10)}`),
         ...(insight
           ? [
               "",
               insight.audience,
               insight.need,
-              insight.opportunity,
+              ...(insight.currentSolution ? [insight.currentSolution] : []),
+              ...(insight.desiredOutcome ? [insight.desiredOutcome] : []),
+              requestAction(g, insight.opportunity, locale),
               insight.check,
+              `> ${reading!.evidence.quote.replace(/\n/g, "\n> ")}`,
               "",
             ]
           : []),

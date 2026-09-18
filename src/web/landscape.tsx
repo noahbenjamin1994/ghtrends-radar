@@ -8,21 +8,26 @@ import {
 import { ArrowUpRight } from "lucide-react";
 import { landscapeLabel, researchLandscape } from "../core/landscape.js";
 import type { Brief, Gap, Market } from "../core/types.js";
+import {
+  issueReading,
+  requestStatus,
+  requestAction,
+  type RequestSignal,
+} from "../core/gaps.js";
 
 export function IssueReading({
   gap,
   brief,
   locale,
 }: {
-  gap: Pick<Gap, "url" | "title" | "excerpt">;
+  gap: Pick<Gap, "url" | "title" | "excerpt"> & {
+    state?: string;
+    stateReason?: string;
+  };
   brief?: Brief;
   locale: "en" | "zh";
 }) {
-  const insight = brief?.issueInsights?.find(
-    (i) =>
-      i.relevance === "direct" &&
-      brief.sources.find((s) => s.id === i.sourceId)?.url === gap.url,
-  );
+  const insight = issueReading(brief, gap.url);
   if (!insight) return <p>{gap.excerpt}</p>;
   const p = insight[locale],
     zh = locale === "zh";
@@ -33,19 +38,135 @@ export function IssueReading({
       </span>
       {[
         [zh ? "谁的需求" : "Who and why", `${p.audience} ${p.need}`],
-        [zh ? "可探索的开源贡献" : "Contribution to explore", p.opportunity],
-        [zh ? "下一步核对" : "Check next", p.check],
+        [
+          gap.state === "closed"
+            ? zh
+              ? "核对已有进展"
+              : "Review the progress"
+            : zh
+              ? "可探索的开源贡献"
+              : "Contribution to explore",
+          requestAction(gap, p.opportunity, locale),
+        ],
       ].map(([label, value]) => (
         <p key={label}>
           <strong>{label}</strong>
           {value}
         </p>
       ))}
-      <small>
-        {zh ? "原始标题：" : "Original title: "}
-        {gap.title}
-      </small>
+      <details className="request-quote">
+        <summary>
+          {zh
+            ? "看当前做法、验证办法与原话"
+            : "Workaround, checks & original request"}
+        </summary>
+        <div className="request-details">
+          {[
+            ...(p.currentSolution
+              ? [
+                  [
+                    zh ? "现在怎么解决" : "Current workaround",
+                    p.currentSolution,
+                  ],
+                ]
+              : []),
+            ...(p.desiredOutcome
+              ? [[zh ? "希望得到什么" : "Desired outcome", p.desiredOutcome]]
+              : []),
+            [zh ? "下一步核对" : "Check next", p.check],
+          ].map(([label, value]) => (
+            <p key={label}>
+              <strong>{label}</strong>
+              {value}
+            </p>
+          ))}
+        </div>
+        <blockquote>{insight.evidence.quote}</blockquote>
+        <small>
+          {zh ? "原始标题：" : "Original title: "}
+          {gap.title}
+        </small>
+      </details>
     </div>
+  );
+}
+
+export function RequestCard({
+  gap: g,
+  brief,
+  locale,
+}: {
+  gap: RequestSignal;
+  brief?: Brief;
+  locale: "en" | "zh";
+}) {
+  const insight = issueReading(brief, g.url),
+    zh = locale === "zh";
+  const labels = {
+    "feature-request": ["Feature request", "功能请求"],
+    friction: ["Usage problem", "使用问题"],
+    selection: ["Choosing a solution", "选型求助"],
+    migration: ["Switching solutions", "迁移意向"],
+    alternative: ["Alternative sought", "寻找替代方案"],
+    promotion: ["Publisher introduction", "作者介绍"],
+  };
+  const label = labels[insight?.kind || g.label];
+  const release = brief?.sources.find(
+    (s) =>
+      s.kind === "project" &&
+      s.url
+        .toLowerCase()
+        .startsWith(`https://github.com/${g.repo.toLowerCase()}/releases/tag/`),
+  );
+  return (
+    <article className="gap-card request-card">
+      <div className="gap-card-meta">
+        <span className="gap-label">{label[zh ? 1 : 0]}</span>
+        {g.reactions != null && (
+          <span>
+            {zh ? "互动" : "Reactions"} {g.reactions}
+          </span>
+        )}
+      </div>
+      <h4>
+        <a href={g.url} target="_blank" rel="noreferrer">
+          {insight?.[locale].title || g.title}
+          <ArrowUpRight size={15} />
+        </a>
+      </h4>
+      <span
+        className={`request-state ${g.state === "closed" ? "request-closed" : ""}`}
+      >
+        {requestStatus(g, locale)}
+      </span>
+      <IssueReading gap={g} brief={brief} locale={locale} />
+      {release && (
+        <a
+          className="request-release"
+          href={release.url}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {zh ? "核对最近发布" : "Check the latest release"} · {release.label}
+        </a>
+      )}
+      <footer className="request-meta">
+        <span>{g.repo}</span>
+        <div>
+          {[
+            [zh ? "发布" : "Posted", g.createdAt],
+            [zh ? "更新" : "Updated", g.updatedAt],
+            [zh ? "采集" : "Collected", g.observedAt],
+          ]
+            .filter(([, value]) => value && Number.isFinite(Date.parse(value)))
+            .map(([label, value]) => (
+              <span key={label}>
+                {label} {value!.slice(0, 10)}
+              </span>
+            ))}
+        </div>
+      </footer>
+    </article>
   );
 }
 export function LandscapePanel({

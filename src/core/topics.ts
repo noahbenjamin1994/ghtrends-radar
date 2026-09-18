@@ -85,6 +85,30 @@ export const TOPICS: Topic[] = [
 // These names resolve user input; they do not expand the curated daily dashboard.
 const KNOWN_TOPICS: Topic[] = [
   ...TOPICS,
+  // Established identifiers can resemble placeholders. Preserve their exact scope.
+  // Sources: https://vvvv.org/ and MDN's Object.prototype.__proto__ reference.
+  {
+    slug: "vvvv",
+    name: "vvvv visual programming",
+    keyword: "vvvv visual programming",
+    query: "topic:vvvv",
+    queries: ["topic:vvvv", '"vvvv" in:name,description'],
+    description:
+      "Tools and workflows around the vvvv visual programming environment.",
+    color: "#79c9ff",
+    aliases: ["vvvv", "vvvv visual programming"],
+  },
+  {
+    slug: "javascript-proto",
+    name: "JavaScript __proto__",
+    scope: "field",
+    keyword: "JavaScript __proto__",
+    query: '"__proto__" in:name,description',
+    description:
+      "JavaScript prototype behavior, education and tooling around __proto__.",
+    color: "#79c9ff",
+    aliases: ["__proto__", "javascript __proto__"],
+  },
   {
     slug: "vibe-coding",
     name: "Vibe coding",
@@ -146,7 +170,9 @@ export function resolveTopic(input: string, keyword?: string): Topic {
   )
     throw new Error("Invalid demand keyword.");
   const original = input.trim().toLowerCase();
-  const value = CHINESE_TOPICS[original] || original;
+  const value = Object.hasOwn(CHINESE_TOPICS, original)
+    ? CHINESE_TOPICS[original]!
+    : original;
   if (!value || value.length > 80 || /[\x00-\x1f<>]/.test(value))
     throw new Error("Enter a topic between 1 and 80 characters.");
   const found = KNOWN_TOPICS.find(

@@ -1,0 +1,402 @@
+[
+  {
+    "input": "360",
+    "expected": "ready"
+  },
+  {
+    "input": "1688",
+    "expected": "ready"
+  },
+  {
+    "input": "12306",
+    "expected": "ready"
+  },
+  {
+    "input": "42 school",
+    "expected": "ready"
+  },
+  {
+    "input": "C++",
+    "expected": "ready"
+  },
+  {
+    "input": "C#",
+    "expected": "ready"
+  },
+  {
+    "input": "n8n",
+    "expected": "ready"
+  },
+  {
+    "input": "vvvv",
+    "expected": "ready"
+  },
+  {
+    "input": "3D printing",
+    "expected": "ready"
+  },
+  {
+    "input": "4K monitor",
+    "expected": "ready"
+  },
+  {
+    "input": "hello world tutorial",
+    "expected": "ready"
+  },
+  {
+    "input": "Hi insurance",
+    "expected": "ready"
+  },
+  {
+    "input": "你好世界编程",
+    "expected": "ready"
+  },
+  {
+    "input": "AI4S",
+    "expected": "ready"
+  },
+  {
+    "input": "mcp-server",
+    "expected": "ready"
+  },
+  {
+    "input": "coding agents",
+    "expected": "ready"
+  },
+  {
+    "input": "agent memory",
+    "expected": "ready"
+  },
+  {
+    "input": "local llm",
+    "expected": "ready"
+  },
+  {
+    "input": "vector database",
+    "expected": "ready"
+  },
+  {
+    "input": "voice agents",
+    "expected": "ready"
+  },
+  {
+    "input": "RAG",
+    "expected": "ready"
+  },
+  {
+    "input": "vibe coding",
+    "expected": "ready"
+  },
+  {
+    "input": "agent skills",
+    "expected": "ready"
+  },
+  {
+    "input": "self hosted password manager",
+    "expected": "ready"
+  },
+  {
+    "input": "cat translator",
+    "expected": "ready"
+  },
+  {
+    "input": "小猫语言翻译器",
+    "expected": "ready"
+  },
+  {
+    "input": "小米手机",
+    "expected": "ready"
+  },
+  {
+    "input": "无人机",
+    "expected": "ready"
+  },
+  {
+    "input": "无代码建站",
+    "expected": "ready"
+  },
+  {
+    "input": "不锈钢水杯",
+    "expected": "ready"
+  },
+  {
+    "input": "小店库存管理",
+    "expected": "ready"
+  },
+  {
+    "input": "摄影师交付照片",
+    "expected": "ready"
+  },
+  {
+    "input": "宠物纪念服务",
+    "expected": "ready"
+  },
+  {
+    "input": "农村养老服务",
+    "expected": "ready"
+  },
+  {
+    "input": "大学生二手课本",
+    "expected": "ready"
+  },
+  {
+    "input": "维修店配件查询",
+    "expected": "ready"
+  },
+  {
+    "input": "装修工地排期",
+    "expected": "ready"
+  },
+  {
+    "input": "程序员眼疲劳",
+    "expected": "ready"
+  },
+  {
+    "input": "苹果手机",
+    "expected": "ready"
+  },
+  {
+    "input": "Apple fruit juice",
+    "expected": "ready"
+  },
+  {
+    "input": "Apple developer tools",
+    "expected": "ready"
+  },
+  {
+    "input": "RSI stock indicator",
+    "expected": "ready"
+  },
+  {
+    "input": "recursive self improvement",
+    "expected": "ready"
+  },
+  {
+    "input": "repetitive strain injury",
+    "expected": "ready"
+  },
+  {
+    "input": "AI agent harness",
+    "expected": "ready"
+  },
+  {
+    "input": "software test harness",
+    "expected": "ready"
+  },
+  {
+    "input": "wiring harness design",
+    "expected": "ready"
+  },
+  {
+    "input": "Java",
+    "expected": "ready"
+  },
+  {
+    "input": "Rust",
+    "expected": "ready"
+  },
+  {
+    "input": "Go programming",
+    "expected": "ready"
+  },
+  {
+    "input": "R programming",
+    "expected": "ready"
+  },
+  {
+    "input": "B2B CRM",
+    "expected": "ready"
+  },
+  {
+    "input": "AI for Science",
+    "expected": "ready"
+  },
+  {
+    "input": "protein design",
+    "expected": "ready"
+  },
+  {
+    "input": "AI protein design",
+    "expected": "ready"
+  },
+  {
+    "input": "cold email software",
+    "expected": "ready"
+  },
+  {
+    "input": "open source forms",
+    "expected": "ready"
+  },
+  {
+    "input": "离线语音笔记",
+    "expected": "ready"
+  },
+  {
+    "input": "self-hosted analytics",
+    "expected": "ready"
+  },
+  {
+    "input": "Markdown editor",
+    "expected": "ready"
+  },
+  {
+    "input": "e-ink calendar",
+    "expected": "ready"
+  },
+  {
+    "input": "USB-C hubs",
+    "expected": "ready"
+  },
+  {
+    "input": "Android backup",
+    "expected": "ready"
+  },
+  {
+    "input": "Minecraft mods",
+    "expected": "ready"
+  },
+  {
+    "input": "ADHD planning tools",
+    "expected": "ready"
+  },
+  {
+    "input": "plant disease camera",
+    "expected": "ready"
+  },
+  {
+    "input": "coffee shops",
+    "expected": "ready"
+  },
+  {
+    "input": "Christmas decorations",
+    "expected": "ready"
+  },
+  {
+    "input": "Notion alternative",
+    "expected": "ready"
+  },
+  {
+    "input": "SQLite",
+    "expected": "ready"
+  },
+  {
+    "input": "PostgreSQL",
+    "expected": "ready"
+  },
+  {
+    "input": "local first budgeting",
+    "expected": "ready"
+  },
+  {
+    "input": "AI-powered translation",
+    "expected": "ready"
+  },
+  {
+    "input": "手机维修报价",
+    "expected": "ready"
+  },
+  {
+    "input": "教老人用智能手机",
+    "expected": "ready"
+  },
+  {
+    "input": "cursor alternatives",
+    "expected": "ready"
+  },
+  {
+    "input": "constructor",
+    "expected": "ready"
+  },
+  {
+    "input": "toString",
+    "expected": "ready"
+  },
+  {
+    "input": "__proto__",
+    "expected": "ready"
+  },
+  {
+    "input": "  小米手机  ",
+    "expected": "ready"
+  },
+  {
+    "input": "你好",
+    "expected": "guide"
+  },
+  {
+    "input": "您好",
+    "expected": "guide"
+  },
+  {
+    "input": "你好！",
+    "expected": "guide"
+  },
+  {
+    "input": "hello",
+    "expected": "guide"
+  },
+  {
+    "input": "HELLO!",
+    "expected": "guide"
+  },
+  {
+    "input": "hi",
+    "expected": "guide"
+  },
+  {
+    "input": "hey",
+    "expected": "guide"
+  },
+  {
+    "input": "嗨",
+    "expected": "guide"
+  },
+  {
+    "input": "在吗",
+    "expected": "guide"
+  },
+  {
+    "input": "good morning",
+    "expected": "guide"
+  },
+  {
+    "input": "123",
+    "expected": "guide"
+  },
+  {
+    "input": "１２３",
+    "expected": "guide"
+  },
+  {
+    "input": "123456",
+    "expected": "guide"
+  },
+  {
+    "input": "asdf",
+    "expected": "guide"
+  },
+  {
+    "input": "qwerty",
+    "expected": "guide"
+  },
+  {
+    "input": "测试一下",
+    "expected": "guide"
+  },
+  {
+    "input": "........",
+    "expected": "guide"
+  },
+  {
+    "input": "Apple",
+    "expected": "clarify"
+  },
+  {
+    "input": "RSI",
+    "expected": "clarify"
+  },
+  {
+    "input": "harness engineering",
+    "expected": "clarify"
+  }
+]

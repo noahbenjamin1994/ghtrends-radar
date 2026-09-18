@@ -97,6 +97,7 @@ interface AdminData {
     warnings: string | null;
     estimated_usd: number | null;
     background: number;
+    kind?: "scan" | "preflight";
   }[];
   users: {
     id: string;
@@ -853,6 +854,10 @@ export function AdminView({ account }: { account: Account | null }) {
                       : r.user_name ||
                         r.user_id ||
                         l("Local workspace", "本地工作区")}{" "}
+                    ·{" "}
+                    {r.kind === "preflight"
+                      ? l("Scope preparation", "输入预检")
+                      : l("Research", "研究")}{" "}
                     · {date(r.created)}
                     {r.started && r.finished
                       ? ` · ${((Date.parse(r.finished) - Date.parse(r.started)) / 1000).toFixed(1)}s`
