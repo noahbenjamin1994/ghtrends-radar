@@ -7,7 +7,7 @@ import type { ResearchSource } from "./types.js";
 import type { WebEvidence, SearchQuery } from "../providers/search.js";
 import type { DocumentRead } from "../providers/documents.js";
 
-export const DEEP_VERSION = "2";
+export const DEEP_VERSION = "3";
 export const deepQuestions = {
   competitors: [
     "Where is the opening among existing products?",
@@ -72,7 +72,7 @@ export const deepBriefSchema = z
           })
           .strip(),
       )
-      .min(4)
+      .min(2)
       .max(6),
     plan: z
       .object({
@@ -95,6 +95,63 @@ export const deepBriefSchema = z
   })
   .strip();
 export type DeepBrief = z.infer<typeof deepBriefSchema>;
+
+/** Small, fixed edit targets keep bilingual claims and evidence together. */
+export function deepEditableFields(
+  raw: unknown,
+): { path: string; value: unknown }[] {
+  const parsed = deepBriefSchema.safeParse(raw);
+  if (!parsed.success) return [];
+  const value = parsed.data;
+  return [
+    { path: "headline", value: value.headline },
+    { path: "answer", value: value.answer },
+    ...value.findings.flatMap((finding, i) =>
+      (
+        ["subject", "statement", "implication", "basis", "evidence"] as const
+      ).map((key) => ({ path: `findings.${i}.${key}`, value: finding[key] })),
+    ),
+    ...Object.entries(value.plan).map(([key, item]) => ({
+      path: `plan.${key}`,
+      value: item,
+    })),
+    { path: "checks", value: value.checks },
+  ];
+}
+
+export function applyDeepEdits(
+  raw: unknown,
+  response: unknown,
+  requested: string[],
+): unknown {
+  const patches = z
+    .object({
+      edits: z
+        .array(
+          z.object({ path: z.string().max(100), value: z.unknown() }).strip(),
+        )
+        .max(32),
+    })
+    .safeParse(response);
+  if (!patches.success) return raw;
+  const allowed = new Set(
+    deepEditableFields(raw)
+      .map((f) => f.path)
+      .filter((path) => requested.includes(path)),
+  );
+  const result = structuredClone(raw) as Record<string, any>,
+    seen = new Set<string>();
+  for (const edit of patches.data.edits) {
+    if (!allowed.has(edit.path) || seen.has(edit.path)) continue;
+    seen.add(edit.path);
+    const keys = edit.path.split("."),
+      leaf = keys.pop()!;
+    const target = keys.reduce((node: any, key) => node?.[key], result);
+    if (target && Object.hasOwn(target, leaf)) target[leaf] = edit.value;
+  }
+  return result;
+}
+
 export function deepEffortText(
   effort: DeepBrief["plan"]["effort"],
   lang: "en" | "zh",
@@ -136,6 +193,7 @@ export function normalizeDeepBrief(
           ? node
               .replace(/不可变的?/g, "写入后保持原样的")
               .replace(/模型无关/g, "模型可替换")
+              .replace(/无锁(?:手机|机)/g, "SIM unlocked 机型")
           : node;
       prose = prose
         .replace(/[（(](E\d+)[）)]/g, (whole, id) =>
@@ -269,9 +327,6 @@ export function deepProblems(
         `${path}: express estimated effort as one total person-hour range, with an explicit scope assumption. Keep the answer focused on the selected question; detailed estimates belong in plan.effort.`,
       );
   }
-  for (const area of Object.keys(deepAreaLabels))
-    if (!result.findings.some((f) => f.area === area))
-      problems.push(`Include the ${area} finding; label hypotheses inferred.`);
   for (const [i, f] of result.findings.entries()) {
     if (f.basis === "observed" && !f.evidence.length)
       problems.push(

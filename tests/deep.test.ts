@@ -15,6 +15,8 @@ import {
   deepDeliveryReady,
   deepMarkdown,
   deepEffortText,
+  deepEditableFields,
+  applyDeepEdits,
   type DeepTask,
   type DeepBrief,
 } from "../src/core/deep.js";
@@ -268,6 +270,13 @@ test("delivery requires exact source support, original material and question-spe
   assert.equal(deepDeliveryReady(b, evidence, "scope"), true);
   assert.equal(deepDeliveryReady(b, evidence, "audience"), true);
   assert.equal(deepDeliveryReady(b, evidence, "opensource"), false);
+  const focusedAudience = { ...b, findings: b.findings.slice(0, 2) };
+  assert.deepEqual(deepProblems(focusedAudience, evidence.sources), []);
+  assert.equal(deepDeliveryReady(focusedAudience, evidence, "audience"), true);
+  assert.equal(
+    deepDeliveryReady(focusedAudience, evidence, "opensource"),
+    false,
+  );
   const proposedScope = structuredClone(b);
   proposedScope.findings[3]!.evidence = [{ id: "E3", quote: source.excerpt! }];
   const snippetEvidence = {
@@ -362,6 +371,41 @@ test("daily attempts count their execution day and admitted tasks can recover wh
   }
 });
 
+test("targeted research edits preserve unrequested facts, quotes and bilingual boundaries", () => {
+  const original = brief(),
+    replacement = copy(
+      "Test the actual editor workflow.",
+      "测试编辑的实际工作流程。",
+    );
+  const changed = applyDeepEdits(
+    original,
+    {
+      edits: [
+        { path: "answer", value: replacement },
+        {
+          path: "answer",
+          value: copy("A duplicate replacement.", "另一份重复的替换。"),
+        },
+        { path: "findings.0.evidence", value: [] },
+        { path: "plan.effort.hoursMin", value: 999 },
+        { path: "__proto__.polluted", value: true },
+      ],
+    },
+    ["answer", "plan.effort.hoursMin", "__proto__.polluted"],
+  );
+  assert.deepEqual(changed, { ...original, answer: replacement });
+  assert.deepEqual(original, brief());
+  assert.equal(Object.hasOwn(Object.prototype, "polluted"), false);
+  assert.equal(
+    deepEditableFields(original).some((f) => f.path.endsWith(".en")),
+    false,
+  );
+  assert.deepEqual(
+    applyDeepEdits(original, { answer: replacement }, ["answer"]),
+    original,
+  );
+});
+
 test("source checkpoints support bounded recovery with direct writing and light semantic review", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-provider-")),
     env = { ...process.env };
@@ -385,13 +429,42 @@ test("source checkpoints support bounded recovery with direct writing and light 
     reads++;
     throw new Error("a model retry should reuse evidence");
   };
+  const experiment = copy(
+    "Try three edited paragraphs with their editor.",
+    "请编辑试用三个修改过的段落。",
+  );
   e.research.json = async (_system, _input, _tokens, operation, thinking) => {
     assert.equal(
       thinking,
       operation === "strategy-deep-review" ? "low" : false,
     );
     calls++;
-    if (operation === "strategy-deep-review")
+    if (operation === "strategy-deep-repair") {
+      assert.deepEqual(
+        (_input as any).requestedFields.map((f: any) => f.path),
+        ["plan.experiment"],
+      );
+      return {
+        edits: [
+          { path: "plan.experiment", value: experiment },
+          {
+            path: "answer",
+            value: copy("Unexpected factual drift.", "模型擅自更改了结论。"),
+          },
+        ],
+      };
+    }
+    if (operation === "strategy-deep-review") {
+      if (calls > 2) {
+        assert.deepEqual((_input as any).changedFields, [
+          {
+            path: "plan.experiment",
+            before: brief().plan.experiment,
+            after: experiment,
+          },
+        ]);
+        assert.equal((_input as any).previousCorrections.length, 1);
+      }
       return {
         ready: calls > 2,
         corrections:
@@ -409,6 +482,7 @@ test("source checkpoints support bounded recovery with direct writing and light 
                 },
               ],
       };
+    }
     return brief();
   };
   try {
@@ -422,6 +496,10 @@ test("source checkpoints support bounded recovery with direct writing and light 
     assert.equal(calls, 4);
     assert.ok(checkpoints >= 4);
     assert.ok(t.result);
+    assert.deepEqual(t.result, {
+      ...brief(),
+      plan: { ...brief().plan, experiment },
+    });
     assert.equal(t.problem, undefined);
   } finally {
     await e.close();
@@ -429,6 +507,191 @@ test("source checkpoints support bounded recovery with direct writing and light 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a quote repair edits its evidence field while preserving the rest of the draft", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-quote-")),
+    env = { ...process.env };
+  process.env.DEEPSEEK_API_KEY = "unit-test-only";
+  const e = new Engine(new Store(dir)),
+    t = task();
+  e.store.saveMarket(sample(), false, t.owner);
+  t.evidence = {
+    collectionFinished: true,
+    collectedAt: new Date().toISOString(),
+    queries: [],
+    githubQuery: "comments",
+    sources: [source, request],
+    reads: [],
+  };
+  const operations: string[] = [];
+  e.research.json = async (_system, input, _tokens, operation) => {
+    operations.push(operation!);
+    if (operation === "strategy-deep-review")
+      return { ready: true, corrections: [] };
+    if (operation === "strategy-deep-repair") {
+      assert.deepEqual(
+        (input as any).requestedFields.map((f: any) => f.path),
+        ["findings.0.evidence"],
+      );
+      return {
+        edits: [
+          { path: "findings.0.evidence", value: brief().findings[0].evidence },
+        ],
+      };
+    }
+    const draft = brief();
+    draft.findings[0].evidence[0].quote =
+      "A wholly fabricated statement about paying customers.";
+    return draft;
+  };
+  try {
+    assert.equal(await runDeepResearch(e, t, () => {}), true);
+    assert.deepEqual(t.result, brief());
+    assert.deepEqual(operations, [
+      "strategy-deep-write",
+      "strategy-deep-repair",
+      "strategy-deep-review",
+    ]);
+  } finally {
+    await e.close();
+    process.env = env;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+for (const mode of ["unlocated-correction", "broken-patch"] as const) {
+  test(`semantic recovery stays bounded for ${mode}`, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-repair-")),
+      env = { ...process.env };
+    process.env.DEEPSEEK_API_KEY = "unit-test-only";
+    const e = new Engine(new Store(dir)),
+      t = task();
+    e.store.saveMarket(sample(), false, t.owner);
+    t.evidence = {
+      collectionFinished: true,
+      collectedAt: new Date().toISOString(),
+      queries: [],
+      githubQuery: "comments",
+      sources: [source, request],
+      reads: [],
+    };
+    const operations: string[] = [];
+    e.research.json = async (_system, input, _tokens, operation) => {
+      operations.push(operation!);
+      if (operation === "strategy-deep-review")
+        return {
+          ready: false,
+          corrections: [
+            {
+              paths: mode === "broken-patch" ? ["answer"] : ["wholeReport"],
+              repair: "Tie the answer to the editor's actual request.",
+            },
+          ],
+        };
+      if (operation === "strategy-deep-repair") {
+        assert.deepEqual((input as any).priorDraft, brief());
+        assert.deepEqual(
+          (input as any).requestedFields.map((f: any) => f.path),
+          ["answer"],
+        );
+        return {
+          edits: [
+            { path: "answer", value: { en: "Incomplete bilingual value." } },
+          ],
+        };
+      }
+      return brief();
+    };
+    try {
+      assert.equal(await runDeepResearch(e, t, () => {}), false);
+      assert.equal(t.problem, "model");
+      assert.equal(t.result, undefined);
+      assert.deepEqual(
+        operations,
+        mode === "broken-patch"
+          ? [
+              "strategy-deep-write",
+              "strategy-deep-review",
+              "strategy-deep-repair",
+              "strategy-deep-repair",
+            ]
+          : ["strategy-deep-write", "strategy-deep-review"],
+      );
+    } finally {
+      await e.close();
+      process.env = env;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+for (const outcome of ["accept", "reject", "provider-error"] as const) {
+  test(`bounded review recovery retains quality checks: ${outcome}`, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-review-")),
+      env = { ...process.env };
+    process.env.DEEPSEEK_API_KEY = "unit-test-only";
+    delete process.env.GHTRENDS_DEEP_REVIEW_THINKING;
+    const e = new Engine(new Store(dir)),
+      t = task();
+    e.store.saveMarket(sample(), false, t.owner);
+    t.evidence = {
+      collectionFinished: true,
+      collectedAt: new Date().toISOString(),
+      queries: [],
+      githubQuery: "comments",
+      sources: [source, request],
+      reads: [],
+    };
+    const operations: string[] = [];
+    let firstReview: unknown;
+    e.research.json = async (_system, input, tokens, operation, thinking) => {
+      operations.push(operation!);
+      if (operation === "strategy-deep-review") {
+        assert.equal(thinking, "low");
+        firstReview = input;
+        throw new Error(
+          outcome === "provider-error"
+            ? "AI research is temporarily unavailable (429)."
+            : "The AI response was incomplete. Please try again.",
+        );
+      }
+      if (operation === "strategy-deep-review-recovery") {
+        assert.equal(thinking, false);
+        assert.equal(tokens, 2400);
+        assert.deepEqual(input, firstReview);
+        return {
+          ready: outcome === "accept",
+          corrections:
+            outcome === "accept"
+              ? []
+              : ["A factual premise still needs verification."],
+        };
+      }
+      return brief();
+    };
+    try {
+      if (outcome === "provider-error")
+        await assert.rejects(
+          runDeepResearch(e, t, () => {}),
+          /429/,
+        );
+      else
+        assert.equal(
+          await runDeepResearch(e, t, () => {}),
+          outcome === "accept",
+        );
+      assert.equal(
+        operations.filter((o) => o === "strategy-deep-review-recovery").length,
+        outcome === "provider-error" ? 0 : 1,
+      );
+      assert.equal(Boolean(t.result), outcome === "accept");
+    } finally {
+      await e.close();
+      process.env = env;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
 
 test("private research API protects HTML, exports, CSRF, duplicate admission, daily quota and history", async () => {
   const env = { ...process.env },
@@ -604,7 +867,7 @@ test("prose-only repair preserves source IDs and quotes, while structural and ne
   assert.equal(original.checks, undefined);
   const terminology = brief();
   terminology.answer.zh =
-    "建议采用模型无关接口与不可变产物（E2），实际兼容范围仍待核对。";
+    "建议采用模型无关接口与不可变产物（E2），无锁机的实际兼容范围仍待核对。";
   terminology.findings[0]!.evidence[0]!.quote = "不可变产物与模型无关接口";
   const readable = normalizeDeepBrief(terminology, [
     source,
@@ -612,7 +875,7 @@ test("prose-only repair preserves source IDs and quotes, while structural and ne
   ]) as DeepBrief;
   assert.equal(
     readable.answer.zh,
-    "建议采用模型可替换接口与写入后保持原样的产物，实际兼容范围仍待核对。",
+    "建议采用模型可替换接口与写入后保持原样的产物，SIM unlocked 机型的实际兼容范围仍待核对。",
   );
   assert.equal(
     readable.findings[0]!.evidence[0]!.quote,
