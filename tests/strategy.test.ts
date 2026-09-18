@@ -1057,7 +1057,8 @@ test("Issue interpretation accepts only real request identities and exact quotes
     };
     r.json = async (_system, input: any, _budget, operation, thinking) => {
       assert.equal(operation, "issue-reading");
-      assert.equal(thinking, false);
+      assert.equal(thinking, "low");
+      assert.ok(!_system.includes('Return JSON {"issueInsights":[]}'));
       assert.deepEqual(input.sources, [modelSources([source])[0]]);
       return {
         issueInsights: [
@@ -1205,6 +1206,7 @@ test("research reasoning stays bounded and configurable and source compaction ke
       compact.find((s) => s.id === "R1")?.excerpt,
       original.find((s) => s.id === "R1")?.excerpt,
     );
+    assert.equal(compact.find((s) => s.id === "R1")?.project, "team/editor");
   } finally {
     if (old === undefined) delete process.env.GHTRENDS_RESEARCH_THINKING;
     else process.env.GHTRENDS_RESEARCH_THINKING = old;

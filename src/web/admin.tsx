@@ -975,8 +975,8 @@ export function AdminView({ account }: { account: Account | null }) {
               <dd>
                 {data.configuration.researchThinking === "low"
                   ? l(
-                      "Light reasoning for blueprint and evidence review",
-                      "提纲与证据复核：轻量思考 · 正文：直接生成",
+                      "Light reasoning for evidence; direct report writing",
+                      "证据研判：轻量思考 · 正文：直接生成",
                     )
                   : l(
                       "Direct generation with evidence review",
