@@ -171,3 +171,31 @@ export function completeWeeklySeries(evidence: DemandEvidence, asOf: string) {
     conflictDates: [...conflicts],
   };
 }
+
+export function documentStatusLabel(status: string, locale: "en" | "zh") {
+  const labels: Record<string, [string, string]> = {
+    read: ["Original text read", "已读取原文"],
+    robots: [
+      "Search excerpt retained under site collection rules",
+      "按站点采集规则保留搜索摘要",
+    ],
+    access: [
+      "Original text requires access; search excerpt retained",
+      "原文访问待核对，保留搜索摘要",
+    ],
+    unavailable: [
+      "Source recovering; search excerpt retained",
+      "来源恢复中，保留搜索摘要",
+    ],
+    limit: [
+      "Reading budget reached; search excerpt retained",
+      "已达本次读取预算，保留搜索摘要",
+    ],
+    format: ["Page content needs a closer check", "页面内容待进一步核对"],
+    deleted: [
+      "Source item removed; review the original link",
+      "来源条目已移除，可核对原链接",
+    ],
+  };
+  return (labels[status] || labels.unavailable!)[locale === "zh" ? 1 : 0];
+}

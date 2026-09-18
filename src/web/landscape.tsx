@@ -39,7 +39,7 @@ export function IssueReading({
       {[
         [zh ? "谁的需求" : "Who and why", `${p.audience} ${p.need}`],
         [
-          gap.state === "closed"
+          gap.state === "closed" || gap.state === "answered"
             ? zh
               ? "核对已有进展"
               : "Review the progress"

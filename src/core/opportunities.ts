@@ -264,6 +264,8 @@ export function groundOpportunityRatings(
             (s) =>
               s.id === r.id &&
               s.kind === "request" &&
+              s.request?.state !== "answered" &&
+              s.request?.state !== "closed" &&
               (!s.directionId || s.directionId === o.id),
           ),
         )
@@ -378,6 +380,8 @@ export function opportunityProblems(
             (s) =>
               s.id === r.id &&
               s.kind === "request" &&
+              s.request?.state !== "answered" &&
+              s.request?.state !== "closed" &&
               (!s.directionId || s.directionId === o.id),
           ),
         )
@@ -405,9 +409,13 @@ export function opportunityProblems(
 export function visibleOpportunities(
   brief?: Brief,
 ): OpportunityMap | undefined {
-  if (!brief || !["2", "3", "4", "5"].includes(brief.strategyVersion || "")) return;
   if (
-    ["3", "4", "5"].includes(brief.strategyVersion || "") &&
+    !brief ||
+    !["2", "3", "4", "5", "6"].includes(brief.strategyVersion || "")
+  )
+    return;
+  if (
+    ["3", "4", "5", "6"].includes(brief.strategyVersion || "") &&
     (!overviewSchema.safeParse(brief.overview).success ||
       !z
         .array(clearOpportunitySchema)

@@ -12,6 +12,7 @@ import {
 } from "../providers/search.js";
 import { marketGapSignals, mergeRequestEvidence } from "./gaps.js";
 import { Research } from "../providers/research.js";
+import { DocumentReader, type DocumentRead } from "../providers/documents.js";
 import { resolveTopic, validateGeo, validateRepo, TOPICS } from "./topics.js";
 import { importDemand } from "./import.js";
 import { analyze, ALGORITHM_VERSION } from "./analyze.js";
@@ -43,11 +44,13 @@ export class Engine {
   trends: Trends;
   research: Research;
   search: GoogleSearch;
+  documents: DocumentReader;
   constructor(public store = new Store()) {
     this.github = new GitHub(store);
     this.trends = new Trends(store);
     this.research = new Research(store);
     this.search = new GoogleSearch(store);
+    this.documents = new DocumentReader(store);
     const seed = fileURLToPath(
       new URL("../../web-dist/seed.json", import.meta.url),
     );
@@ -238,6 +241,23 @@ export class Engine {
           [],
         );
         documents.push(...webDocs.map((s, i) => ({ ...s, id: `WR${i + 1}` })));
+        if (this.documents.enabled) {
+          const candidates = searchSources(web);
+          const discussionReads: DocumentRead[] = [];
+          const [pages, licenses, discussions] = await Promise.all([
+            this.documents.collect(candidates),
+            this.github.licenseSources(selectedProjects),
+            this.github.discussionSources(candidates, (read) =>
+              discussionReads.push(read),
+            ),
+          ]);
+          market.documents = {
+            ...pages,
+            reads: [...pages.reads, ...discussionReads],
+            sources: [...pages.sources, ...licenses, ...discussions],
+          };
+          documents.push(...market.documents.sources);
+        }
         options.onProgress?.({ stage: "brief", preview: market });
         market.brief = await this.research.insights(
           market,

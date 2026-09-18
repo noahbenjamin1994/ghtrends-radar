@@ -1,4 +1,5 @@
 import {
+  documentStatusLabel,
   adCollectionMessage,
   searchCollectionMessage,
   searchEngineLabel,
@@ -211,6 +212,17 @@ export function renderDocument(
         })
         .join("")}</section>
       ${m.web?.queries.length ? `<section><h2>${locale === "zh" ? "网页搜索证据" : "Web search evidence"}</h2><p>${escapeHtml(m.web.region)} · ${escapeHtml(m.web.language)} · ${escapeHtml(m.web.fetchedAt.slice(0, 10))}</p><p>${escapeHtml(searchCollectionMessage(m.web, locale))}</p><p>${escapeHtml(adCollectionMessage(m.web, locale))}</p>${m.web.queries.map((q) => `<h3>${escapeHtml(q.query)}</h3><p>${q.state === "ready" ? escapeHtml(searchEngineLabel(q) + " · " + (q.fetchedAt || m.web!.fetchedAt) + " · " + (q.region || m.web!.region)) : locale === "zh" ? "采集已暂停 · 可更新研究后重试" : "Collection stopped · update research to retry"}</p>${q.results.map((r) => `<p>${r.kind === "ad" ? (locale === "zh" ? "广告" : "Ad") : locale === "zh" ? "自然结果" : "Organic"} · ${link(r.url, r.title)}${r.kind === "ad" ? ` · ${escapeHtml(new URL(r.url).hostname)}` : ""}</p><p>${escapeHtml(r.excerpt)}</p>`).join("")}`).join("")}</section>` : ""}
+      ${
+        m.documents
+          ? `<section><h2>${locale === "zh" ? "原文与许可" : "Original text and licenses"}</h2>${m.documents.sources.map((s) => `<details><summary>${escapeHtml(s.label)} · ${locale === "zh" ? "采集" : "Read"} ${escapeHtml(s.fetchedAt?.slice(0, 10) || "")}</summary>${s.publishedAt ? `<p>${locale === "zh" ? "发布" : "Published"}: ${escapeHtml(s.publishedAt)}</p>` : ""}<p>${link(s.url, locale === "zh" ? "打开原文" : "Open original")}${s.parentUrl ? ` · ${link(s.parentUrl, locale === "zh" ? "查看上下文" : "Discussion context")}` : ""}</p><blockquote>${escapeHtml(s.excerpt || "")}</blockquote></details>`).join("")}${m.documents.reads
+              .filter((r) => r.status !== "read")
+              .map(
+                (r) =>
+                  `<p>${link(r.url, new URL(r.url).hostname)} · ${escapeHtml(documentStatusLabel(r.status, locale))}</p>`,
+              )
+              .join("")}</section>`
+          : ""
+      }
       <section><h2>${e("Use and share the evidence")}</h2><p>${link(`/report/${m.id}`, "Permanent report")} · ${link(`/api/reports/${m.id}?format=md&v=2`, "Markdown")} · ${link(`/api/reports/${m.id}`, "JSON")} · ${link(`/api/cards/${m.id}.png?v=2`, "PNG card")}</p><p>${link(SOURCE, "Use the open-source CLI and MCP server on GitHub")}</p></section>`;
   } else if (status === 404) {
     content = `<h1>${e("Page not found.")}</h1><p>${e("This report or page is unavailable.")} ${link("/", "Explore the radar")}</p>`;

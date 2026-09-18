@@ -1,4 +1,5 @@
 import {
+  documentStatusLabel,
   adCollectionMessage,
   searchCollectionMessage,
   searchEngineLabel,
@@ -20,6 +21,15 @@ import { text, localeUrl, type Locale } from "./i18n.js";
 import { marketAssessment, competitionPressure } from "./assessment.js";
 import { visibleStrategy, strategyRows } from "./strategy.js";
 const cell = (s: string) => s.replaceAll("|", "\\|").replace(/[\r\n]+/g, " ");
+const documentLink = (label: string, url: string) =>
+  `[${cell(label).replace(/[\\\[\]<>]/g, "\\$&")}]` +
+  `(<${url.replace(/[<>\r\n]/g, encodeURIComponent)}>)`;
+const documentQuote = (source: string) => {
+  const fence = "`".repeat(
+    Math.max(3, ...[...source.matchAll(/`+/g)].map((m) => m[0].length + 1)),
+  );
+  return `${fence}text\n${source}\n${fence}`;
+};
 export function compareMarkdown(repos: Repo[], locale: Locale = "en"): string {
   const t = (s: string) => text(s, locale);
   return [
@@ -284,6 +294,34 @@ export function marketMarkdown(
         ]
       : []),
     "",
+    ...(m.documents
+      ? [
+          `## ${locale === "zh" ? "原文与许可" : "Original text and licenses"}`,
+          ...m.documents.sources.flatMap((s) => [
+            `### ${documentLink(s.label, s.url)}`,
+            ...(s.publishedAt
+              ? [`${locale === "zh" ? "发布" : "Published"}: ${s.publishedAt}`]
+              : []),
+            `${locale === "zh" ? "采集" : "Collected"}: ${s.fetchedAt || ""}`,
+            ...(s.parentUrl
+              ? [
+                  documentLink(
+                    locale === "zh" ? "查看上下文" : "Discussion context",
+                    s.parentUrl,
+                  ),
+                ]
+              : []),
+            documentQuote(s.excerpt || ""),
+          ]),
+          ...m.documents.reads
+            .filter((r) => r.status !== "read")
+            .map(
+              (r) =>
+                `- ${documentLink(r.url, r.url)}: ${documentStatusLabel(r.status, locale)}`,
+            ),
+          "",
+        ]
+      : []),
     `## ${t("Scope and limitations")}`,
     "",
     ...a.scopeNotes.map((x) => `- ${t(x)}`),

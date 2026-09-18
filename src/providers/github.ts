@@ -1,6 +1,7 @@
 import { selectGapSignals } from "../core/gaps.js";
 import { createHash } from "node:crypto";
 import type { ProviderCall } from "../core/operations.js";
+import type { DocumentRead } from "./documents.js";
 import { githubToken } from "./github-auth.js";
 import { Store } from "../core/store.js";
 import { repoRelevance } from "../core/competition.js";
@@ -414,9 +415,7 @@ export class GitHub {
             ...s,
             id: prefix + s.id,
             directionId: direction.id,
-            kind: s.id?.endsWith("R")
-              ? ("project" as const)
-              : ("search" as const),
+            kind: s.kind || "search",
           }));
           try {
             const q = `${direction.query} is:issue is:open`;
@@ -501,12 +500,239 @@ export class GitHub {
             [{ name: candidates[0].name } as Repo],
             [],
           );
-          sources.push(...docs.map((d) => ({ ...d, id: `A${i + 1}R` })));
+          sources.push(
+            ...docs.map((d, j) => ({
+              ...d,
+              id: `A${i + 1}${d.id?.startsWith("R") ? "R" : d.id?.startsWith("V") ? "V" : `D${j + 1}`}`,
+            })),
+          );
         }
         return sources;
       }),
     );
     return results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+  }
+  async licenseSources(repos: Repo[]): Promise<ResearchSource[]> {
+    const results = await Promise.allSettled(
+      repos.slice(0, 2).map(async (repo, i): Promise<ResearchSource> => {
+        const name = validateRepo(repo.name),
+          path = `/repos/${name}/license`;
+        const doc = await this.get<{
+          encoding?: string;
+          content?: string;
+          size?: number;
+          html_url?: string;
+          license?: { spdx_id?: string };
+        }>(path, 3600000);
+        const url = new URL(doc.html_url || "https://github.com/");
+        if (
+          doc.encoding !== "base64" ||
+          !doc.content ||
+          doc.content.length > 150000 ||
+          (doc.size || 0) > 100000 ||
+          url.origin !== "https://github.com" ||
+          !url.pathname.startsWith(`/${name}/blob/`)
+        )
+          throw new Error("license_source");
+        const content = Buffer.from(doc.content, "base64")
+          .toString("utf8")
+          .slice(0, 6000);
+        return {
+          id: `L${i + 1}`,
+          kind: "project",
+          documentType: "license",
+          label: `${name} · License · ${doc.license?.spdx_id || "Review terms"}`,
+          url: url.href,
+          fetchedAt: this.observedAt(path),
+          excerpt: content,
+        };
+      }),
+    );
+    return results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+  }
+  async discussionSources(
+    candidates: ResearchSource[],
+    onRead?: (read: DocumentRead) => void,
+  ): Promise<ResearchSource[]> {
+    const selected = [
+      ...new Map(
+        candidates
+          .filter(
+            (s) =>
+              s.placement === "organic" &&
+              /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/discussions\/[1-9]\d*$/.test(
+                s.url,
+              ),
+          )
+          .map((s) => [s.url, s]),
+      ).values(),
+    ].slice(0, 2);
+    const output: ResearchSource[] = [];
+    for (const [index, source] of selected.entries()) {
+      const key = `github-discussion:v1:${source.url}`;
+      const cached = this.store.get<ResearchSource[]>(key);
+      if (cached) {
+        this.store.recordCall({
+          provider: "github",
+          operation: "discussion",
+          started: stamp(),
+          durationMs: 0,
+          cached: true,
+        });
+        output.push(
+          ...cached.map((s, i) => ({ ...s, id: `GD${index + 1}D${i + 1}` })),
+        );
+        onRead?.({
+          url: source.url,
+          status: "read",
+          observedAt: cached[0]?.fetchedAt || stamp(),
+        });
+        continue;
+      }
+      let status: DocumentRead["status"] = "unavailable";
+      const started = Date.now(),
+        call: ProviderCall = {
+          provider: "github",
+          operation: "discussion",
+          started: stamp(),
+          durationMs: 0,
+        };
+      try {
+        const parts = new URL(source.url).pathname.split("/"),
+          name = validateRepo(`${parts[1]}/${parts[2]}`),
+          number = Number(parts[4]);
+        if (!Number.isSafeInteger(number) || number > 2147483647) continue;
+        const token = await githubToken();
+        if (!token) {
+          call.error = "discussion_access";
+          status = "access";
+          continue;
+        }
+        const r = await fetch("https://api.github.com/graphql", {
+          method: "POST",
+          redirect: "error",
+          signal: AbortSignal.timeout(10000),
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "User-Agent": "ghtrends/0.20.0",
+          },
+          body: JSON.stringify({
+            query: `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){isPrivate discussion(number:$number){title url bodyText createdAt updatedAt closed closedAt isAnswered author{login ... on User{databaseId}} comments{totalCount} answer{url bodyText createdAt isMinimized}}} rateLimit{remaining resetAt}}`,
+            variables: { owner: parts[1], name: parts[2], number },
+          }),
+        });
+        call.status = r.status;
+        if (!r.ok) {
+          call.error = `http_${r.status}`;
+          if ([401, 403, 429].includes(r.status)) status = "access";
+          continue;
+        }
+        const reader = r.body?.getReader();
+        if (!reader) throw new Error("discussion_format");
+        const chunks: Uint8Array[] = [];
+        let bytes = 0;
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          bytes += value.byteLength;
+          if (bytes > 250000) {
+            await reader.cancel();
+            throw new Error("discussion_size");
+          }
+          chunks.push(value);
+        }
+        call.transferBytes = bytes;
+        const data = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        call.rateBucket = "graphql";
+        const rate = data.data?.rateLimit;
+        if (rate) {
+          call.rateRemaining = Number.isSafeInteger(rate.remaining)
+            ? rate.remaining
+            : undefined;
+          call.rateReset = Number.isFinite(Date.parse(rate.resetAt))
+            ? Math.floor(Date.parse(rate.resetAt) / 1000)
+            : undefined;
+        }
+        const repo = data.data?.repository,
+          d = repo?.discussion;
+        if (data.errors?.some((e: any) => e.type === "FORBIDDEN"))
+          status = "access";
+        if (
+          data.errors?.length ||
+          !repo ||
+          repo.isPrivate !== false ||
+          d?.url !== source.url ||
+          typeof d.bodyText !== "string"
+        )
+          throw new Error("discussion_source");
+        const fetchedAt = stamp(),
+          sources: ResearchSource[] = [
+            {
+              id: `GD${index + 1}D1`,
+              kind: "request",
+              documentType: "github-discussion",
+              label: String(d.title).slice(0, 180),
+              url: d.url,
+              fetchedAt,
+              publishedAt: d.createdAt,
+              request: {
+                state: d.isAnswered ? "answered" : d.closed ? "closed" : "open",
+                closedAt: d.closedAt || undefined,
+                createdAt: d.createdAt,
+                updatedAt: d.updatedAt,
+                observedAt: fetchedAt,
+                comments: d.comments?.totalCount,
+                authorKey:
+                  typeof d.author?.login === "string"
+                    ? createHash("sha256")
+                        .update(
+                          Number.isSafeInteger(d.author.databaseId) &&
+                            d.author.databaseId > 0
+                            ? "github:" + d.author.databaseId
+                            : "github-login:" + d.author.login.toLowerCase(),
+                        )
+                        .digest("hex")
+                        .slice(0, 24)
+                    : undefined,
+              },
+              excerpt: d.bodyText.slice(0, 2500),
+            },
+          ];
+        if (
+          d.answer &&
+          !d.answer.isMinimized &&
+          typeof d.answer.bodyText === "string" &&
+          typeof d.answer.url === "string" &&
+          new RegExp(
+            "^" +
+              source.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
+              "#discussioncomment-[1-9]\\d*$",
+          ).test(d.answer.url)
+        )
+          sources.push({
+            id: `GD${index + 1}D2`,
+            kind: "project",
+            documentType: "github-discussion",
+            label: `${String(d.title).slice(0, 140)} · Accepted answer`,
+            url: d.answer.url,
+            parentUrl: source.url,
+            fetchedAt,
+            publishedAt: d.answer.createdAt,
+            excerpt: d.answer.bodyText.slice(0, 2500),
+          });
+        this.store.set(key, sources, 3600000);
+        output.push(...sources);
+        status = "read";
+      } catch {
+        call.error ||= "discussion_source";
+      } finally {
+        call.durationMs = Date.now() - started;
+        this.store.recordCall(call);
+        onRead?.({ url: source.url, status, observedAt: stamp() });
+      }
+    }
+    return output;
   }
   async researchSources(repos: Repo[], gaps: Gap[]): Promise<ResearchSource[]> {
     const selected = repos

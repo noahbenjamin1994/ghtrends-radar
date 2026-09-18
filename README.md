@@ -57,7 +57,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 Or install the CLI:
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.19.0/ghtrends-radar-0.19.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.20.0/ghtrends-radar-0.20.0.tgz
 
 ghtrends ui
 ghtrends scan --topic mcp-server --json
@@ -176,6 +176,12 @@ The model proposes one primary Trends phrase, up to two genuine synonyms, and bo
 Sparse source coverage produces a **domain hypothesis**; document-grounded recommendations are labeled **source-led hypotheses**. Both represent research proposals. The interface shows source progress and preliminary measurements while the strategy develops. AI-enabled scans can proceed with available evidence during Trends cooldown, within the same account and attempt limits. A compact reasoning blueprint is followed by separately validated bilingual directions and an overall judgment; direction writing runs with two requests at a time. Completed sections are cached. Strategy generation, direction/overall writing and corrective editing are recorded separately in admin usage. Provider reasoning text stays outside stored reports. Results use a six-hour strategy cache; deeper analysis adds latency and model usage.
 
 `PUBLIC_URL` may include a directory, for example `https://example.com/radar`. The same build supports both directory hosting and a local root URL. Forward that prefix unchanged to the server and configure the matching Logto callback.
+
+**Original text and licenses**
+
+New research selects original pages from up to four domains already observed in organic search. Publisher pages, individual Hacker News discussions and GitHub Discussions retain their source identity. Hacker News uses its official public API and reads at most three direct comments per topic. GitHub Discussions are read from observed links, with accepted answers retained; the backend GitHub credential needs the relevant read permission. Up to two selected repositories contribute their license files for checking attribution, distribution, source-disclosure and third-party conditions.
+
+The report's “Original text and licenses” section keeps collection dates, excerpts and reading status, also included in Markdown, JSON and static HTML. Publisher pages describe publisher claims; discussions describe individual experiences. Page reads respect robots.txt, bound redirects, time and size, and pin connections to checked public addresses. Original text is cached for one hour; restricted pages retain the search excerpt and reading status. Public-page requests use a separate transport; backend identity credentials go only to the fixed GitHub API. Set `GHTRENDS_SOURCE_DOCUMENTS=0` to disable this layer. Reddit and X body integrations follow each platform's authorization requirements.
 
 **Web search (optional)**
 

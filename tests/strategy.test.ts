@@ -218,6 +218,12 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     assert.ok(visibleStrategy(b, "zh"));
     assert.equal(visibleOpportunities(b)?.opportunities.length, 3);
     assert.ok(visibleStrategy({ ...b, strategyVersion: "1" }, "zh"));
+    assert.ok(visibleStrategy({ ...b, strategyVersion: "5" }, "zh"));
+    assert.equal(
+      visibleOpportunities({ ...b, strategyVersion: "5" })?.opportunities
+        .length,
+      3,
+    );
     assert.equal(reviews, 1);
     assert.deepEqual(ops, ["strategy", "strategy-review"]);
     assert.deepEqual(await r.insights(seed, documents), b);
@@ -652,6 +658,38 @@ test("source scope corrects overconfident rating labels while preserving all dir
   );
 });
 
+test("accepted answers and closed requests describe progress rather than current demand strength", () => {
+  const data = sample();
+  const sources: ResearchSource[] = ["answered", "closed"].map((state, i) => ({
+    id: `RES${i}`,
+    kind: "request",
+    label: "Export request",
+    url: `https://github.com/team/editor/discussions/${i + 1}`,
+    excerpt: "Please preserve comments during export.",
+    request: { state },
+  }));
+  data.opportunities[0]!.demand = {
+    level: "high",
+    basis: "observed",
+    evidence: sources.map((s) => ({ id: s.id!, quote: s.excerpt! })),
+  };
+  assert.ok(
+    strategyProblems(data, [...documents, ...sources], seed).some((p) =>
+      p.includes("multiple relevant"),
+    ),
+  );
+  const grounded = groundOpportunityRatings(data, [
+    ...documents,
+    ...sources,
+  ]) as StrategyResponse;
+  assert.equal(grounded.opportunities[0]!.demand.basis, "inferred");
+  assert.equal(grounded.opportunities[0]!.demand.level, "exploratory");
+  assert.deepEqual(
+    grounded.opportunities[0]!.demand.evidence,
+    data.opportunities[0]!.demand.evidence,
+  );
+});
+
 test("targeted copy editing changes requested prose only, preserving evidence and direction ratings", () => {
   const data = sample();
   data.opportunities[0]!.zh.competition =
@@ -736,7 +774,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "5");
+    assert.equal(brief.strategyVersion, "6");
     const legacy = {
       ...brief,
       strategyVersion: "2",

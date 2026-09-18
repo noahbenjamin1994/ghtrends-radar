@@ -11,6 +11,7 @@ import { COMPETITION_POLICY } from "../core/competition.js";
 import { RequestCard, LandscapePanel, CompetitorPanel } from "./landscape.js";
 import { reportIssueSignals, selectGapSignals } from "../core/gaps.js";
 import { enableEngagement, track } from "./engagement.js";
+import { SourceDocuments } from "./documents.js";
 import { AdminView } from "./admin.js";
 import { ALGORITHM_VERSION } from "../core/version.js";
 import { api, setCsrf } from "./api.js";
@@ -1697,6 +1698,7 @@ function MarketView({
       )}
       <LandscapePanel market={m} locale={locale} />
       <CompetitorPanel market={m} locale={locale} />
+      <SourceDocuments market={m} locale={locale} />
       {m.brief && <OpportunityMap key={m.id} market={m} locale={locale} />}
       {strategy ? (
         <section className="strategy-section" id="strategy">
@@ -2830,7 +2832,7 @@ function StartView() {
           )}
         </p>
         <div className="code-block">
-          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.19.0/ghtrends-radar-0.19.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
+          <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.20.0/ghtrends-radar-0.20.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
             value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
             label={t("Copy installation command")}

@@ -148,14 +148,16 @@ export function mergeRequestEvidence(
 }
 
 export function requestStatus(evidence: RequestEvidence, locale: "en" | "zh") {
+  if (evidence.state === "answered")
+    return locale === "zh" ? "已有采纳答案" : "An answer was accepted";
   if (evidence.state === "closed")
     return evidence.stateReason === "completed"
       ? locale === "zh"
         ? "已标记完成"
         : "Marked complete"
       : locale === "zh"
-        ? "已关闭 · 查看维护者说明"
-        : "Closed · read the maintainer’s reply";
+        ? "已关闭 · 查看讨论说明"
+        : "Closed · read the discussion";
   return evidence.state === "open"
     ? locale === "zh"
       ? "讨论中"
@@ -170,11 +172,15 @@ export function requestAction(
   proposal: string,
   locale: "en" | "zh",
 ) {
-  return evidence.state === "closed"
+  return evidence.state === "answered"
     ? locale === "zh"
-      ? "维护者已关闭这条请求，可先结合结项说明与发布版本核对已有能力。"
-      : "The maintainer closed this request. Review the closing discussion and release notes for the capabilities now available."
-    : proposal;
+      ? "先核对提问者采纳的答案与当前版本，再确认还需要哪些补充。"
+      : "Review the accepted answer and current version, then identify any further work."
+    : evidence.state === "closed"
+      ? locale === "zh"
+        ? "这条请求已关闭，可先结合结项说明与发布版本核对已有能力。"
+        : "This request is closed. Review the closing discussion and release notes for the capabilities now available."
+      : proposal;
 }
 
 export function issueReading(brief: Brief | undefined, url: string) {
@@ -257,16 +263,20 @@ export function reportIssueSignals(m: Market) {
       !validQuote(i.evidence, [s])
     )
       continue;
-    const match = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/issues\/\d+$/.exec(
+    const match =
+      /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(?:issues|discussions)\/\d+$/.exec(
+        s.url,
+      );
+    const hn = /^https:\/\/news\.ycombinator\.com\/item\?id=[1-9]\d*$/.test(
       s.url,
     );
-    if (!match) continue;
+    if (!match && !hn) continue;
     rows.push({
       ...s.request,
       url: s.url,
       title: s.label,
       excerpt: i.evidence.quote,
-      repo: match[1]!,
+      repo: match?.[1] || "Hacker News",
       label: "friction",
     });
     seen.add(requestUrl(s.url));

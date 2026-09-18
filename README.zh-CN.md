@@ -61,7 +61,7 @@ npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui
 也可以安装到本机：
 
 ```sh
-npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.19.0/ghtrends-radar-0.19.0.tgz
+npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.20.0/ghtrends-radar-0.20.0.tgz
 
 ghtrends ui
 ghtrends scan --topic ai4s --json
@@ -170,6 +170,12 @@ ghtrends ui
 模型基于项目元数据原文核对角色；竞争压力与搜索方向由确定性代码计算。模型生成一个 Trends 主词、最多两个同义表达，以及受约束的 GitHub 主题与短语。歧义缩写会要求选择含义；随后整理中英文 **3–5 个细分方向**，并深入分析优先方向。市场指标与策略推演分层呈现。输入应限于公开研究内容；查询与限量的公开来源摘录会按需发送给 DeepSeek、Google、DuckDuckGo、GitHub。模型恢复期间，已采集的报告仍可阅读。
 
 **按我的情况筛选。** 在已有细分方向的报告中，选择经验、时间和目标，AI 会重排现有方向，并逐项解释匹配原因与第一步行动。筛选消耗 0 次研究额度，与范围预检共用请求预算。个人条件与筛选建议单独私有保存，回访时自动恢复，保留 30 天，支持 Markdown 导出；公开报告、需求与竞争证据沿用原记录。配置的研究模型会接收这些条件及相关方向建议，请填写适合研究使用的背景。筛选关闭 thinking，格式与措辞按需局部修复；管理员可单独查看这类任务与消耗。
+
+### 原文核对
+
+新研究会从已观察到的自然搜索结果中，选取至多四个域名的原文；官网陈述、Hacker News 个体讨论与 GitHub Discussions 分别标明来源。Hacker News 使用公开官方 API，每个主题读取至多三条直接评论；GitHub Discussions 按搜索中出现的链接读取，保留采纳答案，需后端 GitHub 凭据具备相应读取权限。选中的开源项目补充至多两份许可文件，供核对署名、分发、源码披露与第三方组件条件。
+
+报告的“核对原文与许可”保留采集日期、原文摘录与读取状态，Markdown、JSON 和静态 HTML 同步包含。官网数据代表发布方声明；用户讨论代表个人经历。网页读取遵守 robots.txt，限制跳转、耗时与体积，连接固定到已核验的公网地址。原文缓存一小时；访问受限时保留搜索摘要与状态。来源请求走独立的公开读取通道，后端身份凭据仅用于固定的 GitHub API。设置 `GHTRENDS_SOURCE_DOCUMENTS=0` 可关闭这一层采集。Reddit、X 的正文接入继续按各平台授权条件推进。
 
 ### 网页搜索（可选）
 

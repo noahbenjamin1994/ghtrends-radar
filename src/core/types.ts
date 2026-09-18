@@ -63,6 +63,10 @@ export interface Strategy {
   pivotSignal: string;
 }
 export interface ResearchSource {
+  documentType?:
+    "page" | "license" | "hn-story" | "hn-comment" | "github-discussion";
+  publishedAt?: string;
+  parentUrl?: string;
   directionId?: string;
   searchIntent?: "competition" | "demand" | "opensource";
   placement?: "organic" | "ad";
@@ -257,6 +261,7 @@ export interface Market {
   brief?: Brief;
   aiError?: string;
   web?: import("../providers/search.js").WebEvidence;
+  documents?: import("../providers/documents.js").DocumentEvidence;
 }
 export interface MarketSummary extends Omit<
   Market,
