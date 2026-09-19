@@ -17,6 +17,10 @@ import {
   deepEffortText,
   deepEditableFields,
   applyDeepEdits,
+  normalizeDeepBrief,
+  deepCopyRepairs,
+  deepGenerationSchema,
+  deepProjectUseConditions,
   type DeepTask,
   type DeepBrief,
 } from "../src/core/deep.js";
@@ -111,56 +115,205 @@ const request: ResearchSource = {
   request: { state: "open" },
 };
 function brief(): DeepBrief {
-  return deepBriefSchema.parse({
-    headline: copy(),
-    answer: copy(),
-    findings: ["audience", "competitors", "opensource", "scope"].map(
-      (area, i) => ({
-        area,
-        subject: copy("Draft comments", "草稿评审意见"),
-        statement: copy(),
-        implication: copy(
-          "Offer a paragraph-mapping prototype to test with the editor.",
-          "给编辑试用段落映射原型，观察评审意见的保留情况。",
-        ),
-        basis: i < 2 ? "observed" : "inferred",
-        evidence:
-          i < 2
-            ? [
-                {
-                  id: i ? source.id : request.id,
-                  quote: i ? source.excerpt : request.excerpt,
-                },
-              ]
-            : [],
-      }),
-    ),
-    plan: Object.fromEntries(
-      [
-        "deliverable",
-        "resources",
-        "effort",
-        "maintenance",
-        "experiment",
-        "continueIf",
-        "changeIf",
-      ].map((k) => [
-        k,
-        k === "effort"
-          ? {
-              hoursMin: 12,
-              hoursMax: 20,
-              assumption: copy(
-                "Assume one developer and three existing document examples.",
-                "假设一名开发者已有三个文档样例。",
-              ),
-            }
-          : copy(),
-      ]),
-    ),
-    checks: [],
-  });
+  return deepBriefSchema.parse(
+    normalizeDeepBrief({
+      experimentPlan: {
+        directionId: "comments",
+        counts: {
+          participants: 5,
+          tasksPerParticipant: 3,
+          successfulTasksPerParticipant: 2,
+          continueAt: 4,
+          redirectAtMost: 2,
+        },
+        en: {
+          participants:
+            "Editors with permission to use their document examples.",
+          task: "Map review comments across one document revision and compare with the current editor.",
+          timebox: "A proposed one-week pilot.",
+          measurement:
+            "All comments remain next to the intended paragraphs in the saved revision.",
+          redirectAction:
+            "Test a simpler paragraph matcher with the same editors.",
+        },
+        zh: {
+          participants: "拥有文档样例使用授权的编辑。",
+          task: "对一次文档修订映射评审意见，并与当前编辑器对照。",
+          timebox: "建议用一周开展试验。",
+          measurement: "保存后每条意见均位于预期段落旁。",
+          redirectAction: "与同一组编辑测试简化的段落映射器。",
+        },
+      },
+      headline: copy(),
+      answer: copy(),
+      findings: ["audience", "competitors", "opensource", "scope"].map(
+        (area, i) => ({
+          area,
+          subject: copy("Draft comments", "草稿评审意见"),
+          statement: copy(),
+          implication: copy(
+            "Offer a paragraph-mapping prototype to test with the editor.",
+            "给编辑试用段落映射原型，观察评审意见的保留情况。",
+          ),
+          basis: i < 2 ? "observed" : "inferred",
+          evidence:
+            i < 2
+              ? [
+                  {
+                    id: i ? source.id : request.id,
+                    quote: i ? source.excerpt : request.excerpt,
+                  },
+                ]
+              : [],
+        }),
+      ),
+      plan: Object.fromEntries(
+        [
+          "deliverable",
+          "resources",
+          "effort",
+          "maintenance",
+          "experiment",
+          "continueIf",
+          "changeIf",
+        ].map((k) => [
+          k,
+          k === "effort"
+            ? {
+                hoursMin: 12,
+                hoursMax: 20,
+                assumption: copy(
+                  "Assume one developer and three existing document examples.",
+                  "假设一名开发者已有三个文档样例。",
+                ),
+              }
+            : copy(),
+        ]),
+      ),
+      checks: [],
+    }),
+  );
 }
+test("focused pilots share counts, protect rendered decisions and retain legacy readability", () => {
+  const b = brief();
+  assert.deepEqual(deepProblems(b, [source, request], "comments"), []);
+  assert.match(b.plan.experiment.en, /3 tasks \(15 total\)/);
+  assert.match(b.plan.experiment.zh, /共 15 次/);
+  assert.match(b.plan.continueIf.zh, /至少 4 人/);
+  assert.match(b.plan.continueIf.zh, /达标人数为 3 人/);
+  assert.match(b.plan.changeIf.zh, /至多 2 人/);
+  assert.ok(deepProblems(b, [source, request], "another-direction").length);
+  const forged = structuredClone(b);
+  forged.plan.continueIf.en = "Continue after at least one person succeeds.";
+  assert.ok(deepProblems(forged, [source, request], "comments").length);
+  assert.deepEqual(normalizeDeepBrief(forged), b);
+  assert.deepEqual(
+    applyDeepEdits(b, { edits: [{ path: "plan.continueIf", value: copy() }] }, [
+      "plan.continueIf",
+    ]),
+    b,
+  );
+  const bad = structuredClone(b);
+  bad.experimentPlan!.counts!.redirectAtMost = 4;
+  assert.ok(
+    deepProblems(normalizeDeepBrief(bad), [source, request], "comments").length,
+  );
+  const long = structuredClone(b);
+  long.experimentPlan!.en.participants = "A".repeat(201);
+  assert.ok(
+    deepProblems(
+      normalizeDeepBrief(long),
+      [source, request],
+      "comments",
+    )[0]?.startsWith("experimentPlan.en.participants:"),
+  );
+  const legacy = structuredClone(b);
+  delete legacy.experimentPlan;
+  legacy.plan.experiment = copy();
+  legacy.plan.continueIf = copy();
+  legacy.plan.changeIf = copy();
+  assert.deepEqual(deepProblems(legacy, [source, request]), []);
+  assert.ok(deepProblems(legacy, [source, request], "comments").length);
+  const authored = structuredClone(b) as any;
+  delete authored.plan.experiment;
+  delete authored.plan.continueIf;
+  delete authored.plan.changeIf;
+  assert.ok(deepGenerationSchema.safeParse(authored).success);
+  assert.deepEqual(normalizeDeepBrief(authored), b);
+});
+
+test("pilot copy repairs edit paired authored text and preserve shared outcome counts", () => {
+  const b = brief();
+  b.experimentPlan!.zh.measurement = "记录完整且没有遗漏评审意见。";
+  const edits = deepCopyRepairs(b);
+  assert.deepEqual(
+    edits.map((e) => e.path),
+    ["experimentPlan.zh.measurement"],
+  );
+  assert.equal(edits[0]!.maxCharacters, 200);
+  assert.deepEqual(edits[0]!.counterpart, {
+    language: "en",
+    value: b.experimentPlan!.en.measurement,
+  });
+  b.experimentPlan!.zh.measurement = "全部评审意见均完整记录。";
+  const result = normalizeDeepBrief(b) as DeepBrief;
+  assert.match(result.plan.experiment.zh, /全部评审意见均完整记录/);
+  assert.deepEqual(result.experimentPlan!.counts, b.experimentPlan!.counts);
+  assert.deepEqual(deepCopyRepairs(result), []);
+});
+
+test("focused resources show only cited projects' original use conditions in both exports", () => {
+  const b = brief();
+  const license: ResearchSource = {
+    id: "L1",
+    label: "Project license",
+    url: "https://github.com/team/tool/blob/main/LICENSE",
+    documentType: "license",
+    excerpt: "Copyright 2026 Tool contributors.",
+  };
+  const readme: ResearchSource = {
+    id: "R1",
+    label: "Project README",
+    url: "https://github.com/team/tool/blob/main/README.md",
+    documentType: "github-readme",
+    excerpt: "Useful project.\nCopyright 2026 Tool. All rights reserved.",
+  };
+  const other: ResearchSource = {
+    ...readme,
+    id: "R2",
+    url: "https://github.com/other/tool/blob/main/README.md",
+  };
+  const page: ResearchSource = {
+    ...readme,
+    id: "P1",
+    url: "https://example.com",
+    documentType: "page",
+  };
+  b.findings[0]!.evidence = [{ id: license.id!, quote: license.excerpt! }];
+  const sources = [license, readme, other, page];
+  const notices = deepProjectUseConditions(b, sources);
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0]!.project, "team/tool");
+  assert.equal(notices[0]!.quote, "Copyright 2026 Tool. All rights reserved.");
+  const t = task();
+  t.result = b;
+  t.evidence = {
+    collectedAt: t.created,
+    queries: [],
+    githubQuery: "tool",
+    sources,
+    reads: [],
+  };
+  for (const lang of ["en", "zh"] as const) {
+    const text = deepMarkdown(deepView(t), lang);
+    assert.ok(text.includes(notices[0]!.quote));
+    assert.ok(
+      text.indexOf(notices[0]!.quote) <
+        text.indexOf(lang === "zh" ? "投入估算" : "Effort estimate"),
+    );
+  }
+});
+
 function sample(): Market {
   const m: Market = JSON.parse(
     readFileSync(new URL("../public/seed.json", import.meta.url), "utf8"),
@@ -494,10 +647,9 @@ test("source checkpoints support bounded recovery with direct writing and light 
     reads++;
     throw new Error("a model retry should reuse evidence");
   };
-  const experiment = copy(
-    "Try three edited paragraphs with their editor.",
-    "请编辑试用三个修改过的段落。",
-  );
+  const experiment = structuredClone(brief().experimentPlan!);
+  experiment.en.task = "Try three edited paragraphs with their editor.";
+  experiment.zh.task = "请编辑试用三个修改过的段落。";
   e.research.json = async (_system, _input, _tokens, operation, thinking) => {
     assert.equal(
       thinking,
@@ -518,11 +670,11 @@ test("source checkpoints support bounded recovery with direct writing and light 
     if (operation === "strategy-deep-repair") {
       assert.deepEqual(
         (_input as any).requestedFields.map((f: any) => f.path),
-        ["plan.experiment"],
+        ["experimentPlan"],
       );
       return {
         edits: [
-          { path: "plan.experiment", value: experiment },
+          { path: "experimentPlan", value: experiment },
           {
             path: "answer",
             value: copy("Unexpected factual drift.", "模型擅自更改了结论。"),
@@ -534,8 +686,8 @@ test("source checkpoints support bounded recovery with direct writing and light 
       if (calls > 2) {
         assert.deepEqual((_input as any).changedFields, [
           {
-            path: "plan.experiment",
-            before: brief().plan.experiment,
+            path: "experimentPlan",
+            before: brief().experimentPlan,
             after: experiment,
           },
         ]);
@@ -572,10 +724,13 @@ test("source checkpoints support bounded recovery with direct writing and light 
     assert.equal(calls, 5);
     assert.ok(checkpoints >= 4);
     assert.ok(t.result);
-    assert.deepEqual(t.result, {
-      ...brief(),
-      plan: { ...brief().plan, experiment },
-    });
+    assert.deepEqual(
+      t.result,
+      normalizeDeepBrief({
+        ...brief(),
+        experimentPlan: experiment,
+      }),
+    );
     assert.equal(t.problem, undefined);
   } finally {
     await e.close();
@@ -1755,7 +1910,7 @@ test("wording edits receive the paired meaning and preserve unrequested text and
   const e = new Engine(new Store(dir)),
     t = task(),
     candidate = brief();
-  candidate.plan.changeIf = {
+  candidate.plan.maintenance = {
     en: "If zero testers use the queue, test the simpler composer with the same group.",
     zh: "若无人使用队列，则请同一组试用者测试简化的编辑器。",
   };
@@ -1774,19 +1929,22 @@ test("wording edits receive the paired meaning and preserve unrequested text and
       copyCalls++;
       assert.deepEqual((input as any).fields, [
         {
-          path: "plan.changeIf.zh",
-          value: candidate.plan.changeIf.zh,
+          path: "plan.maintenance.zh",
+          value: candidate.plan.maintenance.zh,
           maxCharacters: 240,
-          counterpart: { language: "en", value: candidate.plan.changeIf.en },
+          counterpart: { language: "en", value: candidate.plan.maintenance.en },
         },
       ]);
       return {
         edits: [
           {
-            path: "plan.changeIf.zh",
+            path: "plan.maintenance.zh",
             value: "若队列使用人数为0，则请同一组试用者测试简化的编辑器。",
           },
-          { path: "plan.changeIf.en", value: "Change the original meaning." },
+          {
+            path: "plan.maintenance.en",
+            value: "Change the original meaning.",
+          },
           {
             path: "findings.0.evidence.0.quote",
             value: "Invent a different source quote.",
@@ -1802,7 +1960,7 @@ test("wording edits receive the paired meaning and preserve unrequested text and
     assert.equal(await runDeepResearch(e, t, () => {}), true);
     assert.equal(copyCalls, 1);
     const expected = structuredClone(candidate);
-    expected.plan.changeIf.zh =
+    expected.plan.maintenance.zh =
       "若队列使用人数为0，则请同一组试用者测试简化的编辑器。";
     assert.deepEqual(t.result, expected);
   } finally {

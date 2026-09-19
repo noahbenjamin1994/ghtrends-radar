@@ -10,7 +10,14 @@ export function projectUseConditions(brief: Brief, directionId: string) {
       .find((d) => d.id === directionId)
       ?.facts.map((f) => f.id) || [],
   );
-  return brief.sources
+  return sourceUseConditions(brief.sources, ids);
+}
+
+export function sourceUseConditions(
+  sources: ResearchSource[],
+  ids: Set<string>,
+) {
+  return sources
     .filter((s) => s.id && ids.has(s.id))
     .flatMap((s) => {
       const project = s.url.match(

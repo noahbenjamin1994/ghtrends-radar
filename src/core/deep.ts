@@ -3,11 +3,18 @@ import { profileSchema } from "./fit.js";
 import { hasNegativeWording, proseCounterpart } from "./i18n.js";
 import { evidenceRef, recoverSourceQuote } from "./opportunities.js";
 import { validQuote } from "./landscape.js";
+import { sourceUseConditions, projectUseCopy } from "./capabilities.js";
+import {
+  countedExperimentSchema,
+  experimentPlanSchema,
+  normalizeExperimentPlan,
+  renderExperiment,
+} from "./experiment.js";
 import type { ResearchSource } from "./types.js";
 import type { WebEvidence, SearchQuery } from "../providers/search.js";
 import type { DocumentRead } from "../providers/documents.js";
 
-export const DEEP_VERSION = "5";
+export const DEEP_VERSION = "6";
 export const deepQuestions = {
   competitors: [
     "Where is the opening among existing products?",
@@ -87,15 +94,57 @@ export const deepBriefSchema = z
           })
           .strip(),
         maintenance: copy,
-        experiment: copy,
+        experiment: z.object({
+          en: z.string().min(8).max(1100),
+          zh: z.string().min(5).max(1100),
+        }),
         continueIf: copy,
         changeIf: copy,
       })
       .strip(),
     checks: z.array(copy).max(5),
+    experimentPlan: experimentPlanSchema.optional(),
   })
   .strip();
 export type DeepBrief = z.infer<typeof deepBriefSchema>;
+
+/** Only the five authored fields and shared counts are generated for new pilots. */
+export const deepGenerationSchema = deepBriefSchema.extend({
+  plan: deepBriefSchema.shape.plan.omit({
+    experiment: true,
+    continueIf: true,
+    changeIf: true,
+  }),
+  experimentPlan: countedExperimentSchema,
+  checks: deepBriefSchema.shape.checks.max(3),
+});
+
+export function deepProjectUseConditions(
+  result: DeepBrief,
+  sources: ResearchSource[],
+) {
+  const ids = new Set(
+    result.findings.flatMap((f) => f.evidence.map((ref) => ref.id)),
+  );
+  // A cited license or release belongs to the same repository's README notice.
+  const projects = new Set(
+    sources
+      .filter((s) => ids.has(s.id || ""))
+      .flatMap(
+        (s) =>
+          /^https:\/\/github\.com\/([^/?#]+\/[^/?#]+)(?:\/|$)/i
+            .exec(s.url)?.[1]
+            ?.toLowerCase() || [],
+      ),
+  );
+  for (const s of sources) {
+    const project = /^https:\/\/github\.com\/([^/?#]+\/[^/?#]+)(?:\/|$)/i
+      .exec(s.url)?.[1]
+      ?.toLowerCase();
+    if (s.id && project && projects.has(project)) ids.add(s.id);
+  }
+  return sourceUseConditions(sources, ids);
+}
 
 /** Small, fixed edit targets keep bilingual claims and evidence together. */
 export function deepEditableFields(
@@ -112,10 +161,19 @@ export function deepEditableFields(
         ["subject", "statement", "implication", "basis", "evidence"] as const
       ).map((key) => ({ path: `findings.${i}.${key}`, value: finding[key] })),
     ),
-    ...Object.entries(value.plan).map(([key, item]) => ({
-      path: `plan.${key}`,
-      value: item,
-    })),
+    ...Object.entries(value.plan)
+      .filter(
+        ([key]) =>
+          !value.experimentPlan?.counts ||
+          !["experiment", "continueIf", "changeIf"].includes(key),
+      )
+      .map(([key, item]) => ({
+        path: `plan.${key}`,
+        value: item,
+      })),
+    ...(value.experimentPlan
+      ? [{ path: "experimentPlan", value: value.experimentPlan }]
+      : []),
     { path: "checks", value: value.checks },
   ];
 }
@@ -172,6 +230,20 @@ export function normalizeDeepBrief(
 ): unknown {
   if (!raw || typeof raw !== "object") return raw;
   const value = structuredClone(raw) as any;
+  const experiment = normalizeExperimentPlan(value.experimentPlan);
+  if (experiment?.counts && value.plan && typeof value.plan === "object") {
+    value.experimentPlan = experiment;
+    for (const lang of ["en", "zh"] as const) {
+      const rendered = renderExperiment(experiment, lang);
+      for (const [key, text] of Object.entries({
+        experiment: rendered.experiment,
+        continueIf: rendered.successSignal,
+        changeIf: rendered.pivotSignal,
+      })) {
+        value.plan[key] = { ...value.plan[key], [lang]: text };
+      }
+    }
+  }
   if (value.checks === undefined && Array.isArray(value.plan?.checks)) {
     value.checks = value.plan.checks;
     delete value.plan.checks;
@@ -221,20 +293,42 @@ export function deepCopyRepairs(raw: unknown, sources: ResearchSource[] = []) {
     counterpart?: { language: "en" | "zh"; value: string };
   }[] = [];
   const visit = (v: unknown, path: string) => {
+    if (
+      (raw as any)?.experimentPlan?.counts &&
+      /^plan\.(experiment|continueIf|changeIf)(\.|$)/.test(path)
+    )
+      return;
     const prose =
       /^(?:headline|answer|findings\.\d+\.(?:subject|statement|implication)|plan\.(?:deliverable|resources|effort\.assumption|maintenance|experiment|continueIf|changeIf)|checks\.\d+)\.(en|zh)$/.exec(
         path,
       );
-    const maxCharacters = path.includes(".subject.")
-      ? prose?.[1] === "zh"
-        ? 60
-        : 100
-      : prose?.[1] === "zh"
-        ? 240
-        : 500;
+    const pilot =
+      /^experimentPlan\.(en|zh)\.(participants|task|timebox|measurement|redirectAction)$/.exec(
+        path,
+      );
+    if (/^experimentPlan\.(en|zh)\.(continueIf|redirectIf)$/.test(path)) return;
+    const maxCharacters = pilot
+      ? (
+          {
+            participants: 200,
+            task: 280,
+            timebox: 140,
+            measurement: 200,
+            redirectAction: 140,
+          } as Record<string, number>
+        )[pilot[2]!]!
+      : path.startsWith("plan.experiment.")
+        ? 1100
+        : path.includes(".subject.")
+          ? prose?.[1] === "zh"
+            ? 60
+            : 100
+          : prose?.[1] === "zh"
+            ? 240
+            : 500;
     if (
       typeof v === "string" &&
-      prose &&
+      (prose || pilot) &&
       (hasNegativeWording(v) ||
         v.length > maxCharacters ||
         /\bknownProjects\b/.test(v) ||
@@ -333,7 +427,17 @@ export const deepPlanLabels = {
 export function deepProblems(
   raw: unknown,
   sources: ResearchSource[],
+  directionId?: string,
 ): string[] {
+  if ((raw as any)?.experimentPlan?.counts) {
+    const pilot = countedExperimentSchema.safeParse(
+      (raw as any).experimentPlan,
+    );
+    if (!pilot.success)
+      return pilot.error.issues
+        .slice(0, 8)
+        .map((i) => `experimentPlan.${i.path.join(".")}: ${i.message}`);
+  }
   const parsed = deepBriefSchema.safeParse(raw);
   if (!parsed.success)
     return parsed.error.issues
@@ -341,6 +445,33 @@ export function deepProblems(
       .map((i) => `${i.path.join(".")}: ${i.message}`);
   const result = parsed.data,
     problems: string[] = [];
+  if (
+    directionId &&
+    (!result.experimentPlan?.counts ||
+      result.experimentPlan.directionId !== directionId)
+  )
+    problems.push(
+      "experimentPlan: provide shared pilot counts for the selected directionId.",
+    );
+  if (result.experimentPlan?.counts) {
+    const normalized = normalizeExperimentPlan(result.experimentPlan);
+    if (!normalized)
+      problems.push(
+        "experimentPlan: use valid shared counts and bounded bilingual task fields.",
+      );
+    else
+      for (const lang of ["en", "zh"] as const) {
+        const rendered = renderExperiment(normalized, lang);
+        if (
+          result.plan.experiment[lang] !== rendered.experiment ||
+          result.plan.continueIf[lang] !== rendered.successSignal ||
+          result.plan.changeIf[lang] !== rendered.pivotSignal
+        )
+          problems.push(
+            "experimentPlan: derive both languages' experiment and decisions from the same shared counts.",
+          );
+      }
+  }
   if (result.plan.effort.hoursMax < result.plan.effort.hoursMin)
     problems.push(
       "plan.effort: hoursMax must be at least hoursMin; use one coherent total effort range.",
@@ -368,7 +499,7 @@ export function deepProblems(
   const checkCopy = (v: unknown, path: string) => {
     if (
       typeof v === "string" &&
-      /\.(en|zh)$/.test(path) &&
+      (/\.(en|zh)$/.test(path) || /^experimentPlan\.(en|zh)\./.test(path)) &&
       hasNegativeWording(v)
     )
       problems.push(
@@ -476,7 +607,7 @@ export function deepMarkdown(task: DeepTaskView, lang: "en" | "zh") {
           "",
         );
     }
-    for (const [key, label] of Object.entries(deepPlanLabels))
+    for (const [key, label] of Object.entries(deepPlanLabels)) {
       lines.push(
         `### ${l(label)}`,
         "",
@@ -487,6 +618,24 @@ export function deepMarkdown(task: DeepTaskView, lang: "en" | "zh") {
         ),
         "",
       );
+      if (key === "resources") {
+        const notices = deepProjectUseConditions(
+            b,
+            task.evidence?.sources || [],
+          ),
+          copy = projectUseCopy(lang);
+        if (notices.length) {
+          lines.push(`#### ${copy.title}`, "", copy.text, "");
+          for (const notice of notices)
+            lines.push(
+              `> ${literal(notice.quote)}`,
+              "",
+              `[${literal(notice.project)}](${notice.url.replace(/[()\s]/g, encodeURIComponent)})`,
+              "",
+            );
+        }
+      }
+    }
     if (b.checks.length)
       lines.push(
         `### ${l(["Checks before committing", "投入前再核对"])}`,

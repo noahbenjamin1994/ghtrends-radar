@@ -11,10 +11,12 @@ import {
   deepPlanLabels,
   deepQuestions,
   deepEffortText,
+  deepProjectUseConditions,
   type DeepAllowance,
   type DeepTaskView,
   type DeepRequest,
 } from "../core/deep.js";
+import { projectUseCopy } from "../core/capabilities.js";
 import type { ResourceProfile } from "../core/fit.js";
 import type { CreditsResponse } from "../core/credits.js";
 import type { Account } from "./account.js";
@@ -422,6 +424,10 @@ export function DeepResearchView({
       <Loading />
     );
   const result = task.result,
+    useConditions = result
+      ? deepProjectUseConditions(result, task.evidence?.sources || [])
+      : [],
+    useCopy = projectUseCopy(locale),
     active = ["queued", "running"].includes(task.state);
   return (
     <article className="deep-page">
@@ -673,6 +679,28 @@ export function DeepResearchView({
                       : result.plan[
                           key as Exclude<keyof typeof result.plan, "effort">
                         ][locale]}
+                    {key === "resources" && useConditions.length > 0 && (
+                      <aside
+                        className="opportunity-use-conditions"
+                        aria-label={useCopy.title}
+                      >
+                        <strong>{useCopy.title}</strong>
+                        <p>{useCopy.text}</p>
+                        {useConditions.map((notice) => (
+                          <div key={notice.project + notice.quote}>
+                            <a
+                              href={notice.url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {notice.project}
+                              <ArrowUpRight size={13} />
+                            </a>
+                            <blockquote>{notice.quote}</blockquote>
+                          </div>
+                        ))}
+                      </aside>
+                    )}
                   </dd>
                 </div>
               ))}
