@@ -21,6 +21,7 @@ import {
   type StrategyResponse,
 } from "../src/core/strategy.js";
 import { reportIssueSignals } from "../src/core/gaps.js";
+import { researchLandscape } from "../src/core/landscape.js";
 import { marketMarkdown } from "../src/core/report.js";
 import { renderDocument } from "../src/server/html.js";
 import type { Market, ResearchSource } from "../src/core/types.js";
@@ -218,7 +219,7 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     assert.ok(visibleStrategy(b, "zh"));
     assert.equal(visibleOpportunities(b)?.opportunities.length, 3);
     assert.ok(visibleStrategy({ ...b, strategyVersion: "1" }, "zh"));
-    for (const version of ["5", "6", "7", "8"]) {
+    for (const version of ["5", "6", "7", "8", "9"]) {
       assert.ok(visibleStrategy({ ...b, strategyVersion: version }, "zh"));
       assert.equal(
         visibleOpportunities({ ...b, strategyVersion: version })?.opportunities
@@ -829,7 +830,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "8");
+    assert.equal(brief.strategyVersion, "9");
     const legacy = {
       ...brief,
       strategyVersion: "2",
@@ -1186,6 +1187,99 @@ test("Issue interpretation accepts only real request identities and exact quotes
     assert.equal(result.length, 1);
     assert.equal(result[0].sourceId, "I1");
   }));
+
+test("advice stays in source audit and contributes zero user-demand cards or observed demand votes", () => {
+  const sources: ResearchSource[] = [
+    {
+      id: "I1",
+      kind: "request",
+      label: "Form advice",
+      url: "https://news.ycombinator.com/item?id=40179924",
+      excerpt: 'You guys know that you can use "mailto:" as form action, yes?',
+    },
+    {
+      id: "D1I1",
+      kind: "request",
+      label: "Same comment retrieved again",
+      url: "https://news.ycombinator.com/item?id=40179924",
+      excerpt: 'You guys know that you can use "mailto:" as form action, yes?',
+      directionId: "review-anchors",
+    },
+    {
+      id: "P1",
+      kind: "project",
+      label: "Existing form builder",
+      url: "https://github.com/team/forms",
+      excerpt: "The form builder accepts email submissions.",
+    },
+  ];
+  const data = sample();
+  const copy = {
+    title: "An existing email form action",
+    audience: "A commenter discussing form delivery.",
+    need: "The commenter recommends the existing mailto action.",
+    opportunity: "Check whether that workaround fits the intended form.",
+    check: "Test behavior in the intended browser and email client.",
+  };
+  data.issueInsights = [
+    {
+      sourceId: "I1",
+      relevance: "direct",
+      kind: "advice",
+      en: copy,
+      zh: copy,
+      evidence: { id: "I1", quote: sources[0]!.excerpt! },
+    },
+  ];
+  data.opportunities[0]!.demand = {
+    level: "high",
+    basis: "observed",
+    evidence: [{ id: "D1I1", quote: sources[1]!.excerpt! }],
+  };
+  const grounded = groundOpportunityRatings(data, sources) as typeof data;
+  assert.equal(grounded.opportunities[0]!.demand.basis, "inferred");
+  assert.equal(grounded.opportunities[0]!.demand.level, "exploratory");
+  assert.deepEqual(grounded.issueInsights, data.issueInsights);
+  const market = structuredClone(seed);
+  market.gaps = [];
+  market.brief = {
+    model: "test",
+    generatedAt: market.asOf,
+    en: { summary: "Summary", nextSteps: [] },
+    zh: { summary: "总结", nextSteps: [] },
+    sources,
+    issueInsights: data.issueInsights,
+    landscape: {
+      demand: {
+        level: "medium",
+        evidence: [{ id: "D1I1", quote: sources[1]!.excerpt! }],
+      },
+      competition: {
+        level: "low",
+        evidence: [{ id: "P1", quote: sources[2]!.excerpt! }],
+      },
+      barrier: "low",
+      leaders: [],
+      en: {
+        summary: "Explore a form workflow.",
+        demand: "An email form action is discussed.",
+        competition: "One form tool supplies a baseline.",
+        entry: "Test the proposed form workflow.",
+      },
+      zh: {
+        summary: "探索表单工作流。",
+        demand: "讨论提到了邮件表单。",
+        competition: "已有表单工具提供参照。",
+        entry: "验证具体的表单工作流。",
+      },
+    },
+  };
+  assert.equal(reportIssueSignals(market).length, 0);
+  assert.equal(researchLandscape(market)?.kind, "uncertain");
+  market.brief.issueInsights![0]!.kind = "feature-request";
+  assert.equal(reportIssueSignals(market).length, 1);
+  assert.equal(researchLandscape(market)?.kind, "blue");
+});
 
 test("the selected open-source direction can provide the strategy's documented premise", () => {
   const sources = strategySources(

@@ -109,6 +109,7 @@ export function RequestCard({
     migration: ["Switching solutions", "迁移意向"],
     alternative: ["Alternative sought", "寻找替代方案"],
     promotion: ["Publisher introduction", "作者介绍"],
+    advice: ["Existing approaches and advice", "已有办法与建议"],
   };
   const label = labels[insight?.kind || g.label];
   const release = brief?.sources.find(

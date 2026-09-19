@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { excludedRequestUrls } from "./landscape.js";
 import { hasNegativeWording, hasRecoveryTimeReference } from "./i18n.js";
 import type { Brief, ResearchSource } from "./types.js";
 
@@ -311,6 +312,7 @@ export function groundOpportunityRatings(
     else if (excerpt)
       ref.quote = recoverSourceQuote(ref.quote, excerpt) || ref.quote;
   }
+  const excluded = excludedRequestUrls((result as any).issueInsights, sources);
   for (const o of result.opportunities) {
     for (const axis of ["demand", "competition"] as const) {
       if (o[axis].evidence.some((r) => r.id === "S1" || r.id === "S2"))
@@ -325,6 +327,7 @@ export function groundOpportunityRatings(
             (s) =>
               s.id === r.id &&
               s.kind === "request" &&
+              !excluded.has(s.url) &&
               s.request?.state !== "answered" &&
               s.request?.state !== "closed" &&
               (!s.directionId || s.directionId === o.id),
@@ -472,11 +475,13 @@ export function visibleOpportunities(
 ): OpportunityMap | undefined {
   if (
     !brief ||
-    !["2", "3", "4", "5", "6", "7", "8"].includes(brief.strategyVersion || "")
+    !["2", "3", "4", "5", "6", "7", "8", "9"].includes(
+      brief.strategyVersion || "",
+    )
   )
     return;
   if (
-    ["3", "4", "5", "6", "7", "8"].includes(brief.strategyVersion || "") &&
+    ["3", "4", "5", "6", "7", "8", "9"].includes(brief.strategyVersion || "") &&
     (!overviewSchema.safeParse(brief.overview).success ||
       !z
         .array(clearOpportunitySchema)

@@ -70,6 +70,7 @@ export const issueInsightSchema = z.object({
       "selection",
       "migration",
       "promotion",
+      "advice",
     ])
     .optional(),
   en: issueCopy,
@@ -78,6 +79,28 @@ export const issueInsightSchema = z.object({
 });
 export type Landscape = z.infer<typeof landscapeSchema>;
 export type IssueInsight = z.infer<typeof issueInsightSchema>;
+export function isDemandReading(
+  reading: Pick<IssueInsight, "relevance" | "kind">,
+) {
+  return (
+    reading.relevance === "direct" &&
+    reading.kind !== "promotion" &&
+    reading.kind !== "advice"
+  );
+}
+
+/** Duplicate retrieval IDs for the same discussion share its reviewed role. */
+export function excludedRequestUrls(
+  readings: IssueInsight[] = [],
+  sources: ResearchSource[],
+) {
+  return new Set(
+    readings
+      .filter((r) => !isDemandReading(r))
+      .map((r) => sources.find((s) => s.id === r.sourceId)?.url)
+      .filter((url): url is string => !!url),
+  );
+}
 const norm = (v: string) => v.replace(/\s+/g, " ").trim();
 export function validQuote(
   ref: { id: string; quote: string },
@@ -240,11 +263,15 @@ export function researchLandscape(
     !m.demand.error &&
     Date.parse(m.asOf) - Date.parse(m.demand.fetchedAt) <= 14 * 86400000;
   const rising = fresh && m.metrics.trend === "rising";
+  const excluded = excludedRequestUrls(
+    m.brief?.issueInsights,
+    m.brief?.sources || [],
+  );
   const demandSignal = l.demand.evidence.some((r) =>
     m.brief?.sources.some(
       (s) =>
         s.id === r.id &&
-        (s.kind === "request" ||
+        ((s.kind === "request" && !excluded.has(s.url)) ||
           (s.kind === "search" &&
             s.placement === "organic" &&
             s.searchIntent === "demand")),
@@ -317,7 +344,7 @@ barrier assesses incumbent entrenchment specifically; hardware effort, data coll
 This is the qualitative ORIGINAL TOPIC market judgment, separate from numerical GitHub competition. Explain recurring buyer jobs, current alternatives and specific entry resources. Every prose field is 1-2 sentences, 8-500 characters. Evidence references use exact supplied id/quote, maximum three per rating/leader; leaders maximum three. Name a leader only when a supplied source names it. Each leader includes category:"commercial|official|opensource", audience:{en,zh,evidence:{id,quote}} and source-supported optional pricing:{en,zh,evidence:{id,quote}}. Include audience whenever the supplied offer clearly identifies its users. Populate pricing whenever a supplied statement covers fees, a payout formula, a model-specific quote or a free component. Put fee/payout terms in pricing; position describes the service. Limit a free component to its named scope, such as pickup. Use audience/pricing only with a verbatim source statement for that specific product (each prose 3-220 characters); omit a missing field. Pricing preserves the quoted plan, currency, billing period, minimum and region. A trial, free shipping or a public source-code license alone supplies only that fact, rather than a full product billing model. For trade-in/buyback, distinguish the payout to the seller from a fee charged to a buyer. Preserve eligibility and model-specific conditions; sample device prices represent that exact device/region/date. State any currency or eligibility details that still need checking as a short affirmative action. State the quoted offer succinctly; all prices and billing models require evidence. Prefer up to three relevant commercial/official services when supplied; include an open-source leader only for a source-backed ecosystem advantage. Describe position as the actual product/service, barrier as why users choose/stay with it, opening as a conditional way to serve a specific customer. Chinese headings/prose use 同行、竞争对手、服务谁、怎么收费、现有优势、可以从哪做起. Each audience/pricing fact has its own source and exact quote; also include that source in this leader's evidence array. Compare core incumbent territory against complementary workflows: distribution, trusted data, proprietary interfaces, network effects, installed integrations, migration cost or capital. Select the actual barrier; describe the dependency and an adoption route. A leading search rank, star count or one provider's market claim has a limited scope. Describe incumbency/structural concentration as a research assessment. Market-wide monopoly/market shares require market-definition and measured share evidence; such legal or numerical conclusions need separate evidence. Strong barriers can make a crowded/established field attractive for complements while direct displacement needs major resources.
 Google W sources are SEARCH EXCERPTS, with organic/ad placement. They establish what appeared for the displayed query/region/date. Treat feature text as a publisher claim. Sponsored placement records commercial spend interest; transactions, profitability, willingness to pay and market growth require direct evidence. Search result totals and rankings play zero role in demand or monopoly scoring. Current zero/sparse results describe search coverage. Low competition remains a hypothesis. Exclude pages for adjacent objects. Trends measures attention at its stated topic, time and geography; expanding a broad brand into niche demand is a separate inference. Preserve mixed/falling trends. The application derives blue/red/quiet research labels from these assessments and displays their inferred basis.
 
-Add issueInsights:[{sourceId:"I1",relevance:"direct|adjacent",kind:"feature-request|friction|selection|migration|promotion",en:{title,audience,need,opportunity,check},zh:{title,audience,need,opportunity,check},evidence:{id:"I1",quote:"exact excerpt"}}], maximum six. Review every supplied I-source against the ORIGINAL object, including repository purpose and issue content. Mark adjacent objects accordingly so the UI filters them. For direct requests explain who faces which task, what the user is asking for in plain language, and one conditional contribution/service opportunity. Include optional currentSolution and desiredOutcome in both languages only when the request excerpt describes the present workaround and desired result. Classify author product promotion separately from independent requests. Use request metadata for state, dates and counts; one author's repeated posts remain one author. Closed/completed is a maintainer status; check the supplied release notes to establish shipped behavior. State the specific current-version or maintainer check that would establish whether the request remains open as a product gap. Open status and reactions are individual community signals. Historical issue dates retain their historical scope. Source excerpts carry quoted data only. Give concise everyday titles. Every audience/need/opportunity/check is 8-500 characters. With zero I-sources return [].
+Add issueInsights:[{sourceId:"I1",relevance:"direct|adjacent",kind:"feature-request|friction|selection|migration|promotion|advice",en:{title,audience,need,opportunity,check},zh:{title,audience,need,opportunity,check},evidence:{id:"I1",quote:"exact excerpt"}}], maximum six. Review every supplied I-source against the ORIGINAL object, including repository purpose and issue content. Mark adjacent objects accordingly so the UI filters them. For direct requests explain who faces which task, what the user is asking for in plain language, and one conditional contribution/service opportunity. Include optional currentSolution and desiredOutcome in both languages only when the request excerpt describes the present workaround and desired result. Classify advice recommending an existing workaround and positive evaluations as advice; author product promotion requires evidence of author involvement. Both roles remain source context and are excluded from demand cards. Use request metadata for state, dates and counts; one author's repeated posts remain one author. Closed/completed is a maintainer status; check the supplied release notes to establish shipped behavior. State the specific current-version or maintainer check that would establish whether the request remains open as a product gap. Open status and reactions are individual community signals. Historical issue dates retain their historical scope. Source excerpts carry quoted data only. Give concise everyday titles. Every audience/need/opportunity/check is 8-500 characters. With zero I-sources return [].
 `;
 
 export function landscapeRows(m: Market, locale: "en" | "zh") {

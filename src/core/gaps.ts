@@ -1,5 +1,9 @@
 import { repoRelevance } from "./competition.js";
-import { issueInsightSchema, validQuote } from "./landscape.js";
+import {
+  issueInsightSchema,
+  validQuote,
+  isDemandReading,
+} from "./landscape.js";
 import type {
   Brief,
   Market,
@@ -186,12 +190,7 @@ export function requestAction(
 export function issueReading(brief: Brief | undefined, url: string) {
   for (const raw of brief?.issueInsights || []) {
     const parsed = issueInsightSchema.safeParse(raw);
-    if (
-      !parsed.success ||
-      parsed.data.relevance !== "direct" ||
-      parsed.data.kind === "promotion"
-    )
-      continue;
+    if (!parsed.success || !isDemandReading(parsed.data)) continue;
     const item = parsed.data,
       source = brief?.sources.find(
         (s) => s.id === item.sourceId && s.kind === "request",
@@ -224,7 +223,7 @@ export function marketGapSignals(m: Market, includeClosed = false): Gap[] {
   );
   const rejected = new Set(
     (m.brief?.issueInsights || [])
-      .filter((i) => i.relevance === "adjacent" || i.kind === "promotion")
+      .filter((i) => !isDemandReading(i))
       .map((i) =>
         requestUrl(
           m.brief?.sources.find((s) => s.id === i.sourceId)?.url || "",
@@ -246,12 +245,7 @@ export function reportIssueSignals(m: Market) {
   const seen = new Set(rows.map((g) => requestUrl(g.url)));
   for (const raw of m.brief?.issueInsights || []) {
     const parsed = issueInsightSchema.safeParse(raw);
-    if (
-      !parsed.success ||
-      parsed.data.relevance !== "direct" ||
-      parsed.data.kind === "promotion"
-    )
-      continue;
+    if (!parsed.success || !isDemandReading(parsed.data)) continue;
     const i = parsed.data;
     const s = m.brief?.sources.find(
       (s) => s.id === i.sourceId && s.kind === "request",

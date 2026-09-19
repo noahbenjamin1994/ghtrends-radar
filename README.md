@@ -213,6 +213,8 @@ The report combines Trends, commercial alternatives and the open-source ecosyste
 
 Light reasoning produces a compact blueprint; direct generation writes concise bilingual direction, priority and overall sections. Each section is validated and cached. A final review checks source scope, actual capabilities, proposed services and bilingual meaning; oversized passages receive targeted edits. Issue interpretations use only supplied request sources. Admin records the usage of each step.
 
+Community readings distinguish specific requests and user experiences from existing-workaround advice and author promotion. Advice and promotion remain source context and contribute zero demand votes or demand cards, including duplicate retrievals of the same comment. Research proposals state skills, permissions, recruiting access and participants as requirements, preserving source dates, versions and testing restrictions.
+
 `GHTRENDS_RESEARCH_THINKING=low` is the default: light thinking for the research blueprint, request interpretation and independent evidence review; direct generation for report writing. Copy editing starts in direct mode; repeatedly failing fields receive one bounded low-effort repair. Set `off` for direct generation throughout when comparing cost and quality on your own topics. Repeated citation metadata and translated context are omitted from model inputs; stored source evidence stays complete. Admin shows the active policy and reasoning tokens as a component of total output, with older missing breakdowns marked pending.
 
 **Access and research credits**
