@@ -170,6 +170,11 @@ export function proseRepairs(
   const visit = (node: unknown, path: string) => {
     if (typeof node === "string") {
       if (
+        data.experimentPlan?.counts &&
+        /^experimentPlan\.(?:en|zh)\.(?:continueIf|redirectIf)$/.test(path)
+      )
+        return;
+      if (
         sharedPilot &&
         (/^(?:en|zh)\.strategy\.(?:experiment|successSignal|pivotSignal)$/.test(
           path,
@@ -584,6 +589,7 @@ export function visibleOpportunities(
       "14",
       "15",
       "16",
+      "17",
     ].includes(brief.strategyVersion || "")
   )
     return;
@@ -603,6 +609,7 @@ export function visibleOpportunities(
       "14",
       "15",
       "16",
+      "17",
     ].includes(brief.strategyVersion || "") &&
     (!overviewSchema.safeParse(brief.overview).success ||
       !z

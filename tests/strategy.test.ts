@@ -211,6 +211,41 @@ function sample(): StrategyResponse {
   };
   return syncExperimentPlan(value);
 }
+function countedSample(): StrategyResponse {
+  const value = sample();
+  value.experimentPlan = {
+    directionId: value.recommendedId,
+    counts: {
+      participants: 5,
+      tasksPerParticipant: 2,
+      successfulTasksPerParticipant: 2,
+      continueAt: 4,
+      redirectAtMost: 2,
+    },
+    en: {
+      participants:
+        "Documentation reviewers who consent to using redacted fixtures.",
+      task: "Relocate a review comment after a split using each workflow.",
+      timebox:
+        "Run a one-week pilot after confirming recruitment and source permissions.",
+      measurement:
+        "The anchor identifies its correct passage within the existing workflow's time.",
+      redirectAction: "Try a handoff checklist for the same review task.",
+      continueIf: "Derived during synchronization.",
+      redirectIf: "Derived during synchronization.",
+    },
+    zh: {
+      participants: "征得同意的文档评审者，使用脱敏文档样例。",
+      task: "分别使用现有流程和拟议工具，定位文件拆分后的评论。",
+      timebox: "确认招募和资料权限后，开展一周试验。",
+      measurement: "锚点指向正确段落，且用时至多为现有流程的耗时。",
+      redirectAction: "围绕同一评审任务测试交接清单。",
+      continueIf: "由程序根据共享数字生成。",
+      redirectIf: "由程序根据共享数字生成。",
+    },
+  };
+  return syncExperimentPlan(value);
+}
 function capabilitySample(directions: { id: string }[]) {
   return {
     directions: directions.map((d) => ({
@@ -305,12 +340,12 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
       );
       assert.ok(budget! >= 8000);
       if (ops.length === 1) {
-        const bad = sample();
+        const bad = countedSample();
         bad.en.strategy.wedge = "Build an MVP";
         return bad;
       }
       assert.ok(input.requiredCorrections.length);
-      return sample();
+      return countedSample();
     };
     const b = await r.insights(seed, documents, () => reviews++);
     assert.equal(b.reviewed, true);
@@ -532,14 +567,17 @@ test("existing implementations reach the critic; corrective editing preserves th
     r.json = async (_system, input: any, _budget, op, thinking) => {
       if (op === "capability-audit") return capabilitySample(input.directions);
       ops.push(op!);
-      const result = sample();
+      const result = countedSample();
       if (op === "strategy") return result;
       assert.ok(input.sources.some((s: ResearchSource) => s.id === "A1R"));
       if (op === "strategy-evidence-review") {
         assert.ok(input.requiredCorrections.length);
         return {
           edits: [
-            { path: "en.strategy.wedge", value: sample().en.strategy.wedge },
+            {
+              path: "en.strategy.wedge",
+              value: countedSample().en.strategy.wedge,
+            },
           ],
         };
       }
@@ -574,7 +612,7 @@ test("existing implementations reach the critic; corrective editing preserves th
     assert.equal(result.reviewed, true);
     assert.match(result.en.strategy!.angle, /existing review tool/);
     assert.ok(result.sources.some((s) => s.id === "A1R"));
-    const words = sample();
+    const words = countedSample();
     words.experimentPlan!.en.continueIf =
       "Proposed continue threshold: three of four teams retain their review anchors.";
     words.experimentPlan!.zh.continueIf =
@@ -884,7 +922,10 @@ test("every direction receives scoped evidence; one source failure preserves the
         ).toString("base64"),
       } as T;
     };
-    const dirs = sample().opportunities.map(({ id, query }) => ({ id, query }));
+    const dirs = countedSample().opportunities.map(({ id, query }) => ({
+      id,
+      query,
+    }));
     const evidence = await gh.directionEvidence([
       ...dirs,
       { id: "unsafe", query: "org:private" },
@@ -905,7 +946,7 @@ test("every direction receives scoped evidence; one source failure preserves the
             (s: ResearchSource) => s.directionId === "translation-review",
           ),
         );
-      return sample();
+      return countedSample();
     };
     let calls = 0;
     const b = await r.insights(
@@ -1094,7 +1135,7 @@ test("reference-style Markdown labels recover their original span and unique sam
 
 test("new reports require an overall answer and a readable customer need and offer; old reports remain readable", async () =>
   fixture(async (r) => {
-    const missingOverview: any = sample();
+    const missingOverview: any = countedSample();
     delete missingOverview.overview;
     assert.ok(
       strategyProblems(
@@ -1103,7 +1144,7 @@ test("new reports require an overall answer and a readable customer need and off
         seed,
       ).some((p) => p.includes("overview")),
     );
-    const missingOffer: any = sample();
+    const missingOffer: any = countedSample();
     delete missingOffer.opportunities[0].zh.service;
     assert.ok(
       strategyProblems(
@@ -1115,9 +1156,9 @@ test("new reports require an overall answer and a readable customer need and off
     r.json = async (_prompt, input: any, _budget, operation) =>
       operation === "capability-audit"
         ? capabilitySample(input.directions)
-        : sample();
+        : countedSample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "16");
+    assert.equal(brief.strategyVersion, "17");
     const legacy = {
       ...brief,
       strategyVersion: "2",
@@ -1229,7 +1270,7 @@ test("broad topics retain their original scope while relevant project evidence i
         assert.ok(input.projectInventory.some((p: any) => p.id === "R1"));
       } else
         assert.ok(input.sources.some((s: ResearchSource) => s.id === "R1"));
-      const result = sample();
+      const result = countedSample();
       result.evidence = [];
       result.overview.evidence = [];
       return result;
@@ -1264,13 +1305,13 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
   fixture(async (r) => {
     const blueprint = {
       overall: { verdict: "Review continuity is a focused opportunity." },
-      opportunities: sample().opportunities.map((o) => ({
+      opportunities: countedSample().opportunities.map((o) => ({
         id: o.id,
         query: o.query,
         route: "opensource",
         offer: o.en.service,
       })),
-      recommendedId: sample().recommendedId,
+      recommendedId: countedSample().recommendedId,
     };
     const audited = capabilitySample(blueprint.opportunities);
     for (const direction of audited.directions)
@@ -1301,10 +1342,12 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
             (s: ResearchSource) => !["S1", "S2"].includes(s.id!),
           ),
         );
-        return sample().opportunities.find((o) => o.id === input.candidate.id);
+        return countedSample().opportunities.find(
+          (o) => o.id === input.candidate.id,
+        );
       }
       assert.ok(["strategy-priority", "strategy-overall"].includes(operation!));
-      const { opportunities, ...overall } = sample();
+      const { opportunities, ...overall } = countedSample();
       return overall;
     };
     const brief = await r.insights(
@@ -1331,7 +1374,7 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
 
 test("section format recovery preserves completed siblings and review budget recovery uses one direct response", async () =>
   fixture(async (r) => {
-    const data = sample(),
+    const data = countedSample(),
       calls: string[] = [];
     r.json = async (_prompt, input: any, _budget, operation, thinking) => {
       if (operation === "capability-audit")
@@ -1385,7 +1428,7 @@ test("section format recovery preserves completed siblings and review budget rec
 
 test("an overlong citation ID is resolved as an identity with its actual limit, never shortened as prose", async () =>
   fixture(async (r) => {
-    const data = sample();
+    const data = countedSample();
     let repaired = false;
     r.json = async (_prompt, input: any, _budget, operation) => {
       if (operation === "capability-audit")
@@ -2096,7 +2139,7 @@ test("research reasoning stays bounded and configurable and source compaction ke
 
 test("mixed citation and wording corrections preserve the rest of a complete report", async () =>
   fixture(async (r) => {
-    const good = sample();
+    const good = countedSample();
     const bad = structuredClone(good);
     bad.en.strategy.tradeoff =
       "This prototype does not include dashboard editing.";

@@ -22,43 +22,33 @@ import {
   proseLanguageMismatch,
 } from "./i18n.js";
 import type { Brief, Market, ResearchSource, Strategy } from "./types.js";
+import {
+  experimentPlanSchema,
+  normalizeExperimentPlan,
+  renderExperiment,
+  COUNTED_EXPERIMENT_PROMPT,
+  countedExperimentSchema,
+} from "./experiment.js";
+export { experimentPlanSchema } from "./experiment.js";
+export type { ExperimentPlan } from "./experiment.js";
 
-export const STRATEGY_VERSION = "16";
-const experimentCopy = z.object({
-  participants: z.string().trim().min(8).max(250),
-  task: z.string().trim().min(8).max(350),
-  timebox: z.string().trim().min(8).max(180),
-  measurement: z.string().trim().min(8).max(300),
-  continueIf: z.string().trim().min(8).max(300),
-  redirectIf: z.string().trim().min(8).max(300),
-});
-export const experimentPlanSchema = z.object({
-  directionId: z.string().min(2).max(41),
-  en: experimentCopy,
-  zh: experimentCopy,
-});
-export type ExperimentPlan = z.infer<typeof experimentPlanSchema>;
+export const STRATEGY_VERSION = "17";
 
 /** One authored pilot supplies the summary, direction and exports. */
 export function syncExperimentPlan(raw: any) {
-  const parsed = experimentPlanSchema.safeParse(raw?.experimentPlan);
-  if (!parsed.success || parsed.data.directionId !== raw?.recommendedId)
-    return raw;
+  const plan = normalizeExperimentPlan(raw?.experimentPlan);
+  if (!plan || plan.directionId !== raw?.recommendedId) return raw;
   const selected = raw.opportunities?.find(
     (o: any) => o.id === raw.recommendedId,
   );
   if (!selected) return raw;
   const value = structuredClone(raw);
+  value.experimentPlan = plan;
   const direction = value.opportunities.find(
     (o: any) => o.id === value.recommendedId,
   );
   for (const lang of ["en", "zh"] as const) {
-    const p = parsed.data[lang];
-    const fields = {
-      experiment: [p.participants, p.task, p.timebox, p.measurement].join(" "),
-      successSignal: p.continueIf,
-      pivotSignal: p.redirectIf,
-    };
+    const fields = renderExperiment(plan, lang);
     if (value[lang]?.strategy) Object.assign(value[lang].strategy, fields);
     if (direction[lang]) Object.assign(direction[lang], fields);
   }
@@ -117,6 +107,7 @@ export function strategyProblems(
   sources: ResearchSource[],
   m: Market,
   requireExperimentPlan = false,
+  requireCountedPlan = false,
 ): string[] {
   const parsed = strategyResponse.safeParse(raw);
   if (!parsed.success)
@@ -143,8 +134,27 @@ export function strategyProblems(
     problems.push(
       "Experiment plan: provide one shared bilingual pilot for the recommended direction.",
     );
+  if (requireCountedPlan) {
+    const counted = countedExperimentSchema.safeParse(data.experimentPlan);
+    if (!counted.success)
+      problems.push(
+        ...counted.error.issues.map(
+          (issue) =>
+            `Experiment plan: ${issue.path.join(".")}: ${issue.message}`,
+        ),
+      );
+  }
   if (data.experimentPlan) {
     const synced = syncExperimentPlan(data);
+    if (data.experimentPlan.counts)
+      for (const lang of ["en", "zh"] as const)
+        for (const key of ["continueIf", "redirectIf"] as const)
+          if (
+            data.experimentPlan[lang][key] !== synced.experimentPlan[lang][key]
+          )
+            problems.push(
+              `Experiment plan: ${lang}.${key} must use the shared counts.`,
+            );
     const selected = data.opportunities.find(
       (o) => o.id === data.recommendedId,
     );
@@ -338,6 +348,7 @@ export function visibleStrategy(
       "13",
       "14",
       "15",
+      "16",
       STRATEGY_VERSION,
     ].includes(brief.strategyVersion)
   )
@@ -403,8 +414,7 @@ export const RESEARCH_SCOPE_RULES = `Evidence scope and execution conditions:
 - Skills, permissions, devices, recruitment channels and pilot participants are REQUIRED resources unless the user explicitly supplied them. Describe how to seek access or use public/synthetic fixtures. Use conditional prototype and maintenance estimates; customer commitments and paid pilots are proposed outcomes.
 - The selected direction and root strategy describe ONE experiment: retain its task, cohort, time window, metrics and numerical comparison operators. Translation and summarization preserve these conditions. Additional adoption evidence is a separate later test.`;
 
-export const EXPERIMENT_PLAN_PROMPT = `
-Shared pilot: include experimentPlan {directionId: recommendedId, en: {participants, task, timebox, measurement, continueIf, redirectIf}, zh: {participants, task, timebox, measurement, continueIf, redirectIf}}. Write one short sentence per field. participants states the recruitment target and access; task states the artifact and user task; timebox states the proposed pilot window; measurement states the measured outcome and comparison baseline. Numeric decision rules appear only in continueIf/redirectIf. Preserve counts, time windows, AND/OR and comparison operators across both languages. This shared plan supplies the root strategy and selected direction experiment. Any later study is a separate proposal. Skills, permissions and recruitment remain requirements. Distinguish participants, assets per participant and total task count; every criterion names a unit defined in task/measurement. Length targets: participants 200 characters, task 220, measurement 160, timebox 100, continueIf/redirectIf 240. The schema's hard bounds leave room for essential conditions.`;
+export const EXPERIMENT_PLAN_PROMPT = COUNTED_EXPERIMENT_PROMPT;
 
 export const STRATEGY_PROMPT =
   `You are a product opportunity researcher. First answer the original topic at its full scope, then compare distinct customer jobs and select one for deeper exploration. The user is researching opportunities to build a product or offer a service around the input. Treat earlier query intent as retrieval context; a broad phone-brand input calls for opportunity analysis around phones. Software, data products and services are valid offers. Produce JSON only with this schema:

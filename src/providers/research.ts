@@ -67,12 +67,15 @@ import {
   RESEARCH_SCOPE_RULES,
   strategyResponse,
   strategySchema,
-  experimentPlanSchema,
   syncExperimentPlan,
   strategyProblems,
   strategySources,
   ideaQueries,
 } from "../core/strategy.js";
+import {
+  countedExperimentSchema,
+  COUNTED_EXPERIMENT_PROMPT,
+} from "../core/experiment.js";
 import type {
   Topic,
   QueryPlan,
@@ -1658,7 +1661,7 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
         .extend({
           en: priorityCopy,
           zh: priorityCopy,
-          experimentPlan: experimentPlanSchema,
+          experimentPlan: countedExperimentSchema,
         }),
       {
         input: context.input,
@@ -1683,7 +1686,8 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
         },
       },
       4200,
-      "Write root en/zh headline and summary about the ORIGINAL topic, then the six-field strategy for the recommended direction (angle/audience/mechanism/wedge/tradeoff/assumption). Return the supplied recommendedId, selection reasoning and at most four evidence references. Headline names the original topic and its overall opportunity map; summary compares entry routes at the original scope, with measurements in metric cards. Create ONE experimentPlan bound to recommendedId. Its en and zh objects each contain participants (recruitment target and access), task (artifact and user task), timebox (proposed pilot window), measurement (what to measure and comparison baseline), continueIf and redirectIf (proposed numeric decision criteria). Design the pilot from selected customer job and capabilityCheck. Compare the proposed benefit with the documented existing feature on the same task; derive a fresh baseline and criteria here. Keep the cohort, task and comparison operators consistent. Put decision thresholds ONLY in continueIf/redirectIf; the other four fields describe execution. Distinguish participant count from items per task, and define the sample for every criterion. Keep a five-item fixture as five items, with pilot participants as a separate recruitment target. Target 100 characters per execution field; use the schema bounds when essential scope needs more space. Use the same cohort and metrics for both outcomes. State counts, AND/OR and time windows equivalently in both languages. The application derives the strategy and selected-card experiment from this plan; omit duplicate experiment/successSignal/pivotSignal fields. Recruitment, data access and device permissions remain requirements. State both languages as complete objects.",
+      "Write root en/zh headline and summary about the ORIGINAL topic, then the six-field strategy for the recommended direction (angle/audience/mechanism/wedge/tradeoff/assumption). Return the supplied recommendedId, selection reasoning and at most four evidence references. Headline and summary describe the original topic's opportunity map; measurements belong in metric cards. Design a fresh pilot from the selected customer job and capabilityCheck, using documented existing behavior as its comparison. Omit duplicate strategy experiment/successSignal/pivotSignal fields. " +
+        COUNTED_EXPERIMENT_PROMPT,
     );
     const market = await section(
       "overall",
@@ -1999,7 +2003,7 @@ Each direction must name a familiar customer, task, offered artifact and concret
     }
     draft = groundOpportunityRatings(draft, sources);
     const initialProblems = strategyResponse.safeParse(draft).success
-      ? strategyProblems(draft, sources, m, true)
+      ? strategyProblems(draft, sources, m, true, true)
       : [];
     let final = draft,
       reviewed = false;
@@ -2064,12 +2068,12 @@ Each direction must name a familiar customer, task, offered artifact and concret
       revision = syncExperimentPlan(
         groundOpportunityRatings(revision, sources),
       );
-      let corrections = strategyProblems(revision, sources, m, true);
+      let corrections = strategyProblems(revision, sources, m, true, true);
       if (corrections.length && strategyResponse.safeParse(revision).success) {
         // Quotes and wording are local repairs. Rewriting the whole report here
         // changed valid fields and introduced fresh citation/translation errors.
         revision = await this.repairStrategyCopy(revision, sources);
-        corrections = strategyProblems(revision, sources, m, true);
+        corrections = strategyProblems(revision, sources, m, true, true);
       }
       if (
         corrections.some((c) =>
@@ -2084,7 +2088,7 @@ Each direction must name a familiar customer, task, offered artifact and concret
           requiredCorrections: corrections,
         });
         revision = await this.repairStrategyCopy(revision, sources);
-        corrections = strategyProblems(revision, sources, m, true);
+        corrections = strategyProblems(revision, sources, m, true, true);
       }
       if (corrections.length && !strategyResponse.safeParse(revision).success) {
         revision = await this.json(
@@ -2101,7 +2105,7 @@ Each direction must name a familiar customer, task, offered artifact and concret
       );
       if (context.capabilityAudit)
         (revision as any).capabilityAudit = context.capabilityAudit;
-      if (!strategyProblems(revision, sources, m, true).length) {
+      if (!strategyProblems(revision, sources, m, true, true).length) {
         final = revision;
         reviewed = true;
       }
@@ -2112,7 +2116,7 @@ Each direction must name a familiar customer, task, offered artifact and concret
     if (
       !reviewed ||
       !context.capabilityAudit ||
-      strategyProblems(final, sources, m, true).length
+      strategyProblems(final, sources, m, true, true).length
     ) {
       this.store.recordCall({
         provider: "deepseek",
