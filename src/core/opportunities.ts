@@ -29,9 +29,9 @@ const copy = z.object({
   delivery: prose,
   upkeep: prose,
   wedge: prose,
-  experiment: z.string().trim().min(8).max(700),
-  successSignal: z.string().trim().min(8).max(240).optional(),
-  pivotSignal: z.string().trim().min(8).max(240).optional(),
+  experiment: z.string().trim().min(8).max(1100),
+  successSignal: z.string().trim().min(8).max(300).optional(),
+  pivotSignal: z.string().trim().min(8).max(300).optional(),
 });
 export const opportunitySchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]{1,40}$/),

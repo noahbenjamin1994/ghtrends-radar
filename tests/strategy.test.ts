@@ -23,6 +23,7 @@ import {
   strategySources,
   visibleStrategy,
   syncExperimentPlan,
+  strategyResponse,
   type StrategyResponse,
 } from "../src/core/strategy.js";
 import { reportIssueSignals } from "../src/core/gaps.js";
@@ -226,6 +227,56 @@ function capabilitySample(directions: { id: string }[]) {
     })),
   };
 }
+
+test("shared pilot hard bounds retain essential conditions and fit both derived report fields", () => {
+  const value = sample();
+  for (const [key, size] of Object.entries({
+    participants: 250,
+    task: 350,
+    timebox: 180,
+    measurement: 300,
+    continueIf: 300,
+    redirectIf: 300,
+  }))
+    (value.experimentPlan!.en as any)[key] = "x".repeat(size);
+  const normalized = syncExperimentPlan(value);
+  assert.equal(normalized.en.strategy.experiment.length, 1083);
+  assert.equal(
+    normalized.opportunities[0].en.experiment,
+    normalized.en.strategy.experiment,
+  );
+  assert.equal(strategyResponse.safeParse(normalized).success, true);
+  value.experimentPlan!.en.task += "x";
+  assert.equal(strategyResponse.safeParse(value).success, false);
+});
+
+test("accessibility terminology is normalized in Chinese prose with zero calls while original quotes stay exact", async () =>
+  fixture(async (r) => {
+    const value = sample();
+    value.zh.strategy.tradeoff = "首版聚焦无障碍检查，后续评估更广的协作范围。";
+    const source = {
+      ...documents[0]!,
+      id: "R9",
+      excerpt: "保留原文中的无障碍断言。",
+    };
+    value.evidence.push({ id: "R9", quote: source.excerpt });
+    let calls = 0;
+    r.json = async () => {
+      calls++;
+      throw new Error("Unexpected model call");
+    };
+    const result = await (r as any).repairStrategyCopy(value, [
+      ...documents,
+      source,
+    ]);
+    assert.equal(calls, 0);
+    assert.equal(
+      result.zh.strategy.tradeoff,
+      "首版聚焦可访问性检查，后续评估更广的协作范围。",
+    );
+    assert.deepEqual(result.evidence, value.evidence);
+    assert.match(value.zh.strategy.tradeoff, /无障碍/);
+  }));
 async function fixture(run: (r: Research, s: Store) => Promise<void>) {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-strategy-"));
   const s = new Store(dir);
