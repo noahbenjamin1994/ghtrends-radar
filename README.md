@@ -223,6 +223,9 @@ Authored prose is checked for clear English/Chinese language swaps and repaired 
 
 The recommended direction has one shared pilot definition: recruitment, task, time window, measurement and proposed continue/redirect criteria. The report summary, direction card and exports derive their experiment text from that definition. Review edits apply to the shared fields; source quotations and other directions stay independent.
 
+Before writing directions, a compact capability audit checks original project/product documents. It retains exact feature and constraint quotes, separates proposed additions from existing functions, and records code/data permissions, compatibility and access checks. Search snippets remain discovery leads. The audit runs with thinking disabled, allows one bounded correction and is stored with the report for inspection. A pending evidence review keeps delivery in the source-recovery flow.
+
+
 `GHTRENDS_RESEARCH_THINKING=low` is the default: light thinking for the research blueprint, request interpretation and independent evidence review; direct generation for report writing. Copy editing starts in direct mode; repeatedly failing fields receive one bounded low-effort repair. Set `off` for direct generation throughout when comparing cost and quality on your own topics. Repeated citation metadata and translated context are omitted from model inputs; stored source evidence stays complete. Admin shows the active policy and reasoning tokens as a component of total output, with older missing breakdowns marked pending.
 
 **Access and research credits**

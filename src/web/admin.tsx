@@ -708,77 +708,82 @@ export function AdminView({ account }: { account: Account | null }) {
                         <small>
                           {m.operation === "plan"
                             ? l("Query planning", "搜索词整理")
-                            : m.operation === "strategy"
-                              ? l("Product strategy", "深度研判")
-                              : m.operation === "issue-reading"
-                                ? l("Issue interpretation", "社区请求解读")
-                                : m.operation === "strategy-evidence-review"
-                                  ? l(
-                                      "Evidence and meaning review",
-                                      "证据与语义复核",
-                                    )
-                                  : m.operation === "strategy-copy"
-                                    ? l("Copy & citations", "文案与引用校验")
-                                    : m.operation === "strategy-edit"
-                                      ? l("Strategy editing", "建议校订")
-                                      : m.operation === "strategy-direction"
-                                        ? l(
-                                            "Direction analysis",
-                                            "细分方向分析",
-                                          )
-                                        : m.operation === "strategy-priority"
+                            : m.operation.startsWith("capability-audit")
+                              ? l("Project capability check", "项目能力核对")
+                              : m.operation === "strategy"
+                                ? l("Product strategy", "深度研判")
+                                : m.operation === "issue-reading"
+                                  ? l("Issue interpretation", "社区请求解读")
+                                  : m.operation === "strategy-evidence-review"
+                                    ? l(
+                                        "Evidence and meaning review",
+                                        "证据与语义复核",
+                                      )
+                                    : m.operation === "strategy-copy"
+                                      ? l("Copy & citations", "文案与引用校验")
+                                      : m.operation === "strategy-edit"
+                                        ? l("Strategy editing", "建议校订")
+                                        : m.operation === "strategy-direction"
                                           ? l(
-                                              "Priority strategy",
-                                              "优先方向策略",
+                                              "Direction analysis",
+                                              "细分方向分析",
                                             )
-                                          : m.operation === "strategy-overall"
+                                          : m.operation === "strategy-priority"
                                             ? l(
-                                                "Overall analysis",
-                                                "整体机会分析",
+                                                "Priority strategy",
+                                                "优先方向策略",
                                               )
-                                            : m.operation ===
-                                                "strategy-section-edit"
-                                              ? l("Section review", "分项校验")
+                                            : m.operation === "strategy-overall"
+                                              ? l(
+                                                  "Overall analysis",
+                                                  "整体机会分析",
+                                                )
                                               : m.operation ===
-                                                  "strategy-translate"
+                                                  "strategy-section-edit"
                                                 ? l(
-                                                    "Bilingual copy",
-                                                    "双语整理",
+                                                    "Section review",
+                                                    "分项校验",
                                                   )
                                                 : m.operation ===
-                                                    "strategy-review"
+                                                    "strategy-translate"
                                                   ? l(
-                                                      "Strategy review",
-                                                      "建议复核",
+                                                      "Bilingual copy",
+                                                      "双语整理",
                                                     )
                                                   : m.operation ===
-                                                      "document-selection"
+                                                      "strategy-review"
                                                     ? l(
-                                                        "Source selection",
-                                                        "文档选取",
+                                                        "Strategy review",
+                                                        "建议复核",
                                                       )
                                                     : m.operation ===
-                                                        "relevance"
+                                                        "document-selection"
                                                       ? l(
-                                                          "Project relevance",
-                                                          "项目相关性",
+                                                          "Source selection",
+                                                          "文档选取",
                                                         )
                                                       : m.operation ===
-                                                          "query-repair"
+                                                          "relevance"
                                                         ? l(
-                                                            "Query refinement",
-                                                            "检索修复",
+                                                            "Project relevance",
+                                                            "项目相关性",
                                                           )
                                                         : m.operation ===
-                                                            "brief-rewrite"
+                                                            "query-repair"
                                                           ? l(
-                                                              "Brief review",
-                                                              "报告校验",
+                                                              "Query refinement",
+                                                              "检索修复",
                                                             )
-                                                          : l(
-                                                              "Research brief",
-                                                              "简短报告",
-                                                            )}
+                                                          : m.operation ===
+                                                              "brief-rewrite"
+                                                            ? l(
+                                                                "Brief review",
+                                                                "报告校验",
+                                                              )
+                                                            : l(
+                                                                "Research brief",
+                                                                "简短报告",
+                                                              )}
                         </small>
                       </th>
                       <td>

@@ -29,6 +29,7 @@ export interface QueryPlan {
   webQueries?: import("../providers/search.js").SearchQuery[];
 }
 export interface Brief {
+  capabilityAudit?: import("./capabilities.js").CapabilityAudit;
   experimentPlan?: import("./strategy.js").ExperimentPlan;
   model: string;
   generatedAt: string;

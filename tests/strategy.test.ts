@@ -210,6 +210,24 @@ function sample(): StrategyResponse {
   };
   return syncExperimentPlan(value);
 }
+function capabilitySample(directions: { id: string }[]) {
+  return {
+    directions: directions.map((d) => ({
+      id: d.id,
+      facts: [
+        { kind: "feature" as const, id: "R1", quote: documents[0]!.excerpt! },
+      ],
+      overlap: "partial" as const,
+      proposedWork:
+        "Prototype review continuity after checking the current export behavior.",
+      prerequisites: [
+        "Confirm the editor version, source license and access to redacted review fixtures.",
+      ],
+      nextCheck:
+        "Compare relocation behavior against the current manual workflow.",
+    })),
+  };
+}
 async function fixture(run: (r: Research, s: Store) => Promise<void>) {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-strategy-"));
   const s = new Store(dir);
@@ -227,6 +245,8 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
       ops: string[] = [];
     let reviews = 0;
     r.json = async (_system, input: any, budget, operation, thinking) => {
+      if (operation === "capability-audit")
+        return capabilitySample(input.directions);
       ops.push(operation!);
       assert.equal(
         thinking,
@@ -316,7 +336,7 @@ test("fabricated source quotes and generic threshold-free strategies fail valida
     );
   }));
 
-test("an invalid second pass preserves the validated first pass; sparse data stays a hypothesis", async () =>
+test("a failed evidence review preserves measurements and leaves report delivery pending", async () =>
   fixture(async (r) => {
     const m = structuredClone(seed);
     m.supply.repositories = [];
@@ -336,12 +356,9 @@ test("an invalid second pass preserves the validated first pass; sparse data sta
       if (n >= 2) a.en.strategy.wedge = "Build an MVP";
       return a;
     };
-    const b = await r.insights(m);
-    assert.equal(b.basis, "hypothesis-led");
-    assert.equal(b.reviewed, false);
+    await assert.rejects(r.insights(m), /another source pass/);
     assert.equal(m.kind, "uncertain");
     assert.equal(m.metrics.growth, null);
-    assert.equal(b.evidence?.length, 0);
   }));
 
 test("explicit reasoning levels reach the API while ordinary calls stay disabled and private reasoning is discarded", async () =>
@@ -464,6 +481,7 @@ test("existing implementations reach the critic; corrective editing preserves th
     };
     let checks = 0;
     r.json = async (_system, input: any, _budget, op, thinking) => {
+      if (op === "capability-audit") return capabilitySample(input.directions);
       ops.push(op!);
       const result = sample();
       if (op === "strategy") return result;
@@ -830,6 +848,8 @@ test("every direction receives scoped evidence; one source failure preserves the
     assert.ok(dirs.every((d) => evidence.some((s) => s.directionId === d.id)));
     assert.equal(new Set(evidence.map((s) => s.id)).size, evidence.length);
     r.json = async (_prompt, input: any, _budget, operation) => {
+      if (operation === "capability-audit")
+        return capabilitySample(input.directions);
       if (operation === "strategy-review")
         assert.ok(
           input.sources.some(
@@ -1043,9 +1063,12 @@ test("new reports require an overall answer and a readable customer need and off
         seed,
       ).some((p) => p.includes("zh.service")),
     );
-    r.json = async () => sample();
+    r.json = async (_prompt, input: any, _budget, operation) =>
+      operation === "capability-audit"
+        ? capabilitySample(input.directions)
+        : sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "15");
+    assert.equal(brief.strategyVersion, "16");
     const legacy = {
       ...brief,
       strategyVersion: "2",
@@ -1122,6 +1145,11 @@ test("overall judgments validate quotes and allow only requested affirmative cop
 test("broad topics retain their original scope while relevant project evidence informs the draft", async () =>
   fixture(async (r) => {
     const market = structuredClone(seed);
+    const fieldDocuments = documents.map((d) => ({
+      ...d,
+      kind: "project" as const,
+      documentType: "github-readme" as const,
+    }));
     market.topic.scope = "field";
     market.topic.plan = {
       input: "小米手机",
@@ -1135,12 +1163,18 @@ test("broad topics retain their original scope while relevant project evidence i
     };
     const calls: string[] = [];
     r.json = async (_system, input: any, _budget, operation) => {
+      if (operation === "capability-audit")
+        return capabilitySample(input.directions);
       calls.push(operation!);
       assert.equal(input.input, "小米手机");
       if (operation === "strategy") {
         assert.deepEqual(
           input.sources.map((s: ResearchSource) => s.id),
-          strategySources(market, documents).map((s) => s.id),
+          strategySources(market, fieldDocuments)
+            .filter(
+              (s) => s.id === "S1" || s.id === "S2" || s.kind === "search",
+            )
+            .map((s) => s.id),
         );
         assert.equal(input.basis, "hypothesis-led");
         assert.ok(input.projectInventory.some((p: any) => p.id === "R1"));
@@ -1152,7 +1186,7 @@ test("broad topics retain their original scope while relevant project evidence i
       return result;
     };
     const before = JSON.stringify(market);
-    const result = await r.insights(market, documents);
+    const result = await r.insights(market, fieldDocuments);
     assert.equal(result.reviewed, true);
     assert.ok(result.overview);
     assert.deepEqual(calls, ["strategy", "strategy-review"]);
@@ -1191,6 +1225,8 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
     };
     let checked = false;
     r.json = async (_system, input: any, _budget, operation, thinking) => {
+      if (operation === "capability-audit")
+        return capabilitySample(input.directions);
       if (operation === "strategy") {
         assert.equal(thinking, "low");
         return blueprint;
@@ -1203,6 +1239,11 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
       assert.equal(thinking, false);
       assert.ok(checked);
       if (operation === "strategy-direction") {
+        assert.equal(input.capabilityCheck.id, input.candidate.id);
+        assert.equal(
+          input.capabilityCheck.facts[0].quote,
+          documents[0]!.excerpt,
+        );
         assert.ok(
           input.sources.every(
             (s: ResearchSource) => !["S1", "S2"].includes(s.id!),
@@ -1229,6 +1270,10 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
       },
     );
     assert.equal(brief.reviewed, true);
+    assert.deepEqual(
+      brief.capabilityAudit,
+      capabilitySample(blueprint.opportunities),
+    );
     assert.equal(brief.opportunities?.length, 3);
   }));
 
@@ -1237,6 +1282,8 @@ test("section format recovery preserves completed siblings and review budget rec
     const data = sample(),
       calls: string[] = [];
     r.json = async (_prompt, input: any, _budget, operation, thinking) => {
+      if (operation === "capability-audit")
+        return capabilitySample(input.directions);
       calls.push(operation!);
       if (operation === "strategy-direction") {
         if (input.candidate.id === data.opportunities[0]!.id)
@@ -1289,6 +1336,8 @@ test("an overlong citation ID is resolved as an identity with its actual limit, 
     const data = sample();
     let repaired = false;
     r.json = async (_prompt, input: any, _budget, operation) => {
+      if (operation === "capability-audit")
+        return capabilitySample(input.directions);
       if (operation === "strategy-direction") {
         const direction = structuredClone(
           data.opportunities.find((o) => o.id === input.candidate.id)!,
@@ -2002,6 +2051,7 @@ test("mixed citation and wording corrections preserve the rest of a complete rep
     bad.evidence[0]!.quote = "A paraphrase that is absent from the source.";
     const ops: string[] = [];
     r.json = async (_prompt, input: any, _budget, op) => {
+      if (op === "capability-audit") return capabilitySample(input.directions);
       ops.push(op!);
       if (op === "strategy") return good;
       if (op === "strategy-review") return bad;

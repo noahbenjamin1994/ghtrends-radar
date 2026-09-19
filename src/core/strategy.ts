@@ -1,3 +1,4 @@
+import { capabilityAuditSchema, capabilityProblems } from "./capabilities.js";
 import { z } from "zod";
 import {
   landscapeSchema,
@@ -22,7 +23,7 @@ import {
 } from "./i18n.js";
 import type { Brief, Market, ResearchSource, Strategy } from "./types.js";
 
-export const STRATEGY_VERSION = "15";
+export const STRATEGY_VERSION = "16";
 const experimentCopy = z.object({
   participants: z.string().trim().min(8).max(200),
   task: z.string().trim().min(8).max(220),
@@ -91,6 +92,7 @@ export const ideaQueries = z
   )
   .max(2);
 export const strategyResponse = opportunityMapSchema.extend({
+  capabilityAudit: capabilityAuditSchema.optional(),
   experimentPlan: experimentPlanSchema.optional(),
   overview: overviewSchema,
   landscape: landscapeSchema.optional(),
@@ -129,6 +131,14 @@ export function strategyProblems(
       ...opportunityProblems(data, sources),
       ...landscapeProblems(data, sources),
     ];
+  if (data.capabilityAudit)
+    problems.push(
+      ...capabilityProblems(
+        data.capabilityAudit,
+        sources,
+        data.opportunities.map((o) => o.id),
+      ),
+    );
   if (requireExperimentPlan && !data.experimentPlan)
     problems.push(
       "Experiment plan: provide one shared bilingual pilot for the recommended direction.",
@@ -327,6 +337,7 @@ export function visibleStrategy(
       "12",
       "13",
       "14",
+      "15",
       STRATEGY_VERSION,
     ].includes(brief.strategyVersion)
   )
@@ -385,6 +396,7 @@ export const RESEARCH_SCOPE_RULES = `Evidence scope and execution conditions:
 - Preserve WHO said WHAT and WHEN. A person's search experience establishes their reported experience at that date; current market gaps require matching current product evidence. Search geography describes the sample; customer location requires explicit source/user evidence.
 - A vendor feature list or comparison article establishes published supply/claims. Buying intent, adoption, repeat need and market leadership each require their own behavior/market evidence. Free software, free cloud tiers, hosting costs and paid plans retain distinct scopes and quoted billing conditions.
 - Read a comment's whole speech act. Advice recommending an existing workaround stays advice; praise stays an evaluation; a request explicitly describes the author's task/problem. Promotion requires author involvement in the promoted offering. Keep source qualifiers, including beta/testing-only restrictions and version/product scope.
+- capabilityAudit quotes are source observations; proposedWork, prerequisites and nextCheck are research proposals. Compare the drafted offer with documented features first. A documented overlap calls for a useful extension, contribution or implementation service with a distinct user benefit. Carry the relevant checks into resources, first-release scope and experiment. An omission in documentation creates a verification task.
 - Reuse requires the same customer task, compatible inputs/outputs and applicable project assets. A similarly named tool in another field is an analogy to investigate. Name existing capability and the extra behavior proposed; carry source license/testing restrictions into the pilot.
 - Skills, permissions, devices, recruitment channels and pilot participants are REQUIRED resources unless the user explicitly supplied them. Describe how to seek access or use public/synthetic fixtures. Use conditional prototype and maintenance estimates; customer commitments and paid pilots are proposed outcomes.
 - The selected direction and root strategy describe ONE experiment: retain its task, cohort, time window, metrics and numerical comparison operators. Translation and summarization preserve these conditions. Additional adoption evidence is a separate later test.`;
