@@ -193,6 +193,14 @@ test("feature selection retains explicit rights and testing notices from the sam
   assert.deepEqual(
     capabilityNotices({
       ...source,
+      documentType: "page",
+      url: "https://example.com/pricing",
+    }),
+    [],
+  );
+  assert.deepEqual(
+    capabilityNotices({
+      ...source,
       excerpt: "Experimental build. Not for production use. Use with caution!",
     }),
     ["Experimental build. Not for production use. Use with caution!"],

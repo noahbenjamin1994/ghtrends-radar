@@ -28,8 +28,11 @@ export type CapabilityAudit = z.infer<typeof capabilityAuditSchema>;
 /** Carry explicit source restrictions forward even when feature selection omits them.
  * These are quoted notices, not a conclusion about the asset's full license. */
 export function capabilityNotices(source: ResearchSource): string[] {
-  if (source.documentType === "license" || !capabilitySources([source]).length)
-    return [];
+  const repositoryDocument =
+    ["github-readme", "github-release"].includes(source.documentType || "") ||
+    (!source.documentType && /^https:\/\/github\.com\//i.test(source.url));
+  // A commercial page footer concerns that page; it is not a software license.
+  if (!repositoryDocument || !capabilitySources([source]).length) return [];
   const marker =
     /all rights reserved|not for production(?: use)?|(?:for )?testing[- ]only/gi;
   const excerpt = source.excerpt!;

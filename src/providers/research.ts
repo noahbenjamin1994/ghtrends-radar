@@ -278,7 +278,7 @@ export class Research {
       schema: zodToJsonSchema(capabilityAuditSchema),
     };
     const key =
-      "capability-audit:v3:" +
+      "capability-audit:v4:" +
       createHash("sha256")
         .update(JSON.stringify([this.model, CAPABILITY_PROMPT, input]))
         .digest("hex");
