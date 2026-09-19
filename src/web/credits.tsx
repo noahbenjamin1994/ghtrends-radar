@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { api } from "./api.js";
+import { MyFeedback } from "./feedback.js";
 import { locale, localUrl } from "./i18n.js";
 import { Loading } from "./components.js";
 import { SignInGate, type Account } from "./account.js";
@@ -466,6 +467,7 @@ function AccountDetails({ account }: { account: Account }) {
           )}
         </>
       )}
+      <MyFeedback account={account} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { ScopeReview } from "./preflight.js";
 import { DeepResearchView } from "./deep.js";
 import { AccountView } from "./credits.js";
+import { ResearchFeedback } from "./feedback.js";
 import {
   inspectInput,
   type PreflightResult,
@@ -2314,6 +2315,7 @@ function MarketView({
           </button>
         </details>{" "}
       </section>
+      <ResearchFeedback key={m.id} kind="report" id={m.id} account={account} />
     </div>
   );
 }

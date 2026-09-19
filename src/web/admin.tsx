@@ -5,6 +5,7 @@ import { locale } from "./i18n.js";
 import { Loading, Empty } from "./components.js";
 import { SignInGate, type Account } from "./account.js";
 import type { ProxyUsage } from "../providers/proxy-usage.js";
+import { feedbackLabels, type FeedbackOverview } from "../core/feedback.js";
 const l = (en: string, zh: string) => (locale === "zh" ? zh : en);
 const n = (x: number | null | undefined) =>
   x == null ? "—" : Math.round(x).toLocaleString();
@@ -25,6 +26,7 @@ const labels: Record<string, string> = {
   interrupted: l("Interrupted", "重启中断"),
 };
 interface AdminData {
+  feedback: FeedbackOverview;
   proxyUsage: ProxyUsage;
   traffic: {
     since: string;
@@ -503,6 +505,95 @@ export function AdminView({ account }: { account: Account | null }) {
             )}
           </p>
           <section className="panel">
+            <h2>
+              {l(
+                "Did the research help people move forward?",
+                "报告有没有帮助用户推进？",
+              )}
+            </h2>
+            <p>
+              {l(
+                "Saved, self-reported feedback in the selected period. Administrators and self-hosted testing are counted separately. Editing a note preserves the original decision date.",
+                "以下为所选时间段内保存的用户自述反馈。管理员与自部署测试单独统计；修改说明沿用原有决策反馈日期。",
+              )}
+            </p>
+            <div className="admin-table feedback-metrics">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{l("Measure", "指标")}</th>
+                    <th>{l("Count", "数量")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      {l(
+                        "Users reporting a direction, plan change or validation",
+                        "提交选定方向、调整方案或完成验证的用户",
+                      )}
+                    </td>
+                    <td>{data.feedback.decisionUsers}</td>
+                  </tr>
+                  <tr>
+                    <td>{l("People who left feedback", "留下反馈的用户")}</td>
+                    <td>{data.feedback.users}</td>
+                  </tr>
+                  <tr>
+                    <td>{l("Saved responses", "已保存反馈")}</td>
+                    <td>{data.feedback.responses}</td>
+                  </tr>
+                  <tr>
+                    <td>{l("Internal test responses", "内部测试反馈")}</td>
+                    <td>{data.feedback.internalResponses}</td>
+                  </tr>
+                  {data.feedback.statuses.map((row) => (
+                    <tr key={row.status}>
+                      <td>
+                        {feedbackLabels[row.status][locale === "zh" ? 1 : 0]}
+                      </td>
+                      <td>
+                        {row.users} {l("people", "人")} · {row.responses}{" "}
+                        {l("responses", "条")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="footnote">
+              {l(
+                "Decision users are deduplicated across reports. The date records when a response was saved, rather than when an experiment happened. Validate reported value through interviews and observed use.",
+                "决策反馈按用户跨报告去重，日期采用反馈保存时间；实际实验日期以用户说明为准。报告价值继续结合访谈和实际使用核对。",
+              )}
+            </p>
+            <details>
+              <summary>
+                {l("Recent user notes", "最近的用户说明")} ·{" "}
+                {data.feedback.recent.length}
+              </summary>
+              <div className="feedback-history">
+                {data.feedback.recent.map((row, index) => (
+                  <article key={row.kind + row.targetId + row.created + index}>
+                    <div>
+                      <strong>
+                        {feedbackLabels[row.status][locale === "zh" ? 1 : 0]}
+                      </strong>
+                      <small>
+                        {row.kind === "deep"
+                          ? l("Focused research", "专项研究")
+                          : l("Standard report", "标准报告")}{" "}
+                        · {l("Method", "方法")} {row.method} ·{" "}
+                        {date(row.updated)}
+                      </small>
+                      <p>{row.note || l("Choice recorded", "已记录选择")}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </details>
+          </section>
+          <section className="panel">
             <h2>{l("Research and sharing", "研究与传播")}</h2>
             <p>
               {l("Aggregate actions since", "汇总行为记录开始于")}{" "}
@@ -516,7 +607,7 @@ export function AdminView({ account }: { account: Account | null }) {
                 "以下统计行为次数，独立用户与 GitHub Star 分别衡量；存储字段仅包含每日事件汇总。",
               )}
             </p>
-            <div className="admin-table-wrap">
+            <div className="admin-table">
               <table>
                 <thead>
                   <tr>

@@ -25,6 +25,7 @@ import { locale, localUrl, loginUrl } from "./i18n.js";
 import { appUrl } from "./paths.js";
 import { Loading } from "./components.js";
 import "./deep.css";
+import { ResearchFeedback } from "./feedback.js";
 
 const l = (en: string, zh: string) => (locale === "zh" ? zh : en);
 const label = (pair: readonly [string, string]) =>
@@ -787,6 +788,9 @@ export function DeepResearchView({
           </a>
         </div>
       </footer>
+      {!active && (
+        <ResearchFeedback key={id} kind="deep" id={id} account={account} />
+      )}
       {!active && (
         <button
           className="deep-delete"

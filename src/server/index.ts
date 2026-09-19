@@ -12,6 +12,7 @@ import { operationContext } from "../core/operations.js";
 import sharp from "sharp";
 import { installAuth } from "./auth.js";
 import { installFitRoutes } from "./fit.js";
+import { installFeedbackRoutes } from "./feedback.js";
 import { installDeepRoutes } from "./deep.js";
 import { installCreditAccountRoutes, CreditAccountClient } from "./credits.js";
 import { marketCard } from "../core/card.js";
@@ -88,6 +89,7 @@ export function createApp(
     next();
   });
   installFitRoutes(app, engine, auth);
+  installFeedbackRoutes(app, engine, auth);
   installCreditAccountRoutes(app, engine.store, auth, credits);
   const dailyLimit = Math.max(
     1,
@@ -442,6 +444,7 @@ export function createApp(
         proxyUsage: await proxyUsage.overview(days),
         version: ALGORITHM_VERSION,
         researchPayments: engine.store.deepPaymentOverview(),
+        feedback: engine.store.feedbackOverview(days),
         queue: [
           ...[...jobs.values()]
             .filter((j) => j.state === "queued" || j.state === "running")

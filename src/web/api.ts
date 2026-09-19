@@ -18,14 +18,14 @@ export async function api<T>(url: string, options?: RequestInit): Promise<T> {
     window.dispatchEvent(new Event("ghtrends:usage"));
   if (r.headers.get("X-Research-Credit") === "returned")
     window.dispatchEvent(new Event("ghtrends:credit-returned"));
-  if (d.retryAt)
+  if (d?.retryAt)
     d.error =
       t(d.error) +
       " " +
       t("Resume at {time}", { time: new Date(d.retryAt).toLocaleString() });
   if (!r.ok)
     throw Object.assign(
-      new Error(d.error || "The request could not be completed."),
+      new Error(d?.error || "The request could not be completed."),
       { status: r.status, ...d },
     );
   return d as T;

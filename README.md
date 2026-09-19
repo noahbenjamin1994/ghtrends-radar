@@ -230,6 +230,8 @@ Before writing directions, a compact capability audit checks original project/pr
 
 `GHTRENDS_RESEARCH_THINKING=low` is the default: light thinking for the research blueprint, request interpretation and independent evidence review; direct generation for report writing. Copy editing starts in direct mode; repeatedly failing fields receive one bounded low-effort repair. Set `off` for direct generation throughout when comparing cost and quality on your own topics. Repeated citation metadata and translated context are omitted from model inputs; stored source evidence stays complete. Admin shows the active policy and reasoning tokens as a component of total output, with older missing breakdowns marked pending.
 
+Reports include an optional progress check-in: useful insight, a request for more detail, a chosen direction, a changed plan or a completed validation. Signed-in users can save a note (up to 500 characters), edit or delete it, and export their feedback from Account. These records stay separate from shared reports and model inputs; only the author and deployment administrators can read them. Removing a report from history or deleting focused research also removes that author’s related feedback. Admin counts unique people separately from responses and internal testing; feedback timestamps record submission, with user interviews and observed behavior providing additional validation.
+
 **Access and research credits**
 
 | Access      | Included                                                                            |

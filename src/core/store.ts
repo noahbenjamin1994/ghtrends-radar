@@ -1,4 +1,10 @@
 import type { EngagementEvent } from "./engagement.js";
+import type {
+  FeedbackKind,
+  FeedbackInput,
+  ResearchFeedback,
+  FeedbackOverview,
+} from "./feedback.js";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, chmodSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
@@ -43,6 +49,8 @@ export class Store {
       CREATE INDEX IF NOT EXISTS usage_reservations_day ON usage_reservations(day,user_id);
       CREATE TABLE IF NOT EXISTS engagement_daily(day TEXT NOT NULL,event TEXT NOT NULL,count INTEGER NOT NULL,PRIMARY KEY(day,event));
       CREATE TABLE IF NOT EXISTS operations_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS research_feedback(owner TEXT NOT NULL,target_kind TEXT NOT NULL,target_id TEXT NOT NULL,status TEXT NOT NULL,note TEXT NOT NULL,method TEXT NOT NULL,internal INTEGER NOT NULL,created TEXT NOT NULL,updated TEXT NOT NULL,status_at TEXT NOT NULL,PRIMARY KEY(owner,target_kind,target_id));
+      CREATE INDEX IF NOT EXISTS research_feedback_updated ON research_feedback(internal,updated DESC);
       CREATE TABLE IF NOT EXISTS scan_runs(id TEXT PRIMARY KEY,user_id TEXT,input TEXT NOT NULL,geo TEXT NOT NULL,background INTEGER NOT NULL,created TEXT NOT NULL,started TEXT,finished TEXT,state TEXT NOT NULL,report_id TEXT,error TEXT,warnings TEXT);
       CREATE INDEX IF NOT EXISTS scan_runs_created ON scan_runs(created DESC);
       CREATE INDEX IF NOT EXISTS scan_runs_user ON scan_runs(user_id,created);
@@ -97,6 +105,113 @@ export class Store {
       ),
     );
   }
+  feedback(
+    owner: string,
+    kind: FeedbackKind,
+    id: string,
+  ): ResearchFeedback | null {
+    return (
+      (this.db
+        .prepare(
+          "SELECT target_kind AS kind,target_id AS targetId,status,note,method,created,updated,status_at AS statusAt FROM research_feedback WHERE owner=? AND target_kind=? AND target_id=?",
+        )
+        .get(owner, kind, id) as ResearchFeedback | undefined) || null
+    );
+  }
+  feedbackHistory(owner: string): ResearchFeedback[] {
+    return this.db
+      .prepare(
+        "SELECT target_kind AS kind,target_id AS targetId,status,note,method,created,updated,status_at AS statusAt FROM research_feedback WHERE owner=? ORDER BY updated DESC",
+      )
+      .all(owner) as ResearchFeedback[];
+  }
+  saveFeedback(
+    owner: string,
+    kind: FeedbackKind,
+    id: string,
+    input: FeedbackInput,
+    method: string,
+    internal: boolean,
+    now = new Date().toISOString(),
+  ) {
+    const previous = this.feedback(owner, kind, id);
+    if (
+      !previous &&
+      (
+        this.db
+          .prepare("SELECT COUNT(*) AS n FROM research_feedback WHERE owner=?")
+          .get(owner) as { n: number }
+      ).n >= 500
+    )
+      throw Object.assign(
+        new Error(
+          "Manage your saved feedback in Account before adding another.",
+        ),
+        { status: 429 },
+      );
+    if (previous?.status === input.status && previous.note === input.note)
+      return previous;
+    this.db
+      .prepare(
+        `INSERT INTO research_feedback VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(owner,target_kind,target_id) DO UPDATE SET status=excluded.status,note=excluded.note,updated=excluded.updated,status_at=CASE WHEN research_feedback.status!=excluded.status THEN excluded.status_at ELSE research_feedback.status_at END`,
+      )
+      .run(
+        owner,
+        kind,
+        id,
+        input.status,
+        input.note,
+        method,
+        Number(internal),
+        now,
+        now,
+        now,
+      );
+    return this.feedback(owner, kind, id)!;
+  }
+  removeFeedback(owner: string, kind: FeedbackKind, id: string) {
+    this.db
+      .prepare(
+        "DELETE FROM research_feedback WHERE owner=? AND target_kind=? AND target_id=?",
+      )
+      .run(owner, kind, id);
+  }
+  feedbackOverview(days: number, now = Date.now()): FeedbackOverview {
+    const since = new Date(now - days * 86400000).toISOString();
+    const summary = this.db
+      .prepare(
+        "SELECT COUNT(*) AS responses,COUNT(DISTINCT owner) AS users FROM research_feedback WHERE internal=0 AND updated>=?",
+      )
+      .get(since) as { responses: number; users: number };
+    return {
+      since,
+      ...summary,
+      decisionUsers: (
+        this.db
+          .prepare(
+            "SELECT COUNT(DISTINCT owner) AS n FROM research_feedback WHERE internal=0 AND status_at>=? AND status IN ('chosen','adjusted','tested')",
+          )
+          .get(since) as { n: number }
+      ).n,
+      internalResponses: (
+        this.db
+          .prepare(
+            "SELECT COUNT(*) AS n FROM research_feedback WHERE internal=1 AND updated>=?",
+          )
+          .get(since) as { n: number }
+      ).n,
+      statuses: this.db
+        .prepare(
+          "SELECT status,COUNT(*) AS responses,COUNT(DISTINCT owner) AS users FROM research_feedback WHERE internal=0 AND updated>=? GROUP BY status",
+        )
+        .all(since) as FeedbackOverview["statuses"],
+      recent: this.db
+        .prepare(
+          "SELECT target_kind AS kind,target_id AS targetId,status,note,method,created,updated,status_at AS statusAt FROM research_feedback WHERE internal=0 AND updated>=? ORDER BY updated DESC LIMIT 20",
+        )
+        .all(since) as ResearchFeedback[],
+    };
+  }
   deepTask(id: string, owner: string): DeepTask | null {
     const row = this.db
       .prepare(
@@ -149,6 +264,7 @@ export class Store {
           "UPDATE scan_runs SET input='Deleted research',report_id=NULL,error=NULL,warnings='[]' WHERE id=? AND user_id=?",
         )
         .run(id, owner);
+      this.removeFeedback(owner, "deep", id);
       this.db.exec("COMMIT");
     } catch (e) {
       this.db.exec("ROLLBACK");
@@ -999,6 +1115,7 @@ export class Store {
     this.db
       .prepare("DELETE FROM user_reports WHERE user_id=? AND report_id=?")
       .run(user, id);
+    this.removeFeedback(user, "report", id);
   }
   userWatch(user: string) {
     return (
