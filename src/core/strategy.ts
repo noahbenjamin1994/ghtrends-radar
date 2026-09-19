@@ -12,11 +12,16 @@ import {
   opportunityProblems,
   OPPORTUNITY_PROMPT,
   hasCoverageQuantity,
+  proseRepairs,
 } from "./opportunities.js";
-import { hasNegativeWording, hasRecoveryTimeReference } from "./i18n.js";
+import {
+  hasNegativeWording,
+  hasRecoveryTimeReference,
+  proseLanguageMismatch,
+} from "./i18n.js";
 import type { Brief, Market, ResearchSource, Strategy } from "./types.js";
 
-export const STRATEGY_VERSION = "13";
+export const STRATEGY_VERSION = "14";
 const detail = z.string().trim().min(12).max(700);
 export const strategySchema = z.object({
   angle: z.string().trim().min(4).max(200),
@@ -81,6 +86,13 @@ export function strategyProblems(
       ...opportunityProblems(data, sources),
       ...landscapeProblems(data, sources),
     ];
+  for (const field of proseRepairs(data, true)) {
+    const language = field.path.split(".").includes("zh") ? "zh" : "en";
+    if (proseLanguageMismatch(field.value, language))
+      problems.push(
+        `${field.path}: write the authored prose in ${language === "zh" ? "Simplified Chinese" : "English"}; preserve the paired meaning and exact source quotes.`,
+      );
+  }
   for (const [language, p] of Object.entries({ en: data.en, zh: data.zh })) {
     const fields = [p.headline, p.summary, ...Object.values(p.strategy)];
     if (fields.some(hasNegativeWording))
@@ -234,6 +246,7 @@ export function visibleStrategy(
       "10",
       "11",
       "12",
+      "13",
       STRATEGY_VERSION,
     ].includes(brief.strategyVersion)
   )

@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { excludedRequestUrls } from "./landscape.js";
-import { hasNegativeWording, hasRecoveryTimeReference } from "./i18n.js";
+import {
+  hasNegativeWording,
+  hasRecoveryTimeReference,
+  proseLanguageMismatch,
+} from "./i18n.js";
 import type { Brief, ResearchSource } from "./types.js";
 
 const prose = z.string().trim().min(8).max(500);
@@ -93,6 +97,10 @@ export function proseRepairs(
     if (typeof node === "string") {
       if (
         all ||
+        proseLanguageMismatch(
+          node,
+          path.split(".").includes("zh") ? "zh" : "en",
+        ) ||
         hasNegativeWording(node) ||
         hasRecoveryTimeReference(node) ||
         hasCoverageQuantity(node) ||
@@ -484,13 +492,25 @@ export function visibleOpportunities(
 ): OpportunityMap | undefined {
   if (
     !brief ||
-    !["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"].includes(
-      brief.strategyVersion || "",
-    )
+    ![
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+    ].includes(brief.strategyVersion || "")
   )
     return;
   if (
-    ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"].includes(
+    ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"].includes(
       brief.strategyVersion || "",
     ) &&
     (!overviewSchema.safeParse(brief.overview).success ||

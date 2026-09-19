@@ -219,6 +219,8 @@ A mistaken citation ID can be repaired by selecting from supplied sources contai
 
 Section format or output-budget errors get one bounded direct-generation recovery for that section; completed sections retain their cached results. Evidence review and community reading may recover once with thinking disabled after an output-budget or format failure. Provider throttling and network failures keep their existing recovery path. Citation length repair preserves source identities and verbatim quotations with the actual field limit.
 
+Authored prose is checked for clear English/Chinese language swaps and repaired with its paired meaning; source quotes retain their original language. Request interpretations preserve the author’s stated workaround and treat vendor code, permissions and device access as prerequisites for proposed contributions.
+
 `GHTRENDS_RESEARCH_THINKING=low` is the default: light thinking for the research blueprint, request interpretation and independent evidence review; direct generation for report writing. Copy editing starts in direct mode; repeatedly failing fields receive one bounded low-effort repair. Set `off` for direct generation throughout when comparing cost and quality on your own topics. Repeated citation metadata and translated context are omitted from model inputs; stored source evidence stays complete. Admin shows the active policy and reasoning tokens as a component of total output, with older missing breakdowns marked pending.
 
 **Access and research credits**

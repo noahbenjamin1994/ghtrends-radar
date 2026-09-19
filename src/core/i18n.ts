@@ -3,6 +3,21 @@ import type { Market } from "./types.js";
 
 export type Locale = "en" | "zh";
 
+/** Catch clear language swaps, while allowing names, identifiers and quoted errors.
+ * This is a delivery check, not a test of translation equivalence. */
+export function proseLanguageMismatch(value: string, language: Locale) {
+  const han = value.match(/\p{Script=Han}/gu)?.length || 0;
+  const latin = value.match(/[a-z]/gi)?.length || 0;
+  if (language === "en") return han >= 6 && han > latin / 2;
+  const words = value.match(/\b[a-z][a-z'-]*\b/gi) || [];
+  if (han === 0) return words.length >= 4;
+  const grammar =
+    value.match(
+      /\b(?:the|a|an|and|with|for|to|of|from|their|who|should|which)\b/gi,
+    )?.length || 0;
+  return words.length >= 10 && grammar >= 4 && han < (han + latin) * 0.15;
+}
+
 /** A read-only paired meaning for prose edits; source quotes have no language path. */
 export function proseCounterpart(
   raw: unknown,

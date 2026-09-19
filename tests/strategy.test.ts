@@ -1,4 +1,5 @@
 import { recoverSourceQuote } from "../src/core/opportunities.js";
+import { proseLanguageMismatch } from "../src/core/i18n.js";
 import { modelSources } from "../src/providers/research.js";
 import {
   visibleOpportunities,
@@ -219,7 +220,18 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     assert.ok(visibleStrategy(b, "zh"));
     assert.equal(visibleOpportunities(b)?.opportunities.length, 3);
     assert.ok(visibleStrategy({ ...b, strategyVersion: "1" }, "zh"));
-    for (const version of ["5", "6", "7", "8", "9", "10", "11", "12", "13"]) {
+    for (const version of [
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+    ]) {
       assert.ok(visibleStrategy({ ...b, strategyVersion: version }, "zh"));
       assert.equal(
         visibleOpportunities({ ...b, strategyVersion: version })?.opportunities
@@ -874,7 +886,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "13");
+    assert.equal(brief.strategyVersion, "14");
     const legacy = {
       ...brief,
       strategyVersion: "2",
@@ -1427,6 +1439,83 @@ test("a request-reading budget failure gets one compact source-bound recovery", 
       /network/,
     );
     assert.equal(failures, 1);
+  }));
+
+test("delivery language checks catch swapped sentences while preserving names and source quotes", () => {
+  assert.ok(
+    proseLanguageMismatch("开启高级数据保护后核对小米相册同步结果。", "en"),
+  );
+  assert.ok(
+    proseLanguageMismatch(
+      "Users enable Advanced Data Protection before syncing their album.",
+      "zh",
+    ),
+  );
+  assert.ok(
+    proseLanguageMismatch(
+      "With protection enabled, the user sees “请输入正确的userId和passToken” and asks for a supported sync method.",
+      "zh",
+    ),
+  );
+  assert.equal(proseLanguageMismatch("GitHub Actions", "zh"), false);
+  assert.equal(
+    proseLanguageMismatch(
+      "使用 XiaomiAlbumSyncer 核对 userId/passToken 错误。",
+      "zh",
+    ),
+    false,
+  );
+  assert.equal(
+    proseLanguageMismatch(
+      "The user reports the error “请输入正确的userId和passToken” while syncing Xiaomi albums with protection enabled.",
+      "en",
+    ),
+    false,
+  );
+  const data = sample();
+  data.overview.zh.verdict = data.overview.en.verdict;
+  const errors = strategyProblems(data, documents, seed);
+  assert.ok(errors.some((x) => x.startsWith("overview.zh.verdict: write")));
+  assert.ok(proseRepairs(data).some((x) => x.path === "overview.zh.verdict"));
+  assert.equal(
+    proseRepairs(data).some((x) => x.path.includes("evidence")),
+    false,
+  );
+});
+
+test("targeted language recovery preserves both meanings and leaves original quotations intact", async () =>
+  fixture(async (r) => {
+    const data = sample();
+    const original = structuredClone(data);
+    data.overview.en.verdict = original.overview.zh.verdict;
+    data.overview.zh.verdict = original.overview.en.verdict;
+    let calls = 0;
+    r.json = async (_prompt, input: any, _budget, operation, thinking) => {
+      calls++;
+      assert.equal(operation, "strategy-copy");
+      assert.equal(thinking, false);
+      assert.equal(input.fields.length, 2);
+      assert.ok(
+        input.fields.every((f: any) =>
+          f.correction.includes("Translate this authored field"),
+        ),
+      );
+      assert.equal(
+        input.fields[0].counterpart.value,
+        original.overview.en.verdict,
+      );
+      return {
+        edits: input.fields.map((f: any) => ({
+          path: f.path,
+          value:
+            original.overview[f.path.includes(".zh.") ? "zh" : "en"].verdict,
+        })),
+      };
+    };
+    const repaired = await (r as any).repairStrategyCopy(data, documents);
+    assert.equal(calls, 1);
+    assert.deepEqual(repaired, original);
+    assert.deepEqual(strategyProblems(repaired, documents, seed), []);
   }));
 
 test("citation identity repair offers exact-text sources and protects valid IDs, quotes and other fields", async () =>
