@@ -1770,7 +1770,7 @@ test("citation identity repair offers exact-text sources and protects valid IDs,
       };
     };
     const rejected = await (r as any).repairStrategyCopy(data, sources);
-    assert.equal(calls, 3);
+    assert.equal(calls, 2);
     assert.equal(rejected.opportunities[0].basedOn[0].id, "Editor product");
     assert.deepEqual(
       rejected.opportunities[0].basedOn[0].quote,
@@ -2113,3 +2113,109 @@ test("shortening an exact overlong quotation retains source context and one edit
       },
     ]);
   }));
+
+test("copy diagnostics identify positive compounds, source IDs and overlapping length failures", async () =>
+  fixture(async (r) => {
+    const data = sample();
+    data.experimentPlan!.zh.measurement =
+      "测量在两个或更多不同日期回访的五名参与者人数。";
+    data.experimentPlan!.zh.continueIf =
+      "五位参与者中至少三位在两个或更多不同日期回访时继续。";
+    data.opportunities[1]!.en.demand =
+      "Request #I3 describes a concrete workflow to verify.";
+    data.en.headline =
+      "No broader adoption established; " + "exploratory ".repeat(9);
+    const sources = [
+      ...documents,
+      {
+        id: "I3",
+        label: "Workspace feature request",
+        url: "https://github.com/team/editor/issues/3",
+        excerpt: "Please add workspace support.",
+      },
+    ];
+    let calls = 0;
+    r.json = async (_prompt, input: any, _budget, operation, thinking) => {
+      calls++;
+      assert.equal(operation, "strategy-copy");
+      assert.equal(thinking, false);
+      const measured = input.fields.find(
+        (f: any) => f.path === "experimentPlan.zh.measurement",
+      );
+      assert.match(measured.correction, /不/);
+      assert.match(
+        input.fields.find((f: any) => f.path === "opportunities.1.en.demand")
+          .correction,
+        /I3/,
+      );
+      const headline = input.fields.find((f: any) => f.path === "en.headline");
+      assert.equal(headline.maxLength, 100);
+      assert.ok(headline.length > 100);
+      assert.ok(
+        input.fields.every(
+          (f: any) => !f.path.endsWith(".strategy.experiment"),
+        ),
+      );
+      assert.equal(measured.previousAttemptReturnedSameValue, calls === 2);
+      return {
+        edits:
+          calls === 1
+            ? []
+            : [
+                {
+                  path: measured.path,
+                  value: "测量五名参与者中在至少两个独立日期回访的人数。",
+                },
+                {
+                  path: "experimentPlan.zh.continueIf",
+                  value: "五位参与者中至少三位在至少两个独立日期回访时继续。",
+                },
+                {
+                  path: "opportunities.1.en.demand",
+                  value:
+                    "The workspace feature request describes a concrete workflow to verify.",
+                },
+                {
+                  path: "en.headline",
+                  value: "Verify adoption through a small workflow experiment",
+                },
+              ],
+      };
+    };
+    const result = await (r as any).repairStrategyCopy(data, sources);
+    assert.equal(calls, 2);
+    assert.equal(
+      result.zh.strategy.successSignal,
+      result.experimentPlan.zh.continueIf,
+    );
+    assert.equal(
+      result.opportunities[0].zh.experiment,
+      result.zh.strategy.experiment,
+    );
+    assert.deepEqual(proseRepairs(result), []);
+  }));
+
+test("exact quote recovery preserves Markdown emphasis and code instead of asking a model to paraphrase", () => {
+  const source =
+    "**Krust** automatically configures rust-analyzer to send colored diagnostics.";
+  const quote =
+    "Krust automatically configures rust-analyzer to send colored diagnostics.";
+  assert.equal(recoverSourceQuote(quote, source, true), source);
+  assert.equal(
+    recoverSourceQuote(
+      "Call cargo check to inspect the workspace.",
+      "Call `cargo check` to inspect the workspace.",
+      true,
+    ),
+    "Call `cargo check` to inspect the workspace.",
+  );
+  assert.equal(recoverSourceQuote(quote, source + source, true), undefined);
+  assert.equal(
+    recoverSourceQuote(
+      quote,
+      source.replace("automatically", "manually"),
+      true,
+    ),
+    undefined,
+  );
+});

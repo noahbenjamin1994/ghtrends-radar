@@ -4,6 +4,7 @@ import {
   hasNegativeWording,
   hasRecoveryTimeReference,
   proseLanguageMismatch,
+  negativeWordingMatches,
 } from "./i18n.js";
 import type { Brief, ResearchSource } from "./types.js";
 
@@ -85,6 +86,46 @@ export function hasCoverageQuantity(text: string): boolean {
   );
 }
 
+/** The editor receives the same concrete failures that select a prose field. */
+export function proseDiagnostics(
+  value: string,
+  path: string,
+  directionIds: string[] = [],
+): string[] {
+  const problems: string[] = [];
+  const lang = path.split(".").includes("zh") ? "zh" : "en";
+  if (proseLanguageMismatch(value, lang))
+    problems.push(
+      `Translate this authored field into ${lang === "zh" ? "Simplified Chinese" : "English"}; preserve paired meaning, conditions and numbers.`,
+    );
+  const negatives = negativeWordingMatches(value);
+  if (negatives.length)
+    problems.push(
+      `Affirmative wording: replace these exact matches, including inside compounds: ${JSON.stringify(negatives)}. Preserve the claim and comparison operators. For example 不同日期 -> 独立日期, 无关 -> 属于相邻领域; express a limited scope directly instead of using 而非.`,
+    );
+  const ids = [
+    ...new Set(
+      value.match(/\b(?:S[12]|[RI]\d+|W\d+R\d+|D\d+[AIR]\d+)\b/g) || [],
+    ),
+  ];
+  const slugs = directionIds.filter(
+    (id) => id.includes("-") && value.includes(id),
+  );
+  if (ids.length || slugs.length)
+    problems.push(
+      `Replace internal references ${JSON.stringify([...ids, ...slugs])} with readable names from the lookup, preserving attribution.`,
+    );
+  if (hasRecoveryTimeReference(value))
+    problems.push(
+      "Replace collection recovery timing with a product experiment action; source status contains collection timing.",
+    );
+  if (hasCoverageQuantity(value))
+    problems.push(
+      "Keep repository quantities in metric cards. Describe inspected project purposes and a conditional user workflow to validate through actual behavior; repository activity measures supply.",
+    );
+  return problems;
+}
+
 export function proseRepairs(
   raw: unknown,
   all = false,
@@ -122,18 +163,7 @@ export function proseRepairs(
           ).test(path))
       )
         return;
-      if (
-        all ||
-        proseLanguageMismatch(
-          node,
-          path.split(".").includes("zh") ? "zh" : "en",
-        ) ||
-        hasNegativeWording(node) ||
-        hasRecoveryTimeReference(node) ||
-        hasCoverageQuantity(node) ||
-        /\b(?:S[12]|[RI]\d+|W\d+R\d+|D\d+[AIR]\d+)\b/.test(node) ||
-        directionIds.some((id: string) => node.includes(id))
-      )
+      if (all || proseDiagnostics(node, path, directionIds).length)
         fields.push({ path, value: node });
     } else if (node && typeof node === "object") {
       for (const [k, v] of Object.entries(node)) visit(v, `${path}.${k}`);
@@ -227,11 +257,13 @@ export function recoverSourceQuote(
     };
     let cursor = 0;
     for (const match of source.matchAll(
-      /\[([^\]\n]+)\](?:\(https?:\/\/[^\s)]+\)|\[[^\]\n]+\])/g,
+      /\[([^\]\n]+)\](?:\(https?:\/\/[^\s)]+\)|\[[^\]\n]+\])|(\*\*|__|`)([^`*_\n]+?)\2/g,
     )) {
       append(cursor, match.index);
       const labelStart = chars.length;
-      append(match.index + 1, match.index + 1 + match[1]!.length);
+      const offset = match[1] ? 1 : match[2]!.length;
+      const label = match[1] || match[3]!;
+      append(match.index + offset, match.index + offset + label.length);
       starts[labelStart] = match.index;
       ends[ends.length - 1] = match.index + match[0].length;
       cursor = match.index + match[0].length;
