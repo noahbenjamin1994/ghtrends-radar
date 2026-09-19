@@ -13,7 +13,11 @@ import {
   type DocumentTransport,
 } from "../src/providers/documents.js";
 import { Store } from "../src/core/store.js";
-import { GitHub } from "../src/providers/github.js";
+import {
+  GitHub,
+  researchExcerpt,
+  cleanResearchMarkdown,
+} from "../src/providers/github.js";
 import { Engine } from "../src/core/engine.js";
 import {
   reportIssueSignals,
@@ -656,3 +660,133 @@ test("long repository licenses keep complete common clauses and flag the excerpt
     assert.equal(limited.excerpt!.length, 20000);
     assert.equal(limited.excerptTruncated, true);
   }));
+
+test("focused excerpts retain actual late integration instructions rather than only a table of contents", () => {
+  const gitlab =
+    "## GitLab integration\nConfigure the pipeline coverage matcher and publish the Cobertura artifact.\nUse the same project and pipeline to confirm the rendered result.\n";
+  const text =
+    "# Coverage tool\nCollect coverage for a Rust project.\n\n## Table of Contents\n- [GitLab integration](#gitlab-integration)\n\n## Command reference\n" +
+    "General command options and installation instructions.\n".repeat(180) +
+    "\n" +
+    gitlab +
+    "\n## Development\nBuild development dependencies.\n";
+  assert.ok(text.indexOf(gitlab) > 7000);
+  const result = researchExcerpt(text, 6000, "rust coverage gitlab");
+  assert.ok(result.excerpt.includes(gitlab.trim()));
+  assert.match(result.excerpt, /^# Coverage tool/);
+  assert.equal(result.excerptTruncated, true);
+  assert.ok(result.excerpt.length <= 6000);
+  for (const span of result.excerpt.split("\n\n[…]\n\n"))
+    assert.ok(
+      text.includes(span),
+      "Every segment remains exact publisher text",
+    );
+  assert.equal(researchExcerpt(text, 7000).excerpt, text.slice(0, 7000));
+  assert.equal(researchExcerpt(text, 7000).excerptTruncated, true);
+});
+
+test("focused excerpts ignore headings inside code, retain setext headings and stay bounded", () => {
+  const text =
+    "# Form service\nAn API for forms.\n\n## Shell example\n```sh\n# admin approval\n" +
+    "printf 'example command'\n".repeat(350) +
+    "```\n\nAdmin approval\n--------------\nAn administrator can review a draft before publication.\n" +
+    "The caller supplies the draft identifier and a reviewer credential.\n".repeat(
+      60,
+    ) +
+    "\n## Approval API\n" +
+    "Approve a pending draft through the API.\n".repeat(100);
+  const result = researchExcerpt(text, 2200, "admin approval");
+  assert.ok(
+    result.excerpt.includes(
+      "An administrator can review a draft before publication.",
+    ),
+  );
+  assert.ok(result.excerpt.length <= 2200);
+  assert.ok(!result.excerpt.includes("printf 'example command'"));
+  assert.equal(result.excerptTruncated, true);
+  assert.deepEqual(
+    researchExcerpt("# Short\nComplete original.", 100, "short"),
+    {
+      excerpt: "# Short\nComplete original.",
+      excerptTruncated: false,
+    },
+  );
+});
+
+test("focused README collection keeps URL, observation time and query-dependent context from the same cached document", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-focused-readme-"));
+  const store = new Store(dir),
+    gh = new GitHub(store);
+  const original =
+    "# Record tool\nTracks records locally.\n\n## Installation\n" +
+    "Install the package and its dependencies.\n".repeat(200) +
+    "\n## CSV export\nExport all records as CSV, preserving dates, units and tank names.\n" +
+    "\n## Batch entry\nEnter pH and temperature measurements together in the mobile form.\n";
+  const path = "/repos/team/records/readme";
+  store.set(
+    "github:" + path,
+    {
+      encoding: "base64",
+      content: Buffer.from(original).toString("base64"),
+      size: Buffer.byteLength(original),
+      html_url: "https://github.com/team/records/blob/main/README.md",
+    },
+    60000,
+  );
+  store.set("github-observed:" + path, "2026-09-19T00:00:00Z", 60000);
+  store.set(
+    "github:/repos/team/records/releases/latest",
+    {
+      tag_name: "v1",
+      html_url: "https://github.com/team/records/releases/tag/v1",
+      body: "A maintenance release.",
+    },
+    60000,
+  );
+  try {
+    const sources = await gh.researchSources(
+      [{ name: "team/records" } as any],
+      [],
+      "record CSV export",
+    );
+    const readme = sources.find((s) => s.id === "R1")!;
+    assert.match(
+      readme.excerpt!,
+      /Export all records as CSV, preserving dates, units and tank names/,
+    );
+    assert.equal(
+      readme.url,
+      "https://github.com/team/records/blob/main/README.md",
+    );
+    assert.equal(readme.fetchedAt, "2026-09-19T00:00:00Z");
+    assert.equal(readme.excerptTruncated, true);
+    assert.ok(readme.excerpt!.length <= 6000);
+    const ordinary = (
+      await gh.researchSources([{ name: "team/records" } as any], [])
+    )[0]!;
+    assert.equal(ordinary.excerpt, original.slice(0, 7000));
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("Markdown cleaning preserves shell redirects, typed code and following integration documentation", () => {
+  const code =
+    "```sh\nbash <(curl -s https://example.com/install) -f report.info\n```";
+  const integration =
+    "#### grcov with Gitlab\nPublish Cobertura from the pipeline.\n```yaml\ncoverage: '/^lines: (.+) -> (.+)$/'\n```";
+  const text =
+    "<div>Coverage</div>\n<!-- internal note -->\n" +
+    code +
+    "\n" +
+    integration +
+    "\nUse `Vec<T>` and <https://example.com/docs>.";
+  const cleaned = cleanResearchMarkdown(text, 6000);
+  assert.ok(cleaned.includes(code));
+  assert.ok(cleaned.includes(integration));
+  assert.ok(cleaned.includes("`Vec<T>`"));
+  assert.ok(cleaned.includes("<https://example.com/docs>"));
+  assert.ok(!cleaned.includes("<div>"));
+  assert.ok(!cleaned.includes("internal note"));
+});

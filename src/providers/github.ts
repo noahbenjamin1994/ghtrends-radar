@@ -29,6 +29,175 @@ interface GitHubIssue {
   user?: { id?: number; type?: string };
   pull_request?: unknown;
 }
+
+/** Markdown code and autolinks are publisher evidence, even when they contain
+ * angle brackets. Remove presentation markup only outside fenced/inline code. */
+export function cleanResearchMarkdown(text: string, limit: number) {
+  const clean = (plain: string) =>
+    plain
+      .split(/(`+[^`]*`+)/g)
+      .map((part) =>
+        part.startsWith("`")
+          ? part
+          : part
+              .replace(/<!--[\s\S]*?-->/g, "")
+              .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+              .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+              .replace(
+                /<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+[^<>]*?)?\s*\/?>/g,
+                " ",
+              ),
+      )
+      .join("");
+  let output = "",
+    plain = "",
+    fence = "";
+  for (const line of text.match(/^.*(?:\n|$)/gm) || []) {
+    const marker = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+    if (fence) {
+      output += line;
+      if (marker && marker[0] === fence[0] && marker.length >= fence.length)
+        fence = "";
+    } else if (marker) {
+      output += clean(plain) + line;
+      plain = "";
+      fence = marker;
+    } else plain += line;
+  }
+  return (output + clean(plain)).replace(/\n{3,}/g, "\n\n").slice(0, limit);
+}
+
+/** Keep the introduction and relevant Markdown sections within the same source
+ * budget. Each part is an unchanged span; the separator marks omitted text. */
+export function researchExcerpt(text: string, limit: number, focus = "") {
+  const prefix = () => ({
+    excerpt: text.slice(0, limit),
+    excerptTruncated: text.length > limit,
+  });
+  if (text.length <= limit || !focus.trim()) return prefix();
+  const stop = new Set(
+    "a an and are as at be by for from how in into is it of on or that the this to using with tool tools app application software project open source self hosted".split(
+      " ",
+    ),
+  );
+  const terms = [
+    ...new Set(
+      focus
+        .normalize("NFKC")
+        .toLowerCase()
+        .match(/[\p{L}\p{N}][\p{L}\p{N}+#.-]*/gu) || [],
+    ),
+  ]
+    .filter(
+      (word) => word.length >= 3 && /\p{L}/u.test(word) && !stop.has(word),
+    )
+    .slice(0, 16);
+  if (!terms.length) return prefix();
+  const headings: { start: number; title: string; level: number }[] = [];
+  let fence = "";
+  const lines = [...text.matchAll(/^.*(?:\n|$)/gm)];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]![0].trimEnd();
+    const marker = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+    if (marker) {
+      if (!fence) fence = marker;
+      else if (marker[0] === fence[0] && marker.length >= fence.length)
+        fence = "";
+      continue;
+    }
+    if (fence) continue;
+    const atx = /^ {0,3}(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+    const underline = /^(={3,}|-{3,})\s*$/.exec(lines[i + 1]?.[0] || "");
+    if (atx)
+      headings.push({
+        start: lines[i]!.index!,
+        title: atx[2]!,
+        level: atx[1]!.length,
+      });
+    else if (line.trim() && !/^\s/.test(line) && underline) {
+      headings.push({
+        start: lines[i]!.index!,
+        title: line,
+        level: underline[1]![0] === "=" ? 1 : 2,
+      });
+      i++;
+    }
+  }
+  const blocks = headings.map((h, i) => ({
+    ...h,
+    text: text.slice(h.start, headings[i + 1]?.start ?? text.length),
+  }));
+  if (blocks.length < 2) return prefix();
+  const patterns = terms.map(
+    (term) =>
+      new RegExp(
+        `(?:^|[^\\p{L}\\p{N}])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=$|[^\\p{L}\\p{N}])`,
+        "iu",
+      ),
+  );
+  const weights = patterns.map((pattern) =>
+    Math.log1p(
+      blocks.length /
+        Math.max(1, blocks.filter((b) => pattern.test(b.text)).length),
+    ),
+  );
+  const ranked = blocks
+    .map((block) => ({
+      ...block,
+      score: /^(?:table of contents|contents|目录)$/i.test(block.title.trim())
+        ? 0
+        : patterns.reduce(
+            (sum, pattern, i) =>
+              sum +
+              (pattern.test(block.title)
+                ? 4
+                : pattern.test(block.text)
+                  ? 1
+                  : 0) *
+                weights[i]!,
+            0,
+          ),
+    }))
+    .filter((b) => b.score > 0)
+    .sort((a, b) => b.score - a.score || a.start - b.start);
+  if (!ranked.length) return prefix();
+  const separator = "\n\n[…]\n\n";
+  const introEnd = Math.min(
+    800,
+    headings.find((h) => h.level > 1)?.start ?? 800,
+  );
+  const parts = [{ start: 0, value: text.slice(0, introEnd).trimEnd() }];
+  let remaining = limit - parts[0]!.value.length;
+  for (const block of ranked
+    .filter((b) => b.score >= ranked[0]!.score * 0.35)
+    .slice(0, 3)) {
+    if (remaining <= separator.length + 40) break;
+    const start = Math.max(block.start, introEnd);
+    const content = block.text.slice(start - block.start);
+    const available = remaining - separator.length;
+    const value = content
+      .slice(
+        0,
+        content.length <= available
+          ? content.length
+          : Math.min(3000, available),
+      )
+      .trim();
+    if (value.length < 40) continue;
+    parts.push({ start, value });
+    remaining -= value.length + separator.length;
+  }
+  if (parts.length === 1) return prefix();
+  return {
+    excerpt: parts
+      .sort((a, b) => a.start - b.start)
+      .map((p) => p.value)
+      .filter(Boolean)
+      .join(separator),
+    excerptTruncated: true,
+  };
+}
+
 function requestEvidence(
   issue: GitHubIssue,
   observedAt?: string,
@@ -732,20 +901,17 @@ export class GitHub {
     }
     return output;
   }
-  async researchSources(repos: Repo[], gaps: Gap[]): Promise<ResearchSource[]> {
+  async researchSources(
+    repos: Repo[],
+    gaps: Gap[],
+    focus = "",
+  ): Promise<ResearchSource[]> {
     // Excerpts are citable publisher text. Keep our review guidance and
     // observation metadata outside them so they cannot become source quotes.
     const selected = repos
       .filter((r) => !r.relevance || r.relevance.role === "direct")
       .slice(0, 4);
-    const clean = (s: string, limit: number) =>
-      s
-        .replace(/<!--[\s\S]*?-->/g, "")
-        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
-        .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-        .replace(/<[^>]*>/g, " ")
-        .replace(/\n{3,}/g, "\n\n")
-        .slice(0, limit);
+    const clean = cleanResearchMarkdown;
     const documents = await Promise.allSettled([
       ...selected.map(async (repo, i): Promise<ResearchSource> => {
         const name = validateRepo(repo.name);
@@ -777,9 +943,10 @@ export class GitHub {
           label: `${name} · README`,
           url: url.href,
           fetchedAt: this.observedAt(path),
-          excerpt: clean(
-            Buffer.from(doc.content, "base64").toString("utf8"),
-            7000,
+          ...researchExcerpt(
+            clean(Buffer.from(doc.content, "base64").toString("utf8"), 300000),
+            focus ? 6000 : 7000,
+            focus,
           ),
         };
       }),
@@ -807,7 +974,7 @@ export class GitHub {
           url: url.href,
           fetchedAt: this.observedAt(path),
           publishedAt: release.published_at,
-          excerpt: clean(release.body || "", 2200),
+          ...researchExcerpt(clean(release.body || "", 300000), 2200, focus),
         };
       }),
       ...gaps.slice(0, 3).map(async (gap, i): Promise<ResearchSource> => {

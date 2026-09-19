@@ -326,6 +326,7 @@ export async function runDeepResearch(
             await engine.github.researchSources(
               knownProjects.map((name) => ({ name }) as Repo),
               [],
+              direction.query,
             ),
           );
       })(),
@@ -352,7 +353,13 @@ export async function runDeepResearch(
         if (names.length) {
           const repos = names.map((name) => ({ name }) as Repo);
           const gaps = await engine.github.gaps(repos);
-          add(await engine.github.researchSources(repos, gaps.slice(0, 4)));
+          add(
+            await engine.github.researchSources(
+              repos,
+              gaps.slice(0, 4),
+              direction.query,
+            ),
+          );
         }
       })(),
       (async () => {
