@@ -278,7 +278,7 @@ export class Research {
       schema: zodToJsonSchema(capabilityAuditSchema),
     };
     const key =
-      "capability-audit:v2:" +
+      "capability-audit:v3:" +
       createHash("sha256")
         .update(JSON.stringify([this.model, CAPABILITY_PROMPT, input]))
         .digest("hex");
@@ -1608,6 +1608,14 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
         pivotSignal: true,
       }),
     });
+    // The shared pilot owns its criteria. Earlier generated test prose is only
+    // a draft and can anchor the writer to an obsolete comparison baseline.
+    const {
+      experiment: _experiment,
+      successSignal: _success,
+      pivotSignal: _pivot,
+      ...selectedJob
+    } = selected.en;
     const priority = await section(
       "priority",
       strategyResponse
@@ -1636,7 +1644,7 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
           overall: candidate.overall,
           selection: candidate.selection,
           recommendedId: selected.id,
-          selected: selected.en,
+          selected: selectedJob,
           opportunities: opportunities.map((o) => ({
             id: o.id,
             route: o.route,
@@ -1647,7 +1655,7 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
         },
       },
       4200,
-      "Write root en/zh headline and summary about the ORIGINAL topic, then the six-field strategy for the recommended direction (angle/audience/mechanism/wedge/tradeoff/assumption). Return the supplied recommendedId, selection reasoning and at most four evidence references. Headline names the original topic and its overall opportunity map; summary compares entry routes at the original scope, with measurements in metric cards. Create ONE experimentPlan bound to recommendedId. Its en and zh objects each contain participants (recruitment target and access), task (artifact and user task), timebox (proposed pilot window), measurement (what to measure and comparison baseline), continueIf and redirectIf (proposed numeric decision criteria). Use selected.experiment as the starting proposal. Keep the cohort, task and comparison operators consistent; resolve incomplete pilot details once in this shared plan. Put decision thresholds ONLY in continueIf/redirectIf; the other four fields describe execution. Distinguish participant count from items per task, and define the sample for every criterion. Keep a five-item fixture as five items, with pilot participants as a separate recruitment target. Target 100 characters per execution field; use the schema bounds when essential scope needs more space. Use the same cohort and metrics for both outcomes. State counts, AND/OR and time windows equivalently in both languages. The application derives the strategy and selected-card experiment from this plan; omit duplicate experiment/successSignal/pivotSignal fields. Recruitment, data access and device permissions remain requirements. State both languages as complete objects.",
+      "Write root en/zh headline and summary about the ORIGINAL topic, then the six-field strategy for the recommended direction (angle/audience/mechanism/wedge/tradeoff/assumption). Return the supplied recommendedId, selection reasoning and at most four evidence references. Headline names the original topic and its overall opportunity map; summary compares entry routes at the original scope, with measurements in metric cards. Create ONE experimentPlan bound to recommendedId. Its en and zh objects each contain participants (recruitment target and access), task (artifact and user task), timebox (proposed pilot window), measurement (what to measure and comparison baseline), continueIf and redirectIf (proposed numeric decision criteria). Design the pilot from selected customer job and capabilityCheck. Compare the proposed benefit with the documented existing feature on the same task; derive a fresh baseline and criteria here. Keep the cohort, task and comparison operators consistent. Put decision thresholds ONLY in continueIf/redirectIf; the other four fields describe execution. Distinguish participant count from items per task, and define the sample for every criterion. Keep a five-item fixture as five items, with pilot participants as a separate recruitment target. Target 100 characters per execution field; use the schema bounds when essential scope needs more space. Use the same cohort and metrics for both outcomes. State counts, AND/OR and time windows equivalently in both languages. The application derives the strategy and selected-card experiment from this plan; omit duplicate experiment/successSignal/pivotSignal fields. Recruitment, data access and device permissions remain requirements. State both languages as complete objects.",
     );
     const market = await section(
       "overall",

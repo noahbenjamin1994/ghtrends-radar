@@ -10,6 +10,7 @@ import {
   capabilityIssues,
   capabilityEditPaths,
   applyCapabilityEdits,
+  capabilityNotices,
 } from "../src/core/capabilities.js";
 import { Research } from "../src/providers/research.js";
 import { Store } from "../src/core/store.js";
@@ -168,6 +169,35 @@ test("copyright, scoped license restrictions and legacy release observations ret
     ]).length,
     1,
   );
+});
+
+test("feature selection retains explicit rights and testing notices from the same original document", () => {
+  const source = {
+    ...docs[0]!,
+    excerpt:
+      docs[0]!.excerpt + "\nCopyright 2026 Notebook. All rights reserved.",
+  };
+  const x = normalizeCapabilityAudit(audit(), [source]) as ReturnType<
+    typeof audit
+  >;
+  assert.deepEqual(x.directions[0]!.facts[1], {
+    id: "R1",
+    quote: "Copyright 2026 Notebook. All rights reserved.",
+  });
+  assert.deepEqual(capabilityProblems(x, [source], ["grooming-notes"]), []);
+  assert.deepEqual(normalizeCapabilityAudit(x, [source]), x);
+  assert.deepEqual(
+    capabilityNotices({ ...source, documentType: "license" }),
+    [],
+  );
+  assert.deepEqual(
+    capabilityNotices({
+      ...source,
+      excerpt: "Experimental build. Not for production use. Use with caution!",
+    }),
+    ["Experimental build. Not for production use. Use with caution!"],
+  );
+  assert.deepEqual(capabilityNotices({ ...source, kind: "request" }), []);
 });
 
 test("audit repair exposes quote errors alongside length errors and confines edits to rejected fields", () => {

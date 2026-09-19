@@ -13,7 +13,7 @@ export const capabilityAuditSchema = z.object({
     .array(
       z.object({
         id: z.string().max(41),
-        facts: z.array(factSchema).max(4),
+        facts: z.array(factSchema).max(8),
         overlap: z.enum(["documented", "partial", "to-check"]),
         proposedWork: z.string().min(8).max(500),
         prerequisites: z.array(z.string().min(8).max(200)).min(1).max(4),
@@ -24,6 +24,23 @@ export const capabilityAuditSchema = z.object({
     .max(5),
 });
 export type CapabilityAudit = z.infer<typeof capabilityAuditSchema>;
+
+/** Carry explicit source restrictions forward even when feature selection omits them.
+ * These are quoted notices, not a conclusion about the asset's full license. */
+export function capabilityNotices(source: ResearchSource): string[] {
+  if (source.documentType === "license" || !capabilitySources([source]).length)
+    return [];
+  const marker =
+    /all rights reserved|not for production(?: use)?|(?:for )?testing[- ]only/gi;
+  const excerpt = source.excerpt!;
+  const match = marker.exec(excerpt);
+  if (!match) return [];
+  const start = excerpt.lastIndexOf("\n", match.index) + 1;
+  const nextLine = excerpt.indexOf("\n", match.index);
+  const end = nextLine < 0 ? excerpt.length : nextLine;
+  const line = excerpt.slice(start, end).trim();
+  return [line.length <= 300 ? line : match[0]];
+}
 
 export function capabilitySources(sources: ResearchSource[]) {
   return sources.filter(
@@ -48,7 +65,7 @@ export function normalizeCapabilityAudit(
 ) {
   const audit = structuredClone(raw) as any;
   if (!Array.isArray(audit?.directions)) return audit;
-  for (const direction of audit.directions)
+  for (const direction of audit.directions) {
     for (const fact of Array.isArray(direction?.facts) ? direction.facts : []) {
       if (
         !fact ||
@@ -63,6 +80,17 @@ export function normalizeCapabilityAudit(
       // Legacy audit classifications were redundant with source provenance.
       delete fact.kind;
     }
+    if (!Array.isArray(direction?.facts)) continue;
+    const ids = new Set(direction.facts.map((f: any) => f?.id));
+    for (const source of sources.filter((s) => ids.has(s.id)))
+      for (const quote of capabilityNotices(source))
+        if (
+          !direction.facts.some(
+            (f: any) => f?.id === source.id && f?.quote === quote,
+          )
+        )
+          direction.facts.push({ id: source.id, quote });
+  }
   return audit;
 }
 
