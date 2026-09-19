@@ -475,13 +475,13 @@ export function visibleOpportunities(
 ): OpportunityMap | undefined {
   if (
     !brief ||
-    !["2", "3", "4", "5", "6", "7", "8", "9", "10"].includes(
+    !["2", "3", "4", "5", "6", "7", "8", "9", "10", "11"].includes(
       brief.strategyVersion || "",
     )
   )
     return;
   if (
-    ["3", "4", "5", "6", "7", "8", "9", "10"].includes(
+    ["3", "4", "5", "6", "7", "8", "9", "10", "11"].includes(
       brief.strategyVersion || "",
     ) &&
     (!overviewSchema.safeParse(brief.overview).success ||

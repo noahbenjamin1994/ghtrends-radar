@@ -219,7 +219,7 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     assert.ok(visibleStrategy(b, "zh"));
     assert.equal(visibleOpportunities(b)?.opportunities.length, 3);
     assert.ok(visibleStrategy({ ...b, strategyVersion: "1" }, "zh"));
-    for (const version of ["5", "6", "7", "8", "9", "10"]) {
+    for (const version of ["5", "6", "7", "8", "9", "10", "11"]) {
       assert.ok(visibleStrategy({ ...b, strategyVersion: version }, "zh"));
       assert.equal(
         visibleOpportunities({ ...b, strategyVersion: version })?.opportunities
@@ -830,7 +830,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "10");
+    assert.equal(brief.strategyVersion, "11");
     const legacy = {
       ...brief,
       strategyVersion: "2",
@@ -1015,6 +1015,140 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
     );
     assert.equal(brief.reviewed, true);
     assert.equal(brief.opportunities?.length, 3);
+  }));
+
+test("section format recovery preserves completed siblings and review budget recovery uses one direct response", async () =>
+  fixture(async (r) => {
+    const data = sample(),
+      calls: string[] = [];
+    r.json = async (_prompt, input: any, _budget, operation, thinking) => {
+      calls.push(operation!);
+      if (operation === "strategy-direction") {
+        if (input.candidate.id === data.opportunities[0]!.id)
+          throw Object.assign(new Error("Malformed JSON"), {
+            code: "invalid_response",
+          });
+        return data.opportunities.find((o) => o.id === input.candidate.id);
+      }
+      if (operation === "strategy-section-format-recovery") {
+        assert.equal(thinking, false);
+        return data.opportunities[0];
+      }
+      if (operation === "strategy-evidence-review")
+        throw Object.assign(new Error("Thinking exhausted output budget"), {
+          code: "output_limit",
+        });
+      if (operation === "strategy-evidence-review-compact") {
+        assert.equal(thinking, false);
+        assert.equal(_budget, 8500);
+        return { edits: [] };
+      }
+      assert.ok(["strategy-priority", "strategy-overall"].includes(operation!));
+      return data;
+    };
+    const result = await (r as any).writeStrategySections(
+      { input: "Documentation", sources: documents },
+      {
+        overall: {},
+        opportunities: data.opportunities,
+        recommendedId: data.recommendedId,
+      },
+    );
+    assert.deepEqual(
+      result.opportunities.map((o: any) => o.id),
+      data.opportunities.map((o) => o.id),
+    );
+    assert.deepEqual(result.evidence, data.evidence);
+    assert.equal(calls.filter((x) => x === "strategy-direction").length, 3);
+    for (const name of [
+      "strategy-section-format-recovery",
+      "strategy-priority",
+      "strategy-overall",
+      "strategy-evidence-review-compact",
+    ])
+      assert.equal(calls.filter((x) => x === name).length, 1);
+  }));
+
+test("an overlong citation ID is resolved as an identity with its actual limit, never shortened as prose", async () =>
+  fixture(async (r) => {
+    const data = sample();
+    let repaired = false;
+    r.json = async (_prompt, input: any, _budget, operation) => {
+      if (operation === "strategy-direction") {
+        const direction = structuredClone(
+          data.opportunities.find((o) => o.id === input.candidate.id)!,
+        );
+        if (direction.id === data.recommendedId)
+          direction.basedOn = [
+            {
+              id: "a-very-long-organization/a-very-long-repository",
+              quote: documents[0]!.excerpt!,
+            },
+          ];
+        return direction;
+      }
+      if (operation === "strategy-copy") {
+        const field = input.fields.find((f: any) => f.path === "basedOn.0.id");
+        assert.equal(field.maxLength, 30);
+        assert.equal(field.referenceCandidates[0].id, "R1");
+        repaired = true;
+        return { edits: [{ path: field.path, value: "R1" }] };
+      }
+      if (operation === "strategy-evidence-review") return { edits: [] };
+      return data;
+    };
+    const result = await (r as any).writeStrategySections(
+      { input: "Documentation", sources: documents },
+      {
+        overall: {},
+        opportunities: data.opportunities,
+        recommendedId: data.recommendedId,
+      },
+    );
+    assert.equal(repaired, true);
+    assert.deepEqual(result.opportunities[0].basedOn, [
+      { id: "R1", quote: documents[0]!.excerpt },
+    ]);
+  }));
+
+test("review recovery is bounded and provider errors keep their original recovery path", async () =>
+  fixture(async (r) => {
+    for (const code of [
+      "network_error",
+      "http_429",
+      "output_limit",
+      "invalid_response",
+    ]) {
+      let calls = 0;
+      r.json = async () => {
+        calls++;
+        throw Object.assign(new Error(code), { code });
+      };
+      await assert.rejects(
+        (r as any).reviewStrategyMeaning(sample(), {
+          input: "Documentation",
+          sources: documents,
+        }),
+        new RegExp(code),
+      );
+      assert.equal(
+        calls,
+        ["output_limit", "invalid_response"].includes(code) ? 2 : 1,
+      );
+    }
+    let calls = 0;
+    r.json = async () => {
+      calls++;
+      return { unexpected: "shape" };
+    };
+    await assert.rejects(
+      (r as any).reviewStrategyMeaning(sample(), {
+        input: "Documentation",
+        sources: documents,
+      }),
+      /Review format requires/,
+    );
+    assert.equal(calls, 2);
   }));
 
 test("the same issue found through two queries remains a single demand signal", () => {
