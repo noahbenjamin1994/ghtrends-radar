@@ -1233,6 +1233,26 @@ test("a broad issue match stays outside selected-project research and license ev
     id: "E3",
     url: "https://github.com/Example/Drafts/blob/main/README.md",
     kind: "project",
+    excerpt:
+      "Introduction. ".repeat(180) +
+      "The current release supports draft approval.",
+  };
+  const projectRoot: ResearchSource = {
+    ...project,
+    id: "E6",
+    url: "https://github.com/example/drafts?tab=readme-ov-file",
+    excerpt: "The project root identifies the selected draft tool.",
+  };
+  const similarName: ResearchSource = {
+    ...project,
+    id: "E7",
+    url: "https://github.com/example/drafts-extra/blob/main/README.md",
+  };
+  const longPage: ResearchSource = {
+    ...source,
+    id: "E8",
+    kind: "search",
+    excerpt: "Vendor documentation. ".repeat(150),
   };
   const unrelated: ResearchSource = {
     ...request,
@@ -1248,7 +1268,7 @@ test("a broad issue match stays outside selected-project research and license ev
   };
   m.brief!.sources = [project, unrelated];
   m.brief!.opportunities![0]!.basedOn = [
-    { id: "E3", quote: project.excerpt! },
+    { id: "E3", quote: project.excerpt!.slice(-44) },
     { id: "E4", quote: unrelated.excerpt! },
   ];
   e.store.saveMarket(m, false, t.owner);
@@ -1257,7 +1277,16 @@ test("a broad issue match stays outside selected-project research and license ev
     collectedAt: new Date().toISOString(),
     queries: [],
     githubQuery: "document comments",
-    sources: [source, request, project, unrelated, otherLicense],
+    sources: [
+      source,
+      request,
+      project,
+      unrelated,
+      otherLicense,
+      projectRoot,
+      similarName,
+      longPage,
+    ],
     reads: [],
   };
   let checked = false;
@@ -1270,8 +1299,32 @@ test("a broad issue match stays outside selected-project research and license ev
     assert.equal(payload.direction.en.experiment, undefined);
     assert.match(payload.direction.status, /proposed direction/);
     assert.ok(payload.sources.some((s: any) => s.id === "E2"));
+    assert.equal(
+      payload.sources.find((s: any) => s.id === "E2").url,
+      request.url,
+    );
+    assert.equal(
+      payload.sources.find((s: any) => s.id === "E3").excerpt,
+      project.excerpt,
+    );
+    assert.equal(
+      payload.sources.find((s: any) => s.id === "E3").excerptTruncated,
+      false,
+    );
+    assert.equal(
+      payload.sources.find((s: any) => s.id === "E6").project,
+      "example/drafts",
+    );
+    assert.equal(
+      payload.sources.find((s: any) => s.id === "E8").excerpt.length,
+      2200,
+    );
+    assert.equal(
+      payload.sources.find((s: any) => s.id === "E8").excerptTruncated,
+      true,
+    );
     assert.ok(
-      payload.sources.every((s: any) => s.id !== "E4" && s.id !== "E5"),
+      payload.sources.every((s: any) => !["E4", "E5", "E7"].includes(s.id)),
     );
     checked = true;
     return brief();
@@ -1279,14 +1332,14 @@ test("a broad issue match stays outside selected-project research and license ev
   try {
     assert.equal(await runDeepResearch(e, t, () => {}), true);
     assert.equal(checked, true);
-    assert.equal(t.evidence.sources.length, 5);
+    assert.equal(t.evidence.sources.length, 8);
   } finally {
     await e.close();
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("an interrupted source stage is collected again; a planning timeout falls back to the selected direction", async () => {
+test("an interrupted source stage is collected again and retains collection truncation", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-sources-"));
   const e = new Engine(new Store(dir)),
     m = sample(),
@@ -1318,7 +1371,15 @@ test("an interrupted source stage is collected again; a planning timeout falls b
       queries: [],
     };
   };
-  e.github.directionEvidence = async () => [source, request];
+  e.github.directionEvidence = async () => [
+    source,
+    request,
+    {
+      ...source,
+      url: "https://example.com/long-document",
+      excerpt: "Original documentation. ".repeat(300),
+    },
+  ];
   e.github.researchSources = async () => [];
   e.github.gaps = async () => [];
   e.github.researchSources = async () => [];
@@ -1339,6 +1400,11 @@ test("an interrupted source stage is collected again; a planning timeout falls b
     );
     assert.equal(searches, 1);
     assert.equal(t.evidence.collectionFinished, true);
+    const shortened = t.evidence.sources.find((s) =>
+      s.url.endsWith("/long-document"),
+    )!;
+    assert.equal(shortened.excerpt!.length, 6000);
+    assert.equal(shortened.excerptTruncated, true);
     assert.ok(checkpoints >= 5);
   } finally {
     await e.close();

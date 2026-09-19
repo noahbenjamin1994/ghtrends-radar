@@ -281,6 +281,11 @@ export async function runDeepResearch(
             evidence!.sources[found] = {
               ...source,
               id: evidence!.sources[found]!.id,
+              excerptTruncated: Boolean(
+                source.excerptTruncated ||
+                source.excerpt.length >
+                  (source.documentType === "license" ? 20000 : 6000),
+              ),
               excerpt: source.excerpt.slice(
                 0,
                 source.documentType === "license" ? 20000 : 6000,
@@ -290,6 +295,11 @@ export async function runDeepResearch(
           evidence!.sources.push({
             ...source,
             id: `E${evidence!.sources.length + 1}`,
+            excerptTruncated: Boolean(
+              source.excerptTruncated ||
+              source.excerpt.length >
+                (source.documentType === "license" ? 20000 : 6000),
+            ),
             excerpt: source.excerpt.slice(
               0,
               source.documentType === "license" ? 20000 : 6000,
@@ -377,13 +387,16 @@ export async function runDeepResearch(
   task.stage = "writing";
   checkpoint();
   // Keep license identity and the selected projects' requests ahead of broad search matches.
+  const belongsToSelectedProject = (s: ResearchSource) => {
+    const project =
+      /^https:\/\/github\.com\/([^/?#]+\/[^/?#]+)(?:[/?#]|$)/i.exec(s.url)?.[1];
+    return knownProjects.some(
+      (name) => name.toLowerCase() === project?.toLowerCase(),
+    );
+  };
   const sourcePriority = (s: ResearchSource) => {
     if (s.documentType === "license") return 110;
-    const own = knownProjects.some((name) =>
-      s.url
-        .toLowerCase()
-        .startsWith(`https://github.com/${name.toLowerCase()}/`),
-    );
+    const own = belongsToSelectedProject(s);
     if (own) return s.kind === "request" ? 100 : 95;
     if (s.documentType === "page") return 80;
     if (
@@ -405,17 +418,29 @@ export async function runDeepResearch(
         s.kind !== "project"
       )
         return true;
-      return knownProjects.some((name) =>
-        s.url
-          .toLowerCase()
-          .startsWith(`https://github.com/${name.toLowerCase()}/`),
-      );
+      return belongsToSelectedProject(s);
     })
     .sort((a, b) => sourcePriority(b) - sourcePriority(a))
     .slice(0, 18);
-  const sources = ranked.map((s) => ({
+  const sources = ranked.map((s) => {
+    const limit =
+      s.documentType === "license"
+        ? 20000
+        : belongsToSelectedProject(s)
+          ? 6000
+          : 2200;
+    return {
+      ...s,
+      excerpt: s.excerpt?.slice(0, limit),
+      excerptTruncated: Boolean(
+        s.excerptTruncated || (s.excerpt?.length || 0) > limit,
+      ),
+    };
+  });
+  // Writers need the original URL as well as the ID to keep owners and issue numbers distinct.
+  const modelEvidence = modelSources(sources).map((s, i) => ({
     ...s,
-    excerpt: s.excerpt?.slice(0, s.documentType === "license" ? 20000 : 2200),
+    url: sources[i]!.url,
   }));
   const assetTerms = knownProjects.map((project) => ({
     project,
@@ -428,8 +453,6 @@ export async function runDeepResearch(
             .startsWith(`https://github.com/${project.toLowerCase()}/`),
       )
       .map((s) => s.id),
-    scope:
-      "Repository code terms and the rights to included data or third-party materials are separate checks. A public repository establishes access; copying assets requires applicable permission.",
   }));
   const missingTerms = assetTerms.filter((a) => !a.licenseSources.length);
   const payload = {
@@ -437,7 +460,7 @@ export async function runDeepResearch(
     assetTerms,
     collectedAt: evidence.collectedAt,
     parentReportDate: market.asOf,
-    sources: modelSources(sources),
+    sources: modelEvidence,
     schema: zodToJsonSchema(deepGenerationSchema),
   };
   const fingerprint = createHash("sha256")
@@ -481,7 +504,7 @@ export async function runDeepResearch(
         {
           ...input,
           assetTerms,
-          sources: modelSources(sources),
+          sources: modelEvidence,
           priorDraft: candidate,
           corrections,
           requestedFields: requested,
@@ -645,7 +668,7 @@ export async function runDeepResearch(
       ),
       // Plans can depend on documents beyond finding quotes. Review the same
       // bounded source set that the writer saw, so supplied assets stay visible.
-      sources: modelSources(sources),
+      sources: modelEvidence,
     };
     let reviewResponse: unknown;
     try {

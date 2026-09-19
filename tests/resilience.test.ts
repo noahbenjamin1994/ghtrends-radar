@@ -345,6 +345,17 @@ test("an invented refresh timer is removed while grounded brief actions remain",
   }
 });
 
+test("future tense passes wording checks while adjacent negative claims still require edits", () => {
+  assert.equal(hasNegativeWording("策略包属于未来版本的计划范围。"), false);
+  for (const value of [
+    "未来版本不能直接复用。",
+    "未来版本尚未核实。",
+    "未来没有这项功能。",
+    "Future support is unconfirmed.",
+  ])
+    assert.equal(hasNegativeWording(value), true, value);
+});
+
 test("product translations use affirmative prose in both languages", () => {
   for (const key of new Set([...Object.keys(zh), ...Object.keys(en)])) {
     for (const locale of ["en", "zh"] as const) {
