@@ -16,7 +16,7 @@ import {
 import { hasNegativeWording, hasRecoveryTimeReference } from "./i18n.js";
 import type { Brief, Market, ResearchSource, Strategy } from "./types.js";
 
-export const STRATEGY_VERSION = "12";
+export const STRATEGY_VERSION = "13";
 const detail = z.string().trim().min(12).max(700);
 export const strategySchema = z.object({
   angle: z.string().trim().min(4).max(200),
@@ -233,6 +233,7 @@ export function visibleStrategy(
       "9",
       "10",
       "11",
+      "12",
       STRATEGY_VERSION,
     ].includes(brief.strategyVersion)
   )

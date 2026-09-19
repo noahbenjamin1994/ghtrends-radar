@@ -219,7 +219,7 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     assert.ok(visibleStrategy(b, "zh"));
     assert.equal(visibleOpportunities(b)?.opportunities.length, 3);
     assert.ok(visibleStrategy({ ...b, strategyVersion: "1" }, "zh"));
-    for (const version of ["5", "6", "7", "8", "9", "10", "11", "12"]) {
+    for (const version of ["5", "6", "7", "8", "9", "10", "11", "12", "13"]) {
       assert.ok(visibleStrategy({ ...b, strategyVersion: version }, "zh"));
       assert.equal(
         visibleOpportunities({ ...b, strategyVersion: version })?.opportunities
@@ -874,7 +874,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "12");
+    assert.equal(brief.strategyVersion, "13");
     const legacy = {
       ...brief,
       strategyVersion: "2",
@@ -1355,6 +1355,11 @@ test("Issue interpretation accepts only real request identities and exact quotes
             zh: text,
             evidence: { id: "I1", quote: "Fabricated demand assertion" },
           },
+          {
+            sourceId: "I1",
+            en: text,
+            evidence: { id: "I1", quote: source.excerpt },
+          },
         ],
       };
     };
@@ -1364,6 +1369,64 @@ test("Issue interpretation accepts only real request identities and exact quotes
     });
     assert.equal(result.length, 1);
     assert.equal(result[0].sourceId, "I1");
+  }));
+
+test("a request-reading budget failure gets one compact source-bound recovery", async () =>
+  fixture(async (r) => {
+    const source: ResearchSource = {
+      id: "I1",
+      kind: "request",
+      label: "Export request",
+      url: "https://github.com/team/editor/issues/7",
+      excerpt: "Please preserve review comments during export.",
+    };
+    const copy = {
+      title: "Preserve review comments",
+      audience: "Documentation reviewers exporting files.",
+      need: "Keep comments attached during export.",
+      opportunity: "Test a comment-preserving export adapter.",
+      check: "Verify the current export implementation.",
+    };
+    const calls: string[] = [];
+    r.json = async (_prompt, input: any, _budget, operation, thinking) => {
+      calls.push(operation!);
+      if (operation === "issue-reading")
+        throw Object.assign(new Error("Output budget exhausted"), {
+          code: "output_limit",
+        });
+      assert.equal(operation, "issue-reading-compact");
+      assert.equal(thinking, false);
+      assert.equal(_budget, 6500);
+      assert.equal(input.sources[0].excerpt, source.excerpt);
+      return {
+        issueInsights: [
+          {
+            sourceId: "I1",
+            relevance: "direct",
+            kind: "feature-request",
+            en: copy,
+            zh: copy,
+            evidence: { id: "I1", quote: source.excerpt },
+          },
+        ],
+      };
+    };
+    const result = await (r as any).interpretIssues({
+      input: "Documentation",
+      sources: [source],
+    });
+    assert.equal(result.length, 1);
+    assert.deepEqual(calls, ["issue-reading", "issue-reading-compact"]);
+    let failures = 0;
+    r.json = async () => {
+      failures++;
+      throw Object.assign(new Error("network"), { code: "network_error" });
+    };
+    await assert.rejects(
+      (r as any).interpretIssues({ input: "Documentation", sources: [source] }),
+      /network/,
+    );
+    assert.equal(failures, 1);
   }));
 
 test("citation identity repair offers exact-text sources and protects valid IDs, quotes and other fields", async () =>
