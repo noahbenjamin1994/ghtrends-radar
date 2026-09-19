@@ -31,6 +31,7 @@ export const deepRequestSchema = z
     reportId: z.string().regex(/^[a-f0-9]{16}$/),
     directionId: z.string().regex(/^[a-z][a-z0-9-]{1,40}$/),
     question: z.enum(["competitors", "scope", "opensource", "audience"]),
+    funding: z.enum(["trial", "pack"]).optional(),
     context: z
       .string()
       .trim()
@@ -274,10 +275,18 @@ export interface DeepTask {
     | "partial";
   attempts: number;
   attemptDays?: string[];
-  credit: "reserved" | "used" | "returned" | "own-keys";
+  funding?: "trial" | "pack" | "own-keys";
+  credit:
+    | "checking"
+    | "reserved"
+    | "settling"
+    | "used"
+    | "returned"
+    | "uncharged"
+    | "own-keys";
   evidence?: DeepEvidence;
   result?: DeepBrief;
-  problem?: "sources" | "model" | "interrupted";
+  problem?: "sources" | "model" | "interrupted" | "credits" | "billing";
 }
 export type DeepTaskView = Omit<DeepTask, "owner">;
 export interface DeepAllowance {

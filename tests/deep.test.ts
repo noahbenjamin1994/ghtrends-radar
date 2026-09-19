@@ -21,6 +21,8 @@ import {
   type DeepBrief,
 } from "../src/core/deep.js";
 import { runDeepResearch } from "../src/providers/deep.js";
+import { CreditProviderFixture } from "./fixtures/credit-provider.js";
+import { CreditAccountClient } from "../src/server/credits.js";
 import type { Market, ResearchSource } from "../src/core/types.js";
 
 const copy = (
@@ -1166,3 +1168,224 @@ test("deleting private research removes its contents while preserving used trial
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("paid research API keeps retry consent, repeated attempts, private output and actual completion aligned", async () => {
+  const env = { ...process.env };
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-paid-api-"));
+  process.env.GHTRENDS_HOSTED = "1";
+  process.env.PUBLIC_URL = "https://radar.example/radar";
+  process.env.DEEPSEEK_API_KEY = "synthetic-key-only";
+  process.env.GHTRENDS_DEEP_RESEARCH = "1";
+  process.env.GHTRENDS_PAID_RESEARCH = "1";
+  delete process.env.GHTRENDS_AUTO_COLLECT;
+  const e = new Engine(new Store(dir));
+  e.store.saveMarket(sample(), false, "alice");
+  const sid = randomBytes(32).toString("base64url");
+  e.store.set(
+    sessionKey(sid),
+    { id: "alice", name: "Alice", csrf: "csrf" },
+    60000,
+  );
+  const provider = new CreditProviderFixture();
+  let writes = 0;
+  let succeed = false;
+  e.research.json = async (_s, _i, _n, operation) => {
+    if (operation === "deep-plan")
+      return {
+        queries: ["competition", "demand", "opensource"].map((intent) => ({
+          intent,
+          query: "document comments " + intent,
+        })),
+        githubQuery: "document comments",
+      };
+    if (operation === "strategy-deep-review")
+      return { ready: true, corrections: [] };
+    writes++;
+    if (!succeed) throw new Error("synthetic model interruption");
+    return brief();
+  };
+  e.search.collect = async () => ({
+    state: "ready",
+    provider: "multi-search",
+    region: "US",
+    language: "en",
+    fetchedAt: new Date().toISOString(),
+    queries: [],
+  });
+  e.github.directionEvidence = async () => [source, request];
+  e.documents.collect = async () => ({ version: "1", sources: [], reads: [] });
+  e.github.gaps = async () => [];
+  e.github.researchSources = async () => [];
+  e.github.licenseSources = async () => [];
+  e.github.discussionSources = async () => [];
+  const app = createApp(e, provider.client());
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${(server.address() as any).port}/radar`;
+  const call = (path: string, body?: unknown, cookie = true) =>
+    fetch(base + path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://radar.example",
+        Cookie: cookie ? `__Host-ghtrends_session=${sid}` : "",
+        "X-CSRF-Token": "csrf",
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  try {
+    const input = { ...task().request, funding: "pack" };
+    assert.equal((await call("/api/research", input, false)).status, 401);
+    const start = await call("/api/research", input);
+    assert.equal(start.status, 202);
+    const saved = await start.json();
+    await until(
+      () => e.store.deepTask(saved.id, "alice")?.credit === "returned",
+    );
+    assert.equal(provider.reservations, 1);
+    assert.equal(provider.consumed, 0);
+    assert.equal(e.store.deepAllowance("alice", true).remaining, 1);
+    const duplicate = await call("/api/research", input);
+    assert.equal((await duplicate.json()).id, saved.id);
+    assert.equal(provider.reservations, 1);
+    assert.equal(
+      (await call(`/api/research/${saved.id}/retry`, {})).status,
+      400,
+    );
+    assert.equal(
+      (
+        await call(`/api/research/${saved.id}/retry`, {
+          funding: "pack",
+          fromAttempt: 1,
+        })
+      ).status,
+      202,
+    );
+    await until(
+      () => e.store.deepTask(saved.id, "alice")?.credit === "returned",
+    );
+    assert.equal(e.store.deepTask(saved.id, "alice")?.attempts, 2);
+    assert.equal(provider.reservations, 2);
+    // A delayed duplicate from attempt one must not start attempt three.
+    const repeated = await call(`/api/research/${saved.id}/retry`, {
+      funding: "pack",
+      fromAttempt: 1,
+    });
+    assert.equal((await repeated.json()).attempts, 2);
+    assert.equal(provider.reservations, 2);
+    succeed = true;
+    await call(`/api/research/${saved.id}/retry`, {
+      funding: "pack",
+      fromAttempt: 2,
+    });
+    await until(() => e.store.deepTask(saved.id, "alice")?.credit === "used");
+    const final = await (await call(`/api/research/${saved.id}`)).json();
+    assert.equal(final.state, "complete");
+    assert.equal(final.funding, "pack");
+    assert.equal(final.attempts, 3);
+    assert.ok(final.result);
+    assert.equal(provider.consumed, 1);
+    assert.equal(provider.releases, 2);
+    assert.equal(provider.balance(), 9);
+    assert.equal(writes, 3);
+    const receipt = e.store.deepPayment(saved.id)!.receipt!;
+    const exported = await (
+      await call(`/api/research/${saved.id}/export?format=json`)
+    ).text();
+    assert.ok(!exported.includes(receipt.reservation_id));
+    assert.ok(!exported.includes(receipt.lot_id));
+    assert.equal(
+      (await call(`/api/research/${saved.id}`, undefined, false)).status,
+      401,
+    );
+    const balance = await (await call("/api/account/credits")).json();
+    assert.equal(balance.data.balance.available, 9);
+  } finally {
+    app.locals.stopDeepResearch?.();
+    app.locals.stopCollector?.();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await e.close();
+    process.env = env;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+for (const mode of ["disconnected", "backoff"] as const) {
+  test(`a ${mode} paid queue preserves saved work and yields to standard research`, async () => {
+    const env = { ...process.env },
+      dir = mkdtempSync(join(tmpdir(), "ghtrends-paid-lane-"));
+    Object.assign(process.env, {
+      GHTRENDS_HOSTED: "1",
+      PUBLIC_URL: "https://radar.example",
+      DEEPSEEK_API_KEY: "synthetic-only",
+      GHTRENDS_DEEP_RESEARCH: "1",
+      GHTRENDS_PAID_RESEARCH: "1",
+    });
+    delete process.env.GHTRENDS_AUTO_COLLECT;
+    const e = new Engine(new Store(dir)),
+      sid = randomBytes(32).toString("base64url");
+    e.store.set(
+      sessionKey(sid),
+      { id: "alice", name: "Alice", csrf: "csrf" },
+      60000,
+    );
+    e.store.saveMarket(sample(), false, "alice");
+    const waiting = task("another-owner");
+    waiting.funding = "pack";
+    e.store.createDeepTask(waiting, "waiting", true);
+    if (mode === "backoff")
+      e.store.deferDeepPayment(waiting.id, 1, "unavailable");
+    let scans = 0;
+    e.research.plan = async () => sample().topic;
+    e.scan = async () => {
+      scans++;
+      return sample();
+    };
+    const provider = new CreditProviderFixture();
+    const app = createApp(
+      e,
+      mode === "disconnected"
+        ? new CreditAccountClient(fetch, {})
+        : provider.client(),
+    );
+    const server = app.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const base = `http://127.0.0.1:${(server.address() as any).port}`;
+    const post = (path: string, body: unknown) =>
+      fetch(base + path, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://radar.example",
+          Cookie: `__Host-ghtrends_session=${sid}`,
+          "X-CSRF-Token": "csrf",
+        },
+        body: JSON.stringify(body),
+      });
+    try {
+      if (mode === "disconnected")
+        assert.equal(
+          (await post("/api/research", { ...task().request, funding: "pack" }))
+            .status,
+          503,
+        );
+      const response = await post("/api/scan", { topic: "document comments" });
+      assert.equal(response.status, 202, await response.clone().text());
+      const job = await response.json();
+      await until(() => scans === 1);
+      assert.equal(e.store.get<any>("job:" + job.id)?.state, "complete");
+      assert.equal(
+        e.store.deepTask(waiting.id, waiting.owner)?.state,
+        "queued",
+      );
+      assert.equal(provider.reservations, 0);
+    } finally {
+      app.locals.stopDeepResearch?.();
+      app.locals.stopCollector?.();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await e.close();
+      process.env = env;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}

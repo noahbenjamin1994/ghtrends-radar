@@ -128,6 +128,18 @@ interface AdminData {
     background: boolean;
     created: number;
   }[];
+  researchPayments?: {
+    pending: number;
+    attention: number;
+    items: {
+      taskId: string;
+      phase: string;
+      attempt: number;
+      failures: number;
+      error?: string;
+      nextAt: string | null;
+    }[];
+  };
   configuration: {
     mode: string;
     auth: boolean;
@@ -816,6 +828,71 @@ export function AdminView({ account }: { account: Account | null }) {
                     : l("user scan", "用户扫描")}
                 </p>
               ))}
+            </section>
+          )}
+          {data.researchPayments && (
+            <section className="panel">
+              <h2>{l("Purchased research credits", "已购研究次数结算")}</h2>
+              <p>
+                {l("In progress", "处理中")} {data.researchPayments.pending} ·{" "}
+                {l("Review needed", "需要人工核对")}{" "}
+                {data.researchPayments.attention}
+              </p>
+              {data.researchPayments.attention > 0 && (
+                <p className="admin-note">
+                  {l(
+                    "Match each task with the billing ledger before adjusting its credits.",
+                    "请根据任务编号核对账务记录，再处理次数调整。",
+                  )}
+                </p>
+              )}
+              <div className="admin-runs">
+                {data.researchPayments.items.map((p) => (
+                  <article key={p.taskId}>
+                    <strong>
+                      {(
+                        {
+                          reserve: l("Waiting to start", "等待执行"),
+                          reserving: l(
+                            "Confirming reservation",
+                            "核对预留记录",
+                          ),
+                          reserved: l("Credit reserved", "次数已预留"),
+                          settle: l("Confirming result", "核对扣次或返还"),
+                          attention: l("Review needed", "需要人工核对"),
+                        } as Record<string, string>
+                      )[p.phase] || p.phase}
+                    </strong>
+                    <p>
+                      {l("Research attempt", "研究尝试")} {p.attempt} ·{" "}
+                      {l("Connection errors", "连接异常")} {p.failures}
+                      {p.nextAt
+                        ? ` · ${l("Next check", "下次核对")} ${date(p.nextAt)}`
+                        : ""}
+                    </p>
+                    {p.error && (
+                      <p className="muted">
+                        {p.error === "conflict"
+                          ? l(
+                              "Check the task and reservation match.",
+                              "请核对任务与预留记录的对应关系。",
+                            )
+                          : l(
+                              "The billing connection will be checked again automatically.",
+                              "系统将自动再次连接账务服务。",
+                            )}
+                      </p>
+                    )}
+                    <small className="muted">{p.taskId}</small>
+                  </article>
+                ))}
+              </div>
+              <small className="muted">
+                {l(
+                  "Shows up to 50 active records, with review items first. Completed activity is in the account ledger.",
+                  "最多展示 50 条处理中记录，人工核对优先显示。已完成的记录可在账户流水中查看。",
+                )}
+              </small>
             </section>
           )}
           <section className="panel">

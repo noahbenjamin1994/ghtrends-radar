@@ -12,8 +12,22 @@ import { visibleOpportunities } from "../core/opportunities.js";
 import { requestLocale } from "../core/i18n.js";
 import { runDeepResearch } from "../providers/deep.js";
 import type { installAuth } from "./auth.js";
+import { CreditAccountClient } from "./credits.js";
+import { DeepBilling } from "./deep-billing.js";
 
 const messages: Record<string, [string, string]> = {
+  deep_billing_pending: [
+    "Your research credit is being confirmed. Check your saved task shortly.",
+    "研究次数正在核对，请稍后查看已保存的任务。",
+  ],
+  deep_paid_disabled: [
+    "Purchased research is being prepared for this deployment.",
+    "本站正在准备已购专项研究服务。",
+  ],
+  deep_paid_consent: [
+    "Confirm one purchased credit to continue this research.",
+    "请确认使用 1 次已购次数，再继续本项研究。",
+  ],
   deep_removed: [
     "This research content was deleted. Open your history to continue.",
     "这份研究内容已删除，请从个人历史继续。",
@@ -66,6 +80,7 @@ export function installDeepRoutes(
     ownerBusy: (owner: string) => boolean;
     released: () => void;
   },
+  credits = new CreditAccountClient(),
 ) {
   let running = false,
     stopped = false;
@@ -78,29 +93,83 @@ export function installDeepRoutes(
       Math.floor(Number(process.env.GHTRENDS_DEEP_DAILY_REQUESTS) || 20),
     ),
   );
+  const paidCapacity = Math.max(
+    1,
+    Math.min(
+      200,
+      Math.floor(Number(process.env.GHTRENDS_PAID_DEEP_DAILY_REQUESTS) || 20),
+    ),
+  );
+  const paidAttempts = Math.max(
+    1,
+    Math.min(
+      100,
+      Math.floor(Number(process.env.GHTRENDS_PAID_DEEP_DAILY_ATTEMPTS) || 10),
+    ),
+  );
+  const paidEnabled =
+    auth.hosted &&
+    enabled &&
+    credits.enabled &&
+    process.env.GHTRENDS_PAID_RESEARCH === "1";
+  const billing = new DeepBilling(engine.store, credits);
   engine.store.interruptDeepTasks();
   const hasActive = (owner: string) =>
-    engine.store.deepPending().some((t) => t.owner === owner);
+    engine.store.deepPending().some((t) => t.owner === owner) ||
+    engine.store.deepBillingBusy(owner);
   const status = (owner?: string) => ({
     enabled,
     allowance: owner ? engine.store.deepAllowance(owner, auth.hosted) : null,
+    paidAvailable: paidEnabled,
+    paidDailyAttempts: paidAttempts,
   });
+  const nextTask = () =>
+    !enabled
+      ? undefined
+      : engine.store
+          .deepPending()
+          .filter(
+            (t) =>
+              t.state === "queued" &&
+              (t.funding !== "pack" ||
+                (billing.connected &&
+                  (engine.store.deepPayment(t.id)?.nextAt || 0) <= Date.now())),
+          )
+          .sort(
+            (a, b) =>
+              Number(b.funding === "pack") - Number(a.funding === "pack"),
+          )[0];
   async function kick() {
-    if (running || stopped || !lane.available()) return;
-    const next = engine.store.deepPending().find((t) => t.state === "queued");
+    if (running || stopped || !enabled || !lane.available()) return;
+    const next = nextTask();
     if (!next) return;
     running = true;
-    const task = engine.store.claimDeepTask(next.id, next.owner);
+    let task: DeepTask | null = null;
     try {
+      if (next.funding === "pack" && !(await billing.prepare(next))) return;
+      task = engine.store.claimDeepTask(next.id, next.owner);
       if (!task) return;
+      const active = task;
+      // Reserve for one hour; bound execution checkpoints to fifteen minutes,
+      // leaving settlement time even when a provider request finishes slowly.
+      const deadline =
+        task.funding === "pack"
+          ? Math.min(
+              Date.now() + 15 * 60000,
+              Date.parse(
+                engine.store.deepPayment(task.id)!.receipt!.lease_expires_at,
+              ) - 60000,
+            )
+          : Infinity;
+      const checkpoint = () => {
+        if (Date.now() >= deadline) throw new Error("deep_deadline");
+        engine.store.checkpointDeepTask(active);
+      };
       const complete = await operationContext.run(
         { runId: task.id, userId: task.owner },
-        () =>
-          runDeepResearch(engine, task, () =>
-            engine.store.checkpointDeepTask(task),
-          ),
+        () => runDeepResearch(engine, active, checkpoint),
       );
-      engine.store.finishDeepTask(task, complete);
+      engine.store.finishDeepTask(task, complete && Date.now() < deadline);
     } catch {
       if (task) {
         task.problem = task.stage === "sources" ? "sources" : "model";
@@ -109,8 +178,10 @@ export function installDeepRoutes(
     } finally {
       running = false;
       if (!stopped) {
+        void billing.reconcile().catch(() => {});
         lane.released();
-        void kick();
+        // Async admission failures carry their durable next-at time.
+        void kick().catch(() => {});
       }
     }
   }
@@ -153,6 +224,7 @@ export function installDeepRoutes(
           state: t.state,
           stage: t.stage,
           credit: t.credit,
+          funding: t.funding,
           created: t.created,
           updated: t.updated,
         })),
@@ -167,6 +239,8 @@ export function installDeepRoutes(
       const parsed = deepRequestSchema.safeParse(q.body);
       if (!parsed.success) fail("deep_input", 400);
       const input = parsed.data!;
+      if (input.funding === "pack" && !paidEnabled)
+        fail("deep_paid_disabled", 503);
       const market =
         engine.store.canRead(input.reportId, user.id) &&
         engine.store.report(input.reportId);
@@ -197,13 +271,14 @@ export function installDeepRoutes(
           stage: "queued",
           attempts: 1,
           credit: auth.hosted ? "reserved" : "own-keys",
+          funding: input.funding === "pack" ? "pack" : undefined,
         },
         fingerprint,
         auth.hosted,
-        capacity,
+        input.funding === "pack" ? paidCapacity : capacity,
       );
       r.status(result.created ? 202 : 200).json(deepView(result.task));
-      void kick();
+      void kick().catch(() => {});
     }),
   );
   app.get(
@@ -244,26 +319,65 @@ export function installDeepRoutes(
     }),
   );
   app.post(
+    "/api/research/:id/cancel",
+    handler((q, r) => {
+      const user = auth.protect(q);
+      const task = engine.store.deepTask(String(q.params.id), user.id);
+      if (!task) fail("deep_missing", 404);
+      if (task!.state === "running") fail("deep_active", 409);
+      if (task!.state === "queued") {
+        task!.problem = "interrupted";
+        engine.store.finishDeepTask(task!, false);
+      }
+      r.json(deepView(engine.store.deepTask(task!.id, user.id)!));
+      void billing.reconcile().catch(() => {});
+    }),
+  );
+  app.post(
     "/api/research/:id/retry",
     handler((q, r) => {
       const user = auth.protect(q);
       if (!enabled) fail("deep_disabled", 503);
       const task = engine.store.deepTask(String(q.params.id), user.id);
       if (!task) fail("deep_missing", 404);
+      if (task!.funding === "pack") {
+        if (
+          q.body?.funding !== "pack" ||
+          !Number.isInteger(q.body?.fromAttempt) ||
+          q.body.fromAttempt < 1 ||
+          q.body.fromAttempt > 3
+        )
+          fail("deep_paid_consent", 400);
+        if (q.body.fromAttempt < task!.attempts) return r.json(deepView(task!));
+        if (q.body.fromAttempt !== task!.attempts)
+          fail("deep_request_changed", 409);
+      }
+      if (task!.funding === "pack" && task!.state === "partial") {
+        if (!paidEnabled) fail("deep_paid_disabled", 503);
+      }
       if (task!.state === "partial" && lane.ownerBusy(user.id))
         fail("deep_active", 409);
       const result = engine.store.retryDeepTask(
         task!.id,
         user.id,
         auth.hosted,
-        capacity,
+        task!.funding === "pack" ? paidCapacity : capacity,
       );
       r.status(result.state === "queued" ? 202 : 200).json(deepView(result));
-      void kick();
+      void kick().catch(() => {});
     }),
   );
+  const recovery = setInterval(() => {
+    if (!stopped)
+      void billing
+        .reconcile()
+        .then(() => kick())
+        .catch(() => {});
+  }, 5000);
+  recovery.unref();
   return {
     status,
+    next: nextTask,
     hasActive,
     kick,
     get running() {
@@ -271,6 +385,7 @@ export function installDeepRoutes(
     },
     stop: () => {
       stopped = true;
+      clearInterval(recovery);
     },
   };
 }

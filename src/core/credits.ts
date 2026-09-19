@@ -2,6 +2,32 @@ import { z } from "zod";
 
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const stamp = z.string().datetime({ offset: true });
+export const creditReceiptSchema = z.object({
+  reservation_id: z.string().uuid(),
+  task_ref: z.string().max(128),
+  attempt: z.number().int().min(1).max(3),
+  state: z.enum(["reserved", "used", "released", "expired"]),
+  lot_id: z.string().uuid(),
+  lease_expires_at: stamp,
+  settled_at: stamp.nullable(),
+  available: count,
+  settled: z.boolean().optional(),
+  reason: z.string().max(60).optional(),
+});
+export type CreditReceipt = z.infer<typeof creditReceiptSchema>;
+/** Private recovery record, stored independently of deletable research content. */
+export interface DeepPayment {
+  taskId: string;
+  owner: string;
+  taskAttempt: number;
+  creditAttempt: number;
+  phase: "reserve" | "reserving" | "reserved" | "settle" | "done" | "attention";
+  receipt?: CreditReceipt;
+  outcome?: "used" | "released";
+  nextAt: number;
+  failures: number;
+  error?: "unavailable" | "conflict" | "exhausted";
+}
 const lot = z.object({
   lot_id: z.string().uuid(),
   transaction_id: z.string().uuid(),

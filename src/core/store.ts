@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { resolveTopic } from "./topics.js";
 import type { Market, Repo } from "./types.js";
 import type { DeepTask, DeepAllowance } from "./deep.js";
+import type { DeepPayment, CreditReceipt } from "./credits.js";
 import {
   operationContext,
   tokenCount,
@@ -52,6 +53,8 @@ export class Store {
       CREATE TABLE IF NOT EXISTS deep_tasks(id TEXT PRIMARY KEY,owner TEXT NOT NULL,request_key TEXT NOT NULL,fingerprint TEXT NOT NULL,state TEXT NOT NULL,created TEXT NOT NULL,updated TEXT NOT NULL,payload TEXT NOT NULL,UNIQUE(owner,request_key));
       CREATE INDEX IF NOT EXISTS deep_tasks_owner ON deep_tasks(owner,created DESC);
       CREATE TABLE IF NOT EXISTS deep_trials(owner TEXT PRIMARY KEY,task_id TEXT NOT NULL UNIQUE,state TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS deep_payments(task_id TEXT PRIMARY KEY,owner TEXT NOT NULL,phase TEXT NOT NULL,next_at INTEGER NOT NULL,payload TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS deep_payments_pending ON deep_payments(phase,next_at);
     `);
     const runColumns = this.db
       .prepare("PRAGMA table_info(scan_runs)")
@@ -136,6 +139,7 @@ export class Store {
           JSON.stringify({
             attempts: task.attempts,
             attemptDays: task.attemptDays,
+            funding: task.funding,
           }),
           id,
           owner,
@@ -197,8 +201,14 @@ export class Store {
         this.db.exec("COMMIT");
         return { task: JSON.parse(existing.payload), created: false };
       }
-      this.checkDeepCapacity(task.owner, dailyCapacity);
-      this.reserveDeepTrial(task, hosted);
+      this.checkDeepCapacity(
+        task.owner,
+        dailyCapacity,
+        false,
+        task.funding === "pack",
+      );
+      if (hosted && task.funding === "pack") this.prepareDeepPayment(task);
+      else this.reserveDeepTrial(task, hosted);
       task.attemptDays = [new Date().toISOString().slice(0, 10)];
       this.db
         .prepare("INSERT INTO deep_tasks VALUES(?,?,?,?,?,?,?,?)")
@@ -232,6 +242,7 @@ export class Store {
     owner: string,
     dailyCapacity: number,
     retry = false,
+    paid = false,
   ) {
     if (
       this.db
@@ -241,10 +252,14 @@ export class Store {
         .get(owner)
     )
       throw Object.assign(new Error("deep_active"), { status: 409 });
+    if (this.deepBillingBusy(owner))
+      throw Object.assign(new Error("deep_billing_pending"), { status: 409 });
     const day = new Date().toISOString().slice(0, 10);
     const count = this.db
-      .prepare("SELECT COUNT(*) AS n FROM deep_tasks WHERE created>=?")
-      .get(day) as { n: number };
+      .prepare(
+        "SELECT COUNT(*) AS n FROM deep_tasks WHERE created>=? AND (COALESCE(json_extract(payload,'$.funding'),'trial')='pack')=?",
+      )
+      .get(day, paid ? 1 : 0) as { n: number };
     const own = this.db
       .prepare(
         `SELECT COALESCE(SUM(CASE
@@ -256,13 +271,25 @@ export class Store {
       .get(day, day, owner) as { n: number };
     if (
       (!retry && count.n >= dailyCapacity) ||
-      own.n >= 3 ||
+      own.n >=
+        (paid
+          ? Math.max(
+              1,
+              Math.min(
+                100,
+                Math.floor(
+                  Number(process.env.GHTRENDS_PAID_DEEP_DAILY_ATTEMPTS) || 10,
+                ),
+              ),
+            )
+          : 3) ||
       this.deepPending().length >= 20
     )
       throw Object.assign(new Error("deep_capacity"), { status: 429 });
   }
   private reserveDeepTrial(task: DeepTask, hosted: boolean) {
     if (!hosted) {
+      task.funding = "own-keys";
       task.credit = "own-keys";
       return;
     }
@@ -273,6 +300,7 @@ export class Store {
     this.db
       .prepare("INSERT INTO deep_trials VALUES(?,?,'reserved')")
       .run(task.owner, task.id);
+    task.funding = "trial";
     task.credit = "reserved";
   }
   retryDeepTask(
@@ -292,8 +320,14 @@ export class Store {
       }
       if (task.attempts >= 3)
         throw Object.assign(new Error("deep_attempts"), { status: 429 });
-      this.checkDeepCapacity(owner, dailyCapacity, true);
-      this.reserveDeepTrial(task, hosted);
+      this.checkDeepCapacity(
+        owner,
+        dailyCapacity,
+        true,
+        task.funding === "pack",
+      );
+      const paid = hosted && task.funding === "pack";
+      if (!paid) this.reserveDeepTrial(task, hosted);
       task.attemptDays = [
         ...(task.attemptDays ||
           Array(task.attempts).fill(task.updated.slice(0, 10))),
@@ -302,6 +336,7 @@ export class Store {
       task.state = "queued";
       task.stage = "queued";
       task.attempts++;
+      if (paid) this.prepareDeepPayment(task);
       this.writeDeepTask(task);
       this.updateRun(id, "queued");
       this.db.exec("COMMIT");
@@ -329,11 +364,23 @@ export class Store {
       throw new Error("deep_checkpoint_state");
     task.state = "running";
     task.credit = current.credit;
+    task.funding = current.funding;
     this.writeDeepTask(task);
   }
   claimDeepTask(id: string, owner: string): DeepTask | null {
     const task = this.deepTask(id, owner);
     if (!task || task.state !== "queued") return null;
+    if (task.funding === "pack") {
+      const payment = this.deepPayment(id);
+      if (
+        payment?.phase !== "reserved" ||
+        payment.outcome ||
+        payment.taskAttempt !== task.attempts ||
+        !payment.receipt ||
+        Date.parse(payment.receipt.lease_expires_at) <= Date.now() + 60000
+      )
+        return null;
+    }
     task.state = "running";
     this.writeDeepTask(task);
     this.updateRun(id, "running");
@@ -353,7 +400,24 @@ export class Store {
       }
       task.state = complete ? "complete" : "partial";
       task.stage = task.state;
-      if (current.credit === "reserved") {
+      task.funding = current.funding;
+      if (current.funding === "pack") {
+        const payment = this.deepPayment(task.id);
+        if (!payment || payment.taskAttempt !== task.attempts)
+          throw new Error("deep_credit_binding");
+        if (complete && payment.phase !== "reserved")
+          throw new Error("deep_credit_binding");
+        payment.outcome = complete ? "used" : "released";
+        payment.nextAt = 0;
+        if (payment.phase === "reserve") {
+          payment.phase = "done";
+          task.credit = "uncharged";
+        } else {
+          payment.phase = payment.receipt ? "settle" : "reserving";
+          task.credit = "settling";
+        }
+        this.writeDeepPayment(payment);
+      } else if (current.credit === "reserved") {
         if (complete) {
           const receipt = this.db
             .prepare(
@@ -384,8 +448,223 @@ export class Store {
   }
   interruptDeepTasks() {
     for (const task of this.deepPending()) {
+      // Paid queue/admission intent survives a restart; executing work returns
+      // its credit through the durable settlement record before an explicit retry.
+      if (task.funding === "pack" && task.state === "queued") continue;
       task.problem = "interrupted";
       this.finishDeepTask(task, false);
+    }
+  }
+  deepPayment(id: string): DeepPayment | null {
+    const row = this.db
+      .prepare("SELECT payload FROM deep_payments WHERE task_id=?")
+      .get(id) as { payload: string } | undefined;
+    return row ? JSON.parse(row.payload) : null;
+  }
+  deepPaymentPending(now = Date.now()): DeepPayment[] {
+    return (
+      this.db
+        .prepare(
+          "SELECT payload FROM deep_payments WHERE phase NOT IN ('done','attention') AND next_at<=? ORDER BY next_at,task_id LIMIT 50",
+        )
+        .all(now) as { payload: string }[]
+    ).map((r) => JSON.parse(r.payload));
+  }
+  deepBillingBusy(owner: string): boolean {
+    return !!this.db
+      .prepare("SELECT 1 FROM deep_payments WHERE owner=? AND phase!='done'")
+      .get(owner);
+  }
+  deepPaymentOverview() {
+    const counts = this.db
+      .prepare(
+        "SELECT COUNT(*) AS total, COALESCE(SUM(phase='attention'),0) AS attention FROM deep_payments WHERE phase!='done'",
+      )
+      .get() as { total: number; attention: number };
+    const rows = this.db
+      .prepare(
+        "SELECT payload FROM deep_payments WHERE phase!='done' ORDER BY (phase='attention') DESC,next_at,task_id LIMIT 50",
+      )
+      .all() as { payload: string }[];
+    return {
+      pending: counts.total - counts.attention,
+      attention: counts.attention,
+      items: rows.map((row) => {
+        const p = JSON.parse(row.payload) as DeepPayment;
+        return {
+          taskId: p.taskId,
+          phase: p.phase,
+          attempt: p.taskAttempt,
+          failures: p.failures,
+          error: p.error,
+          nextAt:
+            p.phase === "attention" || !p.nextAt
+              ? null
+              : new Date(p.nextAt).toISOString(),
+        };
+      }),
+    };
+  }
+  private writeDeepPayment(payment: DeepPayment) {
+    this.db
+      .prepare(
+        "INSERT INTO deep_payments VALUES(?,?,?,?,?) ON CONFLICT(task_id) DO UPDATE SET phase=excluded.phase,next_at=excluded.next_at,payload=excluded.payload",
+      )
+      .run(
+        payment.taskId,
+        payment.owner,
+        payment.phase,
+        payment.nextAt,
+        JSON.stringify(payment),
+      );
+  }
+  private prepareDeepPayment(task: DeepTask) {
+    const previous = this.deepPayment(task.id);
+    if (previous && previous.phase !== "done")
+      throw Object.assign(new Error("deep_billing_pending"), { status: 409 });
+    const creditAttempt = previous
+      ? previous.receipt
+        ? previous.receipt.attempt + 1
+        : previous.creditAttempt
+      : 1;
+    if (creditAttempt > 3)
+      throw Object.assign(new Error("deep_attempts"), { status: 429 });
+    this.writeDeepPayment({
+      taskId: task.id,
+      owner: task.owner,
+      taskAttempt: task.attempts,
+      creditAttempt,
+      phase: "reserve",
+      nextAt: 0,
+      failures: 0,
+    });
+    task.credit = "checking";
+  }
+  beginDeepReservation(id: string): DeepPayment | null {
+    const payment = this.deepPayment(id);
+    if (!payment || !["reserve", "reserving"].includes(payment.phase))
+      return null;
+    payment.phase = "reserving";
+    this.writeDeepPayment(payment);
+    return payment;
+  }
+  acceptDeepReceipt(
+    id: string,
+    creditAttempt: number,
+    receipt: CreditReceipt,
+    settling = false,
+  ) {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const payment = this.deepPayment(id);
+      if (
+        !payment ||
+        payment.creditAttempt !== creditAttempt ||
+        receipt.task_ref !== id ||
+        receipt.attempt !== creditAttempt
+      )
+        throw new Error("deep_credit_binding");
+      const task = this.deepTask(id, payment.owner);
+      if (settling) {
+        if (
+          payment.phase !== "settle" ||
+          !payment.receipt ||
+          payment.receipt.reservation_id !== receipt.reservation_id ||
+          (receipt.state !== "expired" &&
+            (receipt.state !== payment.outcome || receipt.settled !== true))
+        )
+          throw new Error("deep_credit_binding");
+        payment.phase = "done";
+        if (task) task.credit = receipt.state === "used" ? "used" : "returned";
+      } else {
+        if (payment.phase !== "reserving")
+          throw new Error("deep_credit_binding");
+        if (receipt.state === "used") throw new Error("deep_credit_binding");
+        payment.phase =
+          receipt.state === "reserved"
+            ? payment.outcome
+              ? "settle"
+              : "reserved"
+            : "done";
+        if (task) {
+          task.credit =
+            payment.phase === "reserved"
+              ? "reserved"
+              : payment.phase === "done"
+                ? "returned"
+                : "settling";
+          if (payment.phase === "done" && task.state === "queued") {
+            task.state = task.stage = "partial";
+            task.problem = "credits";
+            this.updateRun(id, "failed", { error: "deep_credits" });
+          }
+        }
+      }
+      payment.receipt = receipt;
+      payment.failures = 0;
+      payment.nextAt = 0;
+      delete payment.error;
+      this.writeDeepPayment(payment);
+      if (task) this.writeDeepTask(task);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  deferDeepPayment(
+    id: string,
+    creditAttempt: number,
+    error: "unavailable" | "conflict" | "exhausted",
+  ) {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const payment = this.deepPayment(id);
+      if (
+        !payment ||
+        payment.creditAttempt !== creditAttempt ||
+        payment.phase === "done"
+      ) {
+        this.db.exec("COMMIT");
+        return;
+      }
+      payment.error = error;
+      payment.failures++;
+      payment.nextAt =
+        Date.now() +
+        Math.min(300000, 5000 * 2 ** Math.min(6, payment.failures));
+      const task = this.deepTask(id, payment.owner);
+      if (
+        error === "exhausted" &&
+        payment.phase === "reserving" &&
+        !payment.receipt
+      ) {
+        payment.phase = "done";
+        if (task) {
+          task.state = task.stage = "partial";
+          task.credit = "uncharged";
+          task.problem = "credits";
+        }
+      } else if (error === "conflict") {
+        payment.phase = "attention";
+        if (task) {
+          task.state = task.stage = "partial";
+          task.credit = "settling";
+          task.problem = "billing";
+        }
+      }
+      this.writeDeepPayment(payment);
+      if (task) {
+        this.writeDeepTask(task);
+        if (task.state === "partial")
+          this.updateRun(id, "failed", {
+            error: "deep_" + (task.problem || "model"),
+          });
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
     }
   }
   pruneOperations() {

@@ -63,6 +63,11 @@ test("administrator access uses server-configured subject IDs; names, session ro
         !text.includes(sid),
     );
     const data = JSON.parse(text);
+    assert.deepEqual(data.researchPayments, {
+      pending: 0,
+      attention: 0,
+      items: [],
+    });
     assert.deepEqual(data.models, []);
     assert.deepEqual(data.configuration.adminUserIds, [
       "admin-sub",

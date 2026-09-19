@@ -16,6 +16,7 @@ import {
   type DeepRequest,
 } from "../core/deep.js";
 import type { ResourceProfile } from "../core/fit.js";
+import type { CreditsResponse } from "../core/credits.js";
 import type { Account } from "./account.js";
 import { api } from "./api.js";
 import { locale, localUrl, loginUrl } from "./i18n.js";
@@ -26,7 +27,12 @@ import "./deep.css";
 const l = (en: string, zh: string) => (locale === "zh" ? zh : en);
 const label = (pair: readonly [string, string]) =>
   pair[locale === "zh" ? 1 : 0];
-export type DeepStatus = { enabled: boolean; allowance: DeepAllowance | null };
+export type DeepStatus = {
+  enabled: boolean;
+  allowance: DeepAllowance | null;
+  paidAvailable?: boolean;
+  paidDailyAttempts?: number;
+};
 const stages = {
   queued: ["Waiting for a research slot", "已保存，等待研究开始"],
   planning: ["Choosing focused searches", "整理这个问题的查询词"],
@@ -39,16 +45,63 @@ const stages = {
   complete: ["Ready to read", "研究已完成"],
   partial: ["Evidence saved · continue research", "证据已保存 · 可继续研究"],
 } as const;
-const creditCopy = (credit: DeepTaskView["credit"]) =>
+const creditCopy = (
+  credit: DeepTaskView["credit"],
+  funding?: DeepTaskView["funding"],
+) =>
   ({
-    reserved: l("1 introductory credit reserved", "已预留 1 次首次体验"),
-    used: l("1 introductory credit used", "已使用 1 次首次体验"),
-    returned: l("Your introductory credit was returned", "首次体验次数已返还"),
+    checking: l(
+      "Credit confirmed when research starts",
+      "研究开始时核对并预留次数",
+    ),
+    settling: l("Confirming the credit record", "正在核对次数记录"),
+    uncharged: l("This attempt used 0 credits", "本次尝试消耗 0 次"),
+    reserved:
+      funding === "pack"
+        ? l("1 purchased credit reserved", "已预留 1 次已购次数")
+        : l("1 introductory credit reserved", "已预留 1 次首次体验"),
+    used:
+      funding === "pack"
+        ? l("1 purchased credit used", "已使用 1 次已购次数")
+        : l("1 introductory credit used", "已使用 1 次首次体验"),
+    returned:
+      funding === "pack"
+        ? l(
+            "Reservation released · original expiry applies",
+            "预留已释放 · 沿用原到期日",
+          )
+        : l("Your introductory credit was returned", "首次体验次数已返还"),
     "own-keys": l(
       "Self-hosted · your provider keys",
       "自部署 · 使用自己的服务密钥",
     ),
   })[credit];
+function usePurchasedCredits(enabled: boolean) {
+  const [snapshot, setSnapshot] = useState<CreditsResponse | null>(null);
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setSnapshot(null);
+    if (enabled)
+      void api<CreditsResponse>("/api/account/credits", {
+        signal: controller.signal,
+      })
+        .then((data) => {
+          if (!controller.signal.aborted) setSnapshot(data);
+        })
+        .catch(() => {
+          if (!controller.signal.aborted)
+            setSnapshot({ state: "unavailable", retryAfter: 10 });
+        });
+    return () => controller.abort();
+  }, [enabled, reload]);
+  return {
+    remaining:
+      snapshot?.state === "ready" ? snapshot.data.balance.available : null,
+    refresh: () => setReload((n) => n + 1),
+    pending: snapshot === null,
+  };
+}
 
 export function DeepStart({
   reportId,
@@ -65,6 +118,13 @@ export function DeepStart({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const key = useRef({ signature: "", id: "" });
+  const paid = !!(
+    account?.user &&
+    account.hosted &&
+    account.deep?.paidAvailable &&
+    account.deep.allowance?.remaining === 0
+  );
+  const purchased = usePurchasedCredits(paid);
   useEffect(() => {
     let active = true;
     void api<Account>("/api/account")
@@ -77,7 +137,9 @@ export function DeepStart({
     };
   }, []);
   if (!account?.deep?.enabled) return null;
-  const remaining = account.deep.allowance?.remaining;
+  const remaining = paid
+    ? purchased.remaining
+    : account.deep.allowance?.remaining;
   const start = async () => {
     setBusy(true);
     setError("");
@@ -86,6 +148,7 @@ export function DeepStart({
       directionId,
       question,
       context,
+      ...(paid ? { funding: "pack" as const } : {}),
       ...(profile ? { profile } : {}),
     };
     const signature = JSON.stringify(body);
@@ -161,12 +224,17 @@ export function DeepStart({
         <div className="deep-start-footer">
           <div>
             <strong>
-              {account.hosted
+              {paid
                 ? l(
-                    "First focused research: 1 free trial",
-                    "首次专项研究：赠送 1 次体验",
+                    "Focused research · 1 purchased credit",
+                    "专项研究 · 使用 1 次已购次数",
                   )
-                : l("Research with your own keys", "使用自己的密钥研究")}
+                : account.hosted
+                  ? l(
+                      "First focused research: 1 free trial",
+                      "首次专项研究：赠送 1 次体验",
+                    )
+                  : l("Research with your own keys", "使用自己的密钥研究")}
             </strong>
             <p>
               {l(
@@ -177,8 +245,16 @@ export function DeepStart({
             {account.user && account.hosted && (
               <span>
                 {l("Available now: ", "当前可用：")}
-                {remaining ?? 0} {l("credit", "次")}
+                {remaining ?? "—"} {l("credit", "次")}
               </span>
+            )}
+            {paid && (
+              <p>
+                {l(
+                  `Up to ${account.deep.paidDailyAttempts || 10} attempts per day; each research allows three attempts.`,
+                  `每日最多 ${account.deep.paidDailyAttempts || 10} 次尝试，每项研究最多尝试 3 次。`,
+                )}
+              </p>
             )}
           </div>
           {!account.user ? (
@@ -189,9 +265,22 @@ export function DeepStart({
               {l("Sign in to research", "登录后开始研究")}
               <ArrowRight size={16} />
             </a>
+          ) : paid && remaining === null ? (
+            <button
+              className="button secondary"
+              disabled={purchased.pending}
+              onClick={purchased.refresh}
+            >
+              {l("Confirm available credits", "核对可用次数")}
+            </button>
           ) : remaining === 0 ? (
-            <a className="button secondary" href={localUrl("/history")}>
-              {l("Open my research", "查看我的研究")}
+            <a
+              className="button secondary"
+              href={localUrl(paid ? "/account" : "/history")}
+            >
+              {paid
+                ? l("View my credits", "查看账户次数")
+                : l("Open my research", "查看我的研究")}
             </a>
           ) : (
             <button
@@ -201,7 +290,12 @@ export function DeepStart({
             >
               {busy
                 ? l("Saving your task…", "正在保存任务…")
-                : l("Start focused research", "开始专项研究")}
+                : paid
+                  ? l(
+                      "Confirm · use 1 purchased credit",
+                      "确认研究 · 使用 1 次已购次数",
+                    )
+                  : l("Start focused research", "开始专项研究")}
               <ArrowRight size={16} />
             </button>
           )}
@@ -228,6 +322,13 @@ export function DeepResearchView({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
+  const purchased = usePurchasedCredits(
+    !!(
+      task?.funding === "pack" &&
+      task.state === "partial" &&
+      task.credit !== "settling"
+    ),
+  );
   useEffect(() => {
     let active = true,
       timer: ReturnType<typeof setTimeout>;
@@ -241,7 +342,10 @@ export function DeepResearchView({
         if (!active) return;
         setTask(next);
         setError("");
-        if (["queued", "running"].includes(next.state))
+        if (
+          ["queued", "running"].includes(next.state) ||
+          ["checking", "settling"].includes(next.credit)
+        )
           timer = setTimeout(() => void load(), 3500);
         else window.dispatchEvent(new Event("ghtrends:usage"));
       } catch (e) {
@@ -261,7 +365,18 @@ export function DeepResearchView({
     setBusy(true);
     setError("");
     try {
-      await api(`/api/research/${id}/retry?lang=${locale}`, { method: "POST" });
+      await api(`/api/research/${id}/retry?lang=${locale}`, {
+        method: "POST",
+        ...(task?.funding === "pack"
+          ? {
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                funding: "pack",
+                fromAttempt: task.attempts,
+              }),
+            }
+          : {}),
+      });
       setReload((v) => v + 1);
     } catch (e) {
       setError((e as Error).message);
@@ -326,7 +441,7 @@ export function DeepResearchView({
         <p>{label(deepQuestions[task.request.question])}</p>
         <div className="deep-record">
           <span>{label(stages[task.stage])}</span>
-          <span>{creditCopy(task.credit)}</span>
+          <span>{creditCopy(task.credit, task.funding)}</span>
           <time>{new Date(task.updated).toLocaleString()}</time>
         </div>
       </header>
@@ -351,6 +466,23 @@ export function DeepResearchView({
               ),
             )}
           </ol>
+          {task.state === "queued" && (
+            <button
+              className="button secondary"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                void api(`/api/research/${id}/cancel?lang=${locale}`, {
+                  method: "POST",
+                })
+                  .then(() => setReload((v) => v + 1))
+                  .catch((e) => setError(e.message))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              {l("Cancel queued research", "取消排队研究")}
+            </button>
+          )}
         </section>
       )}
       {task.state === "partial" && (
@@ -362,41 +494,85 @@ export function DeepResearchView({
             )}
           </h2>
           <p>
-            {task.problem === "interrupted"
+            {task.problem === "credits"
               ? l(
-                  "The service restarted. Your task and collected sources are saved.",
-                  "服务已重启，任务和已采集来源均已保存。",
+                  "Check your available credits, then continue this saved question.",
+                  "核对账户中的可用次数后，可继续这个已保存的问题。",
                 )
-              : task.problem === "sources"
+              : task.problem === "billing"
                 ? l(
-                    "The selected question needs stronger original sources. The available material is saved below.",
-                    "这个问题需要补充更直接的原始来源，已取得的材料保存在下方。",
+                    "Your credit record needs an account review. Your saved work remains available.",
+                    "这笔次数记录需要账户核对，已保存的研究可随时查看。",
                   )
-                : l(
-                    "The draft is going through source and quality checks. Collected evidence is saved below.",
-                    "报告仍需完成来源与质量核对，已采集的证据保存在下方。",
-                  )}
+                : task.problem === "interrupted"
+                  ? l(
+                      "This research paused. Your task and collected sources are saved.",
+                      "研究已暂停，任务和已采集来源均已保存。",
+                    )
+                  : task.problem === "sources"
+                    ? l(
+                        "The selected question needs stronger original sources. The available material is saved below.",
+                        "这个问题需要补充更直接的原始来源，已取得的材料保存在下方。",
+                      )
+                    : l(
+                        "The draft needs source and quality checks. Continue this research to finish them.",
+                        "报告仍需完成来源与质量核对，已采集的证据保存在下方。",
+                      )}
           </p>
           <p>
-            {creditCopy(task.credit)} ·{" "}
+            {creditCopy(task.credit, task.funding)} ·{" "}
             {l("Reading and exporting use 0 credits.", "阅读和导出消耗 0 次。")}
           </p>
-          {task.attempts < 3 && account?.deep?.enabled && (
-            <button
-              className="button"
-              disabled={busy || !account.user}
-              onClick={() => void retry()}
-            >
-              {busy
-                ? l("Resuming…", "正在恢复…")
-                : account.hosted
-                  ? l(
-                      "Continue this research · reserve 1 trial",
-                      "继续本次研究 · 预留 1 次体验",
-                    )
-                  : l("Continue this research", "继续本次研究")}
-            </button>
+          {task.funding === "pack" && (
+            <p>
+              {l("Purchased credits available: ", "已购次数可用：")}
+              {purchased.remaining ?? "—"} ·{" "}
+              <a href={localUrl("/account")}>
+                {l("Account & activity", "查看账户与记录")}
+              </a>
+            </p>
           )}
+          {task.funding === "pack" &&
+            task.credit !== "settling" &&
+            purchased.remaining === null && (
+              <button
+                className="button secondary"
+                disabled={purchased.pending}
+                onClick={purchased.refresh}
+              >
+                {purchased.pending
+                  ? l("Checking credits…", "正在核对次数…")
+                  : l("Refresh credits", "刷新可用次数")}
+              </button>
+            )}
+          {task.attempts < 3 &&
+            account?.deep?.enabled &&
+            task.credit !== "settling" && (
+              <button
+                className="button"
+                disabled={
+                  busy ||
+                  !account.user ||
+                  (task.funding === "pack" &&
+                    (!account.deep.paidAvailable || !purchased.remaining))
+                }
+                onClick={() => void retry()}
+              >
+                {busy
+                  ? l("Resuming…", "正在恢复…")
+                  : task.funding === "pack"
+                    ? l(
+                        "Continue · reserve 1 purchased credit",
+                        "继续研究 · 预留 1 次已购次数",
+                      )
+                    : account.hosted
+                      ? l(
+                          "Continue this research · reserve 1 trial",
+                          "继续本次研究 · 预留 1 次体验",
+                        )
+                      : l("Continue this research", "继续本次研究")}
+              </button>
+            )}
           {task.attempts >= 3 && (
             <p>
               {l(
@@ -601,7 +777,14 @@ export function DeepHistory({ account }: { account: Account }) {
     | (DeepStatus & {
         tasks: Pick<
           DeepTaskView,
-          "id" | "title" | "state" | "stage" | "credit" | "created" | "updated"
+          | "id"
+          | "title"
+          | "state"
+          | "stage"
+          | "credit"
+          | "created"
+          | "updated"
+          | "funding"
         >[];
       })
     | null
@@ -618,7 +801,12 @@ export function DeepHistory({ account }: { account: Account }) {
           setData(d);
           setError("");
           if (
-            d?.tasks.some((t) => t.state === "queued" || t.state === "running")
+            d?.tasks.some(
+              (t) =>
+                t.state === "queued" ||
+                t.state === "running" ||
+                t.credit === "settling",
+            )
           )
             timer = setTimeout(read, 5000);
         })
@@ -657,7 +845,8 @@ export function DeepHistory({ account }: { account: Account }) {
             <div>
               <strong>{task.title[locale]}</strong>
               <span>
-                {label(stages[task.stage])} · {creditCopy(task.credit)}
+                {label(stages[task.stage])} ·{" "}
+                {creditCopy(task.credit, task.funding)}
               </span>
             </div>
             <ArrowRight size={18} />

@@ -13,7 +13,7 @@ import sharp from "sharp";
 import { installAuth } from "./auth.js";
 import { installFitRoutes } from "./fit.js";
 import { installDeepRoutes } from "./deep.js";
-import { installCreditAccountRoutes } from "./credits.js";
+import { installCreditAccountRoutes, CreditAccountClient } from "./credits.js";
 import { marketCard } from "../core/card.js";
 import { isIP } from "node:net";
 import { randomUUID, createHash } from "node:crypto";
@@ -60,7 +60,10 @@ interface Job {
   cacheKey?: string;
   preparedTopic?: Topic;
 }
-export function createApp(engine = new Engine()) {
+export function createApp(
+  engine = new Engine(),
+  credits = new CreditAccountClient(),
+) {
   const proxyUsage = new ProxyUsageClient(engine.store);
   const basePath = process.env.PUBLIC_URL
     ? basePathFromUrl(process.env.PUBLIC_URL)
@@ -85,7 +88,7 @@ export function createApp(engine = new Engine()) {
     next();
   });
   installFitRoutes(app, engine, auth);
-  installCreditAccountRoutes(app, engine.store, auth);
+  installCreditAccountRoutes(app, engine.store, auth, credits);
   const dailyLimit = Math.max(
     1,
     Math.floor(Number(process.env.GHTRENDS_DAILY_SCANS)) || 10,
@@ -128,15 +131,21 @@ export function createApp(engine = new Engine()) {
   let processing = false,
     nextBackgroundAt = 0;
   let backgroundTimer: ReturnType<typeof setTimeout> | undefined;
-  const deep = installDeepRoutes(app, engine, auth, {
-    available: () => !processing,
-    ownerBusy: (owner) =>
-      activeResearch.has(owner) ||
-      [...jobs.values()].some(
-        (j) => j.owner === owner && ["queued", "running"].includes(j.state),
-      ),
-    released: () => void processJobs(),
-  });
+  const deep = installDeepRoutes(
+    app,
+    engine,
+    auth,
+    {
+      available: () => !processing,
+      ownerBusy: (owner) =>
+        activeResearch.has(owner) ||
+        [...jobs.values()].some(
+          (j) => j.owner === owner && ["queued", "running"].includes(j.state),
+        ),
+      released: () => void processJobs(),
+    },
+    credits,
+  );
   app.locals.stopDeepResearch = deep.stop;
   const clientIP = (q: express.Request) => {
     const trusted = process.env.GHTRENDS_CLIENT_IP_HEADER;
@@ -231,9 +240,7 @@ export function createApp(engine = new Engine()) {
               Number(!!a.refresh) - Number(!!b.refresh) ||
               a.created - b.created,
           )[0];
-        const nextDeep = engine.store
-          .deepPending()
-          .find((t) => t.state === "queued");
+        const nextDeep = deep.next();
         if (
           nextDeep &&
           (!job || job.refresh || Date.parse(nextDeep.created) <= job.created)
@@ -434,6 +441,7 @@ export function createApp(engine = new Engine()) {
         ...engine.store.adminOverview(days, page, state),
         proxyUsage: await proxyUsage.overview(days),
         version: ALGORITHM_VERSION,
+        researchPayments: engine.store.deepPaymentOverview(),
         queue: [
           ...[...jobs.values()]
             .filter((j) => j.state === "queued" || j.state === "running")
