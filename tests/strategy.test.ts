@@ -1518,6 +1518,45 @@ test("targeted language recovery preserves both meanings and leaves original quo
     assert.deepEqual(strategyProblems(repaired, documents, seed), []);
   }));
 
+test("copy output recovery retries only the failed field batch and keeps completed content", async () =>
+  fixture(async (r) => {
+    const original = sample();
+    const input = sample();
+    input.en.summary =
+      "Current documents do not establish wider adoption; keep the proposed task conditional.";
+    const calls: string[] = [];
+    r.json = async (_prompt, data: any, _budget, operation, thinking) => {
+      calls.push(operation!);
+      assert.deepEqual(
+        data.fields.map((x: any) => x.path),
+        ["en.summary"],
+      );
+      if (operation === "strategy-copy")
+        throw Object.assign(new Error("Output budget exhausted"), {
+          code: "output_limit",
+        });
+      assert.equal(operation, "strategy-copy-compact");
+      assert.equal(thinking, false);
+      assert.ok(_budget! <= 7000);
+      return { edits: [{ path: "en.summary", value: original.en.summary }] };
+    };
+    assert.deepEqual(
+      await (r as any).repairStrategyCopy(input, documents),
+      original,
+    );
+    assert.deepEqual(calls, ["strategy-copy", "strategy-copy-compact"]);
+    let attempts = 0;
+    r.json = async () => {
+      attempts++;
+      throw Object.assign(new Error("network"), { code: "network_error" });
+    };
+    await assert.rejects(
+      (r as any).repairStrategyCopy(input, documents),
+      /network/,
+    );
+    assert.equal(attempts, 1);
+  }));
+
 test("citation identity repair offers exact-text sources and protects valid IDs, quotes and other fields", async () =>
   fixture(async (r) => {
     const data = sample();
