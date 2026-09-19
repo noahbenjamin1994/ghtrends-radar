@@ -988,7 +988,12 @@ test("prose-only repair preserves source IDs and quotes, while structural and ne
   verbose.extra = { zh: "不应影响内容校验" };
   const repairs = deepCopyRepairs(verbose);
   assert.deepEqual(repairs, [
-    { path: "answer.zh", value: verbose.answer.zh, maxCharacters: 240 },
+    {
+      path: "answer.zh",
+      value: verbose.answer.zh,
+      maxCharacters: 240,
+      counterpart: { language: "en", value: verbose.answer.en },
+    },
   ]);
   const numbered = brief();
   numbered.answer.zh = "先邀请 E2 中提出请求的作者体验段落映射原型。";
@@ -1736,6 +1741,70 @@ test("review keeps the writer's bounded source set, including assets outside fin
   };
   try {
     assert.equal(await runDeepResearch(e, t, () => {}), true);
+  } finally {
+    await e.close();
+    process.env = env;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("wording edits receive the paired meaning and preserve unrequested text and quotes", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-paired-copy-"));
+  const env = { ...process.env };
+  process.env.DEEPSEEK_API_KEY = "unit-test-only";
+  const e = new Engine(new Store(dir)),
+    t = task(),
+    candidate = brief();
+  candidate.plan.changeIf = {
+    en: "If zero testers use the queue, test the simpler composer with the same group.",
+    zh: "若无人使用队列，则请同一组试用者测试简化的编辑器。",
+  };
+  e.store.saveMarket(sample(), false, t.owner);
+  t.evidence = {
+    collectionFinished: true,
+    collectedAt: t.created,
+    queries: [],
+    githubQuery: "comments",
+    sources: [source, request],
+    reads: [],
+  };
+  let copyCalls = 0;
+  e.research.json = async (_s, input, _n, operation) => {
+    if (operation === "strategy-deep-copy") {
+      copyCalls++;
+      assert.deepEqual((input as any).fields, [
+        {
+          path: "plan.changeIf.zh",
+          value: candidate.plan.changeIf.zh,
+          maxCharacters: 240,
+          counterpart: { language: "en", value: candidate.plan.changeIf.en },
+        },
+      ]);
+      return {
+        edits: [
+          {
+            path: "plan.changeIf.zh",
+            value: "若队列使用人数为0，则请同一组试用者测试简化的编辑器。",
+          },
+          { path: "plan.changeIf.en", value: "Change the original meaning." },
+          {
+            path: "findings.0.evidence.0.quote",
+            value: "Invent a different source quote.",
+          },
+        ],
+      };
+    }
+    if (operation === "strategy-deep-review")
+      return { ready: true, corrections: [] };
+    return structuredClone(candidate);
+  };
+  try {
+    assert.equal(await runDeepResearch(e, t, () => {}), true);
+    assert.equal(copyCalls, 1);
+    const expected = structuredClone(candidate);
+    expected.plan.changeIf.zh =
+      "若队列使用人数为0，则请同一组试用者测试简化的编辑器。";
+    assert.deepEqual(t.result, expected);
   } finally {
     await e.close();
     process.env = env;

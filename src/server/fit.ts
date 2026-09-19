@@ -40,7 +40,8 @@ export function installFitRoutes(
     const user = auth.requireUser(q),
       m = report(String(q.params.id), user.id);
     const saved = engine.store.get<SavedFit>(latestKey(user.id, m.id));
-    r.json(saved?.version === FIT_VERSION ? saved : null);
+    // Prompt revisions change generation cache keys; saved user selections stay readable.
+    r.json(saved && ["1", FIT_VERSION].includes(saved.version) ? saved : null);
   });
   app.delete("/api/reports/:id/fit", (q, r) => {
     const user = auth.protect(q),

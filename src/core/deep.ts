@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { profileSchema } from "./fit.js";
-import { hasNegativeWording } from "./i18n.js";
+import { hasNegativeWording, proseCounterpart } from "./i18n.js";
 import { evidenceRef, recoverSourceQuote } from "./opportunities.js";
 import { validQuote } from "./landscape.js";
 import type { ResearchSource } from "./types.js";
 import type { WebEvidence, SearchQuery } from "../providers/search.js";
 import type { DocumentRead } from "../providers/documents.js";
 
-export const DEEP_VERSION = "4";
+export const DEEP_VERSION = "5";
 export const deepQuestions = {
   competitors: [
     "Where is the opening among existing products?",
@@ -214,7 +214,12 @@ export function normalizeDeepBrief(
   return readable(value);
 }
 export function deepCopyRepairs(raw: unknown, sources: ResearchSource[] = []) {
-  const fields: { path: string; value: string; maxCharacters: number }[] = [];
+  const fields: {
+    path: string;
+    value: string;
+    maxCharacters: number;
+    counterpart?: { language: "en" | "zh"; value: string };
+  }[] = [];
   const visit = (v: unknown, path: string) => {
     const prose =
       /^(?:headline|answer|findings\.\d+\.(?:subject|statement|implication)|plan\.(?:deliverable|resources|effort\.assumption|maintenance|experiment|continueIf|changeIf)|checks\.\d+)\.(en|zh)$/.exec(
@@ -236,9 +241,15 @@ export function deepCopyRepairs(raw: unknown, sources: ResearchSource[] = []) {
         (v.match(/\bE\d+\b/g) || []).some((id) =>
           sources.some((s) => s.id === id),
         ))
-    )
-      fields.push({ path, value: v, maxCharacters });
-    else if (v && typeof v === "object")
+    ) {
+      const counterpart = proseCounterpart(raw, path);
+      fields.push({
+        path,
+        value: v,
+        maxCharacters,
+        ...(counterpart ? { counterpart } : {}),
+      });
+    } else if (v && typeof v === "object")
       for (const [k, child] of Object.entries(v))
         visit(child, path ? `${path}.${k}` : k);
   };

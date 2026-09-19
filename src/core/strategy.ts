@@ -16,7 +16,7 @@ import {
 import { hasNegativeWording, hasRecoveryTimeReference } from "./i18n.js";
 import type { Brief, Market, ResearchSource, Strategy } from "./types.js";
 
-export const STRATEGY_VERSION = "6";
+export const STRATEGY_VERSION = "7";
 const detail = z.string().trim().min(12).max(700);
 export const strategySchema = z.object({
   angle: z.string().trim().min(4).max(200),
@@ -221,7 +221,9 @@ export function visibleStrategy(
 ) {
   if (
     !brief?.strategyVersion ||
-    !["1", "2", "3", "4", "5", STRATEGY_VERSION].includes(brief.strategyVersion)
+    !["1", "2", "3", "4", "5", "6", STRATEGY_VERSION].includes(
+      brief.strategyVersion,
+    )
   )
     return undefined;
   const parsed = strategySchema.safeParse(brief[language].strategy);

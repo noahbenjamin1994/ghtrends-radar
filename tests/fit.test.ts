@@ -220,16 +220,21 @@ test("personal ranking keeps every original direction and leaves market evidence
     assert.ok(md.includes("## 1. 导出草稿资料"));
     assert.ok(md.includes("周末先交付一个单文件导出原型。"));
     const operations: string[] = [];
-    engine.research.json = async (_system, _input, _tokens, operation) => {
+    engine.research.json = async (_system, input: any, _tokens, operation) => {
       operations.push(operation!);
       if (operation === "direction-fit-review") return { edits: [] };
-      if (operation === "direction-fit-copy")
+      if (operation === "direction-fit-copy") {
+        assert.deepEqual(
+          input.fields.find((f: any) => f.path === "summary.zh").counterpart,
+          { language: "en", value: result(m).summary.en },
+        );
         return {
           edits: [
             { path: "summary.zh", value: "按现有经验优先做导出工具。" },
             { path: "directions.0.id", value: "invented" },
           ],
         };
+      }
       const response = result(m);
       response.summary.zh = "这个方向与原先不同。";
       return response;
@@ -329,6 +334,14 @@ test("private profile ranking checks ownership, CSRF, caching and duplicate requ
     assert.equal(
       (await request("POST", { ...profile, context: "<script>" })).status,
       400,
+    );
+    const legacy = { ...result(m), version: "1" };
+    engine.store.set(`direction-fit:last:alice:${m.id}`, legacy, 60000);
+    assert.deepEqual(await (await request()).json(), legacy);
+    assert.equal(
+      calls,
+      0,
+      "reading a saved older selection consumes no model call",
     );
     const first = request("POST", profile);
     await waitUntil(() => calls > 0);

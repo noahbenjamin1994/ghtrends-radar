@@ -218,12 +218,14 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     assert.ok(visibleStrategy(b, "zh"));
     assert.equal(visibleOpportunities(b)?.opportunities.length, 3);
     assert.ok(visibleStrategy({ ...b, strategyVersion: "1" }, "zh"));
-    assert.ok(visibleStrategy({ ...b, strategyVersion: "5" }, "zh"));
-    assert.equal(
-      visibleOpportunities({ ...b, strategyVersion: "5" })?.opportunities
-        .length,
-      3,
-    );
+    for (const version of ["5", "6", "7"]) {
+      assert.ok(visibleStrategy({ ...b, strategyVersion: version }, "zh"));
+      assert.equal(
+        visibleOpportunities({ ...b, strategyVersion: version })?.opportunities
+          .length,
+        3,
+      );
+    }
     assert.equal(reviews, 1);
     assert.deepEqual(ops, ["strategy", "strategy-review"]);
     assert.deepEqual(await r.insights(seed, documents), b);
@@ -774,7 +776,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "6");
+    assert.equal(brief.strategyVersion, "7");
     const legacy = {
       ...brief,
       strategyVersion: "2",
@@ -1264,7 +1266,16 @@ test("mixed citation and wording corrections preserve the rest of a complete rep
       if (op === "strategy") return good;
       if (op === "strategy-review") return bad;
       assert.equal(op, "strategy-copy");
-      assert.ok(input.fields.some((f: any) => f.path === "evidence.0.quote"));
+      const quoteEdit = input.fields.find(
+        (f: any) => f.path === "evidence.0.quote",
+      );
+      assert.ok(quoteEdit);
+      assert.equal(quoteEdit.counterpart, undefined);
+      assert.deepEqual(
+        input.fields.find((f: any) => f.path === "en.strategy.tradeoff")
+          .counterpart,
+        { language: "zh", value: bad.zh.strategy.tradeoff },
+      );
       return {
         edits: [
           { path: "en.strategy.tradeoff", value: good.en.strategy.tradeoff },
@@ -1319,3 +1330,49 @@ test("near-verbatim quote recovery copies one exact source span and keeps numeri
     undefined,
   );
 });
+
+test("shortening an exact overlong quotation retains source context and one edit target", async () =>
+  fixture(async (r) => {
+    const raw = sample();
+    const excerpt =
+      "The author wrote that permission does not include third-party data. ".repeat(
+        6,
+      );
+    const source = {
+      id: "Q1",
+      kind: "project" as const,
+      label: "Fixture source",
+      url: "https://example.com/terms",
+      excerpt,
+    };
+    raw.evidence = [{ id: source.id, quote: excerpt }];
+    let calls = 0;
+    r.json = async (_prompt, input: any, _budget, operation) => {
+      calls++;
+      assert.equal(operation, "strategy-copy");
+      const quoteFields = input.fields.filter(
+        (field: any) => field.path === "evidence.0.quote",
+      );
+      assert.equal(quoteFields.length, 1);
+      assert.equal(quoteFields[0].source, excerpt);
+      assert.equal(quoteFields[0].maxLength, 300);
+      assert.equal(quoteFields[0].counterpart, undefined);
+      return {
+        edits: [
+          { path: "evidence.0.quote", value: excerpt.split(". ")[0] + "." },
+        ],
+      };
+    };
+    const result = await (r as any).repairStrategyCopy(raw, [
+      source,
+      ...documents,
+    ]);
+    assert.equal(calls, 1);
+    assert.deepEqual(result.evidence, [
+      {
+        id: source.id,
+        quote:
+          "The author wrote that permission does not include third-party data.",
+      },
+    ]);
+  }));

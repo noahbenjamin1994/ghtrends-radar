@@ -2,6 +2,26 @@ import { zh, en } from "./translations.js";
 import type { Market } from "./types.js";
 
 export type Locale = "en" | "zh";
+
+/** A read-only paired meaning for prose edits; source quotes have no language path. */
+export function proseCounterpart(
+  raw: unknown,
+  path: string,
+): { language: Locale; value: string } | undefined {
+  const keys = path.split(".");
+  const languages = keys.filter((key) => key === "en" || key === "zh");
+  if (languages.length !== 1) return;
+  const language: Locale = languages[0] === "en" ? "zh" : "en";
+  const value = keys.reduce(
+    (node: any, key) => node?.[key === languages[0] ? language : key],
+    raw,
+  );
+  if (typeof value === "string") return { language, value };
+}
+
+export const COPY_MEANING_RULES = `Preserve the exact claim: actor, action, conditions, certainty, source attribution, numbers, comparisons, logical AND/OR, and outcome. An observed zero is a measured result; pending confirmation is an information gap. Keep those meanings distinct. Role exclusions become precise positive role descriptions; never promote a reviewer, comment or public contact into a user-demand signal or confirmed participant. Proposed invitations stay proposed. An absent capability and an unchecked capability have different meanings; preserve which the original says.
+Use affirmative ordinary language. Chinese excludes every 不/无/未/没 character and 并非/而非, including compound terms. English excludes not/no/never/cannot/without/unknown/unconfirmed. Preserve exact meaning while changing wording: 无人使用队列 → 队列使用人数为0; 不超过两人 → 至多两人; 不是需求证据，只适合评审 → 仅作为评审线索; 尚未核实 → 有待核实; 不可变 → 写入后保持原样. An observed zero must stay zero; a maximum must stay a maximum. If users return to their original workflow, describe that behavior instead of saying evidence is pending.`;
+
 export function hasRecoveryTimeReference(value: string) {
   return /(?:time (?:shown|displayed)(?: on (?:this|the) page| below)|(?:shown|displayed) recovery time|页面提示.{0,4}时间|(?:显示|提示)的恢复时间)/i.test(
     value,

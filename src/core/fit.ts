@@ -3,7 +3,7 @@ import { hasNegativeWording } from "./i18n.js";
 import { visibleOpportunities } from "./opportunities.js";
 import type { Market } from "./types.js";
 
-export const FIT_VERSION = "1";
+export const FIT_VERSION = "2";
 export const profileSchema = z
   .object({
     skill: z.enum(["frontend", "backend", "models", "industry", "other"]),
