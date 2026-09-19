@@ -790,7 +790,91 @@ test("a quote repair edits its evidence field while preserving the rest of the d
   }
 });
 
-for (const mode of ["unlocated-correction", "broken-patch"] as const) {
+test("a rejected child patch gets format feedback before the remaining repair attempt", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-noop-")),
+    env = { ...process.env };
+  process.env.DEEPSEEK_API_KEY = "unit-test-only";
+  const e = new Engine(new Store(dir)),
+    t = task();
+  e.store.saveMarket(sample(), false, t.owner);
+  t.evidence = {
+    collectionFinished: true,
+    collectedAt: new Date().toISOString(),
+    queries: [],
+    githubQuery: "comments",
+    sources: [source, request],
+    reads: [],
+  };
+  const operations: string[] = [];
+  let repairs = 0;
+  e.research.json = async (_system, input, _tokens, operation) => {
+    operations.push(operation!);
+    if (operation === "strategy-deep-review")
+      return { ready: true, corrections: [] };
+    if (operation === "strategy-deep-repair") {
+      repairs++;
+      const data = input as any;
+      assert.deepEqual(
+        data.requestedFields.map((f: any) => f.path),
+        ["findings.0.evidence"],
+      );
+      if (repairs === 1)
+        return {
+          edits: [
+            {
+              path: "findings.0.evidence.0.quote",
+              value: brief().findings[0].evidence[0].quote,
+            },
+          ],
+        };
+      assert.ok(
+        data.corrections.some((c: string) =>
+          c.includes("changed zero requested fields"),
+        ),
+      );
+      assert.ok(
+        data.corrections.some((c: string) =>
+          c.includes("exact, contiguous span"),
+        ),
+      );
+      assert.equal(
+        data.priorDraft.findings[0].evidence[0].quote,
+        "A wholly fabricated statement about paying customers.",
+      );
+      return {
+        edits: [
+          { path: "findings.0.evidence", value: brief().findings[0].evidence },
+        ],
+      };
+    }
+    assert.equal(operation, "strategy-deep-write");
+    const draft = brief();
+    draft.findings[0].evidence[0].quote =
+      "A wholly fabricated statement about paying customers.";
+    return draft;
+  };
+  try {
+    assert.equal(await runDeepResearch(e, t, () => {}), true);
+    assert.deepEqual(t.result, brief());
+    assert.deepEqual(operations, [
+      "strategy-deep-write",
+      "strategy-deep-repair",
+      "strategy-deep-repair",
+      "strategy-deep-review",
+    ]);
+  } finally {
+    await e.close();
+    process.env = env;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+for (const mode of [
+  "unlocated-correction",
+  "broken-patch",
+  "unrequested-patch",
+  "unchanged-patch",
+] as const) {
   test(`semantic recovery stays bounded for ${mode}`, async () => {
     const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-repair-")),
       env = { ...process.env };
@@ -824,7 +908,8 @@ for (const mode of ["unlocated-correction", "broken-patch"] as const) {
           ready: false,
           corrections: [
             {
-              paths: mode === "broken-patch" ? ["answer"] : ["wholeReport"],
+              paths:
+                mode === "unlocated-correction" ? ["wholeReport"] : ["answer"],
               repair: "Tie the answer to the editor's actual request.",
             },
           ],
@@ -835,6 +920,12 @@ for (const mode of ["unlocated-correction", "broken-patch"] as const) {
           (input as any).requestedFields.map((f: any) => f.path),
           ["answer"],
         );
+        if (mode === "unrequested-patch")
+          return {
+            edits: [{ path: "answer.en", value: "A narrow child patch." }],
+          };
+        if (mode === "unchanged-patch")
+          return { edits: [{ path: "answer", value: brief().answer }] };
         return {
           edits: [
             { path: "answer", value: { en: "Incomplete bilingual value." } },
@@ -849,7 +940,7 @@ for (const mode of ["unlocated-correction", "broken-patch"] as const) {
       assert.equal(t.result, undefined);
       assert.deepEqual(
         operations,
-        mode === "broken-patch"
+        mode !== "unlocated-correction"
           ? [
               "strategy-deep-write",
               "strategy-deep-review",
@@ -863,6 +954,15 @@ for (const mode of ["unlocated-correction", "broken-patch"] as const) {
               "strategy-deep-correction-check",
             ],
       );
+      if (mode === "unrequested-patch" || mode === "unchanged-patch") {
+        assert.deepEqual(t.work?.draft, brief());
+        assert.equal(
+          t.work?.corrections.filter((c) =>
+            c.includes("changed zero requested fields"),
+          ).length,
+          1,
+        );
+      }
     } finally {
       await e.close();
       process.env = env;

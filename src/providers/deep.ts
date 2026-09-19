@@ -521,6 +521,17 @@ export async function runDeepResearch(
         false,
       );
       candidate = applyDeepEdits(candidate, response, repairFields);
+      if (JSON.stringify(candidate) === JSON.stringify(repairBase)) {
+        // Keep the field boundary strict. Spend the next existing attempt on
+        // a usable patch instead of copying and reviewing the unchanged draft.
+        const feedback = `The previous patch changed zero requested fields. Use exactly these paths: ${repairFields.join(", ")}. Each value replaces the complete requested field: both en and zh for bilingual fields, the full array for evidence. Return a revised value for each correction.`;
+        if (!corrections.includes(feedback)) corrections.push(feedback);
+        if (task.work) {
+          task.work.corrections = [...corrections];
+          checkpoint();
+        }
+        continue;
+      }
     } else if (
       !candidate ||
       deepProblems(candidate, sources, task.request.directionId).length
