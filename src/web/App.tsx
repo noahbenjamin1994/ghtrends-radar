@@ -1,5 +1,6 @@
 import { ScopeReview } from "./preflight.js";
 import { DeepResearchView } from "./deep.js";
+import { AccountView } from "./credits.js";
 import {
   inspectInput,
   type PreflightResult,
@@ -420,21 +421,23 @@ export function App() {
     if (account && route === "/start") track("opensource_view", "start");
   }, [route, account]);
   const active =
-    route === "/admin"
-      ? "admin"
-      : route.startsWith("/history") || route.startsWith("/research/")
-        ? "history"
-        : route.startsWith("/compare")
-          ? "compare"
-          : route.startsWith("/watch")
-            ? "history"
-            : route.startsWith("/docs")
-              ? "docs"
-              : route.startsWith("/start")
-                ? "start"
-                : route.startsWith("/gaps")
-                  ? "gaps"
-                  : "radar";
+    route === "/account"
+      ? "account"
+      : route === "/admin"
+        ? "admin"
+        : route.startsWith("/history") || route.startsWith("/research/")
+          ? "history"
+          : route.startsWith("/compare")
+            ? "compare"
+            : route.startsWith("/watch")
+              ? "history"
+              : route.startsWith("/docs")
+                ? "docs"
+                : route.startsWith("/start")
+                  ? "start"
+                  : route.startsWith("/gaps")
+                    ? "gaps"
+                    : "radar";
   const shown = markets
     .filter((m) => filter === "all" || m.kind === filter)
     .sort((a, b) =>
@@ -522,6 +525,9 @@ export function App() {
                   {account.hosted ? account.user.name : t("Local workspace")}
                 </strong>
                 <UsageSummary account={account} />
+                <button onClick={() => navigate("/account")}>
+                  {locale === "zh" ? "账户与研究次数" : "Account & credits"}
+                </button>
                 <button onClick={() => navigate("/history")}>
                   {t("My research")}
                 </button>
@@ -1107,6 +1113,8 @@ export function App() {
           )
         ) : route === "/admin" ? (
           <AdminView account={account} />
+        ) : route === "/account" ? (
+          <AccountView account={account} />
         ) : route === "/history" || route === "/watch" ? (
           <HistoryView
             account={account}

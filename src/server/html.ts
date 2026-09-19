@@ -90,6 +90,10 @@ export function renderDocument(
     "/watch": "Your GitHub watchlist · ghtrends",
     "/admin": "Operations · ghtrends",
     "/history": "Your research history · ghtrends",
+    "/account":
+      locale === "zh"
+        ? "账户与研究次数 · ghtrends"
+        : "Account & credits · ghtrends",
   };
   if (path.startsWith("/research/"))
     titles[path] =

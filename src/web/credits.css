@@ -1,0 +1,278 @@
+.credits-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 32px 0 72px;
+}
+.credits-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 40px;
+}
+.credits-heading h1 {
+  font-size: clamp(30px, 3.4vw, 44px);
+  font-weight: 550;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+  margin: 14px 0;
+}
+.credits-heading p,
+.credits-metric p,
+.credits-next p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+.credits-heading .button {
+  flex-shrink: 0;
+}
+.credits-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.credits-metric {
+  min-width: 0;
+  background: var(--panel);
+  padding: 28px;
+  border-radius: 16px;
+}
+.credits-metric h2 {
+  font-size: 15px;
+  font-weight: 500;
+  margin: 0 0 16px;
+}
+.credits-metric p {
+  font-size: 13px;
+  margin: 0;
+}
+.credits-metric .credits-number {
+  color: var(--accent-ink);
+  font-size: 64px;
+  font-weight: 550;
+  letter-spacing: -0.045em;
+  line-height: 1.1;
+  margin-bottom: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.credits-number span {
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted);
+  margin-left: 10px;
+}
+.credits-paid {
+  background: #eef6f2;
+}
+.credits-paid .credits-number {
+  color: #087b62;
+}
+.credits-metric .credits-expiry {
+  margin-top: 12px;
+}
+.credits-next {
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 22px 0;
+}
+.credits-next p {
+  font-size: 14px;
+  margin: 0;
+}
+.credits-next a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.credits-section {
+  border-top: 1px solid var(--line);
+  margin-top: 30px;
+  padding-top: 30px;
+}
+.credits-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 22px;
+}
+.credits-section-heading h2 {
+  font-size: 23px;
+  font-weight: 550;
+  margin: 0;
+}
+.credits-section-heading span,
+.credits-explanation,
+.credits-empty {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+.credits-purchases {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.credits-purchase {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+  min-width: 0;
+}
+.credits-order-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.credits-order-title h3 {
+  font-size: 17px;
+  font-weight: 550;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.credits-order-title span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.credits-order-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  margin: 26px 0 20px;
+}
+.credits-purchase .credits-order-count {
+  font-size: 32px;
+  font-weight: 550;
+  color: var(--accent-ink);
+  margin: 0;
+}
+.credits-order-count span {
+  margin-left: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.credits-order-body small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.credits-purchase > p,
+.credits-purchase details {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.credits-purchase details {
+  margin-top: 18px;
+  overflow-wrap: anywhere;
+}
+.credits-purchase summary {
+  cursor: pointer;
+}
+.credits-table-wrap {
+  overflow-x: auto;
+}
+.credits-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  text-align: left;
+}
+.credits-table th {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  padding: 16px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.credits-table td {
+  padding: 18px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+.credits-table td:nth-child(n + 3),
+.credits-table th:nth-child(n + 3) {
+  text-align: right;
+}
+.credits-table time,
+.credits-table small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.credits-table td > a {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.credits-table small {
+  display: block;
+  margin-top: 5px;
+}
+.credits-added {
+  color: var(--positive);
+}
+.credits-section > .button {
+  margin-top: 20px;
+}
+.credits-sync {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 24px;
+}
+.credits-notice {
+  background: #faf5ec;
+  padding: 20px 24px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+.credits-notice span {
+  display: block;
+  font-size: 14px;
+  margin-top: 5px;
+}
+@media (max-width: 640px) {
+  .credits-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 28px;
+  }
+  .credits-summary,
+  .credits-purchases {
+    grid-template-columns: 1fr;
+  }
+  .credits-metric {
+    padding: 24px;
+  }
+  .credits-next {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .credits-table {
+    font-size: 12px;
+  }
+  .credits-table th,
+  .credits-table td {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .credits-table th:nth-child(2),
+  .credits-table td:nth-child(2) {
+    max-width: 85px;
+  }
+}

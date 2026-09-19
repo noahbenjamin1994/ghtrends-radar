@@ -177,6 +177,8 @@ Sparse source coverage produces a **domain hypothesis**; document-grounded recom
 
 `PUBLIC_URL` may include a directory, for example `https://example.com/radar`. The same build supports both directory hosting and a local root URL. Forward that prefix unchanged to the server and configure the matching Logto callback.
 
+**Account and credits:** `/account` separates daily research, the introductory focused research and purchased packs. Hosted operators can connect Nexus with the server-only `GHTRENDS_NEXUS_URL`, `GHTRENDS_NEXUS_PROJECT_ID` and `GHTRENDS_NEXUS_PROJECT_KEY`. The account reads purchase confirmations, per-purchase expiry and credit activity through the authenticated backend. Entries distinguish reservation, completion, release, expiry and purchase adjustments. A temporary connection issue shows a sync message and the previous record timestamp. This connection provides account visibility; paid task admission and checkout activation follow the payment integration milestone.
+
 **Focused research preview**
 
 Set `GHTRENDS_DEEP_RESEARCH=1` with a research model key to try the private, selected-direction workflow. Open a report direction and choose one question: compare other products, scope a first release, build on open source, or find the first users. Optional personal-fit conditions travel with the task. Targeted searches, current project requests and original documents support a compact bilingual decision brief. Facts, proposals, resource estimates and source quotes stay distinct.

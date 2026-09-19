@@ -13,6 +13,7 @@ import sharp from "sharp";
 import { installAuth } from "./auth.js";
 import { installFitRoutes } from "./fit.js";
 import { installDeepRoutes } from "./deep.js";
+import { installCreditAccountRoutes } from "./credits.js";
 import { marketCard } from "../core/card.js";
 import { isIP } from "node:net";
 import { randomUUID, createHash } from "node:crypto";
@@ -84,6 +85,7 @@ export function createApp(engine = new Engine()) {
     next();
   });
   installFitRoutes(app, engine, auth);
+  installCreditAccountRoutes(app, engine.store, auth);
   const dailyLimit = Math.max(
     1,
     Math.floor(Number(process.env.GHTRENDS_DAILY_SCANS)) || 10,
@@ -1240,6 +1242,7 @@ export function createApp(engine = new Engine()) {
           "/compare",
           "/watch",
           "/history",
+          "/account",
           "/admin",
         ].includes(path) ||
         repository ||
@@ -1259,7 +1262,9 @@ export function createApp(engine = new Engine()) {
           path.startsWith("/research/") ||
           repository ||
           !!(m && !engine.store.isPublic(m.id)) ||
-          ["/compare", "/watch", "/history", "/admin"].includes(path) ||
+          ["/compare", "/watch", "/history", "/account", "/admin"].includes(
+            path,
+          ) ||
           (path === "/" && !markets.length),
       });
       return r.status(status).type("html").send(html);

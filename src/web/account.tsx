@@ -121,6 +121,9 @@ export function HistoryView({
           <div className="account-summary">
             <strong>{account.user.name}</strong>
             <UsageSummary account={account} />
+            <a href={localUrl("/account")}>
+              {locale === "zh" ? "查看次数与记录" : "View credits & activity"}
+            </a>
           </div>
         )}
       </div>
