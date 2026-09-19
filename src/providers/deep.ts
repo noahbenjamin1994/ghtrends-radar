@@ -369,7 +369,10 @@ export async function runDeepResearch(
         }
       })(),
       (async () => {
-        const pages = await engine.documents.collect(candidates);
+        const pages = await engine.documents.collect(
+          candidates,
+          `${direction.query} ${direction.en.title}`,
+        );
         evidence!.reads.push(...pages.reads);
         add(pages.sources);
       })(),

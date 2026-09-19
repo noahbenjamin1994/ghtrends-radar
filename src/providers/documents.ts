@@ -19,10 +19,12 @@ const robotsParser = createRequire(import.meta.url)("robots-parser") as (
   getCrawlDelay(agent: string): number | undefined;
 };
 
-export const DOCUMENT_VERSION = "1";
+export const DOCUMENT_VERSION = "2";
 const agentName = "ghtrendsbot";
 const agentHeader = "ghtrendsbot/1.0 (+https://ghtrends.dev/radar/)";
-const MAX_BYTES = 800_000;
+// Documentation shells can exceed 1 MB while their useful article is short.
+// Keep a bounded download; only the existing 6,000-character excerpt is retained.
+const MAX_BYTES = 2_000_000;
 const blockedHosts =
   /(?:^|\.)(?:reddit\.com|redd\.it|twitter\.com|x\.com|facebook\.com|instagram\.com|linkedin\.com|tiktok\.com)$/i;
 export type DocumentStatus =
@@ -197,7 +199,12 @@ export function pageText(html: string) {
     )
   )
     throw failure("format");
-  return { title, text: text.slice(0, 6000), publishedAt };
+  return {
+    title,
+    text: text.slice(0, 6000),
+    excerptTruncated: text.length > 6000,
+    publishedAt,
+  };
 }
 const hostnameKey = (u: URL) => u.hostname.replace(/^www\./, "");
 const hnItem = (url: string) => {
@@ -340,6 +347,7 @@ export class DocumentReader {
         fetchedAt: new Date().toISOString(),
         publishedAt: parsed.publishedAt,
         excerpt: parsed.text,
+        excerptTruncated: parsed.excerptTruncated,
       };
     }
     throw failure("limit");
@@ -448,7 +456,10 @@ export class DocumentReader {
     }
     return out;
   }
-  async collect(candidates: ResearchSource[]): Promise<DocumentEvidence> {
+  async collect(
+    candidates: ResearchSource[],
+    focus = "",
+  ): Promise<DocumentEvidence> {
     const result: DocumentEvidence = {
       version: DOCUMENT_VERSION,
       sources: [],
@@ -469,10 +480,37 @@ export class DocumentReader {
       ).values(),
     ];
     const domains = new Set<string>();
+    const terms = [
+      ...new Set(focus.toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) || []),
+    ].filter(
+      (term) =>
+        !/^(?:the|for|and|with|from|source|sources|tool|tools)$/.test(term),
+    );
+    const documentationMatch = (source: ResearchSource) => {
+      if (!terms.length) return 0;
+      const url = new URL(source.url);
+      // A documentation URL is a reading priority, not proof of authority.
+      // Require overlap with the selected task, keeping unrelated docs in place.
+      if (
+        !/^(?:docs?|developer|developers|support)\./i.test(url.hostname) &&
+        !/\/(?:docs?|documentation|developers?|help)(?:\/|$)/i.test(
+          url.pathname,
+        )
+      )
+        return 0;
+      const words = new Set(
+        `${url.hostname} ${url.pathname} ${source.label} ${source.excerpt || ""}`
+          .toLowerCase()
+          .match(/[\p{L}\p{N}]{2,}/gu) || [],
+      );
+      const matches = terms.filter((term) => words.has(term)).length;
+      return matches >= Math.min(2, terms.length) ? matches : 0;
+    };
     const selected = unique
       .sort(
         (a, b) =>
           Number(!!hnItem(b.url)) - Number(!!hnItem(a.url)) ||
+          documentationMatch(b) - documentationMatch(a) ||
           Number(b.searchIntent === "competition") -
             Number(a.searchIntent === "competition"),
       )

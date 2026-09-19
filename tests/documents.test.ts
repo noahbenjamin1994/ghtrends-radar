@@ -132,7 +132,7 @@ test("pages obey robots, retain exact billing conditions, cache privately neutra
     const requests: string[] = [];
     const transport: DocumentTransport = async (url, _signal, max) => {
       requests.push(url.href);
-      assert.ok(max <= 800000);
+      assert.ok(max <= 2000000);
       return url.pathname === "/robots.txt"
         ? response("User-agent: *\nDisallow: /private\nAllow: /pricing", 200, {
             "content-type": "text/plain",
@@ -151,6 +151,7 @@ test("pages obey robots, retain exact billing conditions, cache privately neutra
     assert.ok(!data.sources[0]!.excerpt!.includes("stealSecrets"));
     assert.ok(!data.sources[0]!.excerpt!.includes("send credentials"));
     assert.equal(data.sources[0]!.documentType, "page");
+    assert.equal(data.sources[0]!.excerptTruncated, false);
     assert.equal(data.reads[0]!.status, "read");
     const later = await reader.collect([
       candidate("https://vendor.example/pricing", "demand"),
@@ -205,6 +206,121 @@ test("redirects remain in the observed host allowlist and check target robots ru
             "</main>",
         ),
       /document_format/,
+    );
+  }));
+
+test("large documentation shells retain a compact article within a bounded download", async () =>
+  fixture(async (store) => {
+    const body = `<title>Integration guide</title><script>${"x".repeat(1_700_000)}</script><main>${"Article text. ".repeat(600)}<p>Late paragraph.</p></main>`;
+    const reader = new DocumentReader(store, async (url, _signal, maxBytes) => {
+      if (url.pathname === "/robots.txt") {
+        assert.ok(maxBytes <= 100_000);
+        return response("", 404, { "content-type": "text/plain" });
+      }
+      assert.ok(Buffer.byteLength(body) <= maxBytes);
+      assert.ok(maxBytes <= 2_000_000);
+      return response(body);
+    });
+    const data = await reader.collect([
+      candidate("https://docs.example/integration"),
+    ]);
+    assert.equal(data.reads[0]!.status, "read");
+    assert.ok(data.sources[0]!.excerpt!.startsWith("Article text."));
+    assert.equal(data.sources[0]!.excerpt!.length, 6000);
+    assert.equal(data.sources[0]!.excerptTruncated, true);
+    assert.ok(!data.sources[0]!.excerpt!.includes("xxx"));
+  }));
+
+test("focused original reads keep matching product docs ahead of comparison articles within the same four-page budget", async () =>
+  fixture(async (store) => {
+    const reader = new DocumentReader(store, async (url) =>
+      url.pathname === "/robots.txt"
+        ? response("", 404, { "content-type": "text/plain" })
+        : response(html),
+    );
+    const comparisons = ["one", "two", "three", "four"].map((host) => ({
+      ...candidate(`https://${host}.example/comparison`),
+      label: "Google Ads connector alternatives",
+    }));
+    const docs = {
+      ...candidate("https://product.example/docs/sources/google-ads", "demand"),
+      label: "Linking Google Ads as a source — PostHog Docs",
+      excerpt: "Sync Campaign and CampaignStats into PostHog.",
+    };
+    const candidates = [
+      ...comparisons,
+      candidate("https://unrelated.example/docs/cat-translator", "opensource"),
+      docs,
+      {
+        ...docs,
+        url: "https://ad.example/docs/google-ads",
+        placement: "ad" as const,
+      },
+      { ...docs, url: "https://reddit.com/docs/google-ads" },
+      {
+        ...docs,
+        url: "https://product.example/docs/overview",
+        label: "PostHog overview",
+        excerpt: "Product overview.",
+      },
+    ];
+    const before = structuredClone(candidates);
+    const normal = await reader.collect(candidates);
+    assert.deepEqual(
+      normal.reads.map((r) => r.url),
+      comparisons.map((s) => s.url),
+    );
+    const focused = await reader.collect(
+      candidates,
+      "google ads connector PostHog",
+    );
+    assert.deepEqual(
+      focused.reads.map((r) => r.url),
+      [docs.url, ...comparisons.slice(0, 3).map((s) => s.url)],
+    );
+    assert.equal(focused.sources[0]!.documentType, "page");
+    assert.equal(focused.sources[0]!.searchIntent, "demand");
+    assert.deepEqual(candidates, before);
+    const unmatched = await reader.collect(candidates, "battery diagnosis");
+    assert.deepEqual(
+      unmatched.reads.map((r) => r.url),
+      comparisons.map((s) => s.url),
+    );
+  }));
+
+test("focused documentation matching accepts docs subdomains and whole terms while preserving host limits", async () =>
+  fixture(async (store) => {
+    const reader = new DocumentReader(store, async (url) =>
+      url.pathname === "/robots.txt"
+        ? response("", 404, { "content-type": "text/plain" })
+        : response(html),
+    );
+    const candidates = [
+      ...["one", "two", "three", "four"].map((host) =>
+        candidate(`https://${host}.example/review`),
+      ),
+      {
+        ...candidate("https://docs.example/adsorption", "demand"),
+        label: "Google adsorption study",
+      },
+      {
+        ...candidate(
+          "https://developers.example/api/test-accounts",
+          "opensource",
+        ),
+        label: "Google Ads test accounts",
+      },
+    ];
+    const data = await reader.collect(candidates, "Google Ads");
+    assert.equal(data.reads.length, 4);
+    assert.equal(
+      data.reads[0]!.url,
+      "https://developers.example/api/test-accounts",
+    );
+    assert.ok(data.reads.every((r) => !r.url.includes("adsorption")));
+    assert.equal(
+      new Set(data.reads.map((r) => new URL(r.url).hostname)).size,
+      4,
     );
   }));
 
