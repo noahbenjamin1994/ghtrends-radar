@@ -171,6 +171,7 @@ export function applyProseRepairs(
 export function recoverSourceQuote(
   quote: string,
   excerpt: string,
+  formattingOnly = false,
 ): string | undefined {
   const norm = (s: string) => s.replace(/\s+/g, " ").trim();
   const q = norm(quote),
@@ -190,7 +191,7 @@ export function recoverSourceQuote(
     };
     let cursor = 0;
     for (const match of source.matchAll(
-      /\[([^\]\n]+)\]\(https?:\/\/[^\s)]+\)/g,
+      /\[([^\]\n]+)\](?:\(https?:\/\/[^\s)]+\)|\[[^\]\n]+\])/g,
     )) {
       append(cursor, match.index);
       const labelStart = chars.length;
@@ -212,6 +213,7 @@ export function recoverSourceQuote(
       }
     }
   }
+  if (formattingOnly) return;
   if (q.length < 40 || q.length > 300 || source.includes(q)) return;
   const start = source.indexOf(q.slice(0, 16));
   if (start < 0 || source.indexOf(q.slice(0, 16), start + 1) >= 0) return;
@@ -291,13 +293,20 @@ export function groundOpportunityRatings(
         return (
           s.id &&
           repo?.toLowerCase() === ref.id.toLowerCase() &&
-          s.excerpt
-            ?.replace(/\s+/g, " ")
+          s.excerpt &&
+          (s.excerpt
+            .replace(/\s+/g, " ")
             .trim()
-            .includes(ref.quote.replace(/\s+/g, " ").trim())
+            .includes(ref.quote.replace(/\s+/g, " ").trim()) ||
+            !!recoverSourceQuote(ref.quote, s.excerpt, true))
         );
       });
-      if (matches.length === 1) ref.id = matches[0]!.id!;
+      if (matches.length === 1) {
+        ref.id = matches[0]!.id!;
+        ref.quote =
+          recoverSourceQuote(ref.quote, matches[0]!.excerpt!, true) ||
+          ref.quote;
+      }
     }
     const excerpt = sources.find((s) => s.id === ref.id)?.excerpt;
     const norm = (v: string) => v.replace(/\s+/g, " ").trim();
@@ -475,13 +484,13 @@ export function visibleOpportunities(
 ): OpportunityMap | undefined {
   if (
     !brief ||
-    !["2", "3", "4", "5", "6", "7", "8", "9", "10", "11"].includes(
+    !["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"].includes(
       brief.strategyVersion || "",
     )
   )
     return;
   if (
-    ["3", "4", "5", "6", "7", "8", "9", "10", "11"].includes(
+    ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12"].includes(
       brief.strategyVersion || "",
     ) &&
     (!overviewSchema.safeParse(brief.overview).success ||

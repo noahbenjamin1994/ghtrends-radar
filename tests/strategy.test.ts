@@ -219,7 +219,7 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     assert.ok(visibleStrategy(b, "zh"));
     assert.equal(visibleOpportunities(b)?.opportunities.length, 3);
     assert.ok(visibleStrategy({ ...b, strategyVersion: "1" }, "zh"));
-    for (const version of ["5", "6", "7", "8", "9", "10", "11"]) {
+    for (const version of ["5", "6", "7", "8", "9", "10", "11", "12"]) {
       assert.ok(visibleStrategy({ ...b, strategyVersion: version }, "zh"));
       assert.equal(
         visibleOpportunities({ ...b, strategyVersion: version })?.opportunities
@@ -808,6 +808,50 @@ test("a shared competitor can inform two directions; citations keep only supplie
   );
 });
 
+test("reference-style Markdown labels recover their original span and unique same-repository identity", () => {
+  const excerpt =
+    "[ReproZip][web] is a tool aimed at simplifying reproducible experiments from command-line executions.";
+  const quote =
+    "ReproZip is a tool aimed at simplifying reproducible experiments from command-line executions.";
+  assert.equal(recoverSourceQuote(quote, excerpt, true), excerpt);
+  assert.equal(
+    recoverSourceQuote(
+      quote.replace("simplifying", "automating"),
+      excerpt,
+      true,
+    ),
+    undefined,
+  );
+  assert.equal(
+    recoverSourceQuote(quote, excerpt + " " + excerpt, true),
+    undefined,
+  );
+  const data = sample();
+  data.opportunities[0]!.basedOn = [{ id: "VIDA-NYU/reprozip", quote }];
+  const source: ResearchSource = {
+    id: "R4",
+    kind: "project",
+    label: "ReproZip README",
+    url: "https://github.com/VIDA-NYU/reprozip/blob/master/README.md",
+    excerpt,
+  };
+  const fixed = groundOpportunityRatings(data, [
+    ...documents,
+    source,
+  ]) as StrategyResponse;
+  assert.deepEqual(fixed.opportunities[0]!.basedOn, [
+    { id: "R4", quote: excerpt },
+  ]);
+  const other = groundOpportunityRatings(data, [
+    ...documents,
+    { ...source, url: "https://github.com/other/project" },
+  ]) as StrategyResponse;
+  assert.deepEqual(
+    other.opportunities[0]!.basedOn,
+    data.opportunities[0]!.basedOn,
+  );
+});
+
 test("new reports require an overall answer and a readable customer need and offer; old reports remain readable", async () =>
   fixture(async (r) => {
     const missingOverview: any = sample();
@@ -830,7 +874,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "11");
+    assert.equal(brief.strategyVersion, "12");
     const legacy = {
       ...brief,
       strategyVersion: "2",
