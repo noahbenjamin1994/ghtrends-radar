@@ -28,7 +28,9 @@ const copy = z.object({
   delivery: prose,
   upkeep: prose,
   wedge: prose,
-  experiment: prose,
+  experiment: z.string().trim().min(8).max(700),
+  successSignal: z.string().trim().min(8).max(240).optional(),
+  pivotSignal: z.string().trim().min(8).max(240).optional(),
 });
 export const opportunitySchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]{1,40}$/),
@@ -93,8 +95,33 @@ export function proseRepairs(
   const directionIds = (data.opportunities || [])
     .map((o: any) => o.id)
     .filter((id: unknown) => typeof id === "string" && id.includes("-"));
+  const sharedPilot =
+    data.experimentPlan?.directionId === data.recommendedId &&
+    ["en", "zh"].every((lang) =>
+      [
+        "participants",
+        "task",
+        "timebox",
+        "measurement",
+        "continueIf",
+        "redirectIf",
+      ].every((key) => typeof data.experimentPlan?.[lang]?.[key] === "string"),
+    );
+  const selectedIndex = data.opportunities?.findIndex(
+    (o: any) => o.id === data.recommendedId,
+  );
   const visit = (node: unknown, path: string) => {
     if (typeof node === "string") {
+      if (
+        sharedPilot &&
+        (/^(?:en|zh)\.strategy\.(?:experiment|successSignal|pivotSignal)$/.test(
+          path,
+        ) ||
+          new RegExp(
+            `^opportunities\\.${selectedIndex}\\.(?:en|zh)\\.(?:experiment|successSignal|pivotSignal)$`,
+          ).test(path))
+      )
+        return;
       if (
         all ||
         proseLanguageMismatch(
@@ -113,6 +140,7 @@ export function proseRepairs(
     }
   };
   for (const lang of ["en", "zh"]) {
+    visit(data.experimentPlan?.[lang], `experimentPlan.${lang}`);
     visit(data[lang], lang);
     visit(data.overview?.[lang], `overview.${lang}`);
     visit(data.landscape?.[lang], `landscape.${lang}`);
@@ -506,13 +534,26 @@ export function visibleOpportunities(
       "12",
       "13",
       "14",
+      "15",
     ].includes(brief.strategyVersion || "")
   )
     return;
   if (
-    ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"].includes(
-      brief.strategyVersion || "",
-    ) &&
+    [
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+    ].includes(brief.strategyVersion || "") &&
     (!overviewSchema.safeParse(brief.overview).success ||
       !z
         .array(clearOpportunitySchema)
@@ -590,6 +631,22 @@ export function opportunityRows(o: Opportunity, lang: "en" | "zh") {
     [lang === "zh" ? "持续成本" : "Ongoing cost", p.upkeep],
     [lang === "zh" ? "切入点与采用理由" : "Entry point & adoption", p.wedge],
     [lang === "zh" ? "验证方法" : "Validation", p.experiment],
+    ...(p.successSignal
+      ? [
+          [
+            lang === "zh" ? "建议继续条件" : "Proposed continue criteria",
+            p.successSignal,
+          ],
+        ]
+      : []),
+    ...(p.pivotSignal
+      ? [
+          [
+            lang === "zh" ? "建议调整条件" : "Proposed redirect criteria",
+            p.pivotSignal,
+          ],
+        ]
+      : []),
   ].map(([label, text]) => ({ label: label!, text: text! }));
 }
 

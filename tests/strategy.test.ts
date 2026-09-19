@@ -19,6 +19,7 @@ import {
   strategyProblems,
   strategySources,
   visibleStrategy,
+  syncExperimentPlan,
   type StrategyResponse,
 } from "../src/core/strategy.js";
 import { reportIssueSignals } from "../src/core/gaps.js";
@@ -38,7 +39,7 @@ const documents: ResearchSource[] = [
       "Project: team/editor. Export preserves document text and discards review comments.",
   },
 ];
-const sample = (): StrategyResponse => ({
+const baseSample = (): StrategyResponse => ({
   checks: ["markdown comment anchors"],
   recommendedId: "review-anchors",
   overview: {
@@ -181,6 +182,31 @@ const sample = (): StrategyResponse => ({
     },
   ],
 });
+function sample(): StrategyResponse {
+  const value = baseSample();
+  value.experimentPlan = {
+    directionId: value.recommendedId,
+    en: {
+      participants:
+        "Seek consent from five documentation reviewers using redacted fixtures.",
+      task: "Have each reviewer relocate comments after a document split.",
+      timebox: "Run one ten-minute task per reviewer during a one-week pilot.",
+      measurement:
+        "Measure correctly relocated anchors against the current manual workflow.",
+      continueIf: value.en.strategy.successSignal,
+      redirectIf: value.en.strategy.pivotSignal,
+    },
+    zh: {
+      participants: "邀请五位文档评审者，在征得同意后使用脱敏样例。",
+      task: "请每位评审者完成文件拆分后的评论重新定位任务。",
+      timebox: "试验为期一周，每位评审者完成一次十分钟任务。",
+      measurement: "记录正确定位的评论锚点，并与当前手动流程对比。",
+      continueIf: value.zh.strategy.successSignal,
+      redirectIf: value.zh.strategy.pivotSignal,
+    },
+  };
+  return syncExperimentPlan(value);
+}
 async function fixture(run: (r: Research, s: Store) => Promise<void>) {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-strategy-"));
   const s = new Store(dir);
@@ -231,6 +257,7 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
       "12",
       "13",
       "14",
+      "15",
     ]) {
       assert.ok(visibleStrategy({ ...b, strategyVersion: version }, "zh"));
       assert.equal(
@@ -478,15 +505,144 @@ test("existing implementations reach the critic; corrective editing preserves th
     assert.match(result.en.strategy!.angle, /existing review tool/);
     assert.ok(result.sources.some((s) => s.id === "A1R"));
     const words = sample();
-    words.en.strategy.successSignal =
+    words.experimentPlan!.en.continueIf =
       "Proposed continue threshold: three of four teams retain their review anchors.";
-    words.zh.strategy.successSignal =
+    words.experimentPlan!.zh.continueIf =
       "建议继续门槛：四个团队中有三个保留评审意见。";
     assert.deepEqual(
-      strategyProblems(words, strategySources(seed, documents), seed),
+      strategyProblems(
+        syncExperimentPlan(words),
+        strategySources(seed, documents),
+        seed,
+      ),
       [],
     );
   }));
+
+test("one pilot drives both languages' strategy and selected direction while unrelated directions stay intact", () => {
+  const original = sample();
+  const value = structuredClone(original);
+  value.zh.strategy.successSignal = "建议四周内完成十五次安装后继续。";
+  value.opportunities[0]!.en.experiment =
+    "Use a different cohort of twenty people for four months.";
+  assert.ok(
+    strategyProblems(value, documents, seed).some((x) =>
+      x.startsWith("Experiment plan:"),
+    ),
+  );
+  const synced = syncExperimentPlan(value);
+  assert.deepEqual(synced, original);
+  assert.notDeepEqual(value, original);
+  const fields = proseRepairs(synced, true).map((x) => x.path);
+  assert.ok(fields.includes("experimentPlan.en.continueIf"));
+  assert.ok(fields.includes("experimentPlan.zh.timebox"));
+  assert.ok(!fields.includes("en.strategy.successSignal"));
+  assert.ok(!fields.includes("opportunities.0.zh.experiment"));
+  assert.ok(fields.includes("opportunities.1.zh.experiment"));
+  const wrong = structuredClone(synced);
+  wrong.experimentPlan!.directionId = "other-direction";
+  assert.ok(
+    strategyProblems(wrong, documents, seed).some((x) =>
+      x.includes("bind the pilot"),
+    ),
+  );
+  assert.deepEqual(syncExperimentPlan(wrong), wrong);
+  assert.ok(
+    strategyProblems(baseSample(), documents, seed, true).some((x) =>
+      x.includes("shared bilingual pilot"),
+    ),
+  );
+  assert.deepEqual(strategyProblems(baseSample(), documents, seed), []);
+});
+
+test("semantic corrections change the shared pilot once and protect its derived copies", async () =>
+  fixture(async (r) => {
+    const value = sample();
+    const en =
+      "Proposed continue criterion: at least four of five reviewers retain 90% of anchors within ten minutes.";
+    const zh =
+      "建议继续条件：五位评审者中至少四位在十分钟内保留 90% 的评论锚点。";
+    r.json = async (_prompt, input: any) => {
+      assert.ok(input.editablePaths.includes("experimentPlan.en.continueIf"));
+      assert.ok(!input.editablePaths.includes("en.strategy.successSignal"));
+      return {
+        edits: [
+          { path: "experimentPlan.en.continueIf", value: en },
+          { path: "experimentPlan.zh.continueIf", value: zh },
+          {
+            path: "en.strategy.successSignal",
+            value: "Require thirty paid customers within one month.",
+          },
+          {
+            path: "opportunities.0.zh.pivotSignal",
+            value: "改为要求十个人完成二十次安装。",
+          },
+        ],
+      };
+    };
+    const after = await (r as any).reviewStrategyMeaning(value, {
+      input: "Documentation",
+      sources: documents,
+    });
+    assert.equal(after.en.strategy.successSignal, en);
+    assert.equal(after.opportunities[0].en.successSignal, en);
+    assert.equal(after.zh.strategy.successSignal, zh);
+    assert.equal(after.opportunities[0].zh.successSignal, zh);
+    assert.equal(
+      after.opportunities[0].zh.pivotSignal,
+      value.experimentPlan!.zh.redirectIf,
+    );
+    assert.deepEqual(after.evidence, value.evidence);
+    assert.deepEqual(after.opportunities[1], value.opportunities[1]);
+    assert.deepEqual(strategyProblems(after, documents, seed, true), []);
+  }));
+
+test("shared pilot survives persisted JSON and bilingual document exports; legacy reports remain readable", () => {
+  const value = sample();
+  const m = structuredClone(seed);
+  m.brief = {
+    ...value,
+    sources: documents,
+    strategyVersion: "15",
+    model: "fixture",
+    generatedAt: m.asOf,
+    en: { ...value.en, nextSteps: [] },
+    zh: { ...value.zh, nextSteps: [] },
+  };
+  const saved = JSON.parse(JSON.stringify(m));
+  for (const lang of ["en", "zh"] as const) {
+    const plan = value.experimentPlan![lang];
+    const markdown = marketMarkdown(saved, undefined, lang);
+    const html = renderDocument(
+      '<html><head></head><body><div id="root"></div></body></html>',
+      {
+        base: "https://ghtrends.dev/radar",
+        path: "/report/" + saved.id,
+        geo: "US",
+        market: saved,
+        markets: [],
+        status: 200,
+        locale: lang,
+      },
+    );
+    for (const text of [plan.continueIf, plan.redirectIf]) {
+      assert.equal(markdown.split(text).length - 1, 2);
+      assert.equal(html.split(text).length - 1, 2);
+    }
+  }
+  const old = {
+    ...m.brief,
+    strategyVersion: "14",
+    experimentPlan: undefined,
+    opportunities: m.brief.opportunities!.map((o) => ({
+      ...o,
+      en: { ...o.en, successSignal: undefined, pivotSignal: undefined },
+      zh: { ...o.zh, successSignal: undefined, pivotSignal: undefined },
+    })),
+  };
+  assert.equal(visibleOpportunities(old)?.opportunities.length, 3);
+  assert.ok(visibleStrategy(old, "zh"));
+});
 
 test("idea checks reject query operators and bound searches and current document reads", async () =>
   fixture(async (_r, store) => {
@@ -886,7 +1042,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "14");
+    assert.equal(brief.strategyVersion, "15");
     const legacy = {
       ...brief,
       strategyVersion: "2",

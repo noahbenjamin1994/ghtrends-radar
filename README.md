@@ -221,6 +221,8 @@ Section format or output-budget errors get one bounded direct-generation recover
 
 Authored prose is checked for clear English/Chinese language swaps and repaired with its paired meaning; source quotes retain their original language. Request interpretations preserve the author’s stated workaround and treat vendor code, permissions and device access as prerequisites for proposed contributions.
 
+The recommended direction has one shared pilot definition: recruitment, task, time window, measurement and proposed continue/redirect criteria. The report summary, direction card and exports derive their experiment text from that definition. Review edits apply to the shared fields; source quotations and other directions stay independent.
+
 `GHTRENDS_RESEARCH_THINKING=low` is the default: light thinking for the research blueprint, request interpretation and independent evidence review; direct generation for report writing. Copy editing starts in direct mode; repeatedly failing fields receive one bounded low-effort repair. Set `off` for direct generation throughout when comparing cost and quality on your own topics. Repeated citation metadata and translated context are omitted from model inputs; stored source evidence stays complete. Admin shows the active policy and reasoning tokens as a component of total output, with older missing breakdowns marked pending.
 
 **Access and research credits**

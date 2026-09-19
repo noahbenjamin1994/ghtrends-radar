@@ -317,6 +317,18 @@ export function OpportunityMap({
           <div>
             <h5>{l("A test worth running", "怎样验证值得投入")}</h5>
             <p>{p.experiment}</p>
+            {p.successSignal && (
+              <>
+                <h5>{l("Proposed continue criteria", "建议继续条件")}</h5>
+                <p>{p.successSignal}</p>
+              </>
+            )}
+            {p.pivotSignal && (
+              <>
+                <h5>{l("Proposed redirect criteria", "建议调整条件")}</h5>
+                <p>{p.pivotSignal}</p>
+              </>
+            )}
           </div>
         </div>
         <div className="strategy-sources">

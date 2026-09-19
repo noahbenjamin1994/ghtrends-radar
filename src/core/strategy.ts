@@ -21,7 +21,47 @@ import {
 } from "./i18n.js";
 import type { Brief, Market, ResearchSource, Strategy } from "./types.js";
 
-export const STRATEGY_VERSION = "14";
+export const STRATEGY_VERSION = "15";
+const experimentCopy = z.object({
+  participants: z.string().trim().min(8).max(140),
+  task: z.string().trim().min(8).max(140),
+  timebox: z.string().trim().min(8).max(100),
+  measurement: z.string().trim().min(8).max(140),
+  continueIf: z.string().trim().min(8).max(240),
+  redirectIf: z.string().trim().min(8).max(240),
+});
+export const experimentPlanSchema = z.object({
+  directionId: z.string().min(2).max(41),
+  en: experimentCopy,
+  zh: experimentCopy,
+});
+export type ExperimentPlan = z.infer<typeof experimentPlanSchema>;
+
+/** One authored pilot supplies the summary, direction and exports. */
+export function syncExperimentPlan(raw: any) {
+  const parsed = experimentPlanSchema.safeParse(raw?.experimentPlan);
+  if (!parsed.success || parsed.data.directionId !== raw?.recommendedId)
+    return raw;
+  const selected = raw.opportunities?.find(
+    (o: any) => o.id === raw.recommendedId,
+  );
+  if (!selected) return raw;
+  const value = structuredClone(raw);
+  const direction = value.opportunities.find(
+    (o: any) => o.id === value.recommendedId,
+  );
+  for (const lang of ["en", "zh"] as const) {
+    const p = parsed.data[lang];
+    const fields = {
+      experiment: [p.participants, p.task, p.timebox, p.measurement].join(" "),
+      successSignal: p.continueIf,
+      pivotSignal: p.redirectIf,
+    };
+    if (value[lang]?.strategy) Object.assign(value[lang].strategy, fields);
+    if (direction[lang]) Object.assign(direction[lang], fields);
+  }
+  return value;
+}
 const detail = z.string().trim().min(12).max(700);
 export const strategySchema = z.object({
   angle: z.string().trim().min(4).max(200),
@@ -50,6 +90,7 @@ export const ideaQueries = z
   )
   .max(2);
 export const strategyResponse = opportunityMapSchema.extend({
+  experimentPlan: experimentPlanSchema.optional(),
   overview: overviewSchema,
   landscape: landscapeSchema.optional(),
   issueInsights: z.array(issueInsightSchema).max(6).optional(),
@@ -72,6 +113,7 @@ export function strategyProblems(
   raw: unknown,
   sources: ResearchSource[],
   m: Market,
+  requireExperimentPlan = false,
 ): string[] {
   const parsed = strategyResponse.safeParse(raw);
   if (!parsed.success)
@@ -86,6 +128,34 @@ export function strategyProblems(
       ...opportunityProblems(data, sources),
       ...landscapeProblems(data, sources),
     ];
+  if (requireExperimentPlan && !data.experimentPlan)
+    problems.push(
+      "Experiment plan: provide one shared bilingual pilot for the recommended direction.",
+    );
+  if (data.experimentPlan) {
+    const synced = syncExperimentPlan(data);
+    const selected = data.opportunities.find(
+      (o) => o.id === data.recommendedId,
+    );
+    if (data.experimentPlan.directionId !== data.recommendedId || !selected)
+      problems.push(
+        "Experiment plan: bind the pilot to the recommended direction.",
+      );
+    else
+      for (const lang of ["en", "zh"] as const)
+        for (const key of [
+          "experiment",
+          "successSignal",
+          "pivotSignal",
+        ] as const)
+          if (
+            data[lang].strategy[key] !== synced[lang].strategy[key] ||
+            selected[lang][key] !== synced[lang].strategy[key]
+          )
+            problems.push(
+              `Experiment plan: ${lang}.${key} must use the shared pilot definition.`,
+            );
+  }
   for (const field of proseRepairs(data, true)) {
     const language = field.path.split(".").includes("zh") ? "zh" : "en";
     if (proseLanguageMismatch(field.value, language))
@@ -247,6 +317,7 @@ export function visibleStrategy(
       "11",
       "12",
       "13",
+      "14",
       STRATEGY_VERSION,
     ].includes(brief.strategyVersion)
   )
@@ -309,6 +380,9 @@ export const RESEARCH_SCOPE_RULES = `Evidence scope and execution conditions:
 - Skills, permissions, devices, recruitment channels and pilot participants are REQUIRED resources unless the user explicitly supplied them. Describe how to seek access or use public/synthetic fixtures. Use conditional prototype and maintenance estimates; customer commitments and paid pilots are proposed outcomes.
 - The selected direction and root strategy describe ONE experiment: retain its task, cohort, time window, metrics and numerical comparison operators. Translation and summarization preserve these conditions. Additional adoption evidence is a separate later test.`;
 
+export const EXPERIMENT_PLAN_PROMPT = `
+Shared pilot: include experimentPlan {directionId: recommendedId, en: {participants, task, timebox, measurement, continueIf, redirectIf}, zh: {participants, task, timebox, measurement, continueIf, redirectIf}}. Write one short sentence per field. participants states the recruitment target and access; task states the artifact and user task; timebox states the proposed pilot window; measurement states the measured outcome and comparison baseline. Numeric decision rules appear only in continueIf/redirectIf. Preserve counts, time windows, AND/OR and comparison operators across both languages. This shared plan supplies the root strategy and selected direction experiment. Any later study is a separate proposal. Skills, permissions and recruitment remain requirements. Limits: participants/task/measurement 140 characters each, timebox 100, continueIf/redirectIf 240.`;
+
 export const STRATEGY_PROMPT =
   `You are a product opportunity researcher. First answer the original topic at its full scope, then compare distinct customer jobs and select one for deeper exploration. The user is researching opportunities to build a product or offer a service around the input. Treat earlier query intent as retrieval context; a broad phone-brand input calls for opportunity analysis around phones. Software, data products and services are valid offers. Produce JSON only with this schema:
 {"en":{"headline":"overall opportunity judgment about the original topic","summary":"two concise sentences describing the original topic and where its opportunities concentrate","strategy":{"angle":"a narrow product entry point","audience":"specific user, trigger and current workaround","mechanism":"causal explanation of the overlooked constraint or incentive","wedge":"small artifact and why this approach could earn adoption alongside existing alternatives","tradeoff":"the capability or audience deliberately deferred, and the cost of this choice","assumption":"one fragile, testable assumption holding up the recommendation","experiment":"a feasible short experiment with named participants, task, artifact and measurement","successSignal":"proposed numeric threshold for continuing","pivotSignal":"proposed numeric threshold and precise alternative direction"}},"zh":{"headline":"原词整体的机会判断","summary":"两句话概括原词的机会结构与进入条件","strategy":{"angle":"具体切入点","audience":"谁在什么时刻完成什么任务，当前如何凑合","mechanism":"解释隐藏约束、激励或因果关系","wedge":"最小交付物及相对现有替代方案的采用理由","tradeoff":"主动留给后续的能力与取舍代价","assumption":"支撑建议的关键可检验假设","experiment":"短周期实验：对象、任务、交付物、衡量方式","successSignal":"建议采用的继续投入数字门槛","pivotSignal":"建议采用的转向数字门槛与具体去向"}},"checks":["short GitHub phrase for the closest existing implementation","second short phrase for the proposed artifact"],"evidence":[{"id":"supplied source ID","quote":"short verbatim excerpt supporting the factual premise"}]}.
@@ -327,6 +401,7 @@ Keep observed trends separate from a product's possible value. Falling search at
 
 Write clear, affirmative prose in English and Simplified Chinese. Chinese excludes 不、无、未、没、并非、而非; English excludes not, no, never, cannot, without, unknown, insufficient. Frame boundaries as current scope, tradeoffs, assumptions and next actions. Source quotations retain their original wording. Chinese should read like a thoughtful product colleague: avoid “专注型…入口”, “赋能”, “闭环”, “蓝海机会巨大”. Angles <= 45 Chinese characters / 25 English words. Headlines <= 24 Chinese characters / 12 English words; summaries roughly 60-140 Chinese characters / 35-65 English words. Each strategy field is 1-2 concrete sentences, roughly 40-100 Chinese characters / 20-50 English words. Use at most six evidence references for the primary strategy. Return matching ideas in both languages.` +
   RESEARCH_SCOPE_RULES +
+  EXPERIMENT_PLAN_PROMPT +
   OPPORTUNITY_PROMPT +
   LANDSCAPE_PROMPT;
 
