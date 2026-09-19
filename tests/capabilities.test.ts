@@ -172,7 +172,7 @@ test("copyright, scoped license restrictions and legacy release observations ret
 
 test("audit repair exposes quote errors alongside length errors and confines edits to rejected fields", () => {
   const x = audit();
-  x.directions[0]!.proposedWork = "x".repeat(301);
+  x.directions[0]!.proposedWork = "x".repeat(501);
   x.directions[0]!.facts[0]!.quote = "Invented offline synchronization.";
   const issues = capabilityIssues(x, docs, ["grooming-notes"]);
   const paths = capabilityEditPaths(issues);
@@ -195,7 +195,7 @@ test("audit repair exposes quote errors alongside length errors and confines edi
     paths,
   );
   assert.deepEqual(repaired, audit());
-  assert.equal(x.directions[0]!.proposedWork.length, 301);
+  assert.equal(x.directions[0]!.proposedWork.length, 501);
   for (const path of [
     "directions.0.id",
     "directions.0.nextCheck",
@@ -218,7 +218,7 @@ test("audit repair exposes quote errors alongside length errors and confines edi
     ),
   );
   const y = audit();
-  y.directions[0]!.proposedWork = "x".repeat(301);
+  y.directions[0]!.proposedWork = "x".repeat(501);
   y.directions[0]!.facts[0]!.quote =
     "Notebook stores pet profiles, grooming notes and visit photos.";
   assert.equal(

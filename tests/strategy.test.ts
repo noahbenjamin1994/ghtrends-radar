@@ -1221,10 +1221,12 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
       })),
       recommendedId: sample().recommendedId,
     };
+    const audited = capabilitySample(blueprint.opportunities);
+    for (const direction of audited.directions)
+      direction.facts.push({ id: "R9", quote: documents[0]!.excerpt! });
     let checked = false;
     r.json = async (_system, input: any, _budget, operation, thinking) => {
-      if (operation === "capability-audit")
-        return capabilitySample(input.directions);
+      if (operation === "capability-audit") return audited;
       if (operation === "strategy") {
         assert.equal(thinking, "low");
         return blueprint;
@@ -1238,6 +1240,7 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
       assert.ok(checked);
       if (operation === "strategy-direction") {
         assert.equal(input.capabilityCheck.id, input.candidate.id);
+        assert.ok(input.sources.some((s: ResearchSource) => s.id === "R9"));
         assert.equal(
           input.capabilityCheck.facts[0].quote,
           documents[0]!.excerpt,
@@ -1255,7 +1258,10 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
     };
     const brief = await r.insights(
       seed,
-      documents,
+      [
+        ...documents,
+        { ...documents[0]!, id: "R9", directionId: "release-audit" },
+      ],
       undefined,
       undefined,
       async (directions) => {
@@ -1268,10 +1274,7 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
       },
     );
     assert.equal(brief.reviewed, true);
-    assert.deepEqual(
-      brief.capabilityAudit,
-      capabilitySample(blueprint.opportunities),
-    );
+    assert.deepEqual(brief.capabilityAudit, audited);
     assert.equal(brief.opportunities?.length, 3);
   }));
 
@@ -2208,6 +2211,8 @@ test("copy diagnostics identify positive compounds, source IDs and overlapping l
         ),
       );
       assert.equal(measured.previousAttemptReturnedSameValue, calls === 2);
+      if (calls === 2)
+        assert.match(_prompt, /Rewrite their sentence structure/);
       return {
         edits:
           calls === 1
