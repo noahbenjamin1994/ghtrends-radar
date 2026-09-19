@@ -1100,6 +1100,7 @@ test("private research API protects HTML, exports, CSRF, duplicate admission, da
   e.github.researchSources = async () => [];
   e.github.licenseSources = async () => [];
   e.github.discussionSources = async () => [];
+  e.github.issueThreadSources = async () => [];
   const app = createApp(e),
     server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -1485,9 +1486,39 @@ test("an interrupted source stage is collected again and retains collection trun
   e.github.researchSources = async () => [];
   e.github.licenseSources = async () => [];
   e.github.discussionSources = async () => [];
+  const comment = {
+    ...request,
+    documentType: "github-comment" as const,
+    url: request.url + "#issuecomment-42",
+    parentUrl: request.url,
+    request: { authorKey: "account-1", authorAssociation: "MEMBER" },
+  };
+  let threadsRead = 0;
+  e.github.issueThreadSources = async (candidates, onRead) => {
+    threadsRead++;
+    assert.ok(candidates.some((s) => s.url === request.url));
+    onRead?.({ url: comment.url, status: "read", observedAt: t.created });
+    return [
+      {
+        ...request,
+        url: request.url.replace("/example/", "/Example/"),
+        documentType: "github-issue",
+        request: { state: "open", comments: 5 },
+      },
+      comment,
+    ];
+  };
   e.documents.collect = async () => ({ version: "1", sources: [], reads: [] });
   e.research.json = async (_s, _i, _n, op) => {
     if (op === "deep-plan") throw new Error("timeout");
+    if (op === "strategy-deep-write" || op === "strategy-deep-review") {
+      const cited = (_i as any).sources.find((s: any) => s.url === comment.url);
+      assert.equal(cited.documentType, "github-comment");
+      assert.equal(cited.request.authorAssociation, "MEMBER");
+      assert.equal(cited.parentUrl, request.url);
+      const original = (_i as any).sources.find((s: any) => s.id === "E2");
+      assert.equal(original.request.comments, undefined);
+    }
     if (op === "strategy-deep-review") return { ready: true, corrections: [] };
     return brief();
   };
@@ -1499,6 +1530,15 @@ test("an interrupted source stage is collected again and retains collection trun
       true,
     );
     assert.equal(searches, 1);
+    assert.equal(threadsRead, 1);
+    const refreshed = t.evidence.sources.filter(
+      (s) => s.url.toLowerCase() === request.url,
+    );
+    assert.equal(refreshed.length, 1);
+    assert.equal(refreshed[0]!.id, "E2");
+    assert.equal(refreshed[0]!.request!.comments, 5);
+    assert.ok(t.evidence.reads.some((r) => r.url === comment.url));
+    assert.ok(t.evidence.sources.some((s) => s.url === comment.url));
     assert.equal(t.evidence.collectionFinished, true);
     const shortened = t.evidence.sources.find((s) =>
       s.url.endsWith("/long-document"),
@@ -1643,6 +1683,7 @@ test("paid research API keeps retry consent, repeated attempts, private output a
   e.github.researchSources = async () => [];
   e.github.licenseSources = async () => [];
   e.github.discussionSources = async () => [];
+  e.github.issueThreadSources = async () => [];
   const app = createApp(e, provider.client());
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");

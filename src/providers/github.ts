@@ -16,6 +16,7 @@ import type {
   RequestEvidence,
 } from "../core/types.js";
 interface GitHubIssue {
+  id?: number;
   title: string;
   html_url: string;
   body?: string;
@@ -27,6 +28,9 @@ interface GitHubIssue {
   reactions?: { total_count: number };
   comments?: number;
   user?: { id?: number; type?: string };
+  author_association?: string;
+  issue_url?: string;
+  minimized?: unknown;
   pull_request?: unknown;
 }
 
@@ -224,6 +228,18 @@ function requestEvidence(
       observedAt: date(observedAt),
       reactions: count(issue.reactions?.total_count),
       comments: count(issue.comments),
+      authorAssociation: [
+        "OWNER",
+        "MEMBER",
+        "COLLABORATOR",
+        "CONTRIBUTOR",
+        "FIRST_TIMER",
+        "FIRST_TIME_CONTRIBUTOR",
+        "MANNEQUIN",
+        "NONE",
+      ].includes(issue.author_association || "")
+        ? issue.author_association
+        : undefined,
       authorKey:
         Number.isSafeInteger(issue.user?.id) &&
         issue.user!.id! > 0 &&
@@ -716,6 +732,181 @@ export class GitHub {
       }),
     );
     return results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+  }
+  /** Read a bounded conversation around selected issues, including late replies.
+   * Account keys describe authorship only; demand and recruitment need the text. */
+  async issueThreadSources(
+    candidates: ResearchSource[],
+    onRead?: (read: DocumentRead) => void,
+  ): Promise<ResearchSource[]> {
+    const selected = [
+      ...new Map(
+        candidates
+          .filter((s) =>
+            /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/[1-9]\d*$/.test(
+              s.url,
+            ),
+          )
+          .map((s) => [s.url.toLowerCase(), s]),
+      ).values(),
+    ].slice(0, 2);
+    const threads = await Promise.all(
+      selected.map(async (source, index) => {
+        const out: ResearchSource[] = [];
+        try {
+          const parts = new URL(source.url).pathname.split("/"),
+            name = validateRepo(`${parts[1]}/${parts[2]}`),
+            number = Number(parts[4]);
+          if (!Number.isSafeInteger(number) || number > 2147483647) return out;
+          const repo = await this.get<{ private: boolean }>(
+            `/repos/${name}`,
+            3600000,
+          );
+          if (repo.private !== false)
+            throw new ProviderError("Public issue access required.", 403);
+          const path = `/repos/${name}/issues/${number}`,
+            issue = await this.get<GitHubIssue>(path, 3600000);
+          if (
+            issue.pull_request ||
+            issue.html_url?.toLowerCase() !== source.url.toLowerCase() ||
+            typeof issue.body !== "string"
+          )
+            throw new Error("issue_source");
+          const fetchedAt = this.observedAt(path),
+            body = cleanResearchMarkdown(
+              `${issue.title}\n${issue.body}`,
+              300000,
+            ),
+            parent: ResearchSource = {
+              id: `GT${index + 1}`,
+              kind: "request",
+              documentType: "github-issue",
+              label: issue.title.slice(0, 180),
+              url: issue.html_url,
+              fetchedAt,
+              publishedAt: issue.created_at,
+              request: requestEvidence(issue, fetchedAt),
+              excerpt: body.slice(0, 4000),
+              excerptTruncated: body.length > 4000,
+            };
+          out.push(parent);
+          onRead?.({
+            url: parent.url,
+            status: "read",
+            observedAt: fetchedAt || stamp(),
+          });
+          const count = parent.request!.comments,
+            pages =
+              count === 0
+                ? []
+                : count && count > 30
+                  ? [1, Math.ceil(count / 30)]
+                  : [1];
+          const results = await Promise.allSettled(
+            pages.map(async (page) => {
+              const commentsPath = `${path}/comments?per_page=30&page=${page}`;
+              try {
+                const rows = await this.get<GitHubIssue[]>(
+                  commentsPath,
+                  3600000,
+                );
+                if (!Array.isArray(rows) || rows.length > 30)
+                  throw new Error("issue_comments_format");
+                onRead?.({
+                  url: `https://api.github.com${commentsPath}`,
+                  status: "read",
+                  observedAt: this.observedAt(commentsPath) || stamp(),
+                });
+                return {
+                  page,
+                  rows,
+                  observedAt: this.observedAt(commentsPath),
+                };
+              } catch (error) {
+                onRead?.({
+                  url: `https://api.github.com${commentsPath}`,
+                  status:
+                    error instanceof ProviderError ? "access" : "unavailable",
+                  observedAt: stamp(),
+                });
+                throw error;
+              }
+            }),
+          );
+          const successful = results.flatMap((r) =>
+            r.status === "fulfilled" ? [r.value] : [],
+          );
+          const comments = [
+            ...new Map(
+              successful.flatMap(({ rows, observedAt }) =>
+                rows.flatMap((c) => {
+                  if (
+                    !Number.isSafeInteger(c.id) ||
+                    c.id! <= 0 ||
+                    c.user?.type !== "User" ||
+                    !Number.isSafeInteger(c.user.id) ||
+                    c.user.id! <= 0 ||
+                    c.minimized ||
+                    typeof c.body !== "string" ||
+                    c.body.trim().length < 8 ||
+                    c.html_url?.toLowerCase() !==
+                      `${parent.url}#issuecomment-${c.id}`.toLowerCase() ||
+                    c.issue_url?.toLowerCase() !==
+                      `https://api.github.com${path}`.toLowerCase()
+                  )
+                    return [];
+                  const text = cleanResearchMarkdown(c.body, 300000);
+                  return [
+                    [
+                      c.id!,
+                      {
+                        id: `GT${index + 1}C${c.id}`,
+                        kind: "request",
+                        documentType: "github-comment",
+                        label: `${issue.title.slice(0, 140)} · Comment`,
+                        url: c.html_url,
+                        parentUrl: parent.url,
+                        fetchedAt: observedAt,
+                        publishedAt: c.created_at,
+                        request: requestEvidence(c, observedAt),
+                        excerpt: text.slice(0, 1800),
+                        excerptTruncated: text.length > 1800,
+                      } as ResearchSource,
+                    ] as const,
+                  ];
+                }),
+              ),
+            ).values(),
+          ];
+          // One early comment retains context; two later ones capture developments.
+          const included = [
+            ...new Map(
+              [...comments.slice(0, 1), ...comments.slice(-2)].map((s) => [
+                s.url,
+                s,
+              ]),
+            ).values(),
+          ];
+          parent.request!.commentSample = {
+            pages: successful.map((p) => p.page),
+            pageSize: 30,
+            readComments: successful.reduce((n, p) => n + p.rows.length, 0),
+            includedComments: included.length,
+            distinctAccounts: new Set(included.map((s) => s.request!.authorKey))
+              .size,
+          };
+          return [...out, ...included];
+        } catch (error) {
+          onRead?.({
+            url: source.url,
+            status: error instanceof ProviderError ? "access" : "unavailable",
+            observedAt: stamp(),
+          });
+          return out;
+        }
+      }),
+    );
+    return threads.flat();
   }
   async discussionSources(
     candidates: ResearchSource[],

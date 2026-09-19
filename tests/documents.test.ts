@@ -23,6 +23,8 @@ import {
   reportIssueSignals,
   requestAction,
   requestStatus,
+  requestUrl,
+  mergeRequestEvidence,
 } from "../src/core/gaps.js";
 import { modelSources } from "../src/providers/research.js";
 import { Research } from "../src/providers/research.js";
@@ -790,3 +792,220 @@ test("Markdown cleaning preserves shell redirects, typed code and following inte
   assert.ok(!cleaned.includes("<div>"));
   assert.ok(!cleaned.includes("internal note"));
 });
+
+const threadUrl = "https://github.com/team/editor/issues/1";
+const threadIssue = {
+  title: "Keep comments during export",
+  html_url: threadUrl,
+  body: "Our editors copy review comments to a separate file every week.",
+  state: "open",
+  comments: 5,
+  user: { id: 10, type: "User" },
+  author_association: "NONE",
+  created_at: "2026-09-01T00:00:00Z",
+};
+const threadComment = (id: number, account = 10) => ({
+  id,
+  html_url: `${threadUrl}#issuecomment-${id}`,
+  issue_url: "https://api.github.com/repos/team/editor/issues/1",
+  body: `Comment ${id}: our editors need the original annotation in their exports.`,
+  user: { id: account, type: "User", login: "private-to-source-metadata" },
+  author_association: account === 10 ? "NONE" : "MEMBER",
+  created_at: "2026-09-02T00:00:00Z",
+  updated_at: "2026-09-03T00:00:00Z",
+});
+
+test("issue threads preserve comment identity, account deduplication and cached observation dates", async () =>
+  fixture(async (store) => {
+    const gh = new GitHub(store),
+      date = "2026-09-18T20:00:00.000Z";
+    const data = {
+      "/repos/team/editor": { private: false },
+      "/repos/team/editor/issues/1": threadIssue,
+      "/repos/team/editor/issues/1/comments?per_page=30&page=1": [
+        threadComment(1),
+        threadComment(2),
+        threadComment(3, 20),
+        threadComment(4, 20),
+        threadComment(5, 20),
+      ],
+    };
+    for (const [path, value] of Object.entries(data)) {
+      store.set("github:" + path, value, 60000);
+      store.set("github-observed:" + path, date, 60000);
+    }
+    const result = await gh.issueThreadSources([
+      { label: "Lead", url: threadUrl },
+    ]);
+    assert.equal(result.length, 4);
+    const [parent, first, ...later] = result;
+    assert.equal(parent!.request!.comments, 5);
+    assert.deepEqual(parent!.request!.commentSample, {
+      pages: [1],
+      pageSize: 30,
+      readComments: 5,
+      includedComments: 3,
+      distinctAccounts: 2,
+    });
+    assert.equal(parent!.request!.authorKey, first!.request!.authorKey);
+    assert.equal(later[0]!.request!.authorKey, later[1]!.request!.authorKey);
+    assert.notEqual(first!.request!.authorKey, later[0]!.request!.authorKey);
+    assert.equal(later[0]!.request!.authorAssociation, "MEMBER");
+    assert.equal(first!.fetchedAt, date);
+    assert.equal(first!.parentUrl, threadUrl);
+    assert.equal(first!.excerpt, threadComment(1).body);
+    assert.equal(
+      JSON.stringify(result).includes("private-to-source-metadata"),
+      false,
+    );
+    assert.equal(
+      modelSources(result)[0]!.request!.commentSample!.distinctAccounts,
+      2,
+    );
+    assert.equal(requestUrl(first!.url), first!.url);
+    assert.notEqual(requestUrl(parent!.url), requestUrl(first!.url));
+    assert.equal(
+      mergeRequestEvidence(
+        [{ url: threadUrl, state: "open" } as any],
+        [{ ...first!, request: { state: "closed" } }],
+      )[0]!.state,
+      "open",
+    );
+  }));
+
+test("issue thread samples exclude bots, minimized, missing authors and foreign comment links", async () =>
+  fixture(async (store) => {
+    const gh = new GitHub(store);
+    gh.get = async <T>(path: string): Promise<T> => {
+      if (path === "/repos/team/editor") return { private: false } as T;
+      if (path === "/repos/team/editor/issues/1") return threadIssue as T;
+      return [
+        threadComment(1),
+        { ...threadComment(2), user: { id: 30, type: "Bot" } },
+        { ...threadComment(3), user: null },
+        { ...threadComment(4), minimized: { reason: "spam" } },
+        { ...threadComment(5), html_url: "https://example.com/comment" },
+        {
+          ...threadComment(6),
+          issue_url: "https://api.github.com/repos/other/tool/issues/1",
+        },
+        { ...threadComment(7), body: "" },
+        { ...threadComment(8), user: { type: "User" } },
+      ] as T;
+    };
+    const result = await gh.issueThreadSources([
+      { label: "Lead", url: threadUrl },
+    ]);
+    assert.equal(result.length, 2);
+    assert.equal(result[1]!.url, threadUrl + "#issuecomment-1");
+    assert.deepEqual(result[0]!.request!.commentSample, {
+      pages: [1],
+      pageSize: 30,
+      readComments: 8,
+      includedComments: 1,
+      distinctAccounts: 1,
+    });
+  }));
+
+test("long issue threads read two bounded pages and retain late replies", async () =>
+  fixture(async (store) => {
+    const gh = new GitHub(store),
+      calls: string[] = [];
+    gh.get = async <T>(path: string): Promise<T> => {
+      calls.push(path);
+      if (path === "/repos/team/editor") return { private: false } as T;
+      if (path === "/repos/team/editor/issues/1")
+        return { ...threadIssue, comments: 95 } as T;
+      if (path.endsWith("page=1"))
+        return Array.from({ length: 30 }, (_, i) =>
+          threadComment(i + 1, i + 10),
+        ) as T;
+      if (path.endsWith("page=4"))
+        return Array.from({ length: 5 }, (_, i) =>
+          threadComment(i + 91, i + 100),
+        ) as T;
+      throw Error("unexpected page");
+    };
+    const result = await gh.issueThreadSources([
+      { label: "Lead", url: threadUrl },
+    ]);
+    assert.equal(calls.length, 4);
+    assert.deepEqual(
+      result.slice(1).map((s) => s.url),
+      [1, 94, 95].map((id) => threadUrl + "#issuecomment-" + id),
+    );
+    assert.deepEqual(result[0]!.request!.commentSample, {
+      pages: [1, 4],
+      pageSize: 30,
+      readComments: 35,
+      includedComments: 3,
+      distinctAccounts: 3,
+    });
+  }));
+
+test("thread access and read failures preserve independent source successes", async () =>
+  fixture(async (store) => {
+    const gh = new GitHub(store),
+      calls: string[] = [],
+      reads: any[] = [];
+    gh.get = async <T>(path: string): Promise<T> => {
+      calls.push(path);
+      if (path === "/repos/team/editor") return { private: false } as T;
+      if (path === "/repos/secret/tool") return { private: true } as T;
+      if (path === "/repos/team/editor/issues/1")
+        return { ...threadIssue, comments: 35 } as T;
+      if (path.endsWith("page=1")) return [threadComment(1)] as T;
+      throw Error("page unavailable");
+    };
+    const result = await gh.issueThreadSources(
+      [
+        {
+          label: "invalid",
+          url: "https://github.com.evil.test/team/editor/issues/1",
+        },
+        { label: "private", url: "https://github.com/secret/tool/issues/1" },
+        { label: "lead", url: threadUrl },
+        { label: "duplicate", url: threadUrl.toLowerCase() },
+        { label: "budget", url: "https://github.com/third/tool/issues/2" },
+      ],
+      (read) => reads.push(read),
+    );
+    assert.equal(result.length, 2);
+    assert.deepEqual(result[0]!.request!.commentSample!.pages, [1]);
+    assert.equal(
+      calls.some((p) => p.includes("secret/tool/issues")),
+      false,
+    );
+    assert.equal(
+      calls.some((p) => p.includes("third/tool")),
+      false,
+    );
+    assert.ok(reads.some((r) => r.status === "access"));
+    assert.ok(reads.some((r) => r.status === "unavailable"));
+    assert.ok(reads.some((r) => r.status === "read"));
+  }));
+
+test("pull requests and mismatched issue responses stay out of demand threads", async () =>
+  fixture(async (store) => {
+    const gh = new GitHub(store);
+    for (const issue of [
+      { ...threadIssue, pull_request: {} },
+      { ...threadIssue, html_url: "https://github.com/other/tool/issues/1" },
+    ]) {
+      const calls: string[] = [];
+      gh.get = async <T>(path: string): Promise<T> => {
+        calls.push(path);
+        return (
+          path === "/repos/team/editor" ? { private: false } : issue
+        ) as T;
+      };
+      assert.deepEqual(
+        await gh.issueThreadSources([{ label: "lead", url: threadUrl }]),
+        [],
+      );
+      assert.equal(
+        calls.some((p) => p.includes("/comments")),
+        false,
+      );
+    }
+  }));

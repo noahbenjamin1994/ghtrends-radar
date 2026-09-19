@@ -117,7 +117,13 @@ export function requestUrl(value: string) {
   try {
     const url = new URL(value);
     if (url.origin === "https://github.com")
-      return url.origin + url.pathname.replace(/\/$/, "").toLowerCase();
+      return (
+        url.origin +
+        url.pathname.replace(/\/$/, "").toLowerCase() +
+        (/^#(?:issuecomment|discussioncomment)-[1-9]\d*$/.test(url.hash)
+          ? url.hash
+          : "")
+      );
   } catch {
     /* Historic evidence retains its original URL. */
   }

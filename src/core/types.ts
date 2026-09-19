@@ -71,6 +71,8 @@ export interface ResearchSource {
     | "hn-story"
     | "hn-comment"
     | "github-discussion"
+    | "github-issue"
+    | "github-comment"
     | "github-readme"
     | "github-release";
   publishedAt?: string;
@@ -97,6 +99,14 @@ export interface RequestEvidence {
   reactions?: number;
   comments?: number;
   authorKey?: string;
+  authorAssociation?: string;
+  commentSample?: {
+    pages: number[];
+    pageSize: number;
+    readComments: number;
+    includedComments: number;
+    distinctAccounts: number;
+  };
 }
 export interface InterestPoint {
   date: string;
