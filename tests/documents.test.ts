@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { Readable } from "node:stream";
+import { gzipSync, brotliCompressSync, deflateSync } from "node:zlib";
 import {
   DocumentReader,
   publicAddress,
   publicAddresses,
   publicRequest,
   pageText,
+  documentBody,
   type PageResponse,
   type DocumentTransport,
 } from "../src/providers/documents.js";
@@ -125,7 +128,7 @@ test("pages obey robots, retain exact billing conditions, cache privately neutra
     const requests: string[] = [];
     const transport: DocumentTransport = async (url, _signal, max) => {
       requests.push(url.href);
-      assert.ok(max <= 800000);
+      assert.ok(max <= 2000000);
       return url.pathname === "/robots.txt"
         ? response("User-agent: *\nDisallow: /private\nAllow: /pricing", 200, {
             "content-type": "text/plain",
@@ -527,3 +530,300 @@ test("community readings keep real source links and dates while excluding promot
   m.brief.issueInsights![1]!.relevance = "adjacent";
   assert.equal(reportIssueSignals(m).length, 0);
 });
+
+test("compressed pages preserve exact UTF-8 content and measure wire bytes", async () => {
+  const text = html + "中文条件与原始说明。".repeat(100);
+  const plain = Buffer.from(text);
+  for (const [encoding, body] of [
+    ["", plain],
+    ["identity", plain],
+    ["gzip", gzipSync(plain)],
+    ["br", brotliCompressSync(plain)],
+    ["deflate", deflateSync(plain)],
+  ] as const) {
+    const result = await documentBody(
+      Readable.from([body.subarray(0, 11), body.subarray(11)]),
+      encoding,
+      plain.length,
+      new AbortController().signal,
+    );
+    assert.equal(result.body, text, encoding);
+    assert.equal(result.bytes, body.length, encoding);
+  }
+});
+
+test("wire and decompression limits close the stream before accepting oversized content", async () => {
+  for (const [encoding, data, max] of [
+    ["identity", Buffer.alloc(200), 100],
+    ["gzip", gzipSync(Buffer.alloc(10000)), 100],
+    ["br", brotliCompressSync(Buffer.alloc(10000)), 100],
+    ["deflate", deflateSync(Buffer.alloc(10000)), 100],
+    // A short decoded message still has a compressed wire envelope.
+    ["gzip", gzipSync(Buffer.from("x")), 10],
+  ] as const) {
+    const body = Readable.from([data]);
+    await assert.rejects(
+      documentBody(body, encoding, max, new AbortController().signal),
+      /document_limit/,
+    );
+    assert.equal(body.destroyed, true);
+  }
+  const unsupported = Readable.from([Buffer.from("content")]);
+  await assert.rejects(
+    documentBody(unsupported, "gzip, br", 100, new AbortController().signal),
+    /document_format/,
+  );
+  assert.equal(unsupported.destroyed, true);
+  for (const encoding of ["gzip", "br", "deflate"])
+    await assert.rejects(
+      documentBody(
+        Readable.from([Buffer.from("corrupt payload")]),
+        encoding,
+        100,
+        new AbortController().signal,
+      ),
+    );
+});
+
+test("compressed downloads propagate cancellation and transport failures", async () => {
+  const controller = new AbortController();
+  const body = new Readable({ read() {} });
+  const pending = documentBody(body, "gzip", 100, controller.signal);
+  controller.abort();
+  await assert.rejects(pending, { name: "AbortError" });
+  assert.equal(body.destroyed, true);
+  const broken = new Readable({
+    read() {
+      this.destroy(Object.assign(new Error("reset"), { code: "ECONNRESET" }));
+    },
+  });
+  await assert.rejects(
+    documentBody(broken, "gzip", 100, new AbortController().signal),
+    { code: "ECONNRESET" },
+  );
+  assert.equal(broken.destroyed, true);
+});
+
+test("large documentation shells retain a compact article within a bounded download", async () =>
+  fixture(async (store) => {
+    const body = `<title>Integration guide</title><script>${"x".repeat(1_700_000)}</script><main>${"Article text. ".repeat(600)}<p>Late paragraph.</p></main>`;
+    const reader = new DocumentReader(store, async (url, _signal, maxBytes) => {
+      if (url.pathname === "/robots.txt") {
+        assert.ok(maxBytes <= 100_000);
+        return response("", 404, { "content-type": "text/plain" });
+      }
+      assert.ok(Buffer.byteLength(body) <= maxBytes);
+      assert.ok(maxBytes <= 2_000_000);
+      return response(body);
+    });
+    const data = await reader.collect([
+      candidate("https://docs.example/integration"),
+    ]);
+    assert.equal(data.reads[0]!.status, "read");
+    assert.ok(data.sources[0]!.excerpt!.startsWith("Article text."));
+    assert.equal(data.sources[0]!.excerpt!.length, 6000);
+    assert.equal(data.sources[0]!.excerptTruncated, true);
+    assert.ok(!data.sources[0]!.excerpt!.includes("xxx"));
+  }));
+
+test("transient robots and page failures get one recorded retry and successful originals are cached", async (t) =>
+  fixture(async (store) => {
+    const record = t.mock.method(store, "recordCall");
+    const attempts = new Map<string, number>();
+    const reader = new DocumentReader(store, async (url) => {
+      const n = (attempts.get(url.pathname) || 0) + 1;
+      attempts.set(url.pathname, n);
+      if (n === 1)
+        throw Object.assign(new Error("private connection details"), {
+          cause: { code: "ECONNRESET" },
+        });
+      return url.pathname === "/robots.txt"
+        ? response("", 404)
+        : response(html);
+    });
+    const candidates = [candidate("https://recover.example/pricing")];
+    const data = await reader.collect(candidates);
+    assert.equal(data.reads[0]!.status, "read");
+    assert.match(data.sources[0]!.excerpt!, /\$12 per month, billed annually/);
+    assert.deepEqual([...attempts.values()], [2, 2]);
+    const calls = record.mock.calls.map((c) => c.arguments[0]);
+    assert.deepEqual(
+      calls.map((c) => c.error),
+      [
+        "document_transport_econnreset",
+        "http_404",
+        "document_transport_econnreset",
+        undefined,
+      ],
+    );
+    assert.ok(!JSON.stringify(calls).includes("private connection details"));
+    const cached = await reader.collect(candidates);
+    assert.equal(cached.sources[0]!.fetchedAt, data.sources[0]!.fetchedAt);
+    assert.deepEqual([...attempts.values()], [2, 2]);
+  }));
+
+test("a repeated network failure stops after two requests and retains a source failure", async (t) =>
+  fixture(async (store) => {
+    const record = t.mock.method(store, "recordCall");
+    let attempts = 0;
+    const reader = new DocumentReader(store, async (url) => {
+      if (url.pathname === "/robots.txt") return response("", 404);
+      attempts++;
+      throw Object.assign(new Error("reset"), { code: "UND_ERR_SOCKET" });
+    });
+    const result = await reader.collect([
+      candidate("https://reset.example/docs"),
+    ]);
+    assert.equal(attempts, 2);
+    assert.equal(result.sources.length, 0);
+    assert.equal(result.reads[0]!.status, "unavailable");
+    assert.equal(
+      record.mock.calls.filter(
+        (c) => c.arguments[0].error === "document_transport_und_err_socket",
+      ).length,
+      2,
+    );
+  }));
+
+test("access, size, format, certificate and permanent DNS failures keep one attempt", async () =>
+  fixture(async (store) => {
+    for (const [i, error] of [
+      ...["access", "limit", "format"].map((documentStatus) =>
+        Object.assign(new Error("policy"), {
+          documentStatus,
+          code: "ECONNRESET",
+        }),
+      ),
+      ...["ENOTFOUND", "CERT_HAS_EXPIRED", "UNKNOWN"].map((code) =>
+        Object.assign(new Error("connection"), { code }),
+      ),
+      new Error("unexpected"),
+      ...[401, 403, 429, 503].map((status) => status),
+    ].entries()) {
+      let attempts = 0;
+      const reader = new DocumentReader(store, async (url) => {
+        if (url.pathname === "/robots.txt") return response("", 404);
+        attempts++;
+        if (typeof error === "number") return response("", error);
+        throw error;
+      });
+      const result = await reader.collect([
+        candidate(`https://fail-${i}.example/docs`),
+      ]);
+      assert.equal(attempts, 1);
+      assert.equal(result.sources.length, 0);
+      assert.notEqual(result.reads[0]!.status, "read");
+    }
+  }));
+
+test("a retry observes the site's crawl delay", async () =>
+  fixture(async (store) => {
+    const starts: number[] = [];
+    const reader = new DocumentReader(store, async (url) => {
+      if (url.pathname === "/robots.txt")
+        return response("User-agent: *\nCrawl-delay: 1\nAllow: /", 200, {
+          "content-type": "text/plain",
+        });
+      starts.push(Date.now());
+      if (starts.length === 1)
+        throw Object.assign(new Error("reset"), { code: "ECONNRESET" });
+      return response(html);
+    });
+    const result = await reader.collect([
+      candidate("https://delay.example/docs"),
+    ]);
+    assert.equal(result.reads[0]!.status, "read");
+    assert.equal(starts.length, 2);
+    assert.ok(starts[1]! - starts[0]! >= 1000);
+    const next = await reader.collect([
+      candidate("https://delay.example/other"),
+    ]);
+    assert.equal(next.reads[0]!.status, "robots");
+    assert.equal(starts.length, 2);
+  }));
+
+test("a per-request timeout can recover while the collection deadline is still open", async (t) =>
+  fixture(async (store) => {
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    t.mock.method(AbortSignal, "timeout", (ms: number) =>
+      timeout(ms === 20000 ? 2000 : 20),
+    );
+    const record = t.mock.method(store, "recordCall");
+    let attempts = 0;
+    const reader = new DocumentReader(store, async (url, signal) => {
+      if (url.pathname === "/robots.txt") return response("", 404);
+      if (++attempts === 2) return response(html);
+      return await new Promise<PageResponse>((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), {
+          once: true,
+        });
+      });
+    });
+    const keepAlive = setTimeout(() => {}, 3000);
+    try {
+      const result = await reader.collect([
+        candidate("https://timeout.example/docs"),
+      ]);
+      assert.equal(result.reads[0]!.status, "read");
+      assert.equal(attempts, 2);
+      assert.equal(
+        record.mock.calls.filter(
+          (c) => c.arguments[0].error === "document_transport_timeout",
+        ).length,
+        1,
+      );
+    } finally {
+      clearTimeout(keepAlive);
+      t.mock.restoreAll();
+    }
+  }));
+
+test("request timeouts and retry waits share the collection deadline and preserve other originals", async (t) =>
+  fixture(async (store) => {
+    const record = t.mock.method(store, "recordCall");
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    const configured: number[] = [];
+    t.mock.method(AbortSignal, "timeout", (ms: number) => {
+      configured.push(ms);
+      return timeout(ms === 20000 ? 80 : 20);
+    });
+    const attempts: string[] = [];
+    const reader = new DocumentReader(store, async (url, signal) => {
+      attempts.push(url.href);
+      if (url.pathname === "/robots.txt") return response("", 404);
+      if (url.hostname === "fast.example") return response(html);
+      return await new Promise<PageResponse>((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), {
+          once: true,
+        });
+      });
+    });
+    // AbortSignal timers are unreferenced, so keep this short test alive explicitly.
+    const keepAlive = setTimeout(() => {}, 1000);
+    try {
+      const result = await reader.collect(
+        ["fast", "slow", "later"].map((host) =>
+          candidate(`https://${host}.example/docs`),
+        ),
+      );
+      assert.equal(result.sources.length, 1);
+      assert.equal(result.reads[0]!.status, "read");
+      assert.ok(result.reads.slice(1).every((r) => r.status === "limit"));
+      assert.equal(configured.filter((ms) => ms === 20000).length, 1);
+      assert.ok(
+        configured.filter((ms) => ms !== 20000).every((ms) => ms === 8000),
+      );
+      assert.equal(
+        attempts.filter((url) => url === "https://slow.example/docs").length,
+        1,
+      );
+      assert.ok(
+        record.mock.calls.some(
+          (c) => c.arguments[0].error === "document_transport_timeout",
+        ),
+      );
+    } finally {
+      clearTimeout(keepAlive);
+      t.mock.restoreAll();
+    }
+  }));

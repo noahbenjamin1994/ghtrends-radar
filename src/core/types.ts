@@ -75,6 +75,7 @@ export interface ResearchSource {
   label: string;
   url: string;
   excerpt?: string;
+  excerptTruncated?: boolean;
   fetchedAt?: string;
   request?: RequestEvidence;
 }
