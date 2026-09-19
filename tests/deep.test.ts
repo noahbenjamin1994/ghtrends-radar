@@ -1550,6 +1550,103 @@ test("a broad issue match stays outside selected-project research and license ev
   }
 });
 
+for (const originalFirst of [false, true]) {
+  test(`focused evidence merges issue variants and preserves originals (original first: ${originalFirst})`, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-identities-"));
+    const e = new Engine(new Store(dir)),
+      m = sample(),
+      t = task();
+    e.store.saveMarket(m, false, t.owner);
+    const original: ResearchSource = {
+      ...request,
+      url: request.url.replace("/example/", "/Example/"),
+      documentType: "github-issue",
+      request: { state: "closed", comments: 3 },
+    };
+    const snippet: ResearchSource = {
+      ...request,
+      excerpt: "A shorter search snippet.",
+    };
+    e.search.collect = async () => ({
+      state: "ready",
+      provider: "multi-search",
+      region: "US",
+      language: "en",
+      fetchedAt: t.created,
+      queries: [],
+    });
+    e.github.directionEvidence = async () => [
+      source,
+      originalFirst
+        ? original
+        : {
+            ...snippet,
+            url: original.url + "/?ref=search#top",
+          },
+      snippet,
+      ...[42, 43].map((id) => ({
+        ...request,
+        documentType: "github-comment" as const,
+        url: original.url + `#issuecomment-${id}`,
+      })),
+      { ...request, url: request.url + "?ref=search#issuecomment-42" },
+      ...["README.md", "readme.md"].map((name) => ({
+        ...source,
+        documentType: "github-readme" as const,
+        url: `https://github.com/example/drafts/blob/main/${name}`,
+      })),
+      ...["Example", "example"].map((owner) => ({
+        ...request,
+        url: `https://github.com/${owner}/drafts/discussions/12`,
+      })),
+    ];
+    e.github.gaps = async () => [];
+    e.github.researchSources = async () => [];
+    e.github.licenseSources = async () => [];
+    e.github.discussionSources = async () => [];
+    e.github.issueThreadSources = async () => [];
+    e.documents.collect = async () => {
+      // Deduplicate before original reading and before the bounded model selection.
+      assert.equal(t.evidence!.sources.length, 7);
+      return {
+        version: "2",
+        sources: [originalFirst ? snippet : original],
+        reads: [],
+      };
+    };
+    let checked = false;
+    e.research.json = async (_s, input, _n, op) => {
+      if (op === "deep-plan") throw new Error("Use fallback queries");
+      const sources = (input as any).sources as ResearchSource[];
+      const issue = sources.find((s) => s.id === "E2")!;
+      assert.equal(issue.documentType, "github-issue");
+      assert.equal(issue.excerpt, request.excerpt);
+      assert.equal(issue.request!.state, "closed");
+      assert.equal(
+        sources.filter((s) => s.documentType === "github-comment").length,
+        2,
+      );
+      assert.equal(
+        sources.filter((s) => s.documentType === "github-readme").length,
+        2,
+      );
+      checked = true;
+      return op === "strategy-deep-review"
+        ? { ready: true, corrections: [] }
+        : brief();
+    };
+    try {
+      assert.equal(await runDeepResearch(e, t, () => {}), true);
+      assert.equal(checked, true);
+      assert.equal(t.evidence!.sources.length, 7);
+      assert.equal(t.evidence!.sources[1]!.request!.comments, 3);
+    } finally {
+      await e.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
 test("an interrupted source stage is collected again and retains collection truncation", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-sources-"));
   const e = new Engine(new Store(dir)),

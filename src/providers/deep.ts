@@ -268,21 +268,28 @@ export async function runDeepResearch(
         webQueries: plan.queries,
       },
     };
+    // Issue identities are case-insensitive; comment anchors remain distinct.
+    // File paths retain their case, including README and license URLs.
+    const sourceIdentity = (url: string) =>
+      /^https:\/\/github\.com\/[^/?#]+\/[^/?#]+\/(?:issues|discussions)\/[1-9]\d*\/?(?:[?#]|$)/i.test(
+        url,
+      )
+        ? requestUrl(url)
+        : url;
     const add = (sources: ResearchSource[]) => {
       for (const source of sources) {
         if (!source.excerpt?.trim() || !publicSearchUrl(source.url)) continue;
-        // Originals replace snippets of the same URL, keeping an immutable ID.
+        const identity = sourceIdentity(source.url);
         const found = evidence!.sources.findIndex(
-          (s) =>
-            s.url === source.url ||
-            (source.documentType === "github-issue" &&
-              requestUrl(s.url) === requestUrl(source.url)),
+          (s) => sourceIdentity(s.url) === identity,
         );
         if (found >= 0) {
           if (
-            source.documentType ||
-            source.kind === "project" ||
-            source.kind === "request"
+            // A late snippet keeps the original text and its citation ID intact.
+            (!evidence!.sources[found]!.documentType || source.documentType) &&
+            (source.documentType ||
+              source.kind === "project" ||
+              source.kind === "request")
           )
             evidence!.sources[found] = {
               ...source,
