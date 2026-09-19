@@ -20,7 +20,11 @@ import {
   type DeepTask,
   type DeepBrief,
 } from "../src/core/deep.js";
-import { runDeepResearch } from "../src/providers/deep.js";
+import {
+  runDeepResearch,
+  checkDeepCorrections,
+} from "../src/providers/deep.js";
+import { deepView } from "../src/server/deep.js";
 import { CreditProviderFixture } from "./fixtures/credit-provider.js";
 import { CreditAccountClient } from "../src/server/credits.js";
 import type { Market, ResearchSource } from "../src/core/types.js";
@@ -29,6 +33,65 @@ const copy = (
   en = "Compare three examples with a working editor.",
   zh = "与一位编辑核对三个实际样例。",
 ) => ({ en, zh });
+
+test("correction decisions preserve supported claims and require every issue to be assessed", async () => {
+  const corrections = [
+    { text: "Remove a source-supported notice.", paths: ["answer"] },
+    { text: "Correct an unsupported count.", paths: ["plan.experiment"] },
+  ];
+  let response: unknown = {
+    decisions: [
+      {
+        index: 0,
+        action: "keep_draft",
+        reason: "The original clause explicitly retains this notice.",
+      },
+      {
+        index: 1,
+        action: "apply_correction",
+        reason: "The stated count conflicts with the explicit user limit.",
+      },
+    ],
+  };
+  const engine = {
+    research: { json: async () => response },
+  } as unknown as Engine;
+  assert.deepEqual(await checkDeepCorrections(engine, {}, corrections), [
+    corrections[1],
+  ]);
+  response = {
+    decisions: [
+      { index: 0, action: "keep_draft", reason: "Supported by source." },
+    ],
+  };
+  await assert.rejects(
+    checkDeepCorrections(engine, {}, corrections),
+    /incomplete/,
+  );
+  response = {
+    decisions: [
+      { index: 0, action: "keep_draft", reason: "Supported by source." },
+      { index: 0, action: "apply_correction", reason: "Duplicate decision." },
+    ],
+  };
+  await assert.rejects(
+    checkDeepCorrections(engine, {}, corrections),
+    /incomplete/,
+  );
+  response = {
+    decisions: [
+      {
+        index: 0,
+        action: "check",
+        reason: "The source requires another read.",
+      },
+    ],
+  };
+  await assert.rejects(
+    checkDeepCorrections(engine, {}, corrections.slice(0, 1)),
+    /Invalid enum value/,
+  );
+});
 const source: ResearchSource = {
   id: "E1",
   kind: "project",
@@ -441,6 +504,17 @@ test("source checkpoints support bounded recovery with direct writing and light 
       operation === "strategy-deep-review" ? "low" : false,
     );
     calls++;
+    if (operation === "strategy-deep-correction-check")
+      return {
+        decisions: [
+          {
+            index: 0,
+            action: "apply_correction",
+            reason:
+              "The proposed field correction matches the supplied QA source.",
+          },
+        ],
+      };
     if (operation === "strategy-deep-repair") {
       assert.deepEqual(
         (_input as any).requestedFields.map((f: any) => f.path),
@@ -495,7 +569,7 @@ test("source checkpoints support bounded recovery with direct writing and light 
       true,
     );
     assert.equal(reads, 0);
-    assert.equal(calls, 4);
+    assert.equal(calls, 5);
     assert.ok(checkpoints >= 4);
     assert.ok(t.result);
     assert.deepEqual(t.result, {
@@ -580,6 +654,16 @@ for (const mode of ["unlocated-correction", "broken-patch"] as const) {
     const operations: string[] = [];
     e.research.json = async (_system, input, _tokens, operation) => {
       operations.push(operation!);
+      if (operation === "strategy-deep-correction-check")
+        return {
+          decisions: [
+            {
+              index: 0,
+              action: "apply_correction",
+              reason: "The proposed correction matches the supplied QA source.",
+            },
+          ],
+        };
       if (operation === "strategy-deep-review")
         return {
           ready: false,
@@ -614,10 +698,15 @@ for (const mode of ["unlocated-correction", "broken-patch"] as const) {
           ? [
               "strategy-deep-write",
               "strategy-deep-review",
+              "strategy-deep-correction-check",
               "strategy-deep-repair",
               "strategy-deep-repair",
             ]
-          : ["strategy-deep-write", "strategy-deep-review"],
+          : [
+              "strategy-deep-write",
+              "strategy-deep-review",
+              "strategy-deep-correction-check",
+            ],
       );
     } finally {
       await e.close();
@@ -648,6 +737,16 @@ for (const outcome of ["accept", "reject", "provider-error"] as const) {
     let firstReview: unknown;
     e.research.json = async (_system, input, tokens, operation, thinking) => {
       operations.push(operation!);
+      if (operation === "strategy-deep-correction-check")
+        return {
+          decisions: [
+            {
+              index: 0,
+              action: "apply_correction",
+              reason: "The proposed correction matches the supplied QA source.",
+            },
+          ],
+        };
       if (operation === "strategy-deep-review") {
         assert.equal(thinking, "low");
         firstReview = input;
@@ -1389,3 +1488,257 @@ for (const mode of ["disconnected", "backoff"] as const) {
     }
   });
 }
+
+test("a rejected factual correction leaves the supported draft unchanged", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-dispute-"));
+  const env = { ...process.env };
+  process.env.DEEPSEEK_API_KEY = "unit-test-only";
+  const e = new Engine(new Store(dir)),
+    t = task();
+  e.store.saveMarket(sample(), false, t.owner);
+  t.evidence = {
+    collectionFinished: true,
+    collectedAt: t.created,
+    queries: [],
+    githubQuery: "comments",
+    sources: [source, request],
+    reads: [],
+  };
+  const calls: string[] = [];
+  e.research.json = async (_s, _i, _n, op) => {
+    calls.push(op!);
+    if (op === "strategy-deep-review")
+      return {
+        ready: false,
+        corrections: [
+          {
+            paths: ["answer"],
+            repair: "Replace an already source-supported claim.",
+          },
+        ],
+      };
+    if (op === "strategy-deep-correction-check")
+      return {
+        decisions: [
+          {
+            index: 0,
+            action: "keep_draft",
+            reason: "The original source supports the draft claim exactly.",
+          },
+        ],
+      };
+    if (op === "strategy-deep-repair")
+      throw new Error("An accurate draft must stay intact");
+    return brief();
+  };
+  try {
+    assert.equal(await runDeepResearch(e, t, () => {}), true);
+    assert.deepEqual(t.result, brief());
+    assert.equal(t.work, undefined);
+    assert.equal(calls.length, 3);
+  } finally {
+    await e.close();
+    process.env = env;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+for (const changed of [false, true])
+  test(`saved draft resumes review across process restart; source changed=${changed}`, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-draft-"));
+    const env = { ...process.env };
+    process.env.DEEPSEEK_API_KEY = "unit-test-only";
+    let e = new Engine(new Store(dir));
+    const t = task();
+    e.store.saveMarket(sample(), false, t.owner);
+    t.evidence = {
+      collectionFinished: true,
+      collectedAt: t.created,
+      queries: [],
+      githubQuery: "comments",
+      sources: [source, request],
+      reads: [],
+    };
+    e.store.createDeepTask(t, "draft-test", true);
+    const running = e.store.claimDeepTask(t.id, t.owner)!;
+    e.research.json = async (_s, _i, _n, op) => {
+      if (op === "strategy-deep-review") throw new Error("429 transient");
+      return brief();
+    };
+    try {
+      await assert.rejects(
+        runDeepResearch(e, running, () => e.store.checkpointDeepTask(running)),
+        /429/,
+      );
+      assert.ok(e.store.deepTask(t.id, t.owner)?.work?.draft);
+      assert.equal("work" in deepView(running), false);
+      assert.equal("owner" in deepView(running), false);
+      await e.close();
+      e = new Engine(new Store(dir));
+      e.store.interruptDeepTasks();
+      assert.equal(e.store.deepAllowance(t.owner, true).remaining, 1);
+      e.store.retryDeepTask(t.id, t.owner, true);
+      const resumed = e.store.claimDeepTask(t.id, t.owner)!;
+      if (changed)
+        resumed.evidence!.sources[0] = {
+          ...source,
+          excerpt: source.excerpt + " Added new evidence.",
+        };
+      const calls: string[] = [];
+      e.research.json = async (_s, _i, _n, op) => {
+        calls.push(op!);
+        return op === "strategy-deep-review"
+          ? { ready: true, corrections: [] }
+          : brief();
+      };
+      assert.equal(
+        await runDeepResearch(e, resumed, () =>
+          e.store.checkpointDeepTask(resumed),
+        ),
+        true,
+      );
+      e.store.finishDeepTask(resumed, true);
+      assert.deepEqual(
+        calls,
+        changed
+          ? ["strategy-deep-write", "strategy-deep-review"]
+          : ["strategy-deep-review"],
+      );
+      assert.equal(e.store.deepTask(t.id, t.owner)?.work, undefined);
+      assert.equal(e.store.deepAllowance(t.owner, true).used, 1);
+    } finally {
+      await e.close();
+      process.env = env;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+test("a referenced public project carries an explicit code and data permission check", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-terms-"));
+  const env = { ...process.env };
+  process.env.DEEPSEEK_API_KEY = "unit-test-only";
+  const e = new Engine(new Store(dir)),
+    t = task(),
+    m = sample();
+  const doc = {
+    ...source,
+    url: "https://github.com/team/drafts/blob/main/README.md",
+    kind: "project" as const,
+  };
+  m.brief!.sources = [doc];
+  m.brief!.opportunities![0]!.basedOn = [{ id: doc.id!, quote: doc.excerpt! }];
+  e.store.saveMarket(m, false, t.owner);
+  t.evidence = {
+    collectionFinished: true,
+    collectedAt: t.created,
+    queries: [],
+    githubQuery: "comments",
+    sources: [
+      doc,
+      { ...request, url: "https://github.com/team/drafts/issues/12" },
+    ],
+    reads: [],
+  };
+  e.research.json = async (_s, input, _n, op) => {
+    assert.deepEqual((input as any).assetTerms[0].licenseSources, []);
+    return op === "strategy-deep-review"
+      ? { ready: true, corrections: [] }
+      : brief();
+  };
+  try {
+    assert.equal(await runDeepResearch(e, t, () => {}), true);
+    assert.match(t.result!.checks[0]!.en, /team\/drafts.*code license.*data/);
+    assert.match(t.result!.checks[0]!.zh, /源码许可、数据/);
+  } finally {
+    await e.close();
+    process.env = env;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an overlong copy edit gets its second bounded shortening pass before delivery", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-copy-limit-"));
+  const env = { ...process.env };
+  process.env.DEEPSEEK_API_KEY = "unit-test-only";
+  const e = new Engine(new Store(dir)),
+    t = task();
+  e.store.saveMarket(sample(), false, t.owner);
+  t.evidence = {
+    collectionFinished: true,
+    collectedAt: t.created,
+    queries: [],
+    githubQuery: "comments",
+    sources: [source, request],
+    reads: [],
+  };
+  let edits = 0;
+  e.research.json = async (_s, _i, _n, op) => {
+    if (op === "strategy-deep-copy") {
+      edits++;
+      return {
+        edits: [
+          {
+            path: "answer.en",
+            value:
+              edits === 1
+                ? "Long repeated suggestion. ".repeat(23)
+                : brief().answer.en,
+          },
+        ],
+      };
+    }
+    if (op === "strategy-deep-review") return { ready: true, corrections: [] };
+    const candidate = brief();
+    candidate.answer.en = "An overlong draft. ".repeat(30);
+    return candidate;
+  };
+  try {
+    assert.equal(await runDeepResearch(e, t, () => {}), true);
+    assert.equal(edits, 2);
+    assert.deepEqual(t.result, brief());
+  } finally {
+    await e.close();
+    process.env = env;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("review keeps the writer's bounded source set, including assets outside finding quotes", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-review-sources-"));
+  const env = { ...process.env };
+  process.env.DEEPSEEK_API_KEY = "unit-test-only";
+  const e = new Engine(new Store(dir)),
+    t = task();
+  e.store.saveMarket(sample(), false, t.owner);
+  const extra = {
+    ...source,
+    id: "E3",
+    url: "https://example.com/extra",
+    excerpt: "Additional asset documentation supplied to the writer.",
+  };
+  t.evidence = {
+    collectionFinished: true,
+    collectedAt: t.created,
+    queries: [],
+    githubQuery: "comments",
+    sources: [source, request, extra],
+    reads: [],
+  };
+  let writerSources: unknown;
+  e.research.json = async (_s, input, _n, op) => {
+    if (op === "strategy-deep-write") writerSources = (input as any).sources;
+    if (op === "strategy-deep-review") {
+      assert.deepEqual((input as any).sources, writerSources);
+      assert.ok((input as any).sources.some((s: any) => s.id === "E3"));
+      return { ready: true, corrections: [] };
+    }
+    return brief();
+  };
+  try {
+    assert.equal(await runDeepResearch(e, t, () => {}), true);
+  } finally {
+    await e.close();
+    process.env = env;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

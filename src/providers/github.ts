@@ -534,9 +534,7 @@ export class GitHub {
           !url.pathname.startsWith(`/${name}/blob/`)
         )
           throw new Error("license_source");
-        const content = Buffer.from(doc.content, "base64")
-          .toString("utf8")
-          .slice(0, 6000);
+        const content = Buffer.from(doc.content, "base64").toString("utf8");
         return {
           id: `L${i + 1}`,
           kind: "project",
@@ -544,7 +542,8 @@ export class GitHub {
           label: `${name} · License · ${doc.license?.spdx_id || "Review terms"}`,
           url: url.href,
           fetchedAt: this.observedAt(path),
-          excerpt: content,
+          excerpt: content.slice(0, 20000),
+          excerptTruncated: content.length > 20000,
         };
       }),
     );

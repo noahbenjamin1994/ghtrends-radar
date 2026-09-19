@@ -7,7 +7,7 @@ import type { ResearchSource } from "./types.js";
 import type { WebEvidence, SearchQuery } from "../providers/search.js";
 import type { DocumentRead } from "../providers/documents.js";
 
-export const DEEP_VERSION = "3";
+export const DEEP_VERSION = "4";
 export const deepQuestions = {
   competitors: [
     "Where is the opening among existing products?",
@@ -92,7 +92,7 @@ export const deepBriefSchema = z
         changeIf: copy,
       })
       .strip(),
-    checks: z.array(copy).max(3),
+    checks: z.array(copy).max(5),
   })
   .strip();
 export type DeepBrief = z.infer<typeof deepBriefSchema>;
@@ -285,10 +285,17 @@ export interface DeepTask {
     | "uncharged"
     | "own-keys";
   evidence?: DeepEvidence;
+  // Internal synthesis checkpoint; only approved result is exposed to readers.
+  work?: {
+    fingerprint: string;
+    draft: DeepBrief;
+    corrections: string[];
+    repairFields: string[];
+  };
   result?: DeepBrief;
   problem?: "sources" | "model" | "interrupted" | "credits" | "billing";
 }
-export type DeepTaskView = Omit<DeepTask, "owner">;
+export type DeepTaskView = Omit<DeepTask, "owner" | "work">;
 export interface DeepAllowance {
   limit: number | null;
   remaining: number | null;

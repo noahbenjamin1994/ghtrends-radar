@@ -187,6 +187,7 @@ export function modelSources(sources: ResearchSource[]) {
       searchIntent,
       placement,
       excerpt,
+      excerptTruncated,
       url,
       request,
       fetchedAt,
@@ -201,6 +202,7 @@ export function modelSources(sources: ResearchSource[]) {
       searchIntent,
       placement,
       excerpt,
+      ...(excerptTruncated !== undefined ? { excerptTruncated } : {}),
       ...(documentType ? { documentType, publishedAt, parentUrl } : {}),
       ...(request ? { request } : {}),
       ...(fetchedAt ? { observedAt: fetchedAt } : {}),
@@ -376,6 +378,9 @@ export class Research {
           body: JSON.stringify({
             model: this.model,
             thinking: { type: thinking ? "enabled" : "disabled" },
+            ...(!thinking && operation === "strategy-deep-correction-check"
+              ? { temperature: 0 }
+              : {}),
             ...(thinking
               ? { reasoning_effort: thinking === "low" ? "low" : "high" }
               : {}),

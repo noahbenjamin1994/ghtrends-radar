@@ -422,7 +422,8 @@ test("original source documents survive report persistence and appear in both ex
           ...candidate("https://vendor.example/pricing"),
           documentType: "page" as const,
           fetchedAt: "2026-09-18T00:00:00Z",
-          excerpt: "Starter costs $12 per month, billed annually.\n```\n<script>alert(1)</script>",
+          excerpt:
+            "Starter costs $12 per month, billed annually.\n```\n<script>alert(1)</script>",
         },
       ],
       reads: [
@@ -527,3 +528,29 @@ test("community readings keep real source links and dates while excluding promot
   m.brief.issueInsights![1]!.relevance = "adjacent";
   assert.equal(reportIssueSignals(m).length, 0);
 });
+
+test("long repository licenses keep complete common clauses and flag the excerpt limit", async () =>
+  fixture(async (store) => {
+    const gh = new GitHub(store);
+    let body =
+      "License preamble.\n".repeat(600) +
+      "Redistribution requires retaining notices.";
+    gh.get = async () =>
+      ({
+        encoding: "base64",
+        content: Buffer.from(body).toString("base64"),
+        size: body.length,
+        html_url: "https://github.com/team/editor/blob/main/LICENSE",
+      }) as any;
+    const full = (
+      await gh.licenseSources([{ name: "team/editor" } as any])
+    )[0]!;
+    assert.equal(full.excerpt, body);
+    assert.equal(full.excerptTruncated, false);
+    body = "Long terms.\n".repeat(3000);
+    const limited = (
+      await gh.licenseSources([{ name: "team/editor" } as any])
+    )[0]!;
+    assert.equal(limited.excerpt!.length, 20000);
+    assert.equal(limited.excerptTruncated, true);
+  }));

@@ -66,7 +66,7 @@ const messages: Record<string, [string, string]> = {
   ],
 };
 export const deepView = (task: DeepTask) => {
-  const { owner: _owner, ...view } = task;
+  const { owner: _owner, work: _work, ...view } = task;
   return view;
 };
 
