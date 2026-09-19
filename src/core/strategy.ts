@@ -23,10 +23,10 @@ import type { Brief, Market, ResearchSource, Strategy } from "./types.js";
 
 export const STRATEGY_VERSION = "15";
 const experimentCopy = z.object({
-  participants: z.string().trim().min(8).max(140),
-  task: z.string().trim().min(8).max(140),
+  participants: z.string().trim().min(8).max(200),
+  task: z.string().trim().min(8).max(220),
   timebox: z.string().trim().min(8).max(100),
-  measurement: z.string().trim().min(8).max(140),
+  measurement: z.string().trim().min(8).max(160),
   continueIf: z.string().trim().min(8).max(240),
   redirectIf: z.string().trim().min(8).max(240),
 });
@@ -381,7 +381,7 @@ export const RESEARCH_SCOPE_RULES = `Evidence scope and execution conditions:
 - The selected direction and root strategy describe ONE experiment: retain its task, cohort, time window, metrics and numerical comparison operators. Translation and summarization preserve these conditions. Additional adoption evidence is a separate later test.`;
 
 export const EXPERIMENT_PLAN_PROMPT = `
-Shared pilot: include experimentPlan {directionId: recommendedId, en: {participants, task, timebox, measurement, continueIf, redirectIf}, zh: {participants, task, timebox, measurement, continueIf, redirectIf}}. Write one short sentence per field. participants states the recruitment target and access; task states the artifact and user task; timebox states the proposed pilot window; measurement states the measured outcome and comparison baseline. Numeric decision rules appear only in continueIf/redirectIf. Preserve counts, time windows, AND/OR and comparison operators across both languages. This shared plan supplies the root strategy and selected direction experiment. Any later study is a separate proposal. Skills, permissions and recruitment remain requirements. Limits: participants/task/measurement 140 characters each, timebox 100, continueIf/redirectIf 240.`;
+Shared pilot: include experimentPlan {directionId: recommendedId, en: {participants, task, timebox, measurement, continueIf, redirectIf}, zh: {participants, task, timebox, measurement, continueIf, redirectIf}}. Write one short sentence per field. participants states the recruitment target and access; task states the artifact and user task; timebox states the proposed pilot window; measurement states the measured outcome and comparison baseline. Numeric decision rules appear only in continueIf/redirectIf. Preserve counts, time windows, AND/OR and comparison operators across both languages. This shared plan supplies the root strategy and selected direction experiment. Any later study is a separate proposal. Skills, permissions and recruitment remain requirements. Distinguish participants, assets per participant and total task count; every criterion names a unit defined in task/measurement. Limits: participants 200 characters, task 220, measurement 160, timebox 100, continueIf/redirectIf 240.`;
 
 export const STRATEGY_PROMPT =
   `You are a product opportunity researcher. First answer the original topic at its full scope, then compare distinct customer jobs and select one for deeper exploration. The user is researching opportunities to build a product or offer a service around the input. Treat earlier query intent as retrieval context; a broad phone-brand input calls for opportunity analysis around phones. Software, data products and services are valid offers. Produce JSON only with this schema:
