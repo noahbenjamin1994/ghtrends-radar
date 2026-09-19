@@ -869,6 +869,116 @@ test("a rejected child patch gets format feedback before the remaining repair at
   }
 });
 
+test("a malformed semantic repair preserves factual corrections through rollback", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-rollback-")),
+    env = { ...process.env };
+  process.env.DEEPSEEK_API_KEY = "unit-test-only";
+  const e = new Engine(new Store(dir)),
+    t = task();
+  e.store.saveMarket(sample(), false, t.owner);
+  t.evidence = {
+    collectionFinished: true,
+    collectedAt: t.created,
+    queries: [],
+    githubQuery: "comments",
+    sources: [source, request],
+    reads: [],
+  };
+  const factualCorrection =
+    "Describe the manual route as an alternative considered; confirm the user's current workflow.";
+  const corrected = copy(
+    "The author considered the manual route; confirm their current workflow.",
+    "作者考虑过手动方案；核实其当前工作流。",
+  );
+  let repairs = 0,
+    reviews = 0,
+    copies = 0;
+  const checkpoints: string[][] = [];
+  e.research.json = async (_s, input, _n, operation) => {
+    const data = input as any;
+    if (operation === "strategy-deep-review") {
+      reviews++;
+      if (reviews === 1)
+        return {
+          ready: false,
+          corrections: [
+            {
+              paths: ["answer", "experimentPlan"],
+              source: "E2",
+              repair: factualCorrection,
+            },
+          ],
+        };
+      assert.deepEqual(data.result.answer, corrected);
+      return { ready: true, corrections: [] };
+    }
+    if (operation === "strategy-deep-correction-check")
+      return {
+        decisions: [
+          {
+            index: 0,
+            action: "apply_correction",
+            reason: "The quoted source describes an alternative considered.",
+          },
+        ],
+      };
+    if (operation === "strategy-deep-copy") {
+      copies++;
+      return { edits: [] };
+    }
+    if (operation === "strategy-deep-repair") {
+      repairs++;
+      assert.ok(
+        data.corrections.some((c: string) => c.includes(factualCorrection)),
+      );
+      if (repairs === 2) {
+        assert.ok(
+          data.corrections.some((c: string) =>
+            c.includes("experimentPlan.en.participants"),
+          ),
+        );
+        assert.deepEqual(data.priorDraft.answer, brief().answer);
+      }
+      const pilot = structuredClone(brief().experimentPlan!);
+      if (repairs === 1)
+        pilot.en.participants =
+          "Editors evaluating the proposed workflow. ".repeat(8);
+      return {
+        edits: [
+          { path: "answer", value: corrected },
+          { path: "experimentPlan", value: pilot },
+        ],
+      };
+    }
+    assert.equal(operation, "strategy-deep-write");
+    return brief();
+  };
+  try {
+    assert.equal(
+      await runDeepResearch(e, t, () => {
+        if (t.work) checkpoints.push([...t.work.corrections]);
+      }),
+      true,
+    );
+    assert.deepEqual(t.result!.answer, corrected);
+    assert.deepEqual(t.result!.experimentPlan, brief().experimentPlan);
+    assert.equal(repairs, 2);
+    assert.equal(reviews, 2);
+    assert.equal(copies, 2);
+    assert.ok(
+      checkpoints.some(
+        (cs) =>
+          cs.some((c) => c.includes(factualCorrection)) &&
+          cs.some((c) => c.includes("experimentPlan.en.participants")),
+      ),
+    );
+  } finally {
+    await e.close();
+    process.env = env;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 for (const mode of [
   "unlocated-correction",
   "broken-patch",

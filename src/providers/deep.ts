@@ -523,6 +523,7 @@ export async function runDeepResearch(
   for (let attempt = 0; attempt < 3; attempt++) {
     task.stage = "writing";
     checkpoint();
+    const pendingCorrections = [...corrections];
     const repairBase = repairFields.length
       ? structuredClone(candidate)
       : undefined;
@@ -633,8 +634,16 @@ export async function runDeepResearch(
     if (corrections.length) {
       // Keep the last valid brief when a targeted edit breaks its schema or quotes.
       // Structural first-draft recovery may rewrite; semantic recovery stays bounded.
-      if (repairFields.length) candidate = repairBase;
-      else {
+      if (repairFields.length) {
+        candidate = repairBase;
+        // Reverting a malformed edit restores the original factual problem too.
+        // Keep that correction alongside the rejected patch's format feedback.
+        corrections = [...new Set([...pendingCorrections, ...corrections])];
+        if (task.work) {
+          task.work.corrections = [...corrections];
+          checkpoint();
+        }
+      } else {
         const fields = deepEditableFields(candidate).map((f) => f.path);
         const targets = corrections.map((correction) => {
           const path = correction.split(":", 1)[0];
