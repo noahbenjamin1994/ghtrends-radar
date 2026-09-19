@@ -22,6 +22,7 @@ import {
 } from "../src/core/gaps.js";
 import { modelSources } from "../src/providers/research.js";
 import { Research } from "../src/providers/research.js";
+import { validQuote } from "../src/core/landscape.js";
 import { marketMarkdown } from "../src/core/report.js";
 import { renderDocument } from "../src/server/html.js";
 import type { ResearchSource, Market } from "../src/core/types.js";
@@ -300,6 +301,107 @@ test("repository documents retain distinct source IDs and license excerpts stay 
     assert.match(licenses[0]!.excerpt!, /Permission is hereby granted/);
     const bad = await gh.licenseSources([{ name: "other/repo" } as any]);
     assert.equal(bad.length, 0);
+  }));
+
+test("GitHub quotations contain source text while review instructions and observation metadata stay outside", async () =>
+  fixture(async (store) => {
+    const gh = new GitHub(store),
+      issue = {
+        title: "Add a local chart of accounts",
+        body: "I can prepare the dataset for a pull request.",
+        html_url: "https://github.com/team/editor/issues/1",
+        state: "open",
+        created_at: "2026-09-01T00:00:00Z",
+        updated_at: "2026-09-02T00:00:00Z",
+        reactions: { total_count: 0 },
+      };
+    gh.get = async (path: string) => {
+      if (path.startsWith("/search/repositories"))
+        return { total_count: 0, items: [] } as any;
+      if (path.startsWith("/search/issues")) return { items: [issue] } as any;
+      if (path.endsWith("/readme"))
+        return {
+          encoding: "base64",
+          content: Buffer.from("# Editor\nImport contact records.").toString(
+            "base64",
+          ),
+          html_url: "https://github.com/team/editor/blob/main/README.md",
+        } as any;
+      if (path.endsWith("/releases/latest"))
+        return {
+          tag_name: "v2.2.6",
+          html_url: "https://github.com/team/editor/releases/tag/v2.2.6",
+          published_at: "2026-09-10T12:21:01Z",
+          body: "#2638 [feature] Add Japanese (ja) locale.",
+        } as any;
+      return issue as any;
+    };
+    const sources = await gh.researchSources(
+      [{ name: "team/editor" } as any],
+      [{ title: issue.title, url: issue.html_url } as any],
+    );
+    assert.equal(
+      sources.find((s) => s.id === "R1")!.excerpt,
+      "# Editor\nImport contact records.",
+    );
+    const release = sources.find((s) => s.id === "V1")!;
+    assert.equal(release.documentType, "github-release");
+    assert.equal(
+      modelSources([release])[0]!.publishedAt,
+      "2026-09-10T12:21:01Z",
+    );
+    assert.equal(
+      validQuote(
+        { id: "V1", quote: "#2638 [feature] Add Japanese (ja) locale." },
+        sources,
+      ),
+      true,
+    );
+    // Actual A5-01 failure: internal guidance was cited as maintainer evidence.
+    assert.equal(
+      validQuote(
+        {
+          id: "V1",
+          quote: "Match each requested capability against these release notes.",
+        },
+        sources,
+      ),
+      false,
+    );
+    assert.equal(
+      validQuote(
+        { id: "V1", quote: "Maintainer's latest published release" },
+        sources,
+      ),
+      false,
+    );
+    const request = sources.find((s) => s.id === "I1")!;
+    assert.equal(request.excerpt, issue.title + "\n" + issue.body);
+    assert.equal(request.request!.state, "open");
+    assert.equal(
+      modelSources([request])[0]!.request!.createdAt,
+      new Date(issue.created_at).toISOString(),
+    );
+    const direction = await gh.directionEvidence([
+      { id: "local-accounts", query: "local accounts" },
+    ]);
+    assert.equal(
+      direction.find((s) => s.kind === "request")!.excerpt,
+      request.excerpt,
+    );
+    const emptySearch = direction.find((s) => s.id === "D1A1")!;
+    assert.equal(emptySearch.excerpt, "");
+    assert.match(emptySearch.label, /0 returned/);
+    assert.equal(
+      validQuote(
+        {
+          id: "D1A1",
+          quote: "Demand and Google Trends are measured separately.",
+        },
+        direction,
+      ),
+      false,
+    );
   }));
 
 test("GitHub Discussions use fixed authenticated GraphQL, reject private data and preserve accepted answers", async () =>

@@ -195,6 +195,8 @@ Tasks are saved before admission; the credit is reserved when execution begins. 
 
 **Original text and licenses**
 
+GitHub direction searches match issue titles and bodies, ordered by relevance. README and release excerpts contain publisher text; publication dates, request states and review guidance remain separate. A repository name used as a citation ID is recoverable only when its exact quote uniquely matches a collected source from that same repository.
+
 New research selects original pages from up to four domains already observed in organic search. Publisher pages, individual Hacker News discussions and GitHub Discussions retain their source identity. Hacker News uses its official public API and reads at most three direct comments per topic. GitHub Discussions are read from observed links, with accepted answers retained; the backend GitHub credential needs the relevant read permission. Up to two selected repositories contribute their license files for checking attribution, distribution, source-disclosure and third-party conditions.
 
 The report's “Original text and licenses” section keeps collection dates, excerpts and reading status, also included in Markdown, JSON and static HTML. Publisher pages describe publisher claims; discussions describe individual experiences. Page reads respect robots.txt, bound redirects, time and size, and pin connections to checked public addresses. Original text is cached for one hour; restricted pages retain the search excerpt and reading status. Public-page requests use a separate transport; backend identity credentials go only to the fixed GitHub API. Set `GHTRENDS_SOURCE_DOCUMENTS=0` to disable this layer. Reddit and X body integrations follow each platform's authorization requirements.

@@ -218,7 +218,7 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     assert.ok(visibleStrategy(b, "zh"));
     assert.equal(visibleOpportunities(b)?.opportunities.length, 3);
     assert.ok(visibleStrategy({ ...b, strategyVersion: "1" }, "zh"));
-    for (const version of ["5", "6", "7"]) {
+    for (const version of ["5", "6", "7", "8"]) {
       assert.ok(visibleStrategy({ ...b, strategyVersion: version }, "zh"));
       assert.equal(
         visibleOpportunities({ ...b, strategyVersion: version })?.opportunities
@@ -560,13 +560,65 @@ test("direction ratings keep umbrella trends, project supply and task demand sep
   );
 });
 
+test("repository-name citation IDs recover only a unique verbatim source from that repository", () => {
+  const source: ResearchSource = {
+    id: "R1",
+    kind: "project",
+    label: "team/editor · README",
+    url: "https://github.com/team/editor/blob/main/README.md",
+    excerpt:
+      "The editor imports 100 records while keeping their original identifiers.",
+  };
+  const ref = { id: "team/editor", quote: source.excerpt! };
+  const data = sample();
+  data.evidence = [ref];
+  data.opportunities[0]!.basedOn = [{ ...ref }];
+  data.opportunities[0]!.competition.evidence = [{ ...ref }];
+  const fixed = groundOpportunityRatings(data, [source]) as StrategyResponse;
+  assert.equal(fixed.evidence[0]!.id, "R1");
+  assert.equal(fixed.opportunities[0]!.basedOn![0]!.id, "R1");
+  assert.equal(fixed.opportunities[0]!.competition.evidence[0]!.id, "R1");
+  assert.equal(fixed.evidence[0]!.quote, source.excerpt);
+  assert.equal(data.evidence[0]!.id, "team/editor");
+
+  for (const sources of [
+    [
+      {
+        ...source,
+        url: "https://github.com/another/editor/blob/main/README.md",
+      },
+    ],
+    [{ ...source, url: "https://github.com.example/team/editor" }],
+    [{ ...source, excerpt: source.excerpt!.replace("100", "10") }],
+    [
+      source,
+      {
+        ...source,
+        id: "R2",
+        url: "https://github.com/team/editor/blob/main/OTHER.md",
+      },
+    ],
+    [
+      source,
+      { ...source, id: ref.id, excerpt: "Different existing source text." },
+    ],
+  ]) {
+    const result = groundOpportunityRatings(data, sources) as StrategyResponse;
+    assert.equal(result.evidence[0]!.id, ref.id);
+    assert.equal(result.evidence[0]!.quote, ref.quote);
+  }
+});
+
 test("every direction receives scoped evidence; one source failure preserves the map", async () =>
   fixture(async (r, s) => {
     const gh = new GitHub(s),
       paths: string[] = [];
     gh.get = async <T>(path: string): Promise<T> => {
       paths.push(path);
-      if (path.startsWith("/search/issues"))
+      if (path.startsWith("/search/issues")) {
+        const params = new URL(path, "https://api.github.com").searchParams;
+        assert.match(params.get("q")!, / in:title,body is:issue is:open$/);
+        assert.equal(params.has("sort"), false);
         return {
           items: [
             {
@@ -579,6 +631,7 @@ test("every direction receives scoped evidence; one source failure preserves the
             },
           ],
         } as T;
+      }
       if (path.includes("translation")) throw Error("source recovering");
       if (path.startsWith("/search/repositories"))
         return {
@@ -776,7 +829,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "7");
+    assert.equal(brief.strategyVersion, "8");
     const legacy = {
       ...brief,
       strategyVersion: "2",

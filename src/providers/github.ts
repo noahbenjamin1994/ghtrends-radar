@@ -418,10 +418,11 @@ export class GitHub {
             kind: s.kind || "search",
           }));
           try {
-            const q = `${direction.query} is:issue is:open`;
+            // Comments on rolling task logs can mention almost any topic.
+            // Search the original request text and use GitHub's best match.
+            const q = `${direction.query} in:title,body is:issue is:open`;
             const path =
-              "/search/issues?" +
-              new URLSearchParams({ q, per_page: "3", sort: "updated" });
+              "/search/issues?" + new URLSearchParams({ q, per_page: "3" });
             const data = await this.get<{ items: GitHubIssue[] }>(
               path,
               21600000,
@@ -442,9 +443,7 @@ export class GitHub {
                 url: issue.html_url,
                 fetchedAt: observedAt,
                 request: requestEvidence(issue, observedAt),
-                excerpt: `Individual issue signal for phrase ${direction.query}; task relevance needs review. State: ${issue.state || "pending"}. Created: ${issue.created_at}. Updated: ${issue.updated_at}. Reactions: ${issue.reactions?.total_count ?? 0}. Title: ${issue.title.slice(0, 300)}.\n${(
-                  issue.body || ""
-                )
+                excerpt: `${issue.title.slice(0, 300)}\n${(issue.body || "")
                   .replace(/<!--[\s\S]*?-->/g, "")
                   .replace(/<[^>]*>/g, " ")
                   .slice(0, 1600)}`,
@@ -486,13 +485,13 @@ export class GitHub {
         const sources: ResearchSource[] = [
           {
             id: `A${i + 1}`,
-            label: `Related tools: ${term}`,
+            label: `Related tools: ${term} · ${candidates.length} returned`,
             url:
               "https://github.com/search?" +
               new URLSearchParams({ q, type: "repositories" }),
-            excerpt:
-              `GitHub repository search for the proposed artifact: ${term}. ${candidates.length ? "Candidate names and descriptions follow." : "This phrase matched zero listed candidates; broaden or refine this artifact phrase."} This is repository coverage for a literal phrase. Demand and Google Trends are measured separately. Evaluate candidate features and workflow fit.\n` +
-              candidates.map((r) => `${r.name}: ${r.description}`).join("\n"),
+            excerpt: candidates
+              .map((r) => `${r.name}: ${r.description}`)
+              .join("\n"),
           },
         ];
         if (candidates[0]) {
@@ -734,6 +733,8 @@ export class GitHub {
     return output;
   }
   async researchSources(repos: Repo[], gaps: Gap[]): Promise<ResearchSource[]> {
+    // Excerpts are citable publisher text. Keep our review guidance and
+    // observation metadata outside them so they cannot become source quotes.
     const selected = repos
       .filter((r) => !r.relevance || r.relevance.role === "direct")
       .slice(0, 4);
@@ -772,12 +773,14 @@ export class GitHub {
         return {
           id: `R${i + 1}`,
           kind: "project",
+          documentType: "github-readme",
           label: `${name} · README`,
           url: url.href,
           fetchedAt: this.observedAt(path),
-          excerpt:
-            `Project: ${name}. Reviewed role: ${repo.relevance?.role || "pending"}. Maintainer documentation:\n` +
-            clean(Buffer.from(doc.content, "base64").toString("utf8"), 7000),
+          excerpt: clean(
+            Buffer.from(doc.content, "base64").toString("utf8"),
+            7000,
+          ),
         };
       }),
       ...selected.map(async (repo, i): Promise<ResearchSource> => {
@@ -799,10 +802,12 @@ export class GitHub {
         return {
           id: `V${i + 1}`,
           kind: "project",
+          documentType: "github-release",
           label: `${name} · ${release.tag_name.slice(0, 100)}`,
           url: url.href,
           fetchedAt: this.observedAt(path),
-          excerpt: `Maintainer's latest published release: ${release.tag_name.slice(0, 100)}. Published: ${release.published_at || "date pending"}. Match each requested capability against these release notes.\n${clean(release.body || "", 2200)}`,
+          publishedAt: release.published_at,
+          excerpt: clean(release.body || "", 2200),
         };
       }),
       ...gaps.slice(0, 3).map(async (gap, i): Promise<ResearchSource> => {
@@ -822,7 +827,7 @@ export class GitHub {
           url: gap.url,
           fetchedAt: observedAt,
           request: requestEvidence(issue, observedAt),
-          excerpt: `Individual issue request: ${issue.title}. State: ${issue.state}. State reason: ${issue.state_reason || "pending"}. Created: ${issue.created_at || gap.createdAt}. Updated: ${issue.updated_at || gap.updatedAt}.\n${clean(issue.body || gap.excerpt, 1800)}`,
+          excerpt: `${issue.title}\n${clean(issue.body || gap.excerpt, 1800)}`,
         };
       }),
     ]);

@@ -274,6 +274,30 @@ export function groundOpportunityRatings(
     ]),
   ];
   for (const ref of refs) {
+    // Models sometimes put an exact owner/repo in the reference ID slot.
+    // Resolve only a unique, verbatim quote from that same GitHub repository;
+    // a valid source ID, another repository or an ambiguous match stays intact.
+    if (
+      !sources.some((s) => s.id === ref.id) &&
+      ref.quote.trim().length >= 8 &&
+      /^[\w.-]+\/[\w.-]+$/.test(ref.id)
+    ) {
+      const matches = sources.filter((s) => {
+        const repo =
+          /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)(?:[/#?]|$)/.exec(
+            s.url,
+          )?.[1];
+        return (
+          s.id &&
+          repo?.toLowerCase() === ref.id.toLowerCase() &&
+          s.excerpt
+            ?.replace(/\s+/g, " ")
+            .trim()
+            .includes(ref.quote.replace(/\s+/g, " ").trim())
+        );
+      });
+      if (matches.length === 1) ref.id = matches[0]!.id!;
+    }
     const excerpt = sources.find((s) => s.id === ref.id)?.excerpt;
     const norm = (v: string) => v.replace(/\s+/g, " ").trim();
     const trimmed = ref.quote.replace(/[.!。！]+$/, "");
@@ -448,11 +472,11 @@ export function visibleOpportunities(
 ): OpportunityMap | undefined {
   if (
     !brief ||
-    !["2", "3", "4", "5", "6", "7"].includes(brief.strategyVersion || "")
+    !["2", "3", "4", "5", "6", "7", "8"].includes(brief.strategyVersion || "")
   )
     return;
   if (
-    ["3", "4", "5", "6", "7"].includes(brief.strategyVersion || "") &&
+    ["3", "4", "5", "6", "7", "8"].includes(brief.strategyVersion || "") &&
     (!overviewSchema.safeParse(brief.overview).success ||
       !z
         .array(clearOpportunitySchema)

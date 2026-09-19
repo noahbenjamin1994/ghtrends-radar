@@ -1536,7 +1536,8 @@ Each direction must name a familiar customer, task, offered artifact and concret
           alternatives.some(
             (s) =>
               s.id?.startsWith("A") &&
-              s.excerpt?.includes("Maintainer documentation:"),
+              (s.documentType === "github-readme" ||
+                s.excerpt?.includes("Maintainer documentation:")),
           )
         )
           basis = "source-led";

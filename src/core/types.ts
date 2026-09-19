@@ -64,7 +64,13 @@ export interface Strategy {
 }
 export interface ResearchSource {
   documentType?:
-    "page" | "license" | "hn-story" | "hn-comment" | "github-discussion";
+    | "page"
+    | "license"
+    | "hn-story"
+    | "hn-comment"
+    | "github-discussion"
+    | "github-readme"
+    | "github-release";
   publishedAt?: string;
   parentUrl?: string;
   directionId?: string;
