@@ -25,6 +25,7 @@ import {
   syncExperimentPlan,
   strategyResponse,
   type StrategyResponse,
+  STRATEGY_VERSION,
 } from "../src/core/strategy.js";
 import { reportIssueSignals } from "../src/core/gaps.js";
 import { researchLandscape } from "../src/core/landscape.js";
@@ -312,6 +313,49 @@ test("accessibility terminology is normalized in Chinese prose with zero calls w
     assert.deepEqual(result.evidence, value.evidence);
     assert.match(value.zh.strategy.tradeoff, /无障碍/);
   }));
+test("headless backend terminology passes delivery with zero model calls and keeps source wording and paired meaning", async () =>
+  fixture(async (r) => {
+    const value = countedSample();
+    value.overview.zh.competition =
+      "FormRelay 提供无头后端，可作为表单部署服务的基础。";
+    value.overview.en.competition =
+      "FormRelay provides a headless backend as a foundation for a form deployment service.";
+    value.opportunities[0]!.zh.service =
+      "在客户服务器部署无头表单后端，并交付运行手册。";
+    const source = {
+      ...documents[0]!,
+      id: "R9",
+      excerpt: "原文称为无头后端，包含无头表单后端的部署步骤。",
+    };
+    value.evidence.push({ id: "R9", quote: source.excerpt });
+    const sources = [...documents, source];
+    assert.ok(
+      strategyProblems(value, sources, seed, true, true).some((p) =>
+        p.startsWith("overview.zh.competition:"),
+      ),
+    );
+    let calls = 0;
+    r.json = async () => {
+      calls++;
+      throw new Error("Unexpected model call");
+    };
+    const result = await (r as any).repairStrategyCopy(value, sources);
+    assert.equal(calls, 0);
+    assert.equal(
+      result.overview.zh.competition,
+      "FormRelay 提供 API 后端，可作为表单部署服务的基础。",
+    );
+    assert.equal(
+      result.opportunities[0].zh.service,
+      "在客户服务器部署 API 表单后端，并交付运行手册。",
+    );
+    assert.deepEqual(result.overview.en, value.overview.en);
+    assert.deepEqual(result.evidence, value.evidence);
+    assert.equal(source.excerpt, value.evidence.at(-1)!.quote);
+    assert.match(value.overview.zh.competition, /无头后端/);
+    assert.deepEqual(strategyProblems(result, sources, seed, true, true), []);
+  }));
+
 async function fixture(run: (r: Research, s: Store) => Promise<void>) {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-strategy-"));
   const s = new Store(dir);
@@ -510,6 +554,8 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
       "13",
       "14",
       "15",
+      "16",
+      "17",
     ]) {
       assert.ok(visibleStrategy({ ...b, strategyVersion: version }, "zh"));
       assert.equal(
@@ -1303,7 +1349,7 @@ test("new reports require an overall answer and a readable customer need and off
         ? capabilitySample(input.directions)
         : countedSample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "17");
+    assert.equal(brief.strategyVersion, STRATEGY_VERSION);
     const legacy = {
       ...brief,
       strategyVersion: "2",

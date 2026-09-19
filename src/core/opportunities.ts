@@ -590,6 +590,7 @@ export function visibleOpportunities(
       "15",
       "16",
       "17",
+      "18",
     ].includes(brief.strategyVersion || "")
   )
     return;
@@ -610,6 +611,7 @@ export function visibleOpportunities(
       "15",
       "16",
       "17",
+      "18",
     ].includes(brief.strategyVersion || "") &&
     (!overviewSchema.safeParse(brief.overview).success ||
       !z
