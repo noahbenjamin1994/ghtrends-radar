@@ -223,6 +223,8 @@ Authored prose is checked for clear English/Chinese language swaps and repaired 
 
 The recommended direction has one shared pilot definition: recruitment, task, time window, measurement and proposed continue/redirect criteria. The report summary, direction card and exports derive their experiment text from that definition. Review edits apply to the shared fields; source quotations and other directions stay independent.
 
+The recommended pilot uses shared numeric counts for people, tasks per person and qualifying outcomes. The application checks the denominators and generates equivalent continue/redirect criteria in both languages, with an intermediate range for further evidence. Pilot authoring uses a separate short call with bounded original evidence and thinking disabled. Source-backed project-use notices also appear beside resources and first-release scope, and in text/Markdown exports. These observations support checking the actual license and permissions for the proposed reuse.
+
 Before writing directions, a compact capability audit checks original project/product documents. It retains exact feature and constraint quotes, separates proposed additions from existing functions, and records code/data permissions, compatibility and access checks. Search snippets remain discovery leads. The audit runs with thinking disabled, allows one bounded correction and is stored with the report for inspection. A pending evidence review keeps delivery in the source-recovery flow.
 
 
