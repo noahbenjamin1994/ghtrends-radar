@@ -323,6 +323,106 @@ async function fixture(run: (r: Research, s: Store) => Promise<void>) {
   }
 }
 
+test("pilot authoring receives the selected job and bounded original evidence, with one repair and cached reuse", async () =>
+  fixture(async (r) => {
+    const data = countedSample(),
+      selected = data.opportunities[0]!;
+    const context = {
+      input: "Documentation",
+      capabilityAudit: capabilitySample(data.opportunities),
+      sources: [
+        ...documents,
+        {
+          id: "L1",
+          documentType: "license",
+          url: "https://github.com/team/editor/blob/main/LICENSE",
+          excerpt: "License text ".repeat(1000),
+        },
+        {
+          ...documents[0],
+          id: "R2",
+          excerpt: "Unrelated product ".repeat(1000),
+        },
+      ],
+    };
+    let calls = 0;
+    r.json = async (_prompt, input: any, budget, operation, thinking) => {
+      calls++;
+      assert.equal(thinking, false);
+      assert.equal(budget, 2400);
+      assert.deepEqual(
+        input.documents.map((s: any) => s.id),
+        ["R1"],
+      );
+      assert.equal(input.proposedJob.experiment, undefined);
+      assert.equal(input.proposedJob.successSignal, undefined);
+      assert.equal(input.proposedJob.service, selected.en.service);
+      const plan = structuredClone(data.experimentPlan!);
+      if (calls === 1) {
+        assert.equal(operation, "strategy-pilot");
+        plan.counts!.continueAt = 6;
+      } else {
+        assert.equal(operation, "strategy-pilot-repair");
+        assert.ok(
+          input.requiredCorrections.some(
+            (e: any) => e.path.join(".") === "counts.continueAt",
+          ),
+        );
+      }
+      return plan;
+    };
+    const plan = await (r as any).writeExperiment(context, selected);
+    assert.equal(plan.counts.continueAt, 4);
+    assert.deepEqual(await (r as any).writeExperiment(context, selected), plan);
+    assert.equal(calls, 2);
+  }));
+
+test("pilot format recovery stays bounded and provider failures preserve their recovery route", async () =>
+  fixture(async (r) => {
+    const data = countedSample();
+    let calls = 0;
+    r.json = async () => {
+      calls++;
+      throw Object.assign(new Error("format failure"), {
+        code: "output_limit",
+      });
+    };
+    await assert.rejects(
+      (r as any).writeExperiment(
+        { input: "Docs", sources: documents },
+        data.opportunities[0],
+      ),
+      /format failure/,
+    );
+    assert.equal(calls, 2);
+    calls = 0;
+    r.json = async () => {
+      calls++;
+      throw Object.assign(new Error("source quota"), { code: "http_429" });
+    };
+    await assert.rejects(
+      (r as any).writeExperiment(
+        { input: "Docs", sources: documents },
+        data.opportunities[0],
+      ),
+      /source quota/,
+    );
+    assert.equal(calls, 1);
+  }));
+
+test("current delivery requires shared counts while historical free-text plans remain readable", () => {
+  assert.ok(
+    strategyProblems(sample(), documents, seed, true, true).some((p) =>
+      p.startsWith("Experiment plan:"),
+    ),
+  );
+  assert.deepEqual(
+    strategyProblems(countedSample(), documents, seed, true, true),
+    [],
+  );
+  assert.deepEqual(strategyProblems(sample(), documents, seed, true), []);
+});
+
 test("strategy review repairs generic advice, verifies quotations, caches and preserves measurements", async () =>
   fixture(async (r) => {
     const before = JSON.stringify(seed),
@@ -380,7 +480,7 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     assert.equal(JSON.stringify(seed), before);
     const m = { ...seed, brief: b };
     const md = marketMarkdown(m, undefined, "zh");
-    assert.match(md, /建议继续门槛/);
+    assert.ok(md.includes(b.experimentPlan!.zh.continueIf));
     assert.match(md, /细分方向地图/);
     assert.match(md, /首版投入估算/);
     assert.match(md, /策略由 AI 提出/);
@@ -1318,6 +1418,7 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
       direction.facts.push({ id: "R9", quote: documents[0]!.excerpt! });
     let checked = false;
     r.json = async (_system, input: any, _budget, operation, thinking) => {
+      if (operation === "strategy-pilot") return countedSample().experimentPlan;
       if (operation === "capability-audit") return audited;
       if (operation === "strategy") {
         assert.equal(thinking, "low");
@@ -1377,6 +1478,7 @@ test("section format recovery preserves completed siblings and review budget rec
     const data = countedSample(),
       calls: string[] = [];
     r.json = async (_prompt, input: any, _budget, operation, thinking) => {
+      if (operation === "strategy-pilot") return countedSample().experimentPlan;
       if (operation === "capability-audit")
         return capabilitySample(input.directions);
       calls.push(operation!);
@@ -1431,6 +1533,7 @@ test("an overlong citation ID is resolved as an identity with its actual limit, 
     const data = countedSample();
     let repaired = false;
     r.json = async (_prompt, input: any, _budget, operation) => {
+      if (operation === "strategy-pilot") return countedSample().experimentPlan;
       if (operation === "capability-audit")
         return capabilitySample(input.directions);
       if (operation === "strategy-direction") {
