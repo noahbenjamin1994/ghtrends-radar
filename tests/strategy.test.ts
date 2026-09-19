@@ -219,7 +219,7 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
     assert.ok(visibleStrategy(b, "zh"));
     assert.equal(visibleOpportunities(b)?.opportunities.length, 3);
     assert.ok(visibleStrategy({ ...b, strategyVersion: "1" }, "zh"));
-    for (const version of ["5", "6", "7", "8", "9"]) {
+    for (const version of ["5", "6", "7", "8", "9", "10"]) {
       assert.ok(visibleStrategy({ ...b, strategyVersion: version }, "zh"));
       assert.equal(
         visibleOpportunities({ ...b, strategyVersion: version })?.opportunities
@@ -830,7 +830,7 @@ test("new reports require an overall answer and a readable customer need and off
     );
     r.json = async () => sample();
     const brief = await r.insights(seed, documents);
-    assert.equal(brief.strategyVersion, "9");
+    assert.equal(brief.strategyVersion, "10");
     const legacy = {
       ...brief,
       strategyVersion: "2",
@@ -1186,6 +1186,71 @@ test("Issue interpretation accepts only real request identities and exact quotes
     });
     assert.equal(result.length, 1);
     assert.equal(result[0].sourceId, "I1");
+  }));
+
+test("citation identity repair offers exact-text sources and protects valid IDs, quotes and other fields", async () =>
+  fixture(async (r) => {
+    const data = sample();
+    data.opportunities[0]!.basedOn = [
+      { id: "Editor product", quote: documents[0]!.excerpt! },
+    ];
+    data.opportunities[1]!.basedOn = [
+      { id: "W1", quote: documents[0]!.excerpt! },
+    ];
+    const sources = [
+      ...documents,
+      {
+        id: "W1",
+        kind: "search" as const,
+        label: "Different product",
+        url: "https://example.com/other",
+        excerpt: "A different product provides automatic deployment.",
+      },
+    ];
+    r.json = async (_prompt, input: any, _budget, operation) => {
+      assert.equal(operation, "strategy-copy");
+      const refs = input.fields.filter((f: any) => f.referenceCandidates);
+      assert.equal(refs.length, 2);
+      assert.deepEqual(
+        refs.map((f: any) => f.referenceCandidates.map((s: any) => s.id)),
+        [["R1"], ["R1"]],
+      );
+      return {
+        edits: [
+          ...refs.map((f: any) => ({ path: f.path, value: "R1" })),
+          { path: "evidence.0.id", value: "W1" },
+          {
+            path: "opportunities.0.basedOn.0.quote",
+            value: "Fabricated quote",
+          },
+          { path: "opportunities.0.id", value: "another-task" },
+        ],
+      };
+    };
+    const repaired = await (r as any).repairStrategyCopy(data, sources);
+    assert.deepEqual(repaired.opportunities[0].basedOn, [
+      { id: "R1", quote: documents[0]!.excerpt },
+    ]);
+    assert.equal(repaired.opportunities[1].basedOn[0].id, "R1");
+    assert.deepEqual(repaired.evidence, data.evidence);
+    assert.equal(repaired.opportunities[0].id, data.opportunities[0]!.id);
+
+    let calls = 0;
+    r.json = async (_prompt, input: any) => {
+      calls++;
+      return {
+        edits: input.fields
+          .filter((f: any) => f.referenceCandidates)
+          .map((f: any) => ({ path: f.path, value: "W1" })),
+      };
+    };
+    const rejected = await (r as any).repairStrategyCopy(data, sources);
+    assert.equal(calls, 3);
+    assert.equal(rejected.opportunities[0].basedOn[0].id, "Editor product");
+    assert.deepEqual(
+      rejected.opportunities[0].basedOn[0].quote,
+      documents[0]!.excerpt,
+    );
   }));
 
 test("advice stays in source audit and contributes zero user-demand cards or observed demand votes", () => {
