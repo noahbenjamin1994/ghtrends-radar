@@ -2,6 +2,10 @@ import { lookup } from "node:dns/promises";
 import type { LookupAddress } from "node:dns";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
+import { setTimeout as wait } from "node:timers/promises";
+import { PassThrough, Transform, Writable, type Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { createBrotliDecompress, createGunzip, createInflate } from "node:zlib";
 import { Agent, request } from "undici";
 import ipaddr from "ipaddr.js";
 import { load } from "cheerio";
@@ -19,7 +23,7 @@ const robotsParser = createRequire(import.meta.url)("robots-parser") as (
   getCrawlDelay(agent: string): number | undefined;
 };
 
-export const DOCUMENT_VERSION = "2";
+export const DOCUMENT_VERSION = "3";
 const agentName = "ghtrendsbot";
 const agentHeader = "ghtrendsbot/1.0 (+https://ghtrends.dev/radar/)";
 // Documentation shells can exceed 1 MB while their useful article is short.
@@ -52,6 +56,16 @@ export type DocumentTransport = (
 ) => Promise<PageResponse>;
 const failure = (status: DocumentStatus) =>
   Object.assign(new Error(`document_${status}`), { documentStatus: status });
+// Keep a finite set of transient network errors; access, DNS policy and format
+// failures retain their original result. Raw exception text stays private.
+const transientTransportCode = (error: any) => {
+  const code = error?.code || error?.cause?.code;
+  return /^(?:ECONNRESET|EPIPE|ETIMEDOUT|EAI_AGAIN|UND_ERR_(?:CONNECT_TIMEOUT|HEADERS_TIMEOUT|BODY_TIMEOUT|SOCKET))$/.test(
+    code || "",
+  )
+    ? String(code)
+    : undefined;
+};
 export const publicAddress = (address: string) => {
   try {
     return ipaddr.parse(address).range() === "unicast";
@@ -78,6 +92,48 @@ export async function publicAddresses(
     throw failure("access");
   signal.throwIfAborted();
   return addresses;
+}
+
+export async function documentBody(
+  body: Readable,
+  encoding: string,
+  maxBytes: number,
+  signal: AbortSignal,
+) {
+  const decoder =
+    encoding === "gzip"
+      ? createGunzip()
+      : encoding === "br"
+        ? createBrotliDecompress()
+        : encoding === "deflate"
+          ? createInflate()
+          : !encoding || encoding === "identity"
+            ? new PassThrough()
+            : undefined;
+  if (!decoder) {
+    body.destroy();
+    throw failure("format");
+  }
+  let bytes = 0,
+    decodedBytes = 0;
+  const chunks: Buffer[] = [];
+  const transfer = new Transform({
+    transform(chunk, _encoding, callback) {
+      bytes += chunk.length;
+      callback(bytes > maxBytes ? failure("limit") : null, chunk);
+    },
+  });
+  const output = new Writable({
+    write(chunk, _encoding, callback) {
+      decodedBytes += chunk.length;
+      if (decodedBytes > maxBytes) return callback(failure("limit"));
+      chunks.push(Buffer.from(chunk));
+      callback();
+    },
+  });
+  // Bound both wire traffic and decoded content; cancellation closes every stream.
+  await pipeline(body, transfer, decoder, output, { signal });
+  return { body: Buffer.concat(chunks).toString("utf8"), bytes };
 }
 
 /** Resolve once and pin the connection to the checked public addresses. Cookies,
@@ -110,7 +166,7 @@ export const publicRequest: DocumentTransport = async (
       headers: {
         "user-agent": agentHeader,
         accept: "text/html,text/plain,application/json;q=0.8",
-        "accept-encoding": "identity",
+        "accept-encoding": "gzip, br, deflate",
       },
       headersTimeout: 7000,
       bodyTimeout: 7000,
@@ -126,29 +182,16 @@ export const publicRequest: DocumentTransport = async (
       r.body.destroy();
       throw failure("limit");
     }
-    if (
-      headers["content-encoding"] &&
-      headers["content-encoding"] !== "identity"
-    ) {
-      r.body.destroy();
-      throw failure("format");
-    }
-    const chunks: Buffer[] = [];
-    let bytes = 0;
-    for await (const chunk of r.body) {
-      const b = Buffer.from(chunk);
-      bytes += b.length;
-      if (bytes > maxBytes) {
-        r.body.destroy();
-        throw failure("limit");
-      }
-      chunks.push(b);
-    }
+    const content = await documentBody(
+      r.body,
+      (headers["content-encoding"] || "").trim().toLowerCase(),
+      maxBytes,
+      signal,
+    );
     return {
       status: r.statusCode,
       headers,
-      body: Buffer.concat(chunks).toString("utf8"),
-      bytes,
+      ...content,
     };
   } finally {
     await dispatcher.destroy();
@@ -233,32 +276,53 @@ export class DocumentReader {
     signal: AbortSignal,
     operation: string,
     maxBytes = MAX_BYTES,
+    retryDelayMs = 250,
   ) {
-    const started = Date.now();
-    const call: ProviderCall = {
-      provider: "documents",
-      operation,
-      started: new Date(started).toISOString(),
-      durationMs: 0,
-    };
-    try {
-      const r = await this.transport(
-        url,
-        AbortSignal.any([signal, AbortSignal.timeout(8000)]),
-        maxBytes,
-      );
-      call.status = r.status;
-      call.transferBytes = r.bytes;
-      if (r.status >= 400) call.error = `http_${r.status}`;
-      return r;
-    } catch (error) {
-      call.error = (error as any).documentStatus
-        ? `document_${(error as any).documentStatus}`
-        : "document_transport";
-      throw error;
-    } finally {
-      call.durationMs = Date.now() - started;
-      this.store.recordCall(call);
+    for (let attempt = 0; ; attempt++) {
+      // Each retry shares the original collection deadline.
+      signal.throwIfAborted();
+      const started = Date.now();
+      const attemptSignal = AbortSignal.any([
+        signal,
+        AbortSignal.timeout(8000),
+      ]);
+      const call: ProviderCall = {
+        provider: "documents",
+        operation,
+        started: new Date(started).toISOString(),
+        durationMs: 0,
+      };
+      try {
+        if (operation === "page")
+          this.store.set(
+            `documents:last:${url.origin}`,
+            started,
+            Math.max(86400000, retryDelayMs),
+          );
+        const r = await this.transport(url, attemptSignal, maxBytes);
+        call.status = r.status;
+        call.transferBytes = r.bytes;
+        if (r.status >= 400) call.error = `http_${r.status}`;
+        return r;
+      } catch (error) {
+        const status = (error as any).documentStatus;
+        const code =
+          transientTransportCode(error) ||
+          (attemptSignal.aborted &&
+          attemptSignal.reason?.name === "TimeoutError"
+            ? "TIMEOUT"
+            : undefined);
+        call.error = status
+          ? `document_${status}`
+          : code
+            ? `document_transport_${code.toLowerCase()}`
+            : "document_transport";
+        if (attempt || signal.aborted || status || !code) throw error;
+      } finally {
+        call.durationMs = Date.now() - started;
+        this.store.recordCall(call);
+      }
+      await wait(Math.min(20000, retryDelayMs), undefined, { signal });
     }
   }
   private async robots(url: URL, signal: AbortSignal) {
@@ -300,6 +364,8 @@ export class DocumentReader {
       Date.now(),
       Math.max(86400000, (delay || 0) * 1000),
     );
+    // A delayed page retry also observes the site's advertised crawl interval.
+    return Math.max(250, (delay || 0) * 1000);
   }
   private async page(
     original: ResearchSource,
@@ -314,8 +380,8 @@ export class DocumentReader {
         blockedHosts.test(url.hostname)
       )
         throw failure("access");
-      await this.robots(url, signal);
-      const r = await this.read(url, signal, "page");
+      const retryDelayMs = await this.robots(url, signal);
+      const r = await this.read(url, signal, "page", MAX_BYTES, retryDelayMs);
       if ([301, 302, 303, 307, 308].includes(r.status)) {
         const next = new URL(r.headers.location || "", url);
         if (
