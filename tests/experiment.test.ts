@@ -57,7 +57,7 @@ test("per-person trials and the cohort keep different denominators in both langu
   assert.match(zh.successSignal, /至少 4 人达标/);
   assert.match(
     en.successSignal,
-    /3–3 qualifying participants, gather more evidence/,
+    /3 qualifying participants, gather more evidence/,
   );
   assert.match(zh.pivotSignal, /至多 2 人达标/);
 });
@@ -142,10 +142,10 @@ test("maximum authored field sizes fit stored and displayed bounds", () => {
   };
   for (const lang of ["en", "zh"] as const)
     for (const [key, size] of Object.entries({
-      participants: 160,
-      task: 220,
+      participants: 200,
+      task: 280,
       timebox: 140,
-      measurement: 180,
+      measurement: 200,
       redirectAction: 140,
     }))
       (p[lang] as any)[key] = "x".repeat(size);

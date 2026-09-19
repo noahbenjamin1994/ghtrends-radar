@@ -55,10 +55,10 @@ export type ExperimentPlan = z.infer<typeof experimentPlanSchema>;
 const countedCopy = experimentCopy
   .omit({ continueIf: true, redirectIf: true })
   .extend({
-    participants: z.string().trim().min(8).max(160),
-    task: z.string().trim().min(8).max(220),
+    participants: z.string().trim().min(8).max(200),
+    task: z.string().trim().min(8).max(280),
     timebox: z.string().trim().min(8).max(140),
-    measurement: z.string().trim().min(8).max(180),
+    measurement: z.string().trim().min(8).max(200),
     redirectAction: z.string().trim().min(8).max(140),
   });
 export const countedExperimentSchema = z.object({
@@ -78,11 +78,15 @@ export function renderExperiment(plan: ExperimentPlan, lang: "en" | "zh") {
       pivotSignal: p.redirectIf,
     };
   const total = c.participants * c.tasksPerParticipant;
+  const middle =
+    c.redirectAtMost + 1 === c.continueAt - 1
+      ? String(c.redirectAtMost + 1)
+      : `${c.redirectAtMost + 1}–${c.continueAt - 1}`;
   const intermediate =
     c.redirectAtMost + 1 < c.continueAt
       ? lang === "zh"
-        ? `达标人数为 ${c.redirectAtMost + 1}–${c.continueAt - 1} 人时，继续收集证据。`
-        : `For ${c.redirectAtMost + 1}–${c.continueAt - 1} qualifying participants, gather more evidence.`
+        ? `达标人数为 ${middle} 人时，继续收集证据。`
+        : `For ${middle} qualifying participants, gather more evidence.`
       : "";
   return lang === "zh"
     ? {
@@ -131,4 +135,4 @@ Each en/zh object has five short fields:
 - measurement: a yes/no success rule for ONE task. Target 110 characters. Cover the intended result, optionally AND a time/cost limit. Use elapsed time for that task, from start to completion. Keep participant/trial counts and aggregate percentages out of this field.
 - redirectAction: ONE concrete next change, target 80 characters. The application supplies the condition; write just the action.
 Example of coherent counting: counts={participants:5,tasksPerParticipant:5,successfulTasksPerParticipant:4,continueAt:4,redirectAtMost:2}. Each person performs five separate note-entry tasks (25 total); each task succeeds when every required field matches its fixture and entry takes at most the baseline time. A participant qualifies after four successful tasks; four qualifying people trigger continuation, at most two trigger redirection, three call for more evidence. These aggregate sentences are rendered by the application, so return only the five authored fields and counts.
-For a batch of named measurements, success can require every item to match its expected classification, including BOTH normal and abnormal items. Keep the same item list throughout. Existing batch entry is the baseline for a batch-entry extension. Keep proposed prototypes separate from the current product; a new validation rule belongs to the prototype. Use affirmative English and Simplified Chinese; keep equivalent meaning. Skills and recruitment are requirements. Keep the pilot useful and short.`;
+For a batch of named measurements, success can require every item to match its expected classification, including BOTH normal and abnormal items. Keep the same item list throughout. Existing batch entry is the baseline for a batch-entry extension. Keep proposed prototypes separate from the current product; a new validation rule belongs to the prototype. Use affirmative English and Simplified Chinese; keep equivalent meaning. Use "at most" / "至多" for upper bounds; Chinese authored prose excludes 不、无、未、没, English excludes not, no, without. Skills and recruitment are requirements. Keep the pilot useful and short.`;
