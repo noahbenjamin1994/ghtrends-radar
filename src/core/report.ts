@@ -20,6 +20,7 @@ import type { Market, Repo } from "./types.js";
 import { text, localeUrl, type Locale } from "./i18n.js";
 import { marketAssessment, competitionPressure } from "./assessment.js";
 import { visibleStrategy, strategyRows } from "./strategy.js";
+import { projectUseConditions, projectUseCopy } from "./capabilities.js";
 const cell = (s: string) => s.replaceAll("|", "\\|").replace(/[\r\n]+/g, " ");
 const documentLink = (label: string, url: string) =>
   `[${cell(label).replace(/[\\\[\]<>]/g, "\\$&")}]` +
@@ -130,6 +131,19 @@ export function marketMarkdown(
                     r.text,
                     "",
                   ]),
+                  ...(projectUseConditions(m.brief!, o.id).length
+                    ? [
+                        `**${projectUseCopy(locale).title}**`,
+                        projectUseCopy(locale).text,
+                        ...projectUseConditions(m.brief!, o.id).flatMap(
+                          (condition) => [
+                            documentLink(condition.project, condition.url),
+                            documentQuote(condition.quote),
+                            "",
+                          ],
+                        ),
+                      ]
+                    : []),
                   ...[...o.demand.evidence, ...o.competition.evidence]
                     .filter(
                       (r, i, all) => all.findIndex((x) => x.id === r.id) === i,

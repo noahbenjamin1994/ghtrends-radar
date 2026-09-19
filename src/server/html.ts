@@ -11,6 +11,7 @@ import {
   opportunityRows,
 } from "../core/opportunities.js";
 import { appPath, basePathFromUrl } from "../core/paths.js";
+import { projectUseConditions, projectUseCopy } from "../core/capabilities.js";
 import {
   marketGapSignals,
   reportIssueSignals,
@@ -171,7 +172,19 @@ export function renderDocument(
                       (r) =>
                         `<h4>${escapeHtml(r.label)}</h4><p>${escapeHtml(r.text)}</p>`,
                     )
-                    .join("")}</article>`,
+                    .join("")}${
+                    projectUseConditions(m.brief!, o.id).length
+                      ? `<aside><h4>${escapeHtml(projectUseCopy(locale).title)}</h4><p>${escapeHtml(projectUseCopy(locale).text)}</p>${projectUseConditions(
+                          m.brief!,
+                          o.id,
+                        )
+                          .map(
+                            (condition) =>
+                              `<p><a href="${escapeHtml(condition.url)}">${escapeHtml(condition.project)}</a></p><blockquote>${escapeHtml(condition.quote)}</blockquote>`,
+                          )
+                          .join("")}</aside>`
+                      : ""
+                  }</article>`,
               )
               .join("")}</section>`
           : ""

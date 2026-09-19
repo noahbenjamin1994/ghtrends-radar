@@ -11,10 +11,12 @@ import {
   capabilityEditPaths,
   applyCapabilityEdits,
   capabilityNotices,
+  projectUseConditions,
+  projectUseCopy,
 } from "../src/core/capabilities.js";
 import { Research } from "../src/providers/research.js";
 import { Store } from "../src/core/store.js";
-import type { ResearchSource } from "../src/core/types.js";
+import type { Brief, ResearchSource } from "../src/core/types.js";
 const docs: ResearchSource[] = [
   {
     id: "R1",
@@ -206,6 +208,44 @@ test("feature selection retains explicit rights and testing notices from the sam
     ["Experimental build. Not for production use. Use with caution!"],
   );
   assert.deepEqual(capabilityNotices({ ...source, kind: "request" }), []);
+});
+
+test("displayed use conditions follow selected original documents and exclude other projects and website footers", () => {
+  const source = {
+    ...docs[0]!,
+    excerpt: docs[0]!.excerpt + "\nCopyright Notebook. All rights reserved.",
+  };
+  const website = {
+    ...source,
+    id: "P1",
+    documentType: "page" as const,
+    url: "https://example.com",
+  };
+  const other = {
+    ...source,
+    id: "R2",
+    url: "https://github.com/other/project/blob/main/README.md",
+  };
+  const check = audit();
+  check.directions[0]!.facts.push({ id: "P1", quote: "All rights reserved." });
+  const brief = {
+    sources: [source, website, other],
+    capabilityAudit: check,
+  } as Brief;
+  assert.deepEqual(projectUseConditions(brief, "grooming-notes"), [
+    {
+      project: "team/notebook",
+      url: source.url,
+      quote: "Copyright Notebook. All rights reserved.",
+    },
+  ]);
+  assert.deepEqual(projectUseConditions(brief, "another-direction"), []);
+  assert.deepEqual(
+    projectUseConditions({ sources: brief.sources } as Brief, "grooming-notes"),
+    [],
+  );
+  assert.match(projectUseCopy("zh").text, /首版/);
+  assert.match(projectUseCopy("en").text, /required permissions/);
 });
 
 test("audit repair exposes quote errors alongside length errors and confines edits to rejected fields", () => {

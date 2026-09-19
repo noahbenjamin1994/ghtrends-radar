@@ -10,6 +10,7 @@ import type { Brief, Market } from "../core/types.js";
 import { fitLabel, type SavedFit } from "../core/fit.js";
 import { FitReason, PersonalFit } from "./fit.js";
 import { DeepStart } from "./deep.js";
+import { projectUseConditions, projectUseCopy } from "../core/capabilities.js";
 
 export function TopicOverview({
   brief,
@@ -102,6 +103,8 @@ export function OpportunityMap({
     map.opportunities.find((o) => o.id === choice) ||
     map.opportunities.find((o) => o.id === map.recommendedId)!;
   const p = selected[locale];
+  const useConditions = projectUseConditions(brief, selected.id);
+  const useCopy = projectUseCopy(locale);
   const refs = [
     ...selected.demand.evidence,
     ...selected.competition.evidence,
@@ -309,6 +312,24 @@ export function OpportunityMap({
             <p>{p.upkeep}</p>
           </div>
         </div>
+        {!!useConditions.length && (
+          <aside
+            className="opportunity-use-conditions"
+            aria-label={useCopy.title}
+          >
+            <h5>{useCopy.title}</h5>
+            <p>{useCopy.text}</p>
+            {useConditions.map((condition) => (
+              <div key={condition.url + condition.quote}>
+                <a href={condition.url} target="_blank" rel="noreferrer">
+                  {condition.project}{" "}
+                  <ArrowUpRight size={14} aria-hidden="true" />
+                </a>
+                <blockquote>{condition.quote}</blockquote>
+              </div>
+            ))}
+          </aside>
+        )}
         <div className="opportunity-assessments opportunity-action">
           <div>
             <h5>{l("Build this first", "第一件值得做的东西")}</h5>

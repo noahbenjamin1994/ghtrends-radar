@@ -423,6 +423,51 @@ test("current delivery requires shared counts while historical free-text plans r
   assert.deepEqual(strategyProblems(sample(), documents, seed, true), []);
 });
 
+test("project usage observations reach bilingual report exports even when generated resources omit them", () => {
+  const value = countedSample();
+  value.capabilityAudit = capabilitySample(value.opportunities);
+  const sources = [
+    {
+      ...documents[0]!,
+      documentType: "github-readme" as const,
+      excerpt:
+        documents[0]!.excerpt + "\nCopyright Editor. All rights reserved.",
+    },
+  ];
+  const market: Market = {
+    ...seed,
+    brief: {
+      ...value,
+      sources,
+      strategyVersion: "17",
+      model: "fixture",
+      generatedAt: seed.asOf,
+      en: { ...value.en, nextSteps: [] },
+      zh: { ...value.zh, nextSteps: [] },
+    },
+  };
+  for (const locale of ["en", "zh"] as const) {
+    const md = marketMarkdown(market, undefined, locale);
+    assert.match(md, /Copyright Editor\. All rights reserved\./);
+    const html = renderDocument(
+      '<html><head></head><body><div id="root"></div></body></html>',
+      {
+        base: "https://ghtrends.dev/radar",
+        path: "/report/" + market.id,
+        geo: "US",
+        market,
+        markets: [],
+        status: 200,
+        locale,
+      },
+    );
+    assert.match(html, /Copyright Editor\. All rights reserved\./);
+    assert.ok(
+      html.includes(locale === "zh" ? "所需授权" : "required permissions"),
+    );
+  }
+});
+
 test("strategy review repairs generic advice, verifies quotations, caches and preserves measurements", async () =>
   fixture(async (r) => {
     const before = JSON.stringify(seed),
@@ -1571,6 +1616,59 @@ test("an overlong citation ID is resolved as an identity with its actual limit, 
     assert.deepEqual(result.opportunities[0].basedOn, [
       { id: "R1", quote: documents[0]!.excerpt },
     ]);
+  }));
+
+test("section quote shortening uses the existing exact span instead of resending the entire source", async () =>
+  fixture(async (r) => {
+    const data = countedSample();
+    const clause =
+      "Editor retains review anchors for teams splitting a shared document.";
+    const longQuote =
+      clause +
+      " A longer comparison describes additional publishing and team review workflows.".repeat(
+        4,
+      );
+    const source: ResearchSource = {
+      id: "R2",
+      label: "Editor comparison",
+      documentType: "page",
+      url: "https://example.com/editor",
+      excerpt: "Page context. ".repeat(500) + longQuote,
+    };
+    let shortened = 0;
+    r.json = async (prompt, input: any, _budget, operation) => {
+      if (operation === "capability-audit")
+        return capabilitySample(input.directions);
+      if (operation === "strategy-direction")
+        return data.opportunities.find((o) => o.id === input.candidate.id);
+      if (operation === "strategy-pilot") return data.experimentPlan;
+      if (operation === "strategy-evidence-review") return { edits: [] };
+      if (operation === "strategy-copy") {
+        shortened++;
+        assert.match(prompt, /ONE exact contiguous clause/);
+        assert.equal(input.fields[0].source, longQuote);
+        return { edits: [{ path: input.fields[0].path, value: clause }] };
+      }
+      if (operation === "strategy-overall")
+        return {
+          ...data,
+          overview: {
+            ...data.overview,
+            evidence: [{ id: "R2", quote: longQuote }],
+          },
+        };
+      return data;
+    };
+    const result = await (r as any).writeStrategySections(
+      { input: "Docs", sources: [...documents, source] },
+      {
+        overall: {},
+        opportunities: data.opportunities,
+        recommendedId: data.recommendedId,
+      },
+    );
+    assert.equal(shortened, 1);
+    assert.deepEqual(result.overview.evidence, [{ id: "R2", quote: clause }]);
   }));
 
 test("review recovery is bounded and provider errors keep their original recovery path", async () =>

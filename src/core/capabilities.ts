@@ -1,7 +1,46 @@
 import { z } from "zod";
 import { recoverSourceQuote } from "./opportunities.js";
 import { validQuote } from "./landscape.js";
-import type { ResearchSource } from "./types.js";
+import type { Brief, ResearchSource } from "./types.js";
+
+/** Display observed project notices beside the plan, independently of AI prose. */
+export function projectUseConditions(brief: Brief, directionId: string) {
+  const ids = new Set(
+    brief.capabilityAudit?.directions
+      .find((d) => d.id === directionId)
+      ?.facts.map((f) => f.id) || [],
+  );
+  return brief.sources
+    .filter((s) => s.id && ids.has(s.id))
+    .flatMap((s) => {
+      const project = s.url.match(
+        /^https:\/\/github\.com\/([^/?#]+\/[^/?#]+)(?:\/|$)/i,
+      )?.[1];
+      if (!project) return [];
+      return capabilityNotices(s).map((quote) => ({
+        project,
+        url: s.url,
+        quote,
+      }));
+    })
+    .filter(
+      (s, i, all) =>
+        all.findIndex((x) => x.project === s.project && x.quote === s.quote) ===
+        i,
+    );
+}
+
+export function projectUseCopy(locale: "en" | "zh") {
+  return locale === "zh"
+    ? {
+        title: "动手前，核对项目使用条件",
+        text: "以下是项目原文中的使用说明。首版如涉及这些代码或数据，先核对适用许可、所需授权与允许用途，再确定复用范围。",
+      }
+    : {
+        title: "Check project terms before building",
+        text: "These notices appear in the project documents. For a first release using this code or data, confirm the applicable license, required permissions and permitted uses before setting the reuse scope.",
+      };
+}
 
 const factSchema = z.object({
   id: z.string().max(30),
