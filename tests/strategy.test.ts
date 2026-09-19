@@ -214,9 +214,7 @@ function capabilitySample(directions: { id: string }[]) {
   return {
     directions: directions.map((d) => ({
       id: d.id,
-      facts: [
-        { kind: "feature" as const, id: "R1", quote: documents[0]!.excerpt! },
-      ],
+      facts: [{ id: "R1", quote: documents[0]!.excerpt! }],
       overlap: "partial" as const,
       proposedWork:
         "Prototype review continuity after checking the current export behavior.",

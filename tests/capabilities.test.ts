@@ -7,6 +7,9 @@ import {
   capabilityProblems,
   capabilitySources,
   normalizeCapabilityAudit,
+  capabilityIssues,
+  capabilityEditPaths,
+  applyCapabilityEdits,
 } from "../src/core/capabilities.js";
 import { Research } from "../src/providers/research.js";
 import { Store } from "../src/core/store.js";
@@ -58,7 +61,6 @@ const audit = () => ({
       id: "grooming-notes",
       facts: [
         {
-          kind: "feature" as const,
           id: "R1",
           quote:
             "**Notebook** stores pet profiles, grooming notes and visit photos.",
@@ -86,7 +88,7 @@ async function fixture(fn: (r: Research, s: Store) => Promise<void>) {
   }
 }
 
-test("capability facts require original documents, exact quotes, matching direction and license scope", () => {
+test("capability facts retain original documents and source ownership; collection direction does not limit reuse", () => {
   assert.deepEqual(
     capabilitySources(docs).map((s) => s.id),
     ["R1", "L1"],
@@ -98,37 +100,30 @@ test("capability facts require original documents, exact quotes, matching direct
     ["R1", "Notebook already supports automatic offline syncing."],
   ]) {
     const x = audit();
-    x.directions[0]!.facts[0] = { kind: "feature", id, quote };
+    x.directions[0]!.facts[0] = { id, quote };
     assert.ok(
       capabilityProblems(x, docs, ["grooming-notes"]).some((p) =>
         p.includes("exact original-document"),
       ),
     );
   }
-  const terms: any = audit();
-  terms.directions[0].facts[0].kind = "terms";
-  assert.ok(
-    capabilityProblems(terms, docs, ["grooming-notes"]).some((p) =>
-      p.includes("license document"),
-    ),
-  );
   const license: any = audit();
   license.directions[0].facts[0] = {
-    kind: "feature",
     id: "L1",
     quote: docs[1]!.excerpt,
   };
   assert.ok(
     capabilityProblems(license, docs, ["grooming-notes"]).some((p) =>
-      p.includes("feature/compatibility"),
+      p.includes("product-document quote"),
     ),
   );
-  assert.ok(
+  assert.deepEqual(
     capabilityProblems(
       audit(),
       [{ ...docs[0]!, directionId: "another-task" }],
       ["grooming-notes"],
-    ).some((p) => p.includes("another direction")),
+    ),
+    [],
   );
   assert.ok(
     capabilityProblems(audit(), docs, ["another-task"]).some((p) =>
@@ -141,6 +136,94 @@ test("capability facts require original documents, exact quotes, matching direct
     capabilityProblems(empty, docs, ["grooming-notes"]).some((p) =>
       p.includes("overlap needs"),
     ),
+  );
+});
+
+test("copyright, scoped license restrictions and legacy release observations retain exact provenance", () => {
+  const x = audit();
+  x.directions[0]!.facts.push({ id: "L1", quote: docs[1]!.excerpt! });
+  const src = [
+    ...docs,
+    {
+      ...docs[0]!,
+      id: "R2",
+      excerpt: "Copyright 2026 Pawtrackr. All rights reserved.",
+    },
+  ];
+  x.directions[0]!.facts.push({ id: "R2", quote: src[4]!.excerpt! });
+  assert.deepEqual(capabilityProblems(x, src, ["grooming-notes"]), []);
+  x.directions[0]!.facts[0]!.id = "R2";
+  assert.ok(
+    capabilityProblems(x, src, ["grooming-notes"]).some((p) =>
+      p.includes("same project/page"),
+    ),
+  );
+  assert.equal(
+    capabilitySources([
+      {
+        ...docs[0]!,
+        documentType: undefined,
+        url: "https://github.com/team/notebook/releases/tag/v1.2",
+      },
+    ]).length,
+    1,
+  );
+});
+
+test("audit repair exposes quote errors alongside length errors and confines edits to rejected fields", () => {
+  const x = audit();
+  x.directions[0]!.proposedWork = "x".repeat(301);
+  x.directions[0]!.facts[0]!.quote = "Invented offline synchronization.";
+  const issues = capabilityIssues(x, docs, ["grooming-notes"]);
+  const paths = capabilityEditPaths(issues);
+  assert.deepEqual(paths.sort(), [
+    "directions.0.facts",
+    "directions.0.proposedWork",
+  ]);
+  assert.equal(issues.length, 2);
+  const repaired = applyCapabilityEdits(
+    x,
+    {
+      edits: [
+        { path: "directions.0.facts", value: audit().directions[0]!.facts },
+        {
+          path: "directions.0.proposedWork",
+          value: audit().directions[0]!.proposedWork,
+        },
+      ],
+    },
+    paths,
+  );
+  assert.deepEqual(repaired, audit());
+  assert.equal(x.directions[0]!.proposedWork.length, 301);
+  for (const path of [
+    "directions.0.id",
+    "directions.0.nextCheck",
+    "__proto__.polluted",
+  ]) {
+    assert.throws(() =>
+      applyCapabilityEdits(x, { edits: [{ path, value: "edited" }] }, paths),
+    );
+  }
+  assert.throws(() =>
+    applyCapabilityEdits(
+      x,
+      {
+        edits: [
+          { path: paths[0], value: [] },
+          { path: paths[0], value: [] },
+        ],
+      },
+      paths,
+    ),
+  );
+  const y = audit();
+  y.directions[0]!.proposedWork = "x".repeat(301);
+  y.directions[0]!.facts[0]!.quote =
+    "Notebook stores pet profiles, grooming notes and visit photos.";
+  assert.equal(
+    (normalizeCapabilityAudit(y, docs) as any).directions[0].facts[0].quote,
+    audit().directions[0]!.facts[0]!.quote,
   );
 });
 
@@ -175,12 +258,18 @@ test("a capability audit repairs exact-source violations once, caches accepted c
       const x = audit();
       if (op === "capability-audit")
         x.directions[0]!.facts[0]!.quote = "Invented offline synchronization.";
-      else
+      else {
         assert.ok(
           input.requiredCorrections.some((x: string) =>
             x.includes("exact original-document"),
           ),
         );
+        return {
+          edits: [
+            { path: "directions.0.facts", value: x.directions[0]!.facts },
+          ],
+        };
+      }
       return x;
     };
     const context = { input: "grooming", sources: docs };
