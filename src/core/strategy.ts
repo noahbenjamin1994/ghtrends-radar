@@ -13,6 +13,7 @@ import {
   OPPORTUNITY_PROMPT,
   hasCoverageQuantity,
   proseRepairs,
+  internalProseReferences,
 } from "./opportunities.js";
 import {
   hasNegativeWording,
@@ -157,6 +158,14 @@ export function strategyProblems(
             );
   }
   for (const field of proseRepairs(data, true)) {
+    const refs = internalProseReferences(
+      field.value,
+      sources.flatMap((s) => (s.id ? [s.id] : [])),
+    );
+    if (refs.length)
+      problems.push(
+        `${field.path}: replace internal source handles ${refs.join(", ")} with readable source names.`,
+      );
     const language = field.path.split(".").includes("zh") ? "zh" : "en";
     if (proseLanguageMismatch(field.value, language))
       problems.push(

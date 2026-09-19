@@ -1,4 +1,7 @@
-import { recoverSourceQuote } from "../src/core/opportunities.js";
+import {
+  internalProseReferences,
+  recoverSourceQuote,
+} from "../src/core/opportunities.js";
 import { proseLanguageMismatch } from "../src/core/i18n.js";
 import { modelSources } from "../src/providers/research.js";
 import {
@@ -2217,5 +2220,37 @@ test("exact quote recovery preserves Markdown emphasis and code instead of askin
       true,
     ),
     undefined,
+  );
+});
+
+test("copy delivery gate covers collected-page IDs and preserves embedded product identifiers", () => {
+  const data = sample();
+  data.en.summary =
+    "The publisher page WP1 describes per-GB costs; release V3 describes profiling.";
+  const sources = [
+    ...documents,
+    { id: "WP1", label: "Cost guide", url: "https://example.com/guide" },
+    { id: "V3", label: "Release notes", url: "https://example.com/releases" },
+  ];
+  assert.deepEqual(internalProseReferences(data.en.summary, ["WP1", "V3"]), [
+    "WP1",
+    "V3",
+  ]);
+  assert.deepEqual(
+    internalProseReferences("WP100 and product-V3-lts stay identifiers", [
+      "WP1",
+      "V3",
+    ]),
+    [],
+  );
+  assert.ok(
+    strategyProblems(data, sources, seed).some((x) =>
+      x.includes("internal source handles WP1, V3"),
+    ),
+  );
+  assert.ok(
+    proseRepairs(data, false, ["WP1", "V3"]).some(
+      (f) => f.path === "en.summary",
+    ),
   );
 });

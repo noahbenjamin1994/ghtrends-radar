@@ -86,11 +86,30 @@ export function hasCoverageQuantity(text: string): boolean {
   );
 }
 
+/** Match generated source handles at token boundaries, including collected pages. */
+export function internalProseReferences(
+  value: string,
+  sourceIds: string[] = [],
+): string[] {
+  const known = sourceIds
+    .filter((id) => /^[A-Z][A-Z0-9]{1,20}$/.test(id))
+    .filter((id) =>
+      new RegExp(`(^|[^A-Za-z0-9_-])${id}($|[^A-Za-z0-9_-])`).test(value),
+    );
+  return [
+    ...new Set([
+      ...known,
+      ...(value.match(/\b(?:S[12]|[RI]\d+|W\d+R\d+|D\d+[AIR]\d+)\b/g) || []),
+    ]),
+  ];
+}
+
 /** The editor receives the same concrete failures that select a prose field. */
 export function proseDiagnostics(
   value: string,
   path: string,
   directionIds: string[] = [],
+  sourceIds: string[] = [],
 ): string[] {
   const problems: string[] = [];
   const lang = path.split(".").includes("zh") ? "zh" : "en";
@@ -103,11 +122,7 @@ export function proseDiagnostics(
     problems.push(
       `Affirmative wording: replace these exact matches, including inside compounds: ${JSON.stringify(negatives)}. Preserve the claim and comparison operators. For example 不同日期 -> 独立日期, 无关 -> 属于相邻领域; express a limited scope directly instead of using 而非.`,
     );
-  const ids = [
-    ...new Set(
-      value.match(/\b(?:S[12]|[RI]\d+|W\d+R\d+|D\d+[AIR]\d+)\b/g) || [],
-    ),
-  ];
+  const ids = internalProseReferences(value, sourceIds);
   const slugs = directionIds.filter(
     (id) => id.includes("-") && value.includes(id),
   );
@@ -129,6 +144,7 @@ export function proseDiagnostics(
 export function proseRepairs(
   raw: unknown,
   all = false,
+  sourceIds: string[] = [],
 ): { path: string; value: string }[] {
   if (!raw || typeof raw !== "object") return [];
   const data = raw as Record<string, any>,
@@ -163,7 +179,7 @@ export function proseRepairs(
           ).test(path))
       )
         return;
-      if (all || proseDiagnostics(node, path, directionIds).length)
+      if (all || proseDiagnostics(node, path, directionIds, sourceIds).length)
         fields.push({ path, value: node });
     } else if (node && typeof node === "object") {
       for (const [k, v] of Object.entries(node)) visit(v, `${path}.${k}`);
