@@ -1,0 +1,237 @@
+/* A small ledge at the fold opens naturally into an editorial case gallery. */
+.inspiration-section {
+  max-width: 780px;
+  margin: 0 auto 64px;
+  scroll-margin-top: 28px;
+}
+.inspiration-handle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 22px;
+  border-radius: 22px 22px 0 0;
+  background: #f7f7f7;
+  color: #858585;
+  font-size: 14px;
+  transition:
+    background 300ms ease,
+    color 250ms ease;
+}
+.inspiration-label,
+.inspiration-scroll {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.inspiration-scroll {
+  gap: 8px;
+  font-size: 12px;
+  color: #979797;
+  transition: opacity 220ms ease;
+}
+.inspiration-bulb {
+  width: 23px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  color: #aaa;
+  transition:
+    color 300ms ease,
+    filter 300ms ease;
+}
+.inspiration-bulb::before {
+  content: "";
+  position: absolute;
+  inset: 0 -3px;
+  border-radius: 50%;
+  background: #ffcc7345;
+  filter: blur(7px);
+  opacity: 0;
+  transform: scale(0.7);
+  transition:
+    opacity 300ms ease,
+    transform 300ms ease;
+}
+.inspiration-bulb svg {
+  position: relative;
+  transition: fill 300ms ease;
+}
+.inspiration-section[data-lit="true"] .inspiration-handle {
+  background: #fff;
+  color: #525252;
+}
+.inspiration-section[data-lit="true"] .inspiration-scroll {
+  opacity: 0;
+}
+.inspiration-section[data-lit="true"] .inspiration-bulb,
+.inspiration-handle:hover .inspiration-bulb,
+.inspiration-handle:focus-visible .inspiration-bulb {
+  color: #d68c25;
+}
+.inspiration-section[data-lit="true"] .inspiration-bulb svg {
+  fill: #ffe4b3;
+}
+.inspiration-section[data-lit="true"] .inspiration-bulb::before {
+  opacity: 1;
+  transform: scale(1);
+}
+.inspiration-content {
+  padding: 0 20px 24px;
+}
+.inspiration-caption {
+  color: #858585;
+  font-size: 12px;
+  margin: 4px 0 24px;
+  line-height: 1.6;
+}
+.inspiration-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px 20px;
+}
+.inspiration-card {
+  min-width: 0;
+  border-radius: 16px;
+}
+.case-art {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16/9;
+  border-radius: 16px;
+  border: 1px solid #00000006;
+}
+.case-art > svg {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transition: transform 400ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.case-art-browser {
+  background: #eef1f6;
+}
+.case-art-memory {
+  background: #292534;
+}
+.case-art-mcp {
+  background: #f1ede5;
+}
+.case-art-code {
+  background: #213132;
+}
+.case-art-rag {
+  background: #f3ece6;
+}
+.case-art-local {
+  background: #1a3039;
+}
+.case-open {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffffffed;
+  color: #555;
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+.inspiration-card h3 {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.5;
+  padding: 12px 3px 0;
+}
+.inspiration-card p {
+  color: #8a8a8a;
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 3px 3px 0;
+}
+.inspiration-card:focus-visible .case-open {
+  opacity: 1;
+  transform: translateY(0);
+}
+.case-placeholder {
+  aspect-ratio: 4/3;
+  background: #f7f7f7;
+  border-radius: 16px;
+}
+.inspiration-empty {
+  font-size: 13px;
+  color: #888;
+  padding: 24px 0;
+}
+@media (hover: hover) {
+  .inspiration-handle:hover {
+    color: #555;
+  }
+  .inspiration-card:hover .case-art > svg {
+    transform: scale(1.035);
+  }
+  .inspiration-card:hover .case-open {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .inspiration-card {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity 420ms ease var(--case-delay),
+      transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1) var(--case-delay);
+  }
+  .inspiration-card.is-visible,
+  .inspiration-card:focus-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 800px) {
+  .inspiration-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .inspiration-section {
+    margin-bottom: 40px;
+  }
+}
+@media (max-width: 600px) {
+  .inspiration-handle {
+    padding-inline: 14px;
+    border-radius: 18px 18px 0 0;
+  }
+  .inspiration-content {
+    padding: 0 4px 16px;
+  }
+  .inspiration-grid {
+    gap: 24px 14px;
+  }
+  .case-art {
+    border-radius: 12px;
+  }
+  .inspiration-card h3 {
+    font-size: 13px;
+    padding-top: 10px;
+  }
+  .inspiration-card p {
+    font-size: 11px;
+  }
+  .inspiration-caption {
+    margin: 4px 10px 20px;
+  }
+}
+@media (max-width: 380px) {
+  .inspiration-grid {
+    grid-template-columns: 1fr;
+  }
+}

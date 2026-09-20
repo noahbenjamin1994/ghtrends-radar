@@ -1,3 +1,4 @@
+import { InspirationDeck } from "./inspiration.js";
 import { ScopeReview } from "./preflight.js";
 import { DeepResearchView } from "./deep.js";
 import { AccountView } from "./credits.js";
@@ -29,6 +30,8 @@ import {
 import { t, locale, localUrl, loginUrl, switchLanguage } from "./i18n.js";
 import React, { useEffect, useState, useRef } from "react";
 import {
+  ArrowUp,
+  LoaderCircle,
   ArrowUpRight,
   ArrowRight,
   ArrowLeft,
@@ -302,7 +305,9 @@ export function App() {
     navigate(scope.geo ? "/?geo=" + encodeURIComponent(scope.geo) : "/");
     requestAnimationFrame(() =>
       document
-        .querySelector<HTMLInputElement>(".search-form input, form input")
+        .querySelector<HTMLInputElement | HTMLTextAreaElement>(
+          ".search-field textarea, .search-form input, form input",
+        )
         ?.focus(),
     );
   };
@@ -653,7 +658,7 @@ export function App() {
                 className="search-hero"
                 aria-label={t("Research a direction")}
               >
-                <div className="toolbar">
+                <div className="research-composer">
                   <form
                     className="search-field"
                     onSubmit={(e) => {
@@ -661,8 +666,8 @@ export function App() {
                       void scan(query);
                     }}
                   >
-                    <Search size={18} />
-                    <input
+                    <textarea
+                      rows={2}
                       value={query}
                       onChange={(e) => {
                         ++preparationVersion.current;
@@ -673,29 +678,130 @@ export function App() {
                       placeholder={t("Explore a topic, e.g. agent memory")}
                       aria-label={t("Search or scan a topic")}
                       maxLength={300}
+                      onKeyDown={(event) => {
+                        if (
+                          event.key === "Enter" &&
+                          !event.shiftKey &&
+                          !event.nativeEvent.isComposing
+                        ) {
+                          event.preventDefault();
+                          if (
+                            account &&
+                            !scanning &&
+                            !preparing &&
+                            query.trim()
+                          )
+                            event.currentTarget.form?.requestSubmit();
+                        }
+                      }}
                     />
-                    <button
-                      disabled={
-                        !account || scanning || preparing || !query.trim()
-                      }
-                      type="submit"
-                    >
-                      {t(
-                        preparing
-                          ? "Preparing…"
-                          : scanning
-                            ? "Researching…"
-                            : !account
-                              ? "Research"
-                              : account.hosted
-                                ? account.user
-                                  ? "Research · 1 credit"
-                                  : "Sign in to research"
-                                : "Scan",
-                      )}
-                      <ArrowUpRight size={15} />
-                    </button>
+                    <div className="composer-actions">
+                      <div className="composer-submit">
+                        <span aria-hidden="true">
+                          {t(
+                            preparing
+                              ? "Preparing…"
+                              : scanning
+                                ? "Researching…"
+                                : account?.hosted
+                                  ? account.user
+                                    ? "Research · 1 credit"
+                                    : "Sign in to research"
+                                  : "Research",
+                          )}
+                        </span>
+                        <button
+                          className="send-button"
+                          disabled={
+                            !account || scanning || preparing || !query.trim()
+                          }
+                          type="submit"
+                          aria-label={t(
+                            account?.hosted && !account.user
+                              ? "Sign in to research"
+                              : "Research",
+                          )}
+                          title={t(
+                            account?.hosted && !account.user
+                              ? "Sign in to research"
+                              : "Research",
+                          )}
+                          aria-busy={preparing || scanning}
+                        >
+                          {preparing || scanning ? (
+                            <LoaderCircle
+                              size={19}
+                              className="send-spinner"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <ArrowUp
+                              size={20}
+                              strokeWidth={2.1}
+                              aria-hidden="true"
+                            />
+                          )}
+                        </button>
+                      </div>
+                    </div>
                   </form>
+                  <div className="search-options">
+                    <label className="select-field">
+                      <Globe2 size={15} />
+                      <select
+                        value={geo}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          ++preparationVersion.current;
+                          setPreparing(false);
+                          setPreflight(null);
+                          setGeo(value);
+                          const url = new URL(location.href);
+                          if (value) url.searchParams.set("geo", value);
+                          else url.searchParams.delete("geo");
+                          history.replaceState(
+                            {},
+                            "",
+                            url.pathname + url.search,
+                          );
+                          setPath(routeUrl(url.pathname) + url.search);
+                        }}
+                        aria-label={t("Search-demand region")}
+                      >
+                        <option value="">{t("Worldwide")}</option>
+                        <option value="US">{t("United States")}</option>
+                        <option value="GB">{t("United Kingdom")}</option>
+                        <option value="DE">{t("Germany")}</option>
+                        <option value="JP">{t("Japan")}</option>
+                        <option value="IN">{t("India")}</option>
+                      </select>
+                      <ChevronDown size={13} />
+                    </label>
+                    <details className="keyword-options">
+                      <summary>
+                        {t("Choose a different Google search term")}
+                      </summary>
+                      <label>
+                        {t("Demand keyword")}
+                        <input
+                          value={keyword}
+                          onChange={(e) => {
+                            ++preparationVersion.current;
+                            setPreparing(false);
+                            setPreflight(null);
+                            setKeyword(e.target.value);
+                          }}
+                          maxLength={100}
+                          placeholder={t("Optional — e.g. AI agent memory")}
+                        />
+                      </label>
+                      <p>
+                        {t(
+                          "Keep the GitHub topic above; use this field to measure a more familiar phrase people search for.",
+                        )}
+                      </p>
+                    </details>
+                  </div>
                 </div>
                 <ScopeReview
                   result={preflight}
@@ -713,59 +819,6 @@ export function App() {
                   onEdit={editResearchScope}
                   onClose={() => setPreflight(null)}
                 />
-                <div className="search-options">
-                  <label className="select-field">
-                    <Globe2 size={15} />
-                    <select
-                      value={geo}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        ++preparationVersion.current;
-                        setPreparing(false);
-                        setPreflight(null);
-                        setGeo(value);
-                        const url = new URL(location.href);
-                        if (value) url.searchParams.set("geo", value);
-                        else url.searchParams.delete("geo");
-                        history.replaceState({}, "", url.pathname + url.search);
-                        setPath(routeUrl(url.pathname) + url.search);
-                      }}
-                      aria-label={t("Search-demand region")}
-                    >
-                      <option value="">{t("Worldwide")}</option>
-                      <option value="US">{t("United States")}</option>
-                      <option value="GB">{t("United Kingdom")}</option>
-                      <option value="DE">{t("Germany")}</option>
-                      <option value="JP">{t("Japan")}</option>
-                      <option value="IN">{t("India")}</option>
-                    </select>
-                    <ChevronDown size={13} />
-                  </label>
-                  <details className="keyword-options">
-                    <summary>
-                      {t("Choose a different Google search term")}
-                    </summary>
-                    <label>
-                      {t("Demand keyword")}
-                      <input
-                        value={keyword}
-                        onChange={(e) => {
-                          ++preparationVersion.current;
-                          setPreparing(false);
-                          setPreflight(null);
-                          setKeyword(e.target.value);
-                        }}
-                        maxLength={100}
-                        placeholder={t("Optional — e.g. AI agent memory")}
-                      />
-                    </label>
-                    <p>
-                      {t(
-                        "Keep the GitHub topic above; use this field to measure a more familiar phrase people search for.",
-                      )}
-                    </p>
-                  </details>
-                </div>
                 {!account ? (
                   <p className="research-access-loading" role="status">
                     {t("Checking research access…")}
@@ -797,21 +850,14 @@ export function App() {
                     )}
                   </p>
                 )}
-                <div className="example-links">
-                  <span>{t("Read a public example")}</span>
-                  {["browser-agents", "agent-memory", "mcp-servers"].map(
-                    (slug) => (
-                      <button
-                        key={slug}
-                        onClick={() => navigate("/market/" + slug)}
-                      >
-                        {t(resolveTopic(slug).name)}
-                      </button>
-                    ),
-                  )}
-                </div>
               </section>
             </div>
+            <InspirationDeck
+              markets={markets}
+              loading={loading}
+              geo={geo}
+              navigate={navigate}
+            />
             <section className="market-section">
               <div className="section-header">
                 <div>
