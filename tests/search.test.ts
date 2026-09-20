@@ -226,7 +226,9 @@ test("direct search reuses residential routes, caches results, records traffic a
     plan: {
       ...seed.topic.plan,
       input: "phone sample",
-      webQueries: [{ query: "phone compatibility", intent: "competition" }],
+      webQueries: [
+        { query: "phone sample compatibility", intent: "competition" },
+      ],
     },
   } as any;
   try {
@@ -235,10 +237,10 @@ test("direct search reuses residential routes, caches results, records traffic a
     await search.collect(topic, "US");
     assert.equal(calls, 1);
     fail = true;
-    topic.plan.webQueries[0].query = "another sample";
+    topic.plan.webQueries[0].query = "phone sample alternatives";
     assert.equal((await search.collect(topic, "US")).state, "failed");
     assert.equal(calls, 5);
-    topic.plan.webQueries[0].query = "third sample";
+    topic.plan.webQueries[0].query = "phone sample reviews";
     await search.collect(topic, "US");
     assert.equal(calls, 5);
     assert.ok(!JSON.stringify(search.status()).includes("secret"));
@@ -930,7 +932,7 @@ test("fallback cache expires early, shared cooldowns survive instances and prima
     assert.deepEqual(calls, ["google", "duckduckgo"]);
     assert.equal(a.queries[0]!.fetchedAt, b.queries[0]!.fetchedAt);
     const cache = db
-      .prepare("select expires from cache where key like 'web-search:v4:%'")
+      .prepare("select expires from cache where key like 'web-search:v5:%'")
       .get() as any;
     assert.ok(
       cache.expires - Date.now() > 29 * 60000 &&
@@ -965,7 +967,7 @@ test("fallback cache expires early, shared cooldowns survive instances and prima
     assert.equal(recovered.queries[0]!.adCoverage, "limited");
     const refreshed = db
       .prepare(
-        "select expires from cache where expires>0 and key like 'web-search:v4:%'",
+        "select expires from cache where expires>0 and key like 'web-search:v5:%'",
       )
       .get() as any;
     assert.ok(

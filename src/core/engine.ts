@@ -167,7 +167,13 @@ export class Engine {
           preview();
         })
         .then((data) => (ai ? this.research.reviewSupply(topic, data) : data)),
-      ai ? this.search.collect(topic, geo) : Promise.resolve(undefined),
+      ai
+        ? this.search
+            .collect(topic, geo)
+            .then((web) =>
+              web ? this.research.reviewWeb(topic, web) : undefined,
+            )
+        : Promise.resolve(undefined),
     ]);
     if (ai && !supply.error && supply.repositories.length < 3) {
       const repair = await this.research.repairQueries(topic, supply);

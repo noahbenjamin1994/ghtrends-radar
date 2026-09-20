@@ -337,6 +337,21 @@ function SearchEvidence({
                         ? "自然结果"
                         : "Organic"}
                   </span>
+                  {r.relevance && (
+                    <span>
+                      {
+                        {
+                          direct: zh ? "同类产品" : "Matching offer",
+                          resource: zh ? "相关资料" : "Related source",
+                          adjacent: zh ? "相邻场景" : "Adjacent task",
+                          unrelated: zh
+                            ? "已排除：其他主题"
+                            : "Excluded: other topic",
+                          unclear: zh ? "相关性待核对" : "Relevance pending",
+                        }[r.relevance.role]
+                      }
+                    </span>
+                  )}
                   <strong>{r.title}</strong>
                   <p>{r.excerpt}</p>
                 </a>
@@ -377,7 +392,7 @@ export function CompetitorPanel({
   const ads =
     m.web?.queries.flatMap((q) =>
       q.results
-        .filter((r) => r.kind === "ad")
+        .filter((r) => r.kind === "ad" && r.relevance?.role === "direct")
         .map((r) => ({
           ...r,
           query: q.query,
@@ -567,8 +582,8 @@ export function CompetitorPanel({
           <>
             <p className="research-caption">
               {l(
-                "Product and industry pages found for this query. Publisher excerpts below are discovery leads; the comparison needs a product-level review.",
-                "已找到这些产品与行业页面。下方保留网页原文，供比较具体服务；同行定位与收费以产品页面为准。",
+                "These product pages describe services matching the researched task. Publisher excerpts are preserved; check each page for current pricing.",
+                "以下产品页面已通过主题相关性核对。保留网页原文，便于比较实际服务；收费以产品页面为准。",
               )}
             </p>
             {discovered.map((page) => (

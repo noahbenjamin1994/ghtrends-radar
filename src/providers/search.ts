@@ -17,7 +17,7 @@ export const searchQuerySchema = z.object({
   intent: z.enum(["competition", "demand", "opensource"]),
 });
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
-export const SEARCH_VERSION = "4";
+export const SEARCH_VERSION = "5";
 export type SearchEngine = "google" | "duckduckgo";
 interface SearchPage {
   results: SearchResult[];
@@ -32,6 +32,10 @@ export interface SearchResult {
   url: string;
   excerpt: string;
   kind: "organic" | "ad";
+  relevance?: {
+    role: "direct" | "resource" | "adjacent" | "unrelated" | "unclear";
+    quote: string;
+  };
 }
 export interface WebEvidence {
   provider: "decodo-google" | "google-mobile" | "multi-search";
@@ -41,6 +45,12 @@ export interface WebEvidence {
   language: string;
   fetchedAt: string;
   state: "ready" | "partial" | "failed" | "pending" | "setup";
+  review?: {
+    version: string;
+    model: string;
+    reviewed: number;
+    status: "complete" | "partial" | "failed";
+  };
   queries: (SearchQuery & {
     state: "ready" | "failed" | "pending";
     error?: string;
@@ -52,6 +62,58 @@ export interface WebEvidence {
     fallbackReason?: string;
     results: SearchResult[];
   })[];
+}
+
+/** Keep query expansions anchored to the user's object and its genuine synonyms.
+ * Search operators and purchasing intent are discovery details, not a new scope. */
+export function scopedWebQueries(topic: Topic): SearchQuery[] {
+  const input = topic.plan?.input || topic.keyword;
+  const base = topic.plan?.model === "curated" ? topic.keyword : input;
+  const zh = /[\u3400-\u9fff]/.test(base);
+  const normalize = (s: string) =>
+    s
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]/gu, "");
+  // English expansions keep the literal object. Curated aliases and translated
+  // inputs may use their published/canonical spelling.
+  const anchors = (
+    topic.plan?.model === "curated" || /[\u3400-\u9fff]/.test(input)
+      ? [input, ...(topic.plan?.trends || [topic.keyword])]
+      : [input]
+  ).map(normalize);
+  const qualifiers = [
+    [/\bai\b|人工智能/i, /\bai\b|artificial intelligence|人工智能/i],
+    [/self[ -]hosted|自托管/i, /self[ -]hosted|自托管/i],
+    [/\boffline\b|离线/i, /\boffline\b|离线/i],
+  ];
+  const suffixes = {
+    competition: zh ? "替代产品 价格" : "alternatives pricing",
+    demand: zh ? "使用体验 求助" : "user problems reviews",
+    opensource: "open source",
+  };
+  const intents: SearchQuery["intent"][] = topic.plan?.webQueries?.length
+    ? [...new Set(topic.plan.webQueries.map((q) => q.intent))]
+    : ["competition", "demand", "opensource"];
+  return intents.map((intent) => {
+    const candidate = topic.plan?.webQueries?.find((q) => q.intent === intent);
+    if (
+      candidate &&
+      searchQuerySchema.safeParse(candidate).success &&
+      anchors.some((a) => a && normalize(candidate.query).includes(a)) &&
+      qualifiers.every(
+        ([trigger, required]) =>
+          !trigger!.test(input) || required!.test(candidate.query),
+      )
+    )
+      return candidate;
+    const fallback = qualifiers.every(
+      ([trigger, required]) => !trigger!.test(input) || required!.test(base),
+    )
+      ? base
+      : input;
+    return { intent, query: `${fallback.slice(0, 120)} ${suffixes[intent]}` };
+  });
 }
 
 // Parse only the result rows in the lightweight page. A challenge, a new layout,
@@ -368,7 +430,13 @@ export function searchSources(web?: WebEvidence): ResearchSource[] {
     web?.queries.flatMap((q, i) => {
       // A single brand's help pages otherwise occupy the entire model budget.
       // Keep independent websites first; GitHub repositories remain distinct.
-      const organic = q.results.filter((r) => r.kind === "organic");
+      const usable = q.results.filter(
+        (r) =>
+          !web?.review ||
+          r.relevance?.role === "direct" ||
+          r.relevance?.role === "resource",
+      );
+      const organic = usable.filter((r) => r.kind === "organic");
       const selected: SearchResult[] = [],
         sites: string[] = [];
       for (const r of organic) {
@@ -406,7 +474,7 @@ export function searchSources(web?: WebEvidence): ResearchSource[] {
           )
             selected.push(r);
         }
-      selected.push(...q.results.filter((r) => r.kind === "ad").slice(0, 2));
+      selected.push(...usable.filter((r) => r.kind === "ad").slice(0, 2));
       return selected.map((r, j) => ({
         id: `W${i + 1}R${j + 1}`,
         kind: "search" as const,
@@ -469,24 +537,7 @@ export class GoogleSearch {
       ? "zh-CN"
       : "en";
     const region = geo || "US";
-    // Curated categories already expand aliases (AI4S -> AI for Science).
-    const base =
-      topic.plan?.model === "curated"
-        ? topic.keyword
-        : topic.plan?.input || topic.keyword;
-    const planned = topic.plan?.webQueries?.length
-      ? topic.plan.webQueries
-      : [
-          {
-            query: `${base} ${language === "en" ? "services pricing" : "服务 价格"}`,
-            intent: "competition",
-          },
-          {
-            query: `${base} ${language === "en" ? "user problems reviews" : "使用体验 求助"}`,
-            intent: "demand",
-          },
-          { query: `${topic.keyword} open source tools`, intent: "opensource" },
-        ];
+    const planned = scopedWebQueries(topic);
     const queries = [
       ...new Map(
         planned.flatMap((q) => {

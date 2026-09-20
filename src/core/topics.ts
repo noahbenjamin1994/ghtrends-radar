@@ -133,6 +133,46 @@ const KNOWN_TOPICS: Topic[] = [
     aliases: ["agent skills", "智能体技能"],
   },
   {
+    slug: "auto-research",
+    name: "Autoresearch",
+    scope: "field",
+    keyword: "autoresearch",
+    query: "topic:autoresearch",
+    queries: [
+      "topic:autoresearch",
+      '"autoresearch" in:name,description',
+      '"auto research" in:name,description',
+    ],
+    description:
+      "AI automated research: assistants that search sources, analyze evidence and synthesize findings, plus agents that run research experiments. Compare these distinct user jobs separately.",
+    color: "#79c9ff",
+    aliases: [
+      "autoresearch",
+      "auto research",
+      "auto research ai",
+      "autoresearch ai",
+    ],
+    plan: {
+      input: "autoresearch",
+      model: "curated",
+      version: "1",
+      intent:
+        "AI automated research: source discovery, evidence synthesis and autonomous experiments; compare each user job separately.",
+      trends: ["autoresearch"],
+      githubTopics: ["autoresearch"],
+      githubTerms: ["autoresearch", "auto research"],
+      webQueries: [
+        { query: "auto research ai", intent: "competition" },
+        { query: "auto research ai reviews", intent: "demand" },
+        { query: "autoresearch github", intent: "opensource" },
+      ],
+      explanation: {
+        en: "Research AI automated research, comparing research assistants and autonomous experiment tools as distinct jobs. Trends tracks autoresearch; buyer search uses auto research ai.",
+        zh: "围绕 AI 自动研究，分别比较资料检索与综合分析助手、自主实验工具。趋势追踪 autoresearch；商业产品使用 auto research ai 检索。",
+      },
+    },
+  },
+  {
     slug: "ai-for-science",
     name: "AI for Science",
     scope: "field",

@@ -83,12 +83,14 @@ test("organic pages remain useful discovery leads while ads appear only for capt
             excerpt: "Plans for research teams.",
             url: "https://tool.example/pricing",
             kind: "organic",
+            relevance: { role: "direct", quote: "Plans for research teams." },
           },
           {
             title: "Research tool duplicate",
             excerpt: "Another page.",
             url: "https://tool.example/plans",
             kind: "organic",
+            relevance: { role: "direct", quote: "Plans for research teams." },
           },
         ],
       },
@@ -107,6 +109,7 @@ test("organic pages remain useful discovery leads while ads appear only for capt
     excerpt: "A captured ad.",
     url: "https://advertiser.example/offer",
     kind: "ad",
+    relevance: { role: "direct", quote: "A captured ad." },
   });
   html = renderToStaticMarkup(
     createElement(CompetitorPanel, { market: m, locale: "zh" }),

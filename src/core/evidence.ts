@@ -52,7 +52,7 @@ export function competitorDiscovery(web?: WebEvidence) {
     .filter((q) => q.state === "ready" && q.intent === "competition")
     .flatMap((q) =>
       q.results
-        .filter((r) => r.kind === "organic")
+        .filter((r) => r.kind === "organic" && r.relevance?.role === "direct")
         .flatMap((r) => {
           let host: string;
           try {

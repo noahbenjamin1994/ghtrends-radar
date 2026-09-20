@@ -17,6 +17,10 @@ export function mergeActivity(
 export function activityLabel(operation: string, zh: boolean) {
   const labels: Record<string, [string, string]> = {
     plan: ["Understanding your topic", "理解研究主题"],
+    "web-relevance": [
+      "Checking search result relevance",
+      "核对搜索结果与研究主题",
+    ],
     relevance: ["Checking relevant projects", "筛选相关项目"],
     "capability-audit": [
       "Checking existing product capabilities",
