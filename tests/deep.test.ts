@@ -1759,6 +1759,96 @@ test("an interrupted source stage is collected again and retains collection trun
   }
 });
 
+for (const planning of ["model", "fallback"] as const) {
+  test(`named-project research checks current workflow docs within its existing search budget (${planning})`, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-current-docs-"));
+    const e = new Engine(new Store(dir)),
+      m = sample(),
+      t = task();
+    const projectSource = {
+      ...source,
+      id: "P1",
+      documentType: "github-readme" as const,
+      url: "https://github.com/PostHog/posthog/blob/main/README.md",
+    };
+    const projectRequest = {
+      ...request,
+      url: "https://github.com/PostHog/posthog/issues/12",
+    };
+    m.brief!.sources = [projectSource];
+    const direction = m.brief!.opportunities![0]!;
+    direction.basedOn = [{ id: "P1", quote: source.excerpt! }];
+    direction.en.title = "Google Ads source for PostHog";
+    e.store.saveMarket(m, false, t.owner);
+    let searches = 0;
+    e.search.collect = async (topic) => {
+      searches++;
+      const queries = topic.plan!.webQueries!;
+      assert.equal(queries.length, 3);
+      assert.equal(new Set(queries.map((q) => q.intent)).size, 3);
+      assert.equal(
+        queries.find((q) => q.intent === "opensource")!.query,
+        "posthog documentation Google Ads source for PostHog",
+      );
+      for (const intent of ["competition", "demand"]) {
+        assert.ok(
+          queries
+            .find((q) => q.intent === intent)!
+            .query.startsWith(
+              planning === "model" ? "planned " : "document comments",
+            ),
+        );
+      }
+      return {
+        state: "ready",
+        provider: "multi-search",
+        region: "US",
+        language: "en",
+        fetchedAt: t.created,
+        queries: [],
+      };
+    };
+    e.github.directionEvidence = async () => [projectSource, projectRequest];
+    e.github.researchSources = async () => [];
+    e.github.gaps = async () => [];
+    e.github.licenseSources = async () => [];
+    e.github.discussionSources = async () => [];
+    e.github.issueThreadSources = async () => [];
+    e.documents.collect = async () => ({
+      version: "3",
+      sources: [],
+      reads: [],
+    });
+    e.research.json = async (_prompt, _input, _max, op) => {
+      if (op === "deep-plan") {
+        if (planning === "fallback") throw new Error("planning timeout");
+        return {
+          queries: ["competition", "demand", "opensource"].map((intent) => ({
+            intent,
+            query: "planned " + intent,
+          })),
+          githubQuery: "analytics connector",
+        };
+      }
+      if (op === "strategy-deep-review")
+        return { ready: true, corrections: [] };
+      return brief();
+    };
+    try {
+      assert.equal(await runDeepResearch(e, t, () => {}), true, t.problem);
+      assert.equal(searches, 1);
+      assert.equal(t.evidence!.queries.length, 3);
+      assert.equal(
+        t.evidence!.queries.find((q) => q.intent === "opensource")!.query,
+        "posthog documentation Google Ads source for PostHog",
+      );
+    } finally {
+      await e.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
 test("the model transport always includes the JSON-mode instruction, including short prose-repair prompts", async () => {
   const env = { ...process.env },
     originalFetch = globalThis.fetch;

@@ -240,6 +240,21 @@ export async function runDeepResearch(
         githubQuery: direction.query,
       };
     }
+    // GitHub already discovers related artifacts. Use the existing open-source
+    // web slot to check the cited project's current workflow documentation,
+    // preserving the selected title's source/destination or read/write direction.
+    // A generic alternatives query can otherwise miss an implemented feature.
+    if (knownProjects.length) {
+      const project = knownProjects[0]!.split("/").at(-1)!;
+      const query = `${project} documentation ${direction.en.title}`
+        .replace(/[<>\x00-\x1f]/g, " ")
+        .replace(/\s+/g, " ")
+        .slice(0, 160)
+        .trim();
+      plan.queries = plan.queries.map((item) =>
+        item.intent === "opensource" ? { ...item, query } : item,
+      );
+    }
     evidence = {
       collectedAt: new Date().toISOString(),
       queries: plan.queries,
