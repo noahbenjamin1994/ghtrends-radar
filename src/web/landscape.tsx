@@ -1,9 +1,9 @@
-import { adSample } from "./ad-sample.js";
 import {
   searchCollectionMessage,
   searchEngineLabel,
   searchQueryUrl,
   adCollectionMessage,
+  competitorDiscovery,
 } from "../core/evidence.js";
 import { ArrowUpRight } from "lucide-react";
 import { landscapeLabel, researchLandscape } from "../core/landscape.js";
@@ -358,7 +358,10 @@ export function CompetitorPanel({
 }) {
   const zh = locale === "zh",
     l = (en: string, cn: string) => (zh ? cn : en);
-  const peers = researchLandscape(m) ? m.brief?.landscape?.leaders || [] : [];
+  const peers = (
+    researchLandscape(m) ? m.brief?.landscape?.leaders || [] : []
+  ).filter((p) => p.category !== "opensource");
+  const discovered = competitorDiscovery(m.web);
   const directProjects = [
     ...new Map(
       m.supply.repositories
@@ -560,167 +563,158 @@ export function CompetitorPanel({
               {sourceLinks(x.evidence.map((r) => r.id))}
             </article>
           ))
+        ) : discovered.length ? (
+          <>
+            <p className="research-caption">
+              {l(
+                "Product and industry pages found for this query. Publisher excerpts below are discovery leads; the comparison needs a product-level review.",
+                "已找到这些产品与行业页面。下方保留网页原文，供比较具体服务；同行定位与收费以产品页面为准。",
+              )}
+            </p>
+            {discovered.map((page) => (
+              <article className="peer-card" key={page.url}>
+                <a href={page.url} target="_blank" rel="noreferrer">
+                  <h5>
+                    {page.title} <ArrowUpRight size={15} />
+                  </h5>
+                </a>
+                <p>{page.excerpt}</p>
+                <small>
+                  {page.host} · {page.date.slice(0, 10)}
+                </small>
+                <p className="research-caption">
+                  {l("Found with", "搜索词")}：{page.query}
+                </p>
+              </article>
+            ))}
+          </>
         ) : (
           <p className="peer-empty">
-            {m.aiError
-              ? l(
-                  "The AI review needs another pass. Choose Update research to rebuild the comparison from collected sources.",
-                  "AI 解读需要重新生成。点击「更新研究」，根据采集来源补充同行对比。",
-                )
-              : m.web?.state !== "ready"
-                ? searchCollectionMessage(m.web, locale)
-                : l(
-                    "The collected sources need a closer product-level review. Open the search evidence below to inspect the offers.",
-                    "当前来源需要进一步核对具体产品。展开下方搜索证据，可查看相关方案。",
-                  )}
+            {l(
+              "This report currently compares the open-source projects above. Update research to collect product and pricing pages for the same user task.",
+              "本报告当前已覆盖上方开源项目。更新研究可补充同一用户任务的产品与收费页面。",
+            )}
           </p>
         )}
       </div>
-      <div className="peer-block">
-        <h4>
-          <span>03</span>
-          {l("Competitors appearing in ads", "广告里的同行")}
-        </h4>
-        <p className="research-caption">
-          {l(
-            "These are ads captured for specific searches. The landing-page website identifies the destination; the advertiser's business identity can be checked there.",
-            "这里记录具体搜索中采集到的广告。先看落地页网站，再核对广告主的公司身份。",
-          )}
-        </p>
-        {ads.length ? (
-          ads.map((ad, i) => (
-            <article className="peer-ad" key={ad.query + ad.url + i}>
-              <span className="peer-ad-site">
-                {l("Landing-page website", "投放网站")} ·{" "}
-                {new URL(ad.url).hostname}
-              </span>
-              <a href={ad.url} target="_blank" rel="noreferrer">
-                <h5>
-                  {ad.title}
-                  <ArrowUpRight size={15} />
-                </h5>
-              </a>
-              <p>
-                {ad.excerpt ||
-                  l(
-                    "Open the landing page for the offer details.",
-                    "打开落地页查看方案详情。",
-                  )}
-              </p>
-              <dl>
-                <div>
-                  <dt>{l("Search keyword", "出现的关键词")}</dt>
-                  <dd>{ad.query}</dd>
-                </div>
-                <div>
-                  <dt>{l("Region / language / date", "地区 / 语言 / 时间")}</dt>
-                  <dd>
-                    {ad.region} · {m.web!.language} · {ad.date.slice(0, 10)}
-                  </dd>
-                </div>
-                <div>
-                  <dt>{l("Landing page", "落地页")}</dt>
-                  <dd>
-                    <a href={ad.url} target="_blank" rel="noreferrer">
-                      {ad.url}
-                    </a>
-                  </dd>
-                </div>
-              </dl>
-            </article>
-          ))
-        ) : (
-          <p className="peer-empty">{adCollectionMessage(m.web, locale)}</p>
-        )}
-        <div className="peer-sources">
-          {m.web?.queries
-            .filter((q) => q.intent === "competition")
-            .slice(0, 1)
-            .map((q) => (
-              <a
-                key={q.query}
-                href={`https://www.google.com/search?${new URLSearchParams({ q: q.query, hl: m.web!.language, gl: m.web!.region.toLowerCase() })}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {l("Check this keyword on Google", "在 Google 核对这个关键词")}
-                <ArrowUpRight size={12} />
-              </a>
-            ))}
-          <a
-            href={`https://adstransparency.google.com/?${new URLSearchParams({ platform: "SEARCH", region: m.web?.region || m.geo || "US" })}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {l(
-              "Check advertisers in Google's ad library",
-              "到 Google 广告库核对同行投放",
-            )}
-            <ArrowUpRight size={12} />
-          </a>
-        </div>
-        <p className="research-caption">
-          {l(
-            "Search the ad library by competitor name or website to check creatives and advertiser identity. Keyword appearances come from search-page observations.",
-            "在广告库输入同行名称或官网，可核对广告素材和广告主身份；关键词曝光以搜索页面记录为准。",
-          )}
-        </p>
-        <details className="ad-example">
-          <summary>
-            {l(
-              "What an ad signal looks like · real CRM example",
-              "广告线索长什么样？查看 CRM 实测示例",
-            )}
-          </summary>
+      {ads.length > 0 && (
+        <div className="peer-block">
+          <h4>
+            <span>03</span>
+            {l("Competitors appearing in ads", "广告里的同行")}
+          </h4>
           <p className="research-caption">
             {l(
-              "Independent feature example, kept separate from this topic's evidence and scores. Observed in a browser on",
-              "独立功能示例，与当前主题的证据和评分分别展示。浏览器实测时间：",
-            )}{" "}
-            {adSample.fetchedAt.slice(0, 16).replace("T", " ")} UTC ·{" "}
-            {l("Query", "查询词")}：{adSample.query} ·{" "}
-            {l(
-              "Requested region: US; actual location: to verify",
-              "目标地区 US；实际定位待核对",
-            )}{" "}
-            · EN
+              "These are ads captured for specific searches. The landing-page website identifies the destination; the advertiser's business identity can be checked there.",
+              "这里记录具体搜索中采集到的广告。先看落地页网站，再核对广告主的公司身份。",
+            )}
           </p>
-          <div className="ad-example-grid">
-            {adSample.results.map((ad) => (
-              <article className="peer-ad" key={ad.url}>
+          {ads.length ? (
+            ads.map((ad, i) => (
+              <article className="peer-ad" key={ad.query + ad.url + i}>
                 <span className="peer-ad-site">
-                  {l("Displayed brand", "广告展示品牌")} · {ad.advertiser}
+                  {l("Landing-page website", "投放网站")} ·{" "}
+                  {new URL(ad.url).hostname}
                 </span>
-                <h5>{ad.title}</h5>
-                <p>{ad.excerpt}</p>
                 <a href={ad.url} target="_blank" rel="noreferrer">
-                  {l("Landing page", "落地页")} · {new URL(ad.url).hostname}
+                  <h5>
+                    {ad.title}
+                    <ArrowUpRight size={15} />
+                  </h5>
+                </a>
+                <p>
+                  {ad.excerpt ||
+                    l(
+                      "Open the landing page for the offer details.",
+                      "打开落地页查看方案详情。",
+                    )}
+                </p>
+                <dl>
+                  <div>
+                    <dt>{l("Search keyword", "出现的关键词")}</dt>
+                    <dd>{ad.query}</dd>
+                  </div>
+                  <div>
+                    <dt>
+                      {l("Region / language / date", "地区 / 语言 / 时间")}
+                    </dt>
+                    <dd>
+                      {ad.region} · {m.web!.language} · {ad.date.slice(0, 10)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{l("Landing page", "落地页")}</dt>
+                    <dd>
+                      <a href={ad.url} target="_blank" rel="noreferrer">
+                        {ad.url}
+                      </a>
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            ))
+          ) : (
+            <p className="peer-empty">{adCollectionMessage(m.web, locale)}</p>
+          )}
+          <div className="peer-sources">
+            {m.web?.queries
+              .filter((q) => q.intent === "competition")
+              .slice(0, 1)
+              .map((q) => (
+                <a
+                  key={q.query}
+                  href={`https://www.google.com/search?${new URLSearchParams({ q: q.query, hl: m.web!.language, gl: m.web!.region.toLowerCase() })}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {l(
+                    "Check this keyword on Google",
+                    "在 Google 核对这个关键词",
+                  )}
                   <ArrowUpRight size={12} />
                 </a>
-              </article>
-            ))}
+              ))}
+            <a
+              href={`https://adstransparency.google.com/?${new URLSearchParams({ platform: "SEARCH", region: m.web?.region || m.geo || "US" })}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {l(
+                "Check advertisers in Google's ad library",
+                "到 Google 广告库核对同行投放",
+              )}
+              <ArrowUpRight size={12} />
+            </a>
           </div>
           <p className="research-caption">
             {l(
-              "Captured from Google's Sponsored results group. Ads vary by time, location and browsing context. The brand shown in an ad is checked separately from the payer's legal identity.",
-              "采自 Google 的 Sponsored results 广告区。广告随时间、地区与浏览环境变化；展示品牌与付款公司的身份分别核对。",
+              "Search the ad library by competitor name or website to check creatives and advertiser identity. Keyword appearances come from search-page observations.",
+              "在广告库输入同行名称或官网，可核对广告素材和广告主身份；关键词曝光以搜索页面记录为准。",
             )}
           </p>
+          <p className="research-caption">
+            {m.web?.provider === "google-mobile" ||
+            m.web?.provider === "multi-search"
+              ? l(
+                  "Collected from a lightweight search page. ",
+                  "当前采集使用轻量搜索页面。",
+                )
+              : ""}
+            {l(
+              "Coverage follows the captured page. Spend, clicks and conversions require data from the advertiser's account.",
+              "广告覆盖以实际采集页面为准；投放金额、点击量与转化数据需由广告账户提供。",
+            )}
+          </p>
+        </div>
+      )}
+      {ads.length === 0 && (
+        <details className="web-evidence">
+          <summary>{l("Advertising sample coverage", "广告采样范围")}</summary>
+          <p className="research-caption">
+            {adCollectionMessage(m.web, locale)}
+          </p>
         </details>
-        <p className="research-caption">
-          {m.web?.provider === "google-mobile" ||
-          m.web?.provider === "multi-search"
-            ? l(
-                "Collected from a lightweight search page. ",
-                "当前采集使用轻量搜索页面。",
-              )
-            : ""}
-          {l(
-            "Coverage follows the captured page. Spend, clicks and conversions require data from the advertiser's account.",
-            "广告覆盖以实际采集页面为准；投放金额、点击量与转化数据需由广告账户提供。",
-          )}
-        </p>
-      </div>
+      )}
       <SearchEvidence market={m} locale={locale} />
     </section>
   );

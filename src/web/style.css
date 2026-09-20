@@ -4491,6 +4491,15 @@ footer small {
   font-size: 12px;
   color: #666c64;
 }
+.report-delivery-note {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-left: 2px solid #a59175;
+  color: #666057;
+  background: #faf8f5;
+  font-size: 13px;
+  line-height: 1.7;
+}
 .outlook-copy h2 {
   font-size: clamp(25px, 2.5vw, 34px);
   font-weight: 560;

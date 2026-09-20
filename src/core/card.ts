@@ -5,7 +5,6 @@ import {
   competitionPressure,
   outlookPresentation,
 } from "./assessment.js";
-import { researchLandscape } from "./landscape.js";
 const xml = (s: string) =>
   s.replace(
     /[&<>"']/g,
@@ -50,13 +49,12 @@ function lines(value: string, units: number, limit: number): string[] {
 export function marketCard(m: Market, url: string, locale: Locale = "en") {
   const t = (s: string) => text(s, locale),
     assessment = marketAssessment(m, locale),
-    presentation = outlookPresentation(
-      researchLandscape(m)?.kind || m.kind,
-      locale,
-    );
+    presentation = outlookPresentation(assessment.kind, locale);
   const value = m.metrics.emerging
     ? t("Low-base rise")
-    : m.metrics.fast === null || m.metrics.growth === null
+    : !assessment.searchReady ||
+        m.metrics.fast === null ||
+        m.metrics.growth === null
       ? t("Not established")
       : `${m.metrics.growth >= 0 ? "+" : ""}${(m.metrics.growth * 100).toFixed(0)}%`;
   const title =
@@ -69,14 +67,7 @@ export function marketCard(m: Market, url: string, locale: Locale = "en") {
         (line, i) => `<tspan x="${x}" y="${y + i * step}">${xml(line)}</tspan>`,
       )
       .join("");
-  const qualification =
-    locale === "zh"
-      ? assessment.level === "provisional"
-        ? "初步研判"
-        : "数据研判"
-      : assessment.level === "provisional"
-        ? "Preliminary assessment"
-        : "Evidence-led assessment";
+  const qualification = assessment.basisLabel;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="sans-serif">
 <rect width="1200" height="630" fill="#fff"/>
 <text x="64" y="76" fill="#1c1c1c" font-size="30" font-weight="700">ghtrends ↗</text>
@@ -84,7 +75,7 @@ export function marketCard(m: Market, url: string, locale: Locale = "en") {
 <rect x="44" y="116" width="1112" height="416" rx="24" fill="${presentation.wash}"/>
 <text x="76" y="164" fill="#78726c" font-size="13">${locale === "zh" ? "这次，机会在哪里" : "THE OPPORTUNITY IN FOCUS"}</text>
 <text fill="#20201e" font-size="48" font-weight="700">${textLines(topicLines, 76, 231, 57)}</text>
-<text fill="${presentation.color}" font-size="22">${textLines(lines(presentation.line, 27, 2), 76, 331, 30)}</text>
+<text fill="${presentation.color}" font-size="22">${textLines(lines(assessment.reason, 27, 2), 76, 331, 30)}</text>
 <text x="76" y="427" fill="#20201e" font-size="${value.length > 8 ? 25 : 44}" font-weight="600">${xml(value)}</text>
 <text x="76" y="462" fill="#74716c" font-size="15">${xml(t("Search growth · 8 weeks vs prior 8"))}</text>
 <text x="397" y="427" fill="#20201e" font-size="44" font-weight="600">${m.competition ? competitionPressure(m) + " / 100" : m.supply.error ? "—" : (m.supply.complete ? "" : "≥") + m.supply.total.toLocaleString("en-US")}</text>

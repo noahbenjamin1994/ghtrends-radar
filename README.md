@@ -26,11 +26,12 @@ Find growing categories, inspect the competition, and share the evidence.
 | Red ocean         | Stable / falling / mixed / pending | Established alternatives              | Find a reason users would switch; inspect search status separately |
 | Quiet ocean       | Stable / falling                   | Limited, covered search results       | Validate a focused niche                                           |
 | Needs validation  | Any                                | Coverage or project roles need review | Inspect measured facts and complete the highlighted evidence       |
-| Field overview    | Measured separately                | Several workflows or a broader market | Choose one software task for the next scan                         |
 
 Ocean names summarize the observed search and open-source signals; they do not establish commercial competition. A quiet ocean can still be a valuable niche.
 
 Every result includes its source queries, dates, methodology version and limitations. Category and report pages include readable HTML evidence before JavaScript loads, and shared links show the specific report in their previews. Search interest measures attention, not paying customers. A quadrant is a research starting point, not a prediction of commercial success.
+
+Broad topics retain the original query and a scoped ocean verdict. The report distinguishes a source-backed market assessment from search × open-source competition. When AI synthesis needs another pass, the original query, measured facts and scoped rules-based conclusion remain available. Product discovery pages remain visible when the competitor synthesis is pending; an advertising section appears only for captured ads.
 
 ## A useful answer when the data is thin
 
@@ -231,7 +232,6 @@ The recommended pilot uses shared numeric counts for people, tasks per person an
 
 Before writing directions, a compact capability audit checks original project/product documents. It retains exact feature and constraint quotes, separates proposed additions from existing functions, and records code/data permissions, compatibility and access checks. Search snippets remain discovery leads. The audit runs with thinking disabled, allows one bounded correction and is stored with the report for inspection. A pending evidence review keeps delivery in the source-recovery flow.
 
-
 Community-request readings, extraction and report writing use direct generation. Direction selection and final evidence review retain light reasoning; configure it separately with `GHTRENDS_RESEARCH_REVIEW_THINKING=low|off`. `GHTRENDS_RESEARCH_THINKING=low` is the default for blueprints; setting it to `off` also turns review off when its separate setting is omitted. Independent report sections run two at a time. Both report types stream live research activity, with polling recovery through proxies; the feed shows actual request/output/completion states while prompts, draft JSON and reasoning text stay on the server. Complete quotations, scope checks and bilingual validation remain in the delivery gate. Admin shows the final-review policy and reasoning tokens as part of total output.
 
 Reports include an optional progress check-in: useful insight, a request for more detail, a chosen direction, a changed plan or a completed validation. Signed-in users can save a note (up to 500 characters), edit or delete it, and export their feedback from Account. These records stay separate from shared reports and model inputs; only the author and deployment administrators can read them. Removing a report from history or deleting focused research also removes that author’s related feedback. Admin counts unique people separately from responses and internal testing; feedback timestamps record submission, with user interviews and observed behavior providing additional validation.
@@ -284,7 +284,7 @@ Projects are classified as **direct alternatives, adjacent integrations, resourc
 
 The operational reference line is **45/100**, with lower confidence within 5 points. A lower bound at or above 45 supports established competition even from a partial sample. Limited competition requires complete enumeration of the displayed scope, at least one direct alternative, and an upper bound below 45 after including projects awaiting review. Truncated samples show `≥ score`; complete samples can show a role-uncertainty interval. Zero direct matches prompt further research. See [the exact weights and equations](src/core/competition.ts).
 
-These versioned heuristics describe **observed open-source competition**. Stars indicate developer attention, forks indicate reuse, and owners approximate teams. Commercial products, customer adoption and willingness to pay deserve separate evidence. Broad fields and physical-product markets receive a field overview and guidance toward a concrete software workflow.
+These versioned heuristics describe **observed open-source competition**. Stars indicate developer attention, forks indicate reuse, and owners approximate teams. Commercial products, customer adoption and willingness to pay deserve separate evidence. Broad fields and physical-product markets retain a scoped ocean verdict when supported, alongside concrete competitors and user tasks.
 
 For sparse candidate results, DeepSeek can refine the search once using equivalent product names within the original task. Generic delivery words such as “app” can be omitted from exact GitHub phrases; subject and feature requirements remain explicit. The report retains original and added queries. Search evidence, competition coverage and the recommendation appear separately, so a useful observed signal leads to a concrete next step even while the landscape remains provisional.
 

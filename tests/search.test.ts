@@ -65,7 +65,7 @@ test("limited mobile coverage and fallback never imply a complete zero-ad sample
     ],
   };
   assert.equal(adSampleQueries(web).length, 0);
-  assert.match(adCollectionMessage(web, "zh"), /完整广告位覆盖待补充/);
+  assert.match(adCollectionMessage(web, "zh"), /覆盖自然搜索/);
   web.provider = "google-mobile";
   delete web.queries[0].adCoverage;
   assert.equal(adSampleQueries(web).length, 0);
@@ -743,7 +743,8 @@ test("saved failed searches render stopped states instead of pending work or an 
     createElement(CompetitorPanel, { market: m, locale: "zh" }),
   );
   assert.ok(html.includes("Google 要求访问验证"));
-  assert.ok(html.includes("AI 解读需要重新生成"));
+  assert.ok(html.includes("本报告当前已覆盖上方开源项目"));
+  assert.ok(!html.includes("广告里的同行"));
   assert.ok(html.includes("0/1"));
   assert.ok(!html.includes("0 条结果"));
   assert.ok(!html.includes("采集准备中"));

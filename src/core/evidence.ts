@@ -37,11 +37,46 @@ export function adCollectionMessage(
       : "This captured search sample contains 0 ads. Other times and regions can be checked separately.";
   if (web?.queries.some((q) => q.state === "ready"))
     return zh
-      ? "本轮已采集自然搜索结果。完整广告位覆盖待补充，可打开 Google 搜索与广告透明度中心进一步核对。"
-      : "Organic search results are collected. Full ad-slot coverage needs a separate check in Google Search and the Ads Transparency Center.";
+      ? "本轮证据覆盖自然搜索；广告投放情况需单独采样。"
+      : "This evidence covers organic search; advertising activity requires a separate sample.";
   return zh
-    ? "广告证据待采集。可更新研究，或打开 Google 搜索与广告透明度中心核对。"
-    : "Ad evidence awaits collection. Update research or check Google Search and the Ads Transparency Center.";
+    ? "本轮采集范围：搜索趋势与开源项目。"
+    : "This collection covers search trends and open-source projects.";
+}
+
+/** Discovery results retain publisher wording and query provenance. They are
+ * candidate pages, never automatically promoted to verified competitors. */
+export function competitorDiscovery(web?: WebEvidence) {
+  const seen = new Set<string>();
+  return (web?.queries || [])
+    .filter((q) => q.state === "ready" && q.intent === "competition")
+    .flatMap((q) =>
+      q.results
+        .filter((r) => r.kind === "organic")
+        .flatMap((r) => {
+          let host: string;
+          try {
+            const url = new URL(r.url);
+            if (!["https:", "http:"].includes(url.protocol) || !url.hostname)
+              return [];
+            host = url.hostname.replace(/^www\./, "");
+          } catch {
+            return [];
+          }
+          if (
+            seen.has(host) ||
+            /(^|\.)(github\.com|reddit\.com|youtube\.com|facebook\.com|x\.com)$/.test(
+              host,
+            )
+          )
+            return [];
+          seen.add(host);
+          return [
+            { ...r, host, query: q.query, date: q.fetchedAt || web!.fetchedAt },
+          ];
+        }),
+    )
+    .slice(0, 4);
 }
 export function searchEvidenceIsFresh(web?: WebEvidence, now = Date.now()) {
   return (

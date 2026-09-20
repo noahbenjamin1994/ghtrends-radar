@@ -424,7 +424,7 @@ export const zh: Record<string, string> = {
   "AI interpretation of the evidence below. Verify the sources before acting.":
     "AI 根据下方证据生成的解释；采取行动前请核对来源。",
   "The AI brief is unavailable. Verified source evidence is still shown.":
-    "请先查看已采集的来源证据与下一步建议。",
+    "当前展示已采集证据与规则判断。AI 解读需重新生成，可点击「更新研究」。",
   "Sign in to scan and save your research.": "请登录后扫描并保存研究。",
   "Please reload the page and try again.": "请刷新页面后重试。",
   "Your daily scan allowance is used. Saved reports remain available.":
@@ -1051,7 +1051,7 @@ export const en: Record<string, string> = {
   "Browse public reports without an account. Sign in to run AI-assisted scans and keep your history and watchlist across devices.":
     "Browse public reports freely. Sign in for AI-assisted scans and saved research across devices.",
   "The AI brief is unavailable. Verified source evidence is still shown.":
-    "Read the collected source evidence and next steps below.",
+    "Showing collected evidence and a rules-based assessment. Choose Update research to regenerate the AI analysis.",
   "Could not identify a research topic. Try a specific tool category or describe the problem.":
     "Enter a specific tool category or describe the problem to research.",
   "We compare the last 8 complete weeks with the previous 8, alongside 4-week and 13-week changes. Rising or falling requires a 10% change, a resampling band on the same side of zero, and no opposing short or longer trend. Conflicting windows and opposite-moving synonyms are marked mixed.":

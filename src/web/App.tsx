@@ -430,7 +430,9 @@ export function App() {
                     ? "gaps"
                     : "radar";
   const shown = markets
-    .filter((m) => filter === "all" || m.kind === filter)
+    .filter(
+      (m) => filter === "all" || marketAssessment(m, locale).kind === filter,
+    )
     .sort((a, b) =>
       sort === "growth"
         ? (b.metrics.growth ?? -Infinity) - (a.metrics.growth ?? -Infinity)
@@ -879,7 +881,7 @@ export function App() {
                           <sup>↗</sup>
                         </span>
                         <Pill
-                          kind={m.kind}
+                          kind={marketAssessment(m, locale).kind}
                           label={marketAssessment(m, locale).landscape}
                         />
                       </div>
@@ -888,7 +890,7 @@ export function App() {
                         <ArrowUpRight size={20} />
                       </h3>
                       <p className="card-assessment">
-                        {marketAssessment(m, locale).title}
+                        {marketAssessment(m, locale).reason}
                       </p>
                       <Sparkline
                         values={completeWeeklySeries(m.demand, m.asOf)
@@ -1366,7 +1368,7 @@ function MarketView({
       />
     );
   const assessment = marketAssessment(m, locale);
-  const displayKind = researchLandscape(m)?.kind || m.kind;
+  const displayKind = assessment.kind;
   const presentation = outlookPresentation(displayKind, locale);
   const strategy =
     assessment.narrative.kind === "ai"
@@ -1608,7 +1610,10 @@ function MarketView({
               {assessment.narrative.kind === "ai"
                 ? "DeepSeek Flash"
                 : "ghtrends"}{" "}
-              · {l("Source-led interpretation", "基于来源的解读")}
+              ·{" "}
+              {assessment.narrative.kind === "ai"
+                ? l("Source-led interpretation", "基于来源的解读")
+                : l("Collected evidence", "采集证据摘要")}
             </span>
             <span>
               {new Date(m.asOf).toLocaleDateString(
@@ -1620,12 +1625,10 @@ function MarketView({
         <aside className="outlook-signal">
           <div className="outlook-verdict">
             <span className="outlook-verdict-caption">
-              {assessment.level === "provisional"
-                ? l("Preliminary assessment", "初步研判")
-                : l("Evidence-led assessment", "数据研判")}
+              {assessment.basisLabel}
             </span>
             <h3>{assessment.landscape}</h3>
-            <p>{presentation.line}</p>
+            <p>{assessment.reason}</p>
           </div>
           <div className="outlook-momentum">
             <span>{l("Search momentum", "搜索动向")}</span>
@@ -1653,6 +1656,11 @@ function MarketView({
           </a>
         </aside>
       </section>
+      {m.aiError && (
+        <p className="report-delivery-note" role="status">
+          {t(m.aiError)}
+        </p>
+      )}
       <div className="report-facts">
         <div>
           <span>{l("Year over year", "同比搜索变化")}</span>
@@ -1816,7 +1824,6 @@ function MarketView({
           </ol>
         </section>
       )}
-      {m.aiError && <p className="muted">{t(m.aiError)}</p>}
       {m.demand.retryAt && (
         <p className="admin-note">
           {t("Google Trends refresh window")}:{" "}

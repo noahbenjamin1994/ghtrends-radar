@@ -64,11 +64,11 @@ export function marketMarkdown(
     a.narrative.kind === "ai" ? visibleStrategy(m.brief, locale) : undefined;
   const map = visibleOpportunities(m.brief);
   return [
-    `# ${t(m.topic.name)}: ${a.title}`,
+    `# ${a.narrative.kind === "ai" && a.narrative.headline ? a.narrative.headline : a.title}`,
     "",
     `${m.asOf.slice(0, 10)} · ${t(m.geo || "Worldwide")} · ${t("Method")} ${m.version} · ${t(m.confidence)} ${t("evidence confidence")}`,
     "",
-    `**${t(a.level === "provisional" ? "Preliminary recommendation" : "Measured classification")}**`,
+    `**${a.basisLabel}**`,
     "",
     `${t("Landscape")}: **${a.landscape}**`,
     `${t("Measured search term")}: ${cell(m.demand.keyword)}`,

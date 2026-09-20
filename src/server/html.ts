@@ -107,7 +107,7 @@ export function renderDocument(
     status === 404
       ? t("Page not found · ghtrends")
       : m
-        ? `${t(m.topic.name)}: ${reportTitle} · ghtrends`
+        ? `${reportTitle} · ghtrends`
         : t(titles[path] || "Repository intelligence · ghtrends");
   const description = m
     ? `${reportTitle}. ${t("{count} active projects match the published GitHub search scope.", { count: m.supply.complete ? m.supply.total : "≥" + m.supply.total })} ${t("Evidence dated {date}.", { date: m.asOf.slice(0, 10) })}`
@@ -137,7 +137,7 @@ export function renderDocument(
       : [{ url: m.supply.sourceUrl, query: m.supply.query }];
     content = `<p class="eyebrow">${e("CATEGORY INTELLIGENCE /")} ${e(m.geo || "WORLDWIDE")}</p><h1>${e(m.topic.name)}</h1><p>${e(m.topic.description)}</p>
       <section><p>${escapeHtml(assessment.landscape)} · ${e(assessment.level === "provisional" ? "Preliminary recommendation" : "Measured classification")}</p><h2>${escapeHtml(assessment.title)}</h2><p>${escapeHtml(assessment.summary)}</p><p>${e("Report dated")} <time datetime="${escapeHtml(m.asOf)}">${escapeHtml(m.asOf.slice(0, 10))}</time> · ${e("Method")} ${escapeHtml(m.version)} · ${e(m.confidence)} ${e("evidence confidence")}</p>
-      <p>${e("Measured search term")}: ${escapeHtml(m.demand.keyword)} · ${escapeHtml(assessment.demandNote)}</p>${m.demand.retryAt ? `<p>${e("Google Trends refresh window")}: ${escapeHtml(m.demand.retryAt)}</p>` : ""}${list(assessment.facts)}${m.kind === "uncertain" ? `<p>${e("Quadrant not yet established")}</p><h3>${e("What to do next")}</h3>${list(assessment.nextSteps)}` : ""}
+      <p>${e("Measured search term")}: ${escapeHtml(m.demand.keyword)} · ${escapeHtml(assessment.demandNote)}</p>${m.demand.retryAt ? `<p>${e("Google Trends refresh window")}: ${escapeHtml(m.demand.retryAt)}</p>` : ""}${list(assessment.facts)}${assessment.kind === "uncertain" ? `<p>${e("Quadrant not yet established")}</p><h3>${e("What to do next")}</h3>${list(assessment.nextSteps)}` : ""}
       <dl>${m.competition ? `<dt>${e("Open-source competition")}</dt><dd>${escapeHtml(competitionPressure(m))} / 100 · ${e("pressure." + m.competition.level)}</dd><dt>${e("Open-source alternatives")}</dt><dd>${m.competition.direct}</dd><dt>${e("Direction basis")}</dt><dd>${e("basis." + (m.metrics.directionBasis || "recent-windows"))}</dd>` : ""}<dt>${e("Matching active GitHub projects")}</dt><dd>${m.supply.error ? "—" : (m.supply.complete ? "" : "≥") + number(m.supply.total)}</dd><dt>${e("Search-interest growth")}</dt><dd>${growth(m)} · ${e("Last 8 complete weeks vs previous 8")}</dd><dt>${e("Search term and region")}</dt><dd>${escapeHtml(m.demand.keyword)} · ${e(m.geo || "Worldwide")}</dd><dt>${e("Complete weekly observations")}</dt><dd>${m.metrics.points}</dd></dl></section>
       ${m.brief ? `<section><h2>${e("Research brief")}</h2><p>${escapeHtml(assessment.narrative.summary)}</p>${list(assessment.narrative.nextSteps)}<p>${e(assessment.narrative.kind === "ai" ? "AI interpretation of the evidence below. Verify the sources before acting." : "This recommendation follows the collected source evidence.")}</p></section>` : ""}
       ${

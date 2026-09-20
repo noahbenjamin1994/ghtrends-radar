@@ -290,7 +290,7 @@ export function researchLandscape(
     l.barrier === "high" &&
     competitionSignal &&
     l.leaders.some((x) => x.evidence.length > 0);
-  if (pressure === "high" || incumbentBarrier)
+  if ((pressure === "high" && competitionSignal) || incumbentBarrier)
     kind = rising ? "expanding" : "contested";
   else if (
     pressure === "low" &&
@@ -307,7 +307,11 @@ export function researchLandscape(
     competitionSignal
   )
     kind = "quiet";
-  else if (pressure === "medium" && (demand === "medium" || demand === "high"))
+  else if (
+    competitionSignal &&
+    pressure === "medium" &&
+    (demand === "medium" || demand === "high")
+  )
     kind = rising ? "expanding" : "contested";
   const organicDomains = new Set(
     l.competition.evidence.flatMap((r) => {

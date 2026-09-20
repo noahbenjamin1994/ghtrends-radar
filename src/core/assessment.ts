@@ -193,12 +193,6 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
       "Recent search attention has improved from a lower base. It has not recovered last year’s level; a seasonal explanation is unproven.",
     );
   }
-  if (m.topic.scope === "field") {
-    title = t("Choose a workflow within this field");
-    summary = t(
-      "Use the measured search trajectory to understand the field, then compare tools that serve one audience and one task.",
-    );
-  }
   if (!provisional && searchReady && m.metrics.seasonal) {
     title = t("Seasonal pattern · compare the same period last year");
     summary = t(
@@ -256,37 +250,117 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
                 : "Last 8 complete weeks vs previous 8",
   );
   const research = researchLandscape(m);
+  // A broad subject changes the scope of a conclusion, not the observed
+  // competition. Keep the raw quadrant intact and qualify the rendered verdict.
+  const kind: Market["kind"] =
+    research && research.kind !== "uncertain"
+      ? research.kind
+      : m.kind !== "uncertain"
+        ? m.kind
+        : supplyKnown && m.competition?.level === "established"
+          ? searchReady && m.metrics.trend === "rising"
+            ? "expanding"
+            : "contested"
+          : "uncertain";
+  const scope =
+    research && research.kind !== "uncertain" ? "market" : "opensource";
+  const topicName =
+    locale === "zh" ? m.topic.plan?.input || t(m.topic.name) : t(m.topic.name);
+  const landscape =
+    kind === "uncertain"
+      ? l("Ocean verdict pending", "红海 / 蓝海待定")
+      : scope === "market"
+        ? landscapeLabel(kind, locale)
+        : t(MARKET_LABELS[kind]);
+  const trend = searchReady
+    ? l(
+        {
+          rising: "rising",
+          falling: "falling",
+          stable: "steady",
+          mixed: "mixed",
+          unknown: "awaiting assessment",
+        }[m.metrics.trend || "unknown"],
+        {
+          rising: "上升",
+          falling: "回落",
+          stable: "平稳",
+          mixed: "方向分化",
+          unknown: "待核对",
+        }[m.metrics.trend || "unknown"],
+      )
+    : l("awaiting a usable weekly series", "待补充完整周数据");
+  const direct = supplyKnown ? m.competition?.direct : undefined;
+  const evidenceSummary = [
+    l(
+      `Search attention for “${m.demand.keyword}” is ${trend}.`,
+      `“${m.demand.keyword}”的搜索关注度${trend}。`,
+    ),
+    ...(direct !== undefined
+      ? [
+          l(
+            `${direct} reviewed open-source projects serve this task.`,
+            `当前审核范围内有 ${direct} 个同类开源项目。`,
+          ),
+        ]
+      : []),
+  ].join(" ");
+  const reason =
+    scope === "market" && (kind === "contested" || kind === "expanding")
+      ? l(
+          `Source-backed competitors already serve this market; search attention ${trend}.`,
+          `来源显示已有同行服务这个市场，搜索关注度${trend}。`,
+        )
+      : scope === "market" && m.brief?.landscape
+        ? m.brief.landscape[locale].competition
+        : kind === "contested" || kind === "expanding"
+          ? l(
+              `Established open-source alternatives; search attention ${trend}.`,
+              `开源替代方案已有规模，搜索关注度${trend}。`,
+            )
+          : kind === "blue"
+            ? l(
+                "Rising search attention with limited observed open-source alternatives.",
+                "搜索关注度上升，当前观察到的开源替代方案较少。",
+              )
+            : kind === "quiet"
+              ? l(
+                  "Limited observed open-source alternatives; test the size of one recurring user task.",
+                  "已观察到的开源供给较少，先验证一个具体任务的使用频率。",
+                )
+              : evidenceSummary;
+  // Keep fallback prose tied to the actual query and observations. A generated
+  // section may enrich these facts; a collection or writing failure never erases them.
+  if (m.topic.scope === "field") {
+    title = `${topicName}：${landscape}`;
+    if (locale === "en") title = `${topicName}: ${landscape}`;
+    summary =
+      evidenceSummary +
+      " " +
+      (kind === "contested" || kind === "expanding"
+        ? l(
+            "Compare what existing tools already deliver, then test a specific improvement for their users. This verdict covers the observed open-source landscape; commercial offers are listed separately below.",
+            "先比较现有工具已经解决的任务，再验证用户愿意采用的具体改进。此处判断对应已观察的开源竞争，商业方案见下方来源。",
+          )
+        : l(
+            "Use the collected projects and product pages below to compare specific user tasks and entry requirements.",
+            "结合下方采集到的项目与产品页面，比较具体用户任务和进入条件。",
+          ));
+  } else {
+    title = `${topicName}${locale === "zh" ? "：" : ": "}${title}`;
+    summary = `${evidenceSummary} ${summary}`;
+  }
   return {
+    kind,
+    reason,
+    scope,
+    basisLabel:
+      scope === "market"
+        ? l("Market research assessment", "综合市场研判")
+        : l("Search × open-source competition", "搜索趋势 × 开源竞争"),
     searchReady,
     demandNote,
-    landscape: research
-      ? landscapeLabel(research.kind, locale)
-      : m.topic.scope === "field"
-        ? t("Field overview")
-        : provisional && searchReady
-          ? l(
-              (
-                {
-                  rising: "Growth signal",
-                  falling: "Cooling search",
-                  stable: "Steady interest",
-                  mixed: "Diverging signals",
-                  unknown: "Research outlook",
-                } as const
-              )[m.metrics.trend || "unknown"],
-              (
-                {
-                  rising: "增长信号",
-                  falling: "需求降温",
-                  stable: "平稳市场",
-                  mixed: "分化市场",
-                  unknown: "研究判断",
-                } as const
-              )[m.metrics.trend || "unknown"],
-            )
-          : provisional
-            ? l("Research outlook", "研究判断")
-            : t(MARKET_LABELS[m.kind]),
+    landscape,
     level:
       provisional || research
         ? ("provisional" as const)
@@ -317,8 +391,18 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
           ).test(v) &&
           (!!recoveryTime || !hasRecoveryTimeReference(v)),
       )
-        ? { ...m.brief[locale], kind: "ai" as const }
-        : { summary, nextSteps, kind: "evidence" as const },
+        ? {
+            ...m.brief[locale],
+            kind: "ai" as const,
+          }
+        : research && m.brief?.landscape
+          ? {
+              headline: `${topicName}${locale === "zh" ? "：" : ": "}${landscape}`,
+              summary: m.brief.landscape[locale].summary,
+              nextSteps: [m.brief.landscape[locale].entry],
+              kind: "ai" as const,
+            }
+          : { summary, nextSteps, kind: "evidence" as const },
     queryExplanation:
       m.topic.plan && !hasNegativeWording(m.topic.plan.explanation[locale])
         ? m.topic.plan.explanation[locale]
