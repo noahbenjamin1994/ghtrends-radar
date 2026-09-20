@@ -606,196 +606,212 @@ export function App() {
         )}
         {route === "/" ? (
           <>
-            <section className="page-heading research-heading">
-              <div>
-                <div className="eyebrow">
-                  <span className="live-dot" />
-                  {t("THE OPEN-SOURCE OPPORTUNITY RADAR")}
+            <div className="research-intro">
+              <section className="page-heading research-heading">
+                <div>
+                  <div className="eyebrow">
+                    <span className="live-dot" />
+                    {t("THE OPEN-SOURCE OPPORTUNITY RADAR")}
+                  </div>
+                  <h1>{t("Research your next idea")}</h1>
                 </div>
-                <h1>{t("Research your next idea")}</h1>
-              </div>
-              <div className="heading-aside">
-                <p>
-                  {t("Search interest. Active projects. Unresolved workflows.")}
-                  <br />
-                  {t("A short report with sources and a next step.")}
-                </p>
-                <div className="source-chips">
-                  <span>
-                    <svg viewBox="0 0 16 16" width="13" height="13">
-                      <circle
-                        cx="8"
-                        cy="8"
-                        r="6"
-                        fill="none"
-                        stroke="currentColor"
-                      />
-                      <path
-                        d="M3 11 6 7 9 9 13 4"
-                        fill="none"
-                        stroke="currentColor"
-                      />
-                    </svg>
-                    GitHub
-                  </span>
-                  <span>＋</span>
-                  <span>
-                    <Activity size={13} />
-                    Google Trends
-                  </span>
-                </div>
-              </div>
-            </section>
-            <section
-              className="search-hero"
-              aria-label={t("Research a direction")}
-            >
-              <div className="toolbar">
-                <form
-                  className="search-field"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void scan(query);
-                  }}
-                >
-                  <Search size={18} />
-                  <input
-                    value={query}
-                    onChange={(e) => {
-                      ++preparationVersion.current;
-                      setPreparing(false);
-                      setQuery(e.target.value);
-                      setPreflight(null);
-                    }}
-                    placeholder={t("Explore a topic, e.g. agent memory")}
-                    aria-label={t("Search or scan a topic")}
-                    maxLength={300}
-                  />
-                  <button
-                    disabled={scanning || preparing || !query.trim()}
-                    type="submit"
-                  >
+                <div className="heading-aside">
+                  <p>
                     {t(
-                      account?.hosted
-                        ? account.user
-                          ? "Research · 1 credit"
-                          : "Sign in to research"
-                        : "Scan",
+                      "Search interest. Active projects. Unresolved workflows.",
                     )}
-                    <ArrowUpRight size={15} />
-                  </button>
-                </form>
-              </div>
-              <ScopeReview
-                result={preflight}
-                preparing={preparing}
-                hosted={!!account?.hosted}
-                onChoose={(query) => {
-                  setQuery(query);
-                  void scan(
-                    query,
-                    preparationContext.keyword,
-                    preparationContext.geo,
-                  );
-                }}
-                onConfirm={(scope) => void beginResearch(scope)}
-                onEdit={editResearchScope}
-                onClose={() => setPreflight(null)}
-              />
-              <div className="search-options">
-                <label className="select-field">
-                  <Globe2 size={15} />
-                  <select
-                    value={geo}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      ++preparationVersion.current;
-                      setPreparing(false);
-                      setPreflight(null);
-                      setGeo(value);
-                      const url = new URL(location.href);
-                      if (value) url.searchParams.set("geo", value);
-                      else url.searchParams.delete("geo");
-                      history.replaceState({}, "", url.pathname + url.search);
-                      setPath(routeUrl(url.pathname) + url.search);
+                    <br />
+                    {t("A short report with sources and a next step.")}
+                  </p>
+                  <div className="source-chips">
+                    <span>
+                      <svg viewBox="0 0 16 16" width="13" height="13">
+                        <circle
+                          cx="8"
+                          cy="8"
+                          r="6"
+                          fill="none"
+                          stroke="currentColor"
+                        />
+                        <path
+                          d="M3 11 6 7 9 9 13 4"
+                          fill="none"
+                          stroke="currentColor"
+                        />
+                      </svg>
+                      GitHub
+                    </span>
+                    <span>＋</span>
+                    <span>
+                      <Activity size={13} />
+                      Google Trends
+                    </span>
+                  </div>
+                </div>
+              </section>
+              <section
+                className="search-hero"
+                aria-label={t("Research a direction")}
+              >
+                <div className="toolbar">
+                  <form
+                    className="search-field"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void scan(query);
                     }}
-                    aria-label={t("Search-demand region")}
                   >
-                    <option value="">{t("Worldwide")}</option>
-                    <option value="US">{t("United States")}</option>
-                    <option value="GB">{t("United Kingdom")}</option>
-                    <option value="DE">{t("Germany")}</option>
-                    <option value="JP">{t("Japan")}</option>
-                    <option value="IN">{t("India")}</option>
-                  </select>
-                  <ChevronDown size={13} />
-                </label>
-                <details className="keyword-options">
-                  <summary>
-                    {t("Choose a different Google search term")}
-                  </summary>
-                  <label>
-                    {t("Demand keyword")}
+                    <Search size={18} />
                     <input
-                      value={keyword}
+                      value={query}
                       onChange={(e) => {
                         ++preparationVersion.current;
                         setPreparing(false);
+                        setQuery(e.target.value);
                         setPreflight(null);
-                        setKeyword(e.target.value);
                       }}
-                      maxLength={100}
-                      placeholder={t("Optional — e.g. AI agent memory")}
+                      placeholder={t("Explore a topic, e.g. agent memory")}
+                      aria-label={t("Search or scan a topic")}
+                      maxLength={300}
                     />
+                    <button
+                      disabled={
+                        !account || scanning || preparing || !query.trim()
+                      }
+                      type="submit"
+                    >
+                      {t(
+                        preparing
+                          ? "Preparing…"
+                          : scanning
+                            ? "Researching…"
+                            : !account
+                              ? "Research"
+                              : account.hosted
+                                ? account.user
+                                  ? "Research · 1 credit"
+                                  : "Sign in to research"
+                                : "Scan",
+                      )}
+                      <ArrowUpRight size={15} />
+                    </button>
+                  </form>
+                </div>
+                <ScopeReview
+                  result={preflight}
+                  preparing={preparing}
+                  hosted={!!account?.hosted}
+                  onChoose={(query) => {
+                    setQuery(query);
+                    void scan(
+                      query,
+                      preparationContext.keyword,
+                      preparationContext.geo,
+                    );
+                  }}
+                  onConfirm={(scope) => void beginResearch(scope)}
+                  onEdit={editResearchScope}
+                  onClose={() => setPreflight(null)}
+                />
+                <div className="search-options">
+                  <label className="select-field">
+                    <Globe2 size={15} />
+                    <select
+                      value={geo}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        ++preparationVersion.current;
+                        setPreparing(false);
+                        setPreflight(null);
+                        setGeo(value);
+                        const url = new URL(location.href);
+                        if (value) url.searchParams.set("geo", value);
+                        else url.searchParams.delete("geo");
+                        history.replaceState({}, "", url.pathname + url.search);
+                        setPath(routeUrl(url.pathname) + url.search);
+                      }}
+                      aria-label={t("Search-demand region")}
+                    >
+                      <option value="">{t("Worldwide")}</option>
+                      <option value="US">{t("United States")}</option>
+                      <option value="GB">{t("United Kingdom")}</option>
+                      <option value="DE">{t("Germany")}</option>
+                      <option value="JP">{t("Japan")}</option>
+                      <option value="IN">{t("India")}</option>
+                    </select>
+                    <ChevronDown size={13} />
                   </label>
-                  <p>
+                  <details className="keyword-options">
+                    <summary>
+                      {t("Choose a different Google search term")}
+                    </summary>
+                    <label>
+                      {t("Demand keyword")}
+                      <input
+                        value={keyword}
+                        onChange={(e) => {
+                          ++preparationVersion.current;
+                          setPreparing(false);
+                          setPreflight(null);
+                          setKeyword(e.target.value);
+                        }}
+                        maxLength={100}
+                        placeholder={t("Optional — e.g. AI agent memory")}
+                      />
+                    </label>
+                    <p>
+                      {t(
+                        "Keep the GitHub topic above; use this field to measure a more familiar phrase people search for.",
+                      )}
+                    </p>
+                  </details>
+                </div>
+                {!account ? (
+                  <p className="research-access-loading" role="status">
+                    {t("Checking research access…")}
+                  </p>
+                ) : account.hosted && account.user ? (
+                  <div className="research-allowance">
+                    <UsageSummary account={account} />
+                    <ResearchCost account={account} />
+                  </div>
+                ) : (
+                  <p className="scan-access-note">
                     {t(
-                      "Keep the GitHub topic above; use this field to measure a more familiar phrase people search for.",
+                      account?.hosted
+                        ? "Public reports are free to browse. Sign in for {limit} research credits each day and your saved history."
+                        : "Self-hosted: your keys, your data. Scans are saved on this server.",
+                      { limit: account?.dailyLimit || 10 },
                     )}
                   </p>
-                </details>
-              </div>
-              {account?.hosted && account.user ? (
-                <div className="research-allowance">
-                  <UsageSummary account={account} />
-                  <ResearchCost account={account} />
-                </div>
-              ) : (
-                <p className="scan-access-note">
-                  {t(
-                    account?.hosted
-                      ? "Public reports are free to browse. Sign in for {limit} research credits each day and your saved history."
-                      : "Self-hosted: your keys, your data. Scans are saved on this server.",
-                    { limit: account?.dailyLimit || 10 },
-                  )}
-                </p>
-              )}
-              {account?.trends.retryAt && (
-                <p className="source-notice" role="status">
-                  {t(
-                    "Google Trends collection resumes at {time}. Explore public reports while it refreshes.",
-                    {
-                      time: new Date(
-                        account.trends.retryAt,
-                      ).toLocaleTimeString(),
-                    },
-                  )}
-                </p>
-              )}
-              <div className="example-links">
-                <span>{t("Read a public example")}</span>
-                {["browser-agents", "agent-memory", "mcp-servers"].map(
-                  (slug) => (
-                    <button
-                      key={slug}
-                      onClick={() => navigate("/market/" + slug)}
-                    >
-                      {t(resolveTopic(slug).name)} <ArrowUpRight size={14} />
-                    </button>
-                  ),
                 )}
-              </div>
-            </section>
+                {account?.trends.retryAt && (
+                  <p className="source-notice" role="status">
+                    {t(
+                      "Google Trends collection resumes at {time}. Explore public reports while it refreshes.",
+                      {
+                        time: new Date(
+                          account.trends.retryAt,
+                        ).toLocaleTimeString(),
+                      },
+                    )}
+                  </p>
+                )}
+                <div className="example-links">
+                  <span>{t("Read a public example")}</span>
+                  {["browser-agents", "agent-memory", "mcp-servers"].map(
+                    (slug) => (
+                      <button
+                        key={slug}
+                        onClick={() => navigate("/market/" + slug)}
+                      >
+                        {t(resolveTopic(slug).name)}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </section>
+            </div>
             <section className="market-section">
               <div className="section-header">
                 <div>

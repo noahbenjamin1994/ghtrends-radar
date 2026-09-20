@@ -1,4 +1,8 @@
 export const zh: Record<string, string> = {
+  Research: "研究",
+  "Preparing…": "整理中…",
+  "Researching…": "研究中…",
+  "Checking research access…": "正在读取研究额度…",
   "Choose your experience, time and goal to continue.":
     "选择经验、时间与目标，继续整理建议。",
   "Choose a report with researched directions to continue.":
