@@ -2654,7 +2654,7 @@ test("short pilot fields receive targeted length repairs after evidence review",
   fixture(async (r) => {
     const raw = countedSample();
     raw.experimentPlan!.en.measurement =
-      "A submitted task is counted when every exported comment retains its author, body and position in the resulting document, and the operator completes the same action against the existing editor with a recorded duration for comparison.";
+      "A submitted task is counted when every exported comment retains its author, body and position in the resulting document, and the operator completes the same action against the existing editor with a recorded duration for comparison and a saved record of the matched input and output.";
     const counts = structuredClone(raw.experimentPlan!.counts);
     let repaired = false;
     r.json = async (_prompt, input: any, _budget, operation, thinking) => {
@@ -2663,7 +2663,7 @@ test("short pilot fields receive targeted length repairs after evidence review",
       const field = input.fields.find(
         (f: any) => f.path === "experimentPlan.en.measurement",
       );
-      assert.equal(field.maxLength, 200);
+      assert.equal(field.maxLength, 250);
       repaired = true;
       return {
         edits: [
@@ -2680,6 +2680,6 @@ test("short pilot fields receive targeted length repairs after evidence review",
       strategySources(seed, documents),
     );
     assert.equal(repaired, true);
-    assert.ok(output.experimentPlan.en.measurement.length <= 200);
+    assert.ok(output.experimentPlan.en.measurement.length <= 250);
     assert.deepEqual(output.experimentPlan.counts, counts);
   }));

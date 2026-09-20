@@ -58,7 +58,7 @@ const countedCopy = experimentCopy
     participants: z.string().trim().min(8).max(200),
     task: z.string().trim().min(8).max(280),
     timebox: z.string().trim().min(8).max(140),
-    measurement: z.string().trim().min(8).max(200),
+    measurement: z.string().trim().min(8).max(250),
     redirectAction: z.string().trim().min(8).max(140),
   });
 export const countedExperimentSchema = z.object({
