@@ -111,7 +111,7 @@ export function App() {
     [],
   );
   const loadAccount = () =>
-    api<Account>("/api/account").then((a) => {
+    api<Account>("/api/account?lang=" + locale).then((a) => {
       setCsrf(a.csrf);
       enableEngagement(a.engagementEnabled);
       setAccount(a);

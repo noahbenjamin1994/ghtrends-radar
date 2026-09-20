@@ -11,6 +11,41 @@ import type { installAuth } from "./auth.js";
 
 type Page = { activity_cursor?: string; purchase_cursor?: string };
 type Snapshot = { data: CreditAccount; syncedAt: string };
+
+export function researchCheckoutUrl(
+  paidAvailable: boolean,
+  language: unknown,
+  env = process.env,
+): string | null {
+  if (
+    !paidAvailable ||
+    !env.GHTRENDS_CASHIER_URL ||
+    !/^[a-f0-9-]{36}$/i.test(env.GHTRENDS_RESEARCH_PLAN_ID || "")
+  )
+    return null;
+  try {
+    const url = new URL(env.GHTRENDS_CASHIER_URL);
+    const project = env.GHTRENDS_NEXUS_PROJECT_ID || "ghtrends";
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      !["/", ""].includes(url.pathname) ||
+      !/^[a-zA-Z0-9_.-]{1,32}$/.test(project)
+    )
+      return null;
+    url.pathname = "/credits";
+    url.searchParams.set("projectId", project);
+    url.searchParams.set("planId", env.GHTRENDS_RESEARCH_PLAN_ID!);
+    url.searchParams.set("lang", language === "zh" ? "zh" : "en");
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
 export class CreditServiceError extends Error {
   constructor(public code: "unavailable" | "conflict" | "exhausted") {
     super("credits_" + code);

@@ -12,6 +12,7 @@ import type { MarketKind } from "../core/types.js";
 import { Loading, Empty } from "./components.js";
 import { DeepHistory, type DeepStatus } from "./deep.js";
 export interface Account {
+  checkoutUrl?: string | null;
   deep?: DeepStatus;
   hosted: boolean;
   engagementEnabled: boolean;

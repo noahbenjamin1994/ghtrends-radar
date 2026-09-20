@@ -130,7 +130,7 @@ export function DeepStart({
   const purchased = usePurchasedCredits(paid);
   useEffect(() => {
     let active = true;
-    void api<Account>("/api/account")
+    void api<Account>("/api/account?lang=" + locale)
       .then((a) => {
         if (active) setAccount(a);
       })

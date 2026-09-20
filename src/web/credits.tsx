@@ -227,6 +227,12 @@ function AccountDetails({ account }: { account: Account }) {
                 {say("", " 到期")}
               </p>
             )}
+            {account.checkoutUrl && (
+              <a className="button secondary" href={account.checkoutUrl}>
+                {say("View research pack", "查看专项研究包")}
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </a>
+            )}
           </div>
         )}
       </section>

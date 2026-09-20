@@ -14,7 +14,11 @@ import { installAuth } from "./auth.js";
 import { installFitRoutes } from "./fit.js";
 import { installFeedbackRoutes } from "./feedback.js";
 import { installDeepRoutes } from "./deep.js";
-import { installCreditAccountRoutes, CreditAccountClient } from "./credits.js";
+import {
+  installCreditAccountRoutes,
+  CreditAccountClient,
+  researchCheckoutUrl,
+} from "./credits.js";
 import { marketCard } from "../core/card.js";
 import { isIP } from "node:net";
 import { randomUUID, createHash } from "node:crypto";
@@ -406,6 +410,9 @@ export function createApp(
       authAvailable: auth.enabled,
       aiAvailable: engine.research.enabled,
       deep: deep.status(user?.id),
+      checkoutUrl: user
+        ? researchCheckoutUrl(deep.status(user.id).paidAvailable, q.query.lang)
+        : null,
       user: user ? { name: user.name, isAdmin: auth.isAdmin(user) } : null,
       csrf: user?.csrf || "",
       dailyLimit,

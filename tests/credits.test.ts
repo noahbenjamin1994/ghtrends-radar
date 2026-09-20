@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import {
   CreditAccountClient,
   installCreditAccountRoutes,
+  researchCheckoutUrl,
 } from "../src/server/credits.js";
 import { Store } from "../src/core/store.js";
 import type { installAuth } from "../src/server/auth.js";
@@ -27,6 +28,37 @@ const empty = (): CreditAccount => ({
   activity_next: null,
   purchases: [],
   purchase_next: null,
+});
+
+test("checkout links use operator configuration and stay hidden until paid research is enabled", () => {
+  const config = {
+    ...env,
+    GHTRENDS_CASHIER_URL: "https://pay.example",
+    GHTRENDS_RESEARCH_PLAN_ID: randomUUID(),
+  };
+  assert.equal(researchCheckoutUrl(false, "zh", config), null);
+  assert.equal(researchCheckoutUrl(true, "zh", {}), null);
+  for (const url of [
+    "javascript:alert(1)",
+    "https://user:secret@pay.example",
+    "https://pay.example/?key=secret",
+    "https://pay.example/foreign",
+    "http://pay.example",
+  ])
+    assert.equal(
+      researchCheckoutUrl(true, "zh", { ...config, GHTRENDS_CASHIER_URL: url }),
+      null,
+    );
+  const url = new URL(researchCheckoutUrl(true, "zh", config)!);
+  assert.equal(url.origin, "https://pay.example");
+  assert.equal(url.pathname, "/credits");
+  assert.equal(url.searchParams.get("projectId"), "ghtrends");
+  assert.equal(
+    url.searchParams.get("planId"),
+    config.GHTRENDS_RESEARCH_PLAN_ID,
+  );
+  assert.equal(url.searchParams.get("lang"), "zh");
+  assert.equal(url.href.includes(env.GHTRENDS_NEXUS_PROJECT_KEY), false);
 });
 
 test("billing connection is server-configured and hosted only", () => {
