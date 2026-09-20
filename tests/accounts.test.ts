@@ -76,6 +76,7 @@ test("hosted accounts isolate history, watchlists, jobs and every private report
       `/api/cards/${m.id}.png`,
       `/report/${m.id}`,
       "/api/jobs/private-job",
+      "/api/jobs/private-job?stream=1",
     ]) {
       const anonymous = await get(path);
       assert.equal(anonymous.status, 404, path);

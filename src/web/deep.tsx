@@ -20,7 +20,8 @@ import { projectUseCopy } from "../core/capabilities.js";
 import type { ResourceProfile } from "../core/fit.js";
 import type { CreditsResponse } from "../core/credits.js";
 import type { Account } from "./account.js";
-import { api } from "./api.js";
+import { ActivityFeed } from "./activity.js";
+import { api, watchResearch } from "./api.js";
 import { locale, localUrl, loginUrl } from "./i18n.js";
 import { appUrl } from "./paths.js";
 import { Loading } from "./components.js";
@@ -333,36 +334,21 @@ export function DeepResearchView({
     ),
   );
   useEffect(() => {
-    let active = true,
-      timer: ReturnType<typeof setTimeout>;
-    const controller = new AbortController();
-    async function load() {
-      try {
-        const next = await api<DeepTaskView>(
-          `/api/research/${id}?lang=${locale}`,
-          { signal: controller.signal },
-        );
-        if (!active) return;
-        setTask(next);
-        setError("");
-        if (
-          ["queued", "running"].includes(next.state) ||
-          ["checking", "settling"].includes(next.credit)
-        )
-          timer = setTimeout(() => void load(), 3500);
-        else window.dispatchEvent(new Event("ghtrends:usage"));
-      } catch (e) {
-        if (active) setError((e as Error).message);
-      }
-    }
     setTask(null);
     setError("");
-    void load();
-    return () => {
-      active = false;
-      clearTimeout(timer);
-      controller.abort();
-    };
+    return watchResearch<DeepTaskView>(
+      `/api/research/${id}?lang=${locale}`,
+      (next) => {
+        setTask(next);
+        setError("");
+        const done =
+          !["queued", "running"].includes(next.state) &&
+          !["checking", "settling"].includes(next.credit);
+        if (done) window.dispatchEvent(new Event("ghtrends:usage"));
+        return done;
+      },
+      (e) => setError(e.message),
+    );
   }, [id, reload]);
   const retry = async () => {
     setBusy(true);
@@ -473,6 +459,7 @@ export function DeepResearchView({
               ),
             )}
           </ol>
+          <ActivityFeed items={task.activities} />
           {task.state === "queued" && (
             <button
               className="button secondary"

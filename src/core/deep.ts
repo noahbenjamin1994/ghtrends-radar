@@ -360,6 +360,7 @@ export interface DeepEvidence {
   reads: DocumentRead[];
 }
 export interface DeepTask {
+  activities?: import("./activity.js").ResearchActivity[];
   id: string;
   owner: string;
   request: DeepRequest;

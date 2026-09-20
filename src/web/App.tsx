@@ -17,7 +17,8 @@ import { enableEngagement, track } from "./engagement.js";
 import { SourceDocuments } from "./documents.js";
 import { AdminView } from "./admin.js";
 import { ALGORITHM_VERSION } from "../core/version.js";
-import { api, setCsrf } from "./api.js";
+import { ActivityFeed } from "./activity.js";
+import { api, setCsrf, watchResearch } from "./api.js";
 import {
   HistoryView,
   SignInGate,
@@ -175,14 +176,14 @@ export function App() {
     [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     if (!scanning) return;
-    const started = Date.now();
-    setElapsed(0);
+    const started = job?.created || Date.now();
+    setElapsed(Math.max(0, Math.floor((Date.now() - started) / 1000)));
     const timer = setInterval(
       () => setElapsed(Math.floor((Date.now() - started) / 1000)),
       1000,
     );
     return () => clearInterval(timer);
-  }, [scanning]);
+  }, [scanning, job?.created]);
   const navigate = (input: string) => {
     const destination =
       geo && input.startsWith("/market/") && !input.includes("?")
@@ -347,12 +348,9 @@ export function App() {
   };
   useEffect(() => {
     if (!job) return;
-    let stop = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const d = await api<any>("/api/jobs/" + job.id);
-        if (stop) return;
+    return watchResearch<any>(
+      "/api/jobs/" + job.id,
+      (d) => {
         setPollError("");
         if (d.state === "complete") {
           if (d.credit === "returned")
@@ -363,9 +361,9 @@ export function App() {
           sessionStorage.removeItem("ghtrends:job");
           setScanning(false);
           void loadAccount();
-          await refresh();
+          void refresh();
           navigate("/report/" + d.market.id);
-          return;
+          return true;
         }
         if (d.state === "failed") {
           void loadAccount();
@@ -376,31 +374,23 @@ export function App() {
           sessionStorage.removeItem("ghtrends:job");
           setJob(null);
           setScanning(false);
-          return;
+          return true;
         }
         setJob(d);
-        timer = setTimeout(poll, 3000);
-      } catch (e) {
-        if (!stop) {
-          if ([401, 403, 404].includes((e as any).status)) {
-            setScanError((e as Error).message);
-            sessionStorage.removeItem("ghtrends:job");
-            setJob(null);
-            setScanning(false);
-          } else {
-            setPollError(
-              "Reconnecting to your research. Your task continues on the server.",
-            );
-            timer = setTimeout(poll, 5000);
-          }
-        }
-      }
-    };
-    timer = setTimeout(poll, 1500);
-    return () => {
-      stop = true;
-      clearTimeout(timer);
-    };
+        return false;
+      },
+      (error) => {
+        if ([401, 403, 404].includes(error.status)) {
+          setScanError(error.message);
+          sessionStorage.removeItem("ghtrends:job");
+          setJob(null);
+          setScanning(false);
+        } else
+          setPollError(
+            "Reconnecting to your research. Your task continues on the server.",
+          );
+      },
+    );
   }, [job?.id]);
   const pendingAssessment = job?.progress?.preview
     ? marketAssessment(job.progress.preview, locale)
@@ -1264,6 +1254,7 @@ export function App() {
                     </span>
                   )}
                 </div>
+                <ActivityFeed items={job?.progress?.activities} />
                 {pendingAssessment && (
                   <div className="scan-preview">
                     <small>{t("Preliminary result")}</small>

@@ -272,7 +272,27 @@ test("a running scan exposes received evidence before details finish and languag
     assert.ok(progress.progress.supplyCount > 0);
     assert.ok(progress.progress.preview);
     assert.equal(progress.progress.preview.topic.keyword, "AI for Science");
+    const stream = await fetch(base + "/api/jobs/" + job.id + "?stream=1");
+    assert.match(
+      stream.headers.get("content-type") || "",
+      /text\/event-stream/,
+    );
+    assert.equal(stream.headers.get("x-accel-buffering"), "no");
+    const reader = stream.body!.getReader(),
+      decoder = new TextDecoder();
+    const first = decoder.decode((await reader.read()).value);
+    assert.match(first, /"state":"running"/);
+    assert.match(first, /"supplyCount":/);
     release();
+    let remaining = "";
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      remaining += decoder.decode(next.value);
+    }
+    assert.match(remaining, /"state":"complete"/);
+    const resumed = await fetch(base + "/api/jobs/" + job.id + "?stream=1");
+    assert.match(await resumed.text(), /"state":"complete"/);
     const zh = await fetch(base + "/?lang=zh");
     assert.match(zh.headers.get("set-cookie") || "", /ghtrends_lang=zh/);
     assert.match(await zh.text(), /<html lang="zh-CN">/);

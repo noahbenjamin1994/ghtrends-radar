@@ -2598,6 +2598,72 @@ html:lang(zh) .radar-label text {
   color: #262626;
   margin-top: 10px;
 }
+.research-activity {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #e4e6e2;
+}
+.activity-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12px;
+  color: #6a706a;
+}
+.activity-live {
+  color: #2d755b;
+}
+.activity-live::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin: 0 6px 2px 0;
+  background: currentColor;
+}
+.research-activity ul {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: grid;
+  gap: 10px;
+}
+.research-activity li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: start;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #252a25;
+}
+.research-activity li > svg {
+  margin-top: 3px;
+  color: #39735c;
+}
+.research-activity small {
+  display: block;
+  font-size: 11px;
+  color: #727a72;
+}
+.research-activity time {
+  color: #7a817a;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.research-activity li[data-state="complete"] {
+  color: #767d76;
+}
+.research-activity li[data-state="thinking"] > svg,
+.research-activity li[data-state="writing"] > svg {
+  animation: spin 1.5s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .research-activity li > svg {
+    animation: none !important;
+  }
+}
 .scan-facts span {
   display: flex;
   align-items: center;

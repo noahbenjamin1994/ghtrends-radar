@@ -9,6 +9,8 @@ import { ENGAGEMENT_EVENTS, type EngagementEvent } from "../core/engagement.js";
 import { marketGapSignals, selectGapSignals } from "../core/gaps.js";
 import express from "express";
 import { operationContext } from "../core/operations.js";
+import { mergeActivity } from "../core/activity.js";
+import { streamSnapshot } from "./stream.js";
 import sharp from "sharp";
 import { installAuth } from "./auth.js";
 import { installFitRoutes } from "./fit.js";
@@ -265,7 +267,18 @@ export function createApp(
         engine.store.updateRun(job.id, "running");
         try {
           job.market = await operationContext.run(
-            { runId: job.id, userId: job.owner },
+            {
+              runId: job.id,
+              userId: job.owner,
+              onActivity: (activity) => {
+                job.progress = {
+                  stage: job.progress?.stage || "interpreting",
+                  ...job.progress,
+                  activities: mergeActivity(job.progress?.activities, activity),
+                };
+                engine.store.set("job:" + job.id, job, 3600000);
+              },
+            },
             () =>
               engine.scan(job.topic, {
                 geo: job.geo,
@@ -478,6 +491,7 @@ export function createApp(
           ai: engine.research.enabled,
           model: engine.research.model,
           researchThinking: engine.research.strategyThinking || "off",
+          researchReviewThinking: engine.research.reviewThinking || "off",
           dailyLimit,
           serviceLimit,
           attemptLimit: dailyLimit * 3,
@@ -1072,34 +1086,41 @@ export function createApp(
   );
   app.get("/api/jobs/:id", (q, r) => {
     r.set("Cache-Control", "no-store");
-    const id = String(q.params.id),
-      live = jobs.get(id),
-      job = live || engine.store.get<Job>("job:" + id);
-    if (job?.owner !== auth.user(q)?.id)
-      return r.status(404).json({ error: "Scan not found." });
-    if (job && !live && ["queued", "running"].includes(job.state)) {
-      job.state = "failed";
-      job.credit = auth.hosted ? "returned" : "free";
-      job.error = "The server restarted. Please run this scan again.";
-    }
-    return job
-      ? r.json({
-          ...job,
-          queuePosition:
-            job.state === "queued"
-              ? [...jobs.values()].filter(
-                  (j) =>
-                    j.state === "running" ||
-                    (j.state === "queued" &&
-                      (Number(!!j.refresh) < Number(!!job.refresh) ||
-                        (!!j.refresh === !!job.refresh &&
-                          j.created < job.created))),
-                ).length
-              : 0,
-        })
-      : r.status(404).json({
-          error: "Scan not found. It may have expired; check the topic page.",
-        });
+    const read = () => {
+      const id = String(q.params.id),
+        live = jobs.get(id),
+        job = live || engine.store.get<Job>("job:" + id);
+      if (!job || job.owner !== auth.user(q)?.id) return;
+      if (job && !live && ["queued", "running"].includes(job.state)) {
+        job.state = "failed";
+        job.credit = auth.hosted ? "returned" : "free";
+        job.error = "The server restarted. Please run this scan again.";
+      }
+      return {
+        ...job,
+        queuePosition:
+          job.state === "queued"
+            ? [...jobs.values()].filter(
+                (j) =>
+                  j.state === "running" ||
+                  (j.state === "queued" &&
+                    (Number(!!j.refresh) < Number(!!job.refresh) ||
+                      (!!j.refresh === !!job.refresh &&
+                        j.created < job.created))),
+              ).length
+            : 0,
+      };
+    };
+    const job = read();
+    if (!job)
+      return r.status(404).json({
+        error: "Scan not found. It may have expired; check the topic page.",
+      });
+    if (q.query.stream === "1")
+      return streamSnapshot(r, read, (value) =>
+        ["complete", "failed"].includes(value.state),
+      );
+    return r.json(job);
   });
   const repository = safe(async (q, r) => {
     const name = validateRepo(

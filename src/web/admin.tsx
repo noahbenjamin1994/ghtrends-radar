@@ -148,6 +148,7 @@ interface AdminData {
     ai: boolean;
     model: string;
     researchThinking: "off" | "low";
+    researchReviewThinking: "off" | "low";
     dailyLimit: number;
     serviceLimit: number;
     attemptLimit: number;
@@ -1155,10 +1156,10 @@ export function AdminView({ account }: { account: Account | null }) {
               </dd>
               <dt>{l("Research generation", "研究生成模式")}</dt>
               <dd>
-                {data.configuration.researchThinking === "low"
+                {data.configuration.researchReviewThinking === "low"
                   ? l(
-                      "Light reasoning for evidence; direct report writing",
-                      "证据研判：轻量思考 · 正文：直接生成",
+                      "Light reasoning for final review; direct extraction and writing",
+                      "最终复核：轻量思考 · 资料提取与正文：直接生成",
                     )
                   : l(
                       "Direct generation with evidence review",

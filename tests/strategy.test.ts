@@ -1891,7 +1891,8 @@ test("Issue interpretation accepts only real request identities and exact quotes
     };
     r.json = async (_system, input: any, _budget, operation, thinking) => {
       assert.equal(operation, "issue-reading");
-      assert.equal(thinking, "low");
+      assert.equal(thinking, false);
+      assert.equal(_budget, 6500);
       assert.ok(!_system.includes('Return JSON {"issueInsights":[]}'));
       assert.deepEqual(input.sources, [modelSources([source])[0]]);
       return {
@@ -2648,3 +2649,37 @@ test("copy delivery gate covers collected-page IDs and preserves embedded produc
     ),
   );
 });
+
+test("short pilot fields receive targeted length repairs after evidence review", async () =>
+  fixture(async (r) => {
+    const raw = countedSample();
+    raw.experimentPlan!.en.measurement =
+      "A submitted task is counted when every exported comment retains its author, body and position in the resulting document, and the operator completes the same action against the existing editor with a recorded duration for comparison.";
+    const counts = structuredClone(raw.experimentPlan!.counts);
+    let repaired = false;
+    r.json = async (_prompt, input: any, _budget, operation, thinking) => {
+      assert.equal(operation, "strategy-copy");
+      assert.equal(thinking, false);
+      const field = input.fields.find(
+        (f: any) => f.path === "experimentPlan.en.measurement",
+      );
+      assert.equal(field.maxLength, 200);
+      repaired = true;
+      return {
+        edits: [
+          {
+            path: field.path,
+            value:
+              "A task succeeds when exported comments retain their author, body and position, with completion time at most the existing editor's time.",
+          },
+        ],
+      };
+    };
+    const output = await (r as any).repairStrategyCopy(
+      raw,
+      strategySources(seed, documents),
+    );
+    assert.equal(repaired, true);
+    assert.ok(output.experimentPlan.en.measurement.length <= 200);
+    assert.deepEqual(output.experimentPlan.counts, counts);
+  }));

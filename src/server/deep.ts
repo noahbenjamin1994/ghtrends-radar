@@ -8,6 +8,8 @@ import {
   type DeepTask,
 } from "../core/deep.js";
 import { operationContext } from "../core/operations.js";
+import { mergeActivity } from "../core/activity.js";
+import { streamSnapshot } from "./stream.js";
 import { visibleOpportunities } from "../core/opportunities.js";
 import { requestLocale } from "../core/i18n.js";
 import { runDeepResearch } from "../providers/deep.js";
@@ -166,7 +168,14 @@ export function installDeepRoutes(
         engine.store.checkpointDeepTask(active);
       };
       const complete = await operationContext.run(
-        { runId: task.id, userId: task.owner },
+        {
+          runId: task.id,
+          userId: task.owner,
+          onActivity: (activity) => {
+            active.activities = mergeActivity(active.activities, activity);
+            checkpoint();
+          },
+        },
         () => runDeepResearch(engine, active, checkpoint),
       );
       engine.store.finishDeepTask(task, complete && Date.now() < deadline);
@@ -287,6 +296,21 @@ export function installDeepRoutes(
       const user = auth.requireUser(q),
         task = engine.store.deepTask(String(q.params.id), user.id);
       if (!task) fail("deep_missing", 404);
+      if (q.query.stream === "1")
+        return streamSnapshot(
+          r,
+          () => {
+            const currentUser = auth.requireUser(q);
+            const current = engine.store.deepTask(
+              String(q.params.id),
+              currentUser.id,
+            );
+            return current ? deepView(current) : undefined;
+          },
+          (view) =>
+            ["complete", "partial"].includes(view.state) &&
+            !["checking", "settling"].includes(view.credit),
+        );
       r.json(deepView(task!));
     }),
   );

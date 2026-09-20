@@ -1,8 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { ResearchActivity } from "./activity.js";
 
 export const operationContext = new AsyncLocalStorage<{
   runId: string;
   userId?: string;
+  onActivity?: (activity: ResearchActivity) => void;
 }>();
 export interface ProviderCall {
   provider: "deepseek" | "github" | "trends" | "search" | "documents";

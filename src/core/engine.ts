@@ -1,4 +1,5 @@
 import { requireResearchInput } from "./preflight.js";
+import type { ResearchActivity } from "./activity.js";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -38,6 +39,7 @@ export interface ScanProgress {
   weeklyPoints?: number;
   preview?: Market;
   topic?: Topic;
+  activities?: ResearchActivity[];
 }
 export class Engine {
   github: GitHub;
