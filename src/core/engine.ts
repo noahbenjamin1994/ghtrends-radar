@@ -193,7 +193,7 @@ export class Engine {
             )
             .then((web) => {
               if (web && this.documents.enabled) {
-                collectedPages = this.documents.collect(searchSources(web));
+                collectedPages = this.documents.collect(searchSources(web), topic.plan?.input || topic.keyword);
                 // Original pages can load while GitHub samples are being checked.
                 // The same promise is awaited before the report uses its evidence.
                 void collectedPages.catch(() => {});
@@ -280,7 +280,7 @@ export class Engine {
           const candidates = searchSources(web);
           const discussionReads: DocumentRead[] = [];
           const [pages, licenses, discussions] = await Promise.all([
-            collectedPages ?? this.documents.collect(candidates),
+            collectedPages ?? this.documents.collect(candidates, topic.plan?.input || topic.keyword),
             this.github.licenseSources(selectedProjects),
             this.github.discussionSources(candidates, (read) =>
               discussionReads.push(read),

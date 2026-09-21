@@ -79,6 +79,7 @@ export interface ResearchSource {
   parentUrl?: string;
   directionId?: string;
   searchIntent?: "competition" | "demand" | "opensource";
+  searchRole?: "direct" | "resource";
   placement?: "organic" | "ad";
   kind?: "request" | "project" | "search";
   id?: string;

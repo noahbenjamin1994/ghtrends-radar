@@ -482,6 +482,8 @@ export function searchSources(web?: WebEvidence): ResearchSource[] {
         url: r.url,
         fetchedAt: q.fetchedAt || web!.fetchedAt,
         searchIntent: q.intent,
+        ...(r.relevance?.role === "direct" || r.relevance?.role === "resource"
+          ? { searchRole: r.relevance.role } : {}),
         placement: r.kind,
         excerpt: `${q.engine === "duckduckgo" ? "DuckDuckGo" : "Google"} search excerpt. Query: ${q.query}. Search market: ${q.region || web!.region}. Language: ${web!.language}. Placement: ${r.kind}. Title: ${r.title}. Snippet: ${r.excerpt}`,
       }));

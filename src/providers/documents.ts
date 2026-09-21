@@ -1,3 +1,4 @@
+import { evidenceExcerpt } from "../core/excerpts.js";
 import { lookup } from "node:dns/promises";
 import type { LookupAddress } from "node:dns";
 import { createHash } from "node:crypto";
@@ -23,7 +24,7 @@ const robotsParser = createRequire(import.meta.url)("robots-parser") as (
   getCrawlDelay(agent: string): number | undefined;
 };
 
-export const DOCUMENT_VERSION = "3";
+export const DOCUMENT_VERSION = "4";
 const agentName = "ghtrendsbot";
 const agentHeader = "ghtrendsbot/1.0 (+https://ghtrends.dev/radar/)";
 // Documentation shells can exceed 1 MB while their useful article is short.
@@ -198,7 +199,7 @@ export const publicRequest: DocumentTransport = async (
   }
 };
 
-export function pageText(html: string) {
+export function pageText(html: string, focus = "") {
   const $ = load(html);
   const title = $("title")
     .first()
@@ -244,7 +245,7 @@ export function pageText(html: string) {
     throw failure("format");
   return {
     title,
-    text: text.slice(0, 6000),
+    text: evidenceExcerpt(text, 6000, focus),
     excerptTruncated: text.length > 6000,
     publishedAt,
   };
@@ -402,7 +403,7 @@ export class DocumentReader {
         )
       )
         throw failure("format");
-      const parsed = pageText(r.body);
+      const parsed = pageText(r.body, original.label + " " + (original.excerpt || ""));
       return {
         ...original,
         id: undefined,
@@ -540,6 +541,9 @@ export class DocumentReader {
             (s) =>
               s.placement === "organic" &&
               publicSearchUrl(s.url) &&
+              // This reader handles HTML/text. Keep download snippets as evidence,
+              // but do not spend a four-page slot on a PDF/archive it cannot parse.
+              !/\.(?:pdf|zip|gz|tar|png|jpe?g|webp|mp4)(?:$|[?#])/i.test(s.url) &&
               !discussion(s.url),
           )
           .map((s) => [s.url, s]),
@@ -572,7 +576,7 @@ export class DocumentReader {
       const matches = terms.filter((term) => words.has(term)).length;
       return matches >= Math.min(2, terms.length) ? matches : 0;
     };
-    const selected = unique
+    const ranked = unique
       .sort(
         (a, b) =>
           Number(!!hnItem(b.url)) - Number(!!hnItem(a.url)) ||
@@ -590,8 +594,19 @@ export class DocumentReader {
           return false;
         domains.add(host);
         return true;
-      })
-      .slice(0, 4);
+      });
+    // Retain the best-ranked original and reserve space for each observed job:
+    // offers, first-person needs, and reusable tools. No extra page requests.
+    const selected = ranked.slice(0, 1);
+    for (const intent of ["demand", "competition", "opensource"] as const) {
+      if (selected.some(s => s.searchIntent === intent)) continue;
+      const source = ranked.find(s => s.searchIntent === intent && !!s.searchRole);
+      if (source && selected.length < 4) selected.push(source);
+    }
+    for (const source of ranked) {
+      if (selected.length === 4) break;
+      if (!selected.includes(source)) selected.push(source);
+    }
     const allowed = new Set(selected.map((s) => hostnameKey(new URL(s.url))));
     const signal = AbortSignal.timeout(20000);
     let cursor = 0;
@@ -599,13 +614,13 @@ export class DocumentReader {
       selected.length,
     );
     await Promise.all(
-      Array.from({ length: Math.min(2, selected.length) }, async () => {
+      Array.from({ length: Math.min(4, selected.length) }, async () => {
         while (cursor < selected.length) {
           const index = cursor++,
             s = selected[index]!;
           const key =
             `documents:${DOCUMENT_VERSION}:` +
-            createHash("sha256").update(s.url).digest("hex");
+            createHash("sha256").update(JSON.stringify([s.url, s.label, s.excerpt])).digest("hex");
           const cached = this.store.get<{
             sources: ResearchSource[];
             read: DocumentRead;
