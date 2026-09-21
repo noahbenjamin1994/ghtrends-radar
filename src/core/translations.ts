@@ -747,7 +747,7 @@ export const zh: Record<string, string> = {
   Unavailable: "待补充",
   "No history": "开始记录研究",
   "Ready for your first scan": "开始你的首次扫描",
-  "This report is unavailable": "暂时无法打开这份报告",
+  "This report is unavailable": "查看研究报告",
   "This category is waiting for its first scan": "开始这个赛道的首次扫描",
   "Scan this category": "扫描这个赛道",
   "Your scan is queued": "扫描正在排队",
@@ -1122,7 +1122,7 @@ export const en: Record<string, string> = {
   "No description provided.": "View the repository for details.",
   "Not specified": "See source",
   "No history": "Start your research history",
-  "This report is unavailable": "This report is unavailable",
+  "This report is unavailable": "Open your research report",
   "This category is waiting for its first scan":
     "Start the first scan for this category",
   "Scan failed.": "Please retry the scan.",
