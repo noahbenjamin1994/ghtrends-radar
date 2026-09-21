@@ -61,7 +61,7 @@ export function TopicOverview({
             const source = brief.sources.find((s) => s.id === ref.id);
             return source ? (
               <a
-                key={ref.id}
+                key={`${ref.id}:${ref.quote}`}
                 href={source.url}
                 target="_blank"
                 rel="noreferrer"
@@ -251,7 +251,7 @@ export function OpportunityMap({
               const source = brief.sources.find((s) => s.id === ref.id);
               return source ? (
                 <a
-                  key={ref.id}
+                  key={`${ref.id}:${ref.quote}`}
                   href={source.url}
                   target="_blank"
                   rel="noreferrer"

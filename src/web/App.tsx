@@ -1776,7 +1776,13 @@ function MarketView({
       <LandscapePanel market={m} locale={locale} />
       <CompetitorPanel market={m} locale={locale} />
       <SourceDocuments market={m} locale={locale} />
-      {m.brief && <OpportunityMap key={m.id} market={m} locale={locale} />}
+      {m.brief && (
+        <OpportunityMap
+          key={`opportunities:${m.id}`}
+          market={m}
+          locale={locale}
+        />
+      )}
       {strategy ? (
         <section className="strategy-section" id="strategy">
           <div className="report-section-heading">
@@ -2379,7 +2385,12 @@ function MarketView({
           </button>
         </details>{" "}
       </section>
-      <ResearchFeedback key={m.id} kind="report" id={m.id} account={account} />
+      <ResearchFeedback
+        key={`feedback:${m.id}`}
+        kind="report"
+        id={m.id}
+        account={account}
+      />
     </div>
   );
 }
