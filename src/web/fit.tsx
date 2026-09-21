@@ -1,3 +1,4 @@
+import { BusyMark } from "../ui/loading.js";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Download, SlidersHorizontal } from "lucide-react";
 import {
@@ -188,7 +189,7 @@ export function PersonalFit({
               {busy
                 ? l("Comparing your options…", "正在比较适合你的方向…")
                 : l("Apply my situation", "按这些条件排序")}
-              {busy ? <span className="spinner" /> : <ArrowRight size={15} />}
+              {busy ? <BusyMark /> : <ArrowRight size={15} />}
             </button>
           </div>
           {busy && (

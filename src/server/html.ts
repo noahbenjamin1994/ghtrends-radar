@@ -1,3 +1,6 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { Skeleton, loadingStyles } from "../ui/loading.js";
 import {
   documentStatusLabel,
   adCollectionMessage,
@@ -286,6 +289,11 @@ export function renderDocument(
       : {}),
     isPartOf: { "@type": "WebSite", name: "ghtrends", url: base },
   };
+  const initialSkeleton = renderToStaticMarkup(createElement(Skeleton, {
+    variant: path === "/" ? "home" : /^\/(report|market|repo|research)\//.test(path) ? "report" : "list",
+    text: locale === "zh" ? "正在准备页面…" : "Preparing the page…",
+  }));
+  const boot = `<div class="boot-shell"><header class="boot-header"><a class="boot-brand" href="${escapeHtml(localeUrl(base, locale))}" aria-label="ghtrends"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="20" cy="20" r="14"/><path d="m8 28 11-12 7 7L36 6"/><circle cx="36" cy="6" r="3" fill="currentColor" stroke="none"/></svg><span>gh<b>trends</b></span></a><div class="boot-nav" aria-hidden="true"><span class="skeleton-block skeleton-tab"></span><span class="skeleton-block skeleton-tab"></span><span class="skeleton-block skeleton-tab"></span></div><div class="boot-actions" aria-hidden="true"><span class="skeleton-block"></span><span class="skeleton-block"></span></div></header><main>${initialSkeleton}<p class="boot-help">${locale === "zh" ? "加载时间较长？" : "Taking longer than expected?"} <a href="${escapeHtml(localeUrl(identity, locale))}">${locale === "zh" ? "重新加载" : "Reload"}</a></p></main></div>`;
   return template
     .replace(
       /((?:src|href)=["'])(?:\.\/|\/(?!\/))/g,
@@ -293,7 +301,7 @@ export function renderDocument(
     )
     .replace(
       "</head>",
-      `<meta name="ghtrends-base-path" content="${basePath}"></head>`,
+      `<meta name="ghtrends-base-path" content="${basePath}"><style id="loading-styles">${loadingStyles}</style><noscript><style>.boot-shell{display:none}</style></noscript></head>`,
     )
     .replace(
       /<html\b[^>]*>/i,
@@ -312,5 +320,5 @@ export function renderDocument(
       "</head>",
       `<meta name="description" content="${escapeHtml(description)}"><link rel="canonical" href="${escapeHtml(canonical)}">${(["en", "zh"] as const).map((l) => `<link rel="alternate" hreflang="${l === "zh" ? "zh-CN" : "en"}" href="${escapeHtml(localeUrl(identity, l))}">`).join("")}${noindex ? '<meta name="robots" content="noindex,follow">' : ""}<meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(canonical)}"><meta property="og:type" content="website"><meta property="og:site_name" content="ghtrends"><meta property="og:locale" content="${locale === "zh" ? "zh_CN" : "en_US"}"><meta property="og:image" content="${escapeHtml(image)}"><meta property="og:image:alt" content="${escapeHtml(title)}"><meta name="twitter:card" content="summary_large_image"><script type="application/ld+json">${JSON.stringify(schema).replaceAll("<", "\\u003c")}</script></head>`,
     )
-    .replace('<div id="root"></div>', `<div id="root">${content}</div>`);
+    .replace('<div id="root"></div>', `<div id="root">${boot}<noscript>${content}</noscript></div>`);
 }

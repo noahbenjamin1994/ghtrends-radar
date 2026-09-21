@@ -509,7 +509,7 @@ export function InspirationDeck({
             !available.length &&
             cases.map((item) => (
               <div
-                className="case-placeholder"
+                className="case-placeholder skeleton-block"
                 key={item.slug}
                 aria-hidden="true"
               />

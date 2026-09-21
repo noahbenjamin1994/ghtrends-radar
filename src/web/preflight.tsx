@@ -1,3 +1,4 @@
+import { BusyMark, Skeleton } from "../ui/loading.js";
 import React, { useEffect, useRef } from "react";
 import { ArrowRight, Check, X } from "lucide-react";
 import type { PreflightResult, ResearchScope } from "../core/preflight.js";
@@ -46,7 +47,7 @@ export function ScopeReview({
           )}
         </span>
         {preparing ? (
-          <span className="spinner" />
+          <BusyMark />
         ) : (
           <button
             type="button"
@@ -59,11 +60,10 @@ export function ScopeReview({
         )}
       </div>
       {preparing ? (
-        <p role="status">
-          {t(
-            "Organizing your topic and search phrases · 0 research credits used",
-          )}
-        </p>
+        <>
+          <Skeleton variant="compact" text={t("Preparing your research scope")} />
+          <p>{t("Organizing your topic and search phrases · 0 research credits used")}</p>
+        </>
       ) : result?.status === "ready" ? (
         <>
           <h3>{result.input}</h3>

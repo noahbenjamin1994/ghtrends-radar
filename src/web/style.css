@@ -1539,27 +1539,6 @@ footer small {
   color: var(--accent-ink);
   font-size: 2rem;
 }
-.loading-state {
-  padding: 80px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-}
-.loading-state p {
-  font-size: 0.83rem;
-  color: #262626;
-}
-.spinner {
-  display: inline-block;
-  width: 22px;
-  height: 22px;
-  border: 2px solid #666666;
-  border-top-color: var(--accent-ink);
-  border-radius: 50%;
-  animation: spin 0.85s linear infinite;
-  flex-shrink: 0;
-}
 .scan-status {
   position: fixed;
   bottom: 24px;
@@ -2580,7 +2559,7 @@ html:lang(zh) .radar-label text {
   max-height: 65vh;
   overflow-y: auto;
 }
-.scan-status > .spinner {
+.scan-status > .busy-mark {
   flex-shrink: 0;
   margin-top: 3px;
 }

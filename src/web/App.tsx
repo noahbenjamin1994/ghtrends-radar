@@ -1,3 +1,4 @@
+import { BusyMark } from "../ui/loading.js";
 import { InspirationDeck } from "./inspiration.js";
 import { ScopeReview } from "./preflight.js";
 import { DeepResearchView } from "./deep.js";
@@ -31,7 +32,6 @@ import { t, locale, localUrl, loginUrl, switchLanguage } from "./i18n.js";
 import React, { useEffect, useState, useRef } from "react";
 import {
   ArrowUp,
-  LoaderCircle,
   ArrowUpRight,
   ArrowRight,
   ArrowLeft,
@@ -729,11 +729,7 @@ export function App() {
                           aria-busy={preparing || scanning}
                         >
                           {preparing || scanning ? (
-                            <LoaderCircle
-                              size={19}
-                              className="send-spinner"
-                              aria-hidden="true"
-                            />
+                            <BusyMark />
                           ) : (
                             <ArrowUp
                               size={20}
@@ -1271,7 +1267,7 @@ export function App() {
             </>
           ) : (
             <>
-              <span className="spinner" />
+              <BusyMark />
               <div>
                 <strong>
                   {job?.state === "queued"
@@ -1396,7 +1392,7 @@ function MarketView({
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [path, geo]);
-  if (loading) return <Loading text={t("Opening the evidence…")} />;
+  if (loading) return <Loading variant="report" text={t("Opening the evidence…")} />;
   if (!m || error)
     return (
       <Empty
@@ -2442,6 +2438,7 @@ function RepoView({
   if (loading)
     return (
       <Loading
+        variant="report"
         text={t("Reading repository history and maintenance signals…")}
       />
     );

@@ -1,3 +1,4 @@
+import { Skeleton } from "../ui/loading.js";
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, Download, Trash2 } from "lucide-react";
 import {
@@ -151,9 +152,7 @@ export function ResearchFeedback({
           {l("Sign in to save your feedback", "登录后保存你的反馈")} →
         </a>
       ) : loading ? (
-        <p role="status">
-          {l("Reading your saved feedback…", "正在读取已保存的反馈…")}
-        </p>
+        <Skeleton variant="compact" text={l("Reading your saved feedback…", "正在读取已保存的反馈…")} />
       ) : !ready ? (
         <p role="alert">
           {error}{" "}
@@ -380,7 +379,7 @@ export function MyFeedback({ account }: { account: Account | null }) {
         </article>
       ))}
       {loading && (
-        <p role="status">{l("Reading your feedback…", "正在读取你的反馈…")}</p>
+        <Skeleton variant="compact" text={l("Reading your feedback…", "正在读取你的反馈…")} />
       )}
       {!loading && rows.length === 0 && !error && (
         <p>

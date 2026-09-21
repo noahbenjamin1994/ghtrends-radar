@@ -1,6 +1,7 @@
+import { BusyMark } from "../ui/loading.js";
 import { activityLabel, type ResearchActivity } from "../core/activity.js";
 import { locale } from "./i18n.js";
-import { Check, LoaderCircle } from "lucide-react";
+import { Check } from "lucide-react";
 
 export function ActivityFeed({ items = [] }: { items?: ResearchActivity[] }) {
   if (!items.length) return null;
@@ -26,7 +27,7 @@ export function ActivityFeed({ items = [] }: { items?: ResearchActivity[] }) {
             {item.state === "complete" ? (
               <Check size={14} />
             ) : (
-              <LoaderCircle size={14} />
+              <BusyMark />
             )}
             <span>
               {activityLabel(item.operation, zh)}

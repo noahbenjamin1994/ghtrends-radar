@@ -1,3 +1,4 @@
+import { Skeleton, type SkeletonVariant } from "../ui/loading.js";
 import { COMPETITION_POLICY } from "../core/competition.js";
 import { competitionPressure, marketAssessment } from "../core/assessment.js";
 import { t, locale } from "./i18n.js";
@@ -542,15 +543,12 @@ export function Empty({
 }
 export function Loading({
   text = t("Reading the signals…"),
+  variant = "list",
 }: {
   text?: string;
+  variant?: SkeletonVariant;
 }) {
-  return (
-    <div className="loading-state">
-      <span className="spinner" />
-      <p>{text}</p>
-    </div>
-  );
+  return <Skeleton text={text} variant={variant} />;
 }
 export function ComparisonChart({ repos }: { repos: Repo[] }) {
   const colors = [

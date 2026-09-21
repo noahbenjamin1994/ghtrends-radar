@@ -105,3 +105,19 @@ test("report text and source links cannot inject markup or executable URLs", () 
     `${hostile.topic.name}: ${hostile.headline} · ghtrends`,
   );
 });
+
+test("first paint uses a styled report skeleton; the alternate report is only a no-script fallback", () => {
+  const html = renderDocument(template, { ...options, locale: "zh" });
+  const body = html.split("<body>")[1]!;
+  const [interactive, fallback] = body.split("<noscript>");
+  assert.match(html.split("</head>")[0]!, /<style id="loading-styles">/);
+  assert.match(interactive!, /content-skeleton skeleton-report/);
+  assert.match(interactive!, /role="status" aria-busy="true"/);
+  assert.match(interactive!, /正在准备页面/);
+  assert.doesNotMatch(interactive!, /class="snapshot"|<h1>|class="spinner"/);
+  assert.match(fallback!, /class="snapshot"/);
+  assert.ok(fallback!.includes(market.demand.keyword));
+  assert.match(html, /prefers-reduced-motion:reduce/);
+  const home = renderDocument(template, { ...options, path: "/", market: null });
+  assert.match(home, /content-skeleton skeleton-home/);
+});
