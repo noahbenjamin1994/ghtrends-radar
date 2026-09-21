@@ -543,7 +543,8 @@ export class DocumentReader {
               publicSearchUrl(s.url) &&
               // This reader handles HTML/text. Keep download snippets as evidence,
               // but do not spend a four-page slot on a PDF/archive it cannot parse.
-              !/\.(?:pdf|zip|gz|tar|png|jpe?g|webp|mp4)(?:$|[?#])/i.test(s.url) &&
+              !/\.(?:pdf|zip|gz|tar|docx?|xlsx?|pptx?|png|jpe?g|webp|mp4)(?:$|[?#])/i.test(s.url) &&
+              !/^https?:\/\/(?:www\.)?arxiv\.org\/pdf\//i.test(s.url) &&
               !discussion(s.url),
           )
           .map((s) => [s.url, s]),

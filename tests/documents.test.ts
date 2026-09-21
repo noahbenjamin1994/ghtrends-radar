@@ -1441,11 +1441,12 @@ test("unsupported download URLs retain their snippets without using an original-
     });
     const inputs = [
       { ...candidate("https://papers.example/research.pdf", "demand"), searchRole: "resource" as const },
+      { ...candidate("https://arxiv.org/pdf/2508.06401", "demand"), searchRole: "resource" as const },
       ...["one", "two", "three", "four"].map(host => candidate(`https://${host}.example/article`)),
     ];
     const before = JSON.stringify(inputs);
     const result = await reader.collect(inputs);
     assert.equal(result.reads.length, 4);
-    assert.ok(seen.every(url => !url.includes("papers.example")));
+    assert.ok(seen.every(url => !url.includes("papers.example") && !url.includes("arxiv.org")));
     assert.equal(JSON.stringify(inputs), before);
   }));
