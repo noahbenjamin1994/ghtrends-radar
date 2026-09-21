@@ -263,6 +263,20 @@ export function recoverSourceQuote(
   const norm = (s: string) => s.replace(/\s+/g, " ").trim();
   const q = norm(quote),
     source = norm(excerpt);
+  // Restore the original span when a writer copied rendered blockquote text
+  // or capitalized the first word of a mid-sentence quotation. No words,
+  // numbers, punctuation or qualifiers may be added, removed or substituted.
+  if (q.length >= 8 && q.length <= 600 && !source.includes(q)) {
+    let pattern = q
+      .split(" ")
+      .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("(?:\\s|(?:\\r?\\n[ \\t]*>[ \\t]*))+");
+    if (/^[A-Z][a-z]/.test(q))
+      pattern = `[${q[0]}${q[0]!.toLowerCase()}]` + pattern.slice(1);
+    const matches = [...excerpt.matchAll(new RegExp(pattern, "g"))];
+    if (matches.length === 1 && matches[0]![0].length <= 600)
+      return matches[0]![0];
+  }
   // A model may quote the visible label of a Markdown link. Map that exact
   // visible text back to its original source span, retaining the link markup.
   if (q.length >= 8 && q.length <= 500 && !source.includes(q)) {

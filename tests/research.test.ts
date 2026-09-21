@@ -769,3 +769,13 @@ test("JSON transport recovery preserves literal source text and rejects ambiguou
   );
   assert.throws(() => parseModelJson('{"quote":"cut off\n'));
 });
+
+test("quote formatting recovery restores blockquote markers and sentence case without changing words", async () => {
+  const { recoverSourceQuote } = await import("../src/core/opportunities.js");
+  const excerpt = "And the operator holds the key, not proof of honesty.\n> Argus is not affiliated with CIS\n> or certified by another organization.";
+  assert.equal(recoverSourceQuote("The operator holds the key, not proof of honesty.", excerpt, true), "the operator holds the key, not proof of honesty.");
+  assert.equal(recoverSourceQuote("Argus is not affiliated with CIS or certified by another organization.", excerpt, true), "Argus is not affiliated with CIS\n> or certified by another organization.");
+  assert.equal(recoverSourceQuote("Argus is affiliated with CIS or certified by another organization.", excerpt, true), undefined);
+  assert.equal(recoverSourceQuote("The operator holds two keys, not proof of honesty.", excerpt, true), undefined);
+  assert.equal(recoverSourceQuote("The operator holds the key, not proof of honesty.", excerpt + "\n" + excerpt, true), undefined);
+});
