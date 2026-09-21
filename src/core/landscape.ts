@@ -3,9 +3,13 @@ import { hasReportWordingProblem as hasNegativeWording } from "./i18n.js";
 import type { Market, MarketKind, ResearchSource } from "./types.js";
 
 const prose = z.string().trim().min(8).max(500);
+export const sourceQuoteSchema = z.string().trim().min(4).max(600).refine(
+  (quote) => quote.length >= 8 || (quote.match(/\p{Script=Han}/gu)?.length || 0) >= 4,
+  "Quote at least 8 characters, or a complete Chinese statement containing at least 4 Han characters.",
+).describe("Exact source quotation: at least 8 characters, or at least 4 Chinese characters; keep the complete factual statement and qualifiers.");
 const ref = z.object({
   id: z.string().max(30),
-  quote: z.string().min(8).max(600),
+  quote: sourceQuoteSchema,
 });
 const rating = z.object({
   level: z.enum(["high", "medium", "low", "exploratory"]),

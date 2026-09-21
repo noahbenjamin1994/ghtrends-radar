@@ -10,6 +10,7 @@ import { modelSources } from "../src/providers/research.js";
 import {
   visibleOpportunities,
   groundOpportunityRatings,
+  evidenceRef,
   proseRepairs,
   applyProseRepairs,
 } from "../src/core/opportunities.js";
@@ -2898,3 +2899,60 @@ test("section schema recovery patches only rejected fields and preserves accepte
     );
     assert.equal(({} as any).polluted, undefined);
   }));
+
+test("citation repair can remove unsupported stubs without rewriting accepted direction copy", async () =>
+  fixture(async (r) => {
+    const data = countedSample();
+    let repaired = false;
+    r.json = async (_prompt, input: any, _budget, operation) => {
+      if (operation === "capability-audit") return capabilitySample(input.directions);
+      if (operation === "strategy-direction") {
+        const direction = structuredClone(data.opportunities.find((o) => o.id === input.candidate.id)!);
+        if (direction.id === data.recommendedId) {
+          direction.basedOn = [{ id: "R1", quote: "" }];
+          direction.competition.evidence = [{ id: "R1", quote: "x" }];
+        }
+        return direction;
+      }
+      if (operation === "strategy-section-edit") {
+        repaired = true;
+        assert.deepEqual(input.editablePaths, ["basedOn", "competition.evidence"]);
+        return { edits: [
+          { path: "basedOn", value: [] },
+          { path: "competition.evidence", value: [] },
+          { path: "zh.service", value: "Unrequested change" },
+          { path: "__proto__.polluted", value: true },
+        ] };
+      }
+      if (operation === "strategy-pilot") return data.experimentPlan;
+      if (operation === "strategy-priority" || operation === "strategy-overall") return data;
+      throw new Error(`Unexpected ${operation}`);
+    };
+    const result = await (r as any).writeStrategySections({ input: "Sparse category", sources: documents }, data);
+    assert.ok(repaired);
+    const selected = result.opportunities.find((o: any) => o.id === data.recommendedId);
+    assert.deepEqual(selected.basedOn, []);
+    assert.deepEqual(selected.competition.evidence, []);
+    assert.equal(selected.zh.service, data.opportunities.find(o => o.id === data.recommendedId)!.zh.service);
+    assert.equal(({} as any).polluted, undefined);
+  }));
+
+test("Chinese source statements keep their exact short text while unsupported ratings stay inferred", () => {
+  assert.ok(evidenceRef.safeParse({ id: "WP1", quote: "已开通商品橱窗" }).success);
+  assert.ok(!evidenceRef.safeParse({ id: "WP1", quote: "free" }).success);
+  assert.ok(!evidenceRef.safeParse({ id: "WP1", quote: "" }).success);
+  const data = countedSample();
+  data.opportunities[0]!.competition = { level: "low", basis: "observed", evidence: [] };
+  const grounded = groundOpportunityRatings(data, documents) as StrategyResponse;
+  assert.equal(grounded.opportunities[0]!.competition.basis, "inferred");
+});
+
+test("a non-software report can ground its premise in a collected original page", () => {
+  const data = countedSample();
+  const page: any = { id: "WP1", kind: "search", documentType: "page", label: "Brand account", url: "https://example.com/brand", excerpt: "已开通商品橱窗" };
+  data.evidence = [{ id: "WP1", quote: page.excerpt }];
+  for (const o of data.opportunities) o.basedOn = [];
+  const supplied = [...strategySources(seed, documents), page];
+  assert.ok(!strategyProblems(data, supplied, seed, true, true).some(x => x.startsWith("Ground the factual premise")));
+  assert.ok(strategyProblems(data, supplied.map(s => s.id === "WP1" ? { ...s, documentType: undefined } : s), seed, true, true).some(x => x.startsWith("Ground the factual premise")));
+});

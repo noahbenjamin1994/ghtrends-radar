@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { excludedRequestUrls } from "./landscape.js";
+import { excludedRequestUrls, sourceQuoteSchema } from "./landscape.js";
 import {
   hasReportWordingProblem as hasNegativeWording,
   hasRecoveryTimeReference,
@@ -11,7 +11,7 @@ import type { Brief, ResearchSource } from "./types.js";
 const prose = z.string().trim().min(8).max(500);
 export const evidenceRef = z.object({
   id: z.string().max(30),
-  quote: z.string().min(8).max(600),
+  quote: sourceQuoteSchema,
 });
 const assessment = z.object({
   level: z.enum(["high", "medium", "low", "exploratory"]),
@@ -426,8 +426,13 @@ export function groundOpportunityRatings(
   }
   const excluded = excludedRequestUrls((result as any).issueInsights, sources);
   for (const o of result.opportunities) {
+    if (!o.demand.evidence.length && o.demand.level === "high")
+      o.demand.level = "exploratory";
     for (const axis of ["demand", "competition"] as const) {
-      if (o[axis].evidence.some((r) => r.id === "S1" || r.id === "S2"))
+      if (
+        !o[axis].evidence.length ||
+        o[axis].evidence.some((r) => r.id === "S1" || r.id === "S2")
+      )
         o[axis].basis = "inferred";
     }
     if (o.demand.level === "high" && o.demand.basis === "inferred")

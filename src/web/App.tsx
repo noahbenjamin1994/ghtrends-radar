@@ -1719,9 +1719,13 @@ function MarketView({
         </aside>
       </section>
       {m.aiError && (
-        <p className="report-delivery-note" role="status">
-          {t(m.aiError)}
-        </p>
+        <div className="report-delivery-note" role="alert">
+          <strong>{l("Analysis is incomplete", "分析正文尚未完成")}</strong>
+          <div>{l(
+            "The overview, directions and validation plan could not be completed. The collected sources below remain available; update this research to retry the analysis.",
+            "整体机会、方向分析和验证计划未能完成。下方保留已采集的来源数据，可点击「更新研究」重新生成分析。",
+          )}</div>
+        </div>
       )}
       <div className="report-facts">
         <div>

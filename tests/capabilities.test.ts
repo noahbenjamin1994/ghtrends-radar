@@ -436,3 +436,21 @@ test("capability checks retain a complete source statement beyond the preferred 
     ),
   );
 });
+
+test("a format retry preserves one bounded capability evidence correction", async () =>
+  fixture(async (r) => {
+    let calls = 0;
+    r.json = async (_prompt, input: any) => {
+      calls++;
+      if (calls === 1) throw Object.assign(new Error("JSON format"), { code: "invalid_response" });
+      if (calls === 2) {
+        const x = audit();
+        x.directions[0]!.facts[0]!.quote = "Invented offline synchronization.";
+        return x;
+      }
+      assert.deepEqual(input.editablePaths, ["directions.0.facts"]);
+      return { edits: [{ path: "directions.0.facts", value: audit().directions[0]!.facts }] };
+    };
+    assert.deepEqual(await r.auditCapabilities({ input: "grooming", sources: docs }, draft), audit());
+    assert.equal(calls, 3);
+  }));
