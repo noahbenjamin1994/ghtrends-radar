@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import "@fontsource-variable/archivo";
 import "@fontsource/dm-mono/400.css";
 import "./style.css";
+import "./report.css";
 import { App } from "./App.js";
 if (!document.getElementById("loading-styles")) {
   const style = document.createElement("style");

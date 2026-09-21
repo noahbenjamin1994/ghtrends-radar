@@ -1,0 +1,712 @@
+/* Field notes: an editorial surface shared by the report and its take-away images. */
+.report-page {
+  --report-ink: #183d34;
+  --report-muted: #667469;
+  --report-paper: #f7f5ef;
+  max-width: 1080px;
+  padding-top: 18px;
+  color: #293a32;
+}
+.report-page .back-link {
+  margin-bottom: 22px;
+  color: var(--report-muted);
+  font-size: 12px;
+}
+.report-page .detail-heading {
+  display: block;
+  border-top: 3px solid var(--report-ink);
+  padding-top: 22px;
+  margin-bottom: 0;
+}
+.report-page .detail-heading .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  color: var(--report-muted);
+}
+.report-page .detail-heading h1 {
+  font-size: clamp(34px, 4vw, 52px);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.2;
+  margin: 16px 0 14px;
+  max-width: 940px;
+  overflow-wrap: anywhere;
+}
+.report-page .detail-heading .report-edition {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--report-muted);
+  max-width: none;
+}
+.report-page .detail-actions {
+  margin-top: 20px;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.report-page .detail-actions .button {
+  font-size: 12px;
+  padding: 10px 15px;
+  min-height: 40px;
+  border-radius: 9px;
+}
+.report-page .report-share-trigger {
+  background: var(--report-ink);
+  border-color: var(--report-ink);
+  color: #fff;
+  order: -1;
+}
+.report-page .report-share-trigger:hover {
+  background: #285b4b;
+  transform: translateY(-1px);
+}
+.report-page .report-privacy {
+  font-size: 11px;
+  margin: 14px 0 24px;
+  color: var(--report-muted);
+}
+.report-page .report-nav {
+  position: sticky;
+  flex-wrap: nowrap;
+  top: 0;
+  z-index: 15;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px);
+  gap: 26px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: 0;
+  margin: 26px 0 28px;
+  border-block: 1px solid #e3e7df;
+}
+.report-page .report-nav a {
+  font-size: 12px;
+  min-height: 52px;
+  border-bottom: 2px solid transparent;
+  transition:
+    color 0.18s,
+    border-color 0.18s;
+  text-decoration: none;
+}
+.report-page .report-nav a[aria-current] {
+  color: var(--report-ink);
+  border-bottom-color: var(--report-ink);
+  font-weight: 600;
+}
+.report-page [id] {
+  scroll-margin-top: 84px;
+}
+.report-page .report-outlook {
+  position: relative;
+  background: var(--report-paper);
+  border: 1px solid #e8e7dd;
+  border-radius: 4px 24px 24px 24px;
+  padding: 44px;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 40px;
+}
+.report-page .outlook-meta {
+  color: var(--report-muted);
+  letter-spacing: 0.1em;
+  font-size: 11px;
+  margin-bottom: 20px;
+}
+.report-page .outlook-copy h2 {
+  font-size: clamp(25px, 2.8vw, 36px);
+  line-height: 1.45;
+  color: var(--report-ink);
+  font-weight: 580;
+  letter-spacing: -0.03em;
+  text-wrap: pretty;
+}
+.report-page .outlook-summary {
+  font-size: 15px;
+  line-height: 1.95;
+  color: #536257;
+}
+.report-page .outlook-byline {
+  font-size: 10px;
+  color: #768074;
+  margin-top: 28px;
+}
+.report-page .outlook-signal {
+  padding-left: 28px;
+  border-color: #d9dfd2;
+}
+.report-page .outlook-verdict h3 {
+  font-size: clamp(30px, 3.7vw, 45px);
+  line-height: 1.25;
+}
+.report-page .outlook-verdict p {
+  font-size: 13px;
+  line-height: 1.8;
+  margin-bottom: 24px;
+}
+.report-page .outlook-momentum {
+  font-size: 11px;
+  border-color: #d9dfd2;
+}
+.report-page .outlook-momentum strong {
+  font-size: 29px;
+}
+.report-page .outlook-window {
+  font-size: 10px;
+}
+.report-page .report-facts {
+  margin: 22px 0 56px;
+  padding: 22px 0;
+  border-bottom: 1px solid #e3e7df;
+  gap: 0;
+  background: transparent;
+  border-radius: 0;
+}
+.report-page .report-facts > div {
+  padding: 0 24px;
+  border-right: 1px solid #e3e7df;
+}
+.report-page .report-facts > div:first-child {
+  padding-left: 0;
+}
+.report-page .report-facts > div:last-child {
+  border: 0;
+}
+.report-page .report-facts strong {
+  font-size: 29px;
+  color: var(--report-ink);
+  margin: 12px 0 9px;
+}
+.report-page .report-facts small {
+  line-height: 1.7;
+  font-size: 10px;
+}
+.report-page .report-section-heading {
+  align-items: flex-start;
+  margin-bottom: 24px;
+  gap: 24px;
+}
+.report-page .report-section-heading .eyebrow {
+  color: #6a7c6e;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  margin-bottom: 10px;
+}
+.report-page .report-section-heading h3 {
+  font-size: clamp(23px, 2.4vw, 30px);
+  line-height: 1.4;
+  color: var(--report-ink);
+  font-weight: 560;
+  letter-spacing: -0.025em;
+}
+.report-page .report-section-heading > span {
+  font-size: 11px;
+  line-height: 1.6;
+}
+.report-page
+  :is(
+    .landscape-section,
+    .topic-overview,
+    .opportunity-map,
+    .strategy-section,
+    .report-evidence,
+    .report-projects,
+    .report-method
+  ) {
+  margin-block: 56px;
+}
+.report-page .landscape-section {
+  border-top: 0;
+  padding-top: 0;
+  padding-bottom: 36px;
+}
+.report-page .landscape-summary {
+  font-size: 22px;
+  line-height: 1.65;
+  max-width: 800px;
+}
+.report-page .landscape-columns {
+  background: #fafbf8;
+  border-radius: 16px;
+  padding: 26px;
+  gap: 26px;
+}
+.report-page
+  :is(.landscape-columns, .topic-overview-grid, .strategy-reasoning)
+  p {
+  font-size: 14px;
+  line-height: 1.85;
+}
+.report-page .incumbent-list article {
+  grid-template-columns: 190px minmax(0, 1fr);
+}
+.report-page .opportunity-selection {
+  font-size: 14px;
+  line-height: 1.85;
+  max-width: 800px;
+}
+.report-page .opportunity-priority {
+  font-size: 12px;
+  margin-block: 12px 20px;
+}
+.report-page .opportunity-comparison {
+  border: 1px solid #dde5d9;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-top: 24px;
+}
+.report-page .opportunity-columns {
+  background: #f6f8f3;
+  padding: 14px 20px;
+  font-size: 10px;
+}
+.report-page .opportunity-row {
+  padding: 22px 20px;
+  border-bottom: 1px solid #e8ede4;
+  transition:
+    background 0.18s,
+    box-shadow 0.18s;
+}
+.report-page .opportunity-row:last-child {
+  border-bottom: 0;
+}
+.report-page .opportunity-row.selected {
+  background: #eef4ec;
+  box-shadow: inset 3px 0 #37644d;
+}
+.report-page .opportunity-row:hover {
+  background: #f3f7f0;
+}
+.report-page .opportunity-number {
+  color: #81917f;
+  font-size: 15px;
+  font-weight: 400;
+}
+.report-page .opportunity-name strong {
+  font-size: 15px;
+  line-height: 1.65;
+}
+.report-page .opportunity-service {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.report-page .opportunity-name small {
+  font-size: 10px;
+  color: #38734d;
+}
+.report-page .opportunity-detail {
+  background: #fcfcfa;
+  border: 1px solid #e5e9df;
+  border-radius: 18px;
+  padding: 34px;
+  margin-top: 22px;
+}
+.report-page .opportunity-detail h4 {
+  font-size: 26px;
+  line-height: 1.5;
+  color: var(--report-ink);
+}
+.report-page .opportunity-detail p,
+.report-page .opportunity-explainer dd {
+  font-size: 14px;
+  line-height: 1.9;
+}
+.report-page .opportunity-explainer {
+  gap: 20px;
+}
+.report-page .opportunity-explainer dt {
+  font-size: 11px;
+  color: var(--report-muted);
+}
+.report-page .strategy-section {
+  border-top: 2px solid #2c5744;
+  padding: 30px 32px;
+  background: #f7f5ef;
+  border-radius: 0 0 18px 18px;
+}
+.report-page .strategy-experiment {
+  background: #edf1e7;
+  border-radius: 12px;
+}
+.report-page .source-documents {
+  margin: 24px 0;
+  padding: 18px 22px;
+  border: 1px solid #e3e7df;
+  border-radius: 12px;
+  font-size: 13px;
+}
+.report-page .limits-panel {
+  background: #f8f9f5;
+  border-radius: 14px;
+}
+.report-page button:focus-visible,
+.report-share-dialog button:focus-visible,
+.report-page a:focus-visible {
+  outline: 2px solid #48816b;
+  outline-offset: 4px;
+}
+.report-share-dialog {
+  --report-ink: #183d34;
+  border: 0;
+  border-radius: 22px;
+  width: min(1080px, calc(100vw - 48px));
+  max-width: none;
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  color: #293a32;
+  box-shadow: 0 28px 100px #122a3430;
+}
+.report-share-dialog::backdrop {
+  background: #16241dd0;
+  backdrop-filter: blur(7px);
+}
+.share-dialog-inner {
+  padding: 28px;
+}
+.share-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+.share-heading span {
+  font-size: 10px;
+  color: #778474;
+  letter-spacing: 0.12em;
+}
+.share-heading h2 {
+  font-size: clamp(20px, 2vw, 27px);
+  margin: 10px 0 0;
+  color: #183d34;
+  font-weight: 550;
+  line-height: 1.4;
+}
+.share-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  background: #f1f4ee;
+  border-radius: 50%;
+}
+.share-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 30px;
+}
+.share-preview {
+  background: #e6e9e1;
+  border-radius: 12px;
+  height: min(650px, calc(100dvh - 185px));
+  min-height: 300px;
+  overflow: auto;
+  padding: 28px;
+  scrollbar-width: thin;
+}
+.share-preview img {
+  width: 100%;
+  height: auto;
+  display: block;
+  box-shadow: 0 8px 30px #19342114;
+}
+.share-preview .content-skeleton {
+  background: #f7f5ef;
+  padding: 24px;
+}
+.share-control-label {
+  color: #6b7c6d;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  margin: 4px 0 12px;
+}
+.share-formats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.share-formats button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  border: 1px solid #dde3d8;
+  border-radius: 12px;
+  padding: 16px 12px;
+}
+.share-formats button[aria-pressed="true"] {
+  border-color: #37644d;
+  background: #f0f5ed;
+  box-shadow: 0 0 0 1px #37644d;
+}
+.share-formats strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.share-formats small {
+  font-size: 10px;
+  color: #657565;
+  line-height: 1.6;
+}
+.format-icon {
+  display: block;
+  width: 20px;
+  height: 26px;
+  border: 1px solid #76917b;
+  background:
+    linear-gradient(#76917b, #76917b) 4px 7px/10px 1px no-repeat,
+    linear-gradient(#a0b59e, #a0b59e) 4px 11px/10px 1px no-repeat;
+  border-radius: 2px;
+}
+.format-icon.long {
+  height: 32px;
+  margin-bottom: -6px;
+}
+.share-caption,
+.share-visibility p {
+  font-size: 12px;
+  line-height: 1.85;
+  color: #6c776a;
+}
+.share-caption {
+  margin: 16px 0 24px;
+}
+.share-visibility {
+  border-block: 1px solid #e3e7de;
+  padding: 18px 0;
+}
+.share-visibility > strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 550;
+}
+.share-visibility .text-link {
+  color: #306546;
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: left;
+}
+.share-link {
+  display: flex;
+  margin-top: 14px;
+  background: #f4f6f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.share-link input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 11px;
+  font-size: 11px;
+  color: #54684f;
+}
+.share-link button {
+  padding: 10px;
+}
+.share-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+}
+.share-downloads .button {
+  background: #183d34;
+  color: #fff;
+  border-color: #183d34;
+  border-radius: 9px;
+  padding: 12px 16px;
+  font-size: 12px;
+}
+.share-downloads .button.subtle {
+  background: #fff;
+  color: #183d34;
+  border-color: #dde3d8;
+}
+.share-error {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #a5432d;
+  line-height: 1.7;
+}
+.share-error button {
+  margin-left: 10px;
+  text-decoration: underline;
+}
+.share-status {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 20px;
+  font-size: 11px;
+  color: #357144;
+}
+@media (max-width: 800px) {
+  .report-page .report-outlook {
+    padding: 30px;
+    gap: 26px;
+    grid-template-columns: minmax(0, 1fr) 220px;
+  }
+  .report-page .outlook-verdict h3 {
+    font-size: 33px;
+  }
+  .share-workspace {
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 20px;
+  }
+  .share-preview {
+    padding: 14px;
+  }
+}
+@media (max-width: 600px) {
+  .report-page {
+    padding-top: 18px;
+  }
+  .report-page .back-link {
+    margin-bottom: 22px;
+  }
+  .report-page .detail-heading {
+    padding-top: 24px;
+  }
+  .report-page .detail-heading h1 {
+    font-size: 34px;
+  }
+  .report-page .detail-heading .report-edition {
+    font-size: 10px;
+    gap: 8px;
+  }
+  .report-page .detail-actions {
+    gap: 7px;
+  }
+  .report-page .detail-actions .button {
+    padding: 9px 11px;
+    font-size: 11px;
+  }
+  .report-page .report-nav {
+    gap: 22px;
+    margin: 22px -4px;
+    padding-inline: 4px;
+  }
+  .report-page .report-outlook {
+    grid-template-columns: 1fr;
+    border-radius: 4px 18px 18px 18px;
+    padding: 25px 22px;
+    gap: 28px;
+  }
+  .report-page .outlook-copy h2 {
+    font-size: 25px;
+  }
+  .report-page .outlook-summary {
+    font-size: 14px;
+    line-height: 1.85;
+  }
+  .report-page .outlook-signal {
+    border-left: 0;
+    border-top: 1px solid #d9dfd2;
+    padding: 22px 0 0;
+  }
+  .report-page .outlook-verdict h3 {
+    font-size: 31px;
+    margin: 12px 0;
+  }
+  .report-page .report-facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px 0;
+    margin-bottom: 38px;
+  }
+  .report-page .report-facts > div {
+    padding: 0 14px;
+  }
+  .report-page .report-facts > div:nth-child(odd) {
+    padding-left: 0;
+  }
+  .report-page .report-facts > div:nth-child(even) {
+    border: 0;
+  }
+  .report-page
+    :is(
+      .landscape-section,
+      .topic-overview,
+      .opportunity-map,
+      .strategy-section,
+      .report-evidence,
+      .report-projects,
+      .report-method
+    ) {
+    margin-block: 38px;
+  }
+  .report-page .landscape-columns {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 22px;
+  }
+  .report-page .landscape-summary {
+    font-size: 19px;
+  }
+  .report-page .incumbent-list article {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .report-page .opportunity-row {
+    padding: 18px 15px;
+  }
+  .report-page .opportunity-detail {
+    padding: 24px 18px;
+  }
+  .report-page .opportunity-detail h4 {
+    font-size: 23px;
+  }
+  .report-page .strategy-section {
+    padding: 24px 20px;
+  }
+  .report-share-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+    border-radius: 16px;
+  }
+  .share-dialog-inner {
+    padding: 20px 16px;
+  }
+  .share-workspace {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 20px;
+  }
+  .share-preview {
+    height: 340px;
+    min-height: 0;
+    padding: 20px;
+  }
+  .share-heading {
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .share-heading h2 {
+    font-size: 20px;
+  }
+  .share-caption {
+    margin: 12px 0;
+  }
+  .share-visibility {
+    padding: 14px 0;
+  }
+  .share-downloads {
+    margin-top: 16px;
+  }
+  .share-status {
+    margin-bottom: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .report-page *,
+  .report-share-dialog * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}

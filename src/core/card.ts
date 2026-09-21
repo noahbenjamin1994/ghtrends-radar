@@ -69,8 +69,8 @@ export function marketCard(m: Market, url: string, locale: Locale = "en") {
       .join("");
   const qualification = assessment.basisLabel;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="sans-serif">
-<rect width="1200" height="630" fill="#fff"/>
-<text x="64" y="76" fill="#1c1c1c" font-size="30" font-weight="700">ghtrends ↗</text>
+<rect width="1200" height="630" fill="#f7f5ef"/><rect width="1200" height="8" fill="#183d34"/>
+<text x="64" y="76" fill="#183d34" font-size="30" font-weight="700">ghtrends / FIELD NOTES</text>
 <text x="1136" y="74" fill="#777" font-size="16" text-anchor="end">${xml(t("THE OPEN-SOURCE OPPORTUNITY RADAR"))}</text>
 <rect x="44" y="116" width="1112" height="416" rx="24" fill="${presentation.wash}"/>
 <text x="76" y="164" fill="#78726c" font-size="13">${locale === "zh" ? "这次，机会在哪里" : "THE OPPORTUNITY IN FOCUS"}</text>

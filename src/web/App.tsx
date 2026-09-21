@@ -72,7 +72,8 @@ import {
   kindColors,
   topicColor,
 } from "./components.js";
-import { downloadCard } from "./export.js";
+import { ReportShare } from "./report-share.js";
+import { ReportReading } from "./report-reading.js";
 import {
   marketAssessment,
   competitionPressure,
@@ -1490,11 +1491,7 @@ function MarketView({
               ? m.topic.plan.input
               : t(m.topic.name)}
           </h1>
-          <p>
-            {locale === "zh" && m.topic.plan
-              ? m.topic.name
-              : t(m.topic.description)}
-          </p>
+          <p className="report-edition">{l("RESEARCH EDITION", "机会研究札记")} <span>·</span> {m.asOf.slice(0, 10)} <span>·</span> {l("From signals to a first step", "从趋势证据，到行动的第一步")}</p>
         </div>
         <div className="detail-actions">
           {(account?.user || account?.hosted === false) && (
@@ -1512,32 +1509,14 @@ function MarketView({
               {l("Update research", "更新研究")}
             </button>
           )}
-          {access?.public ? (
-            <CopyButton
-              value={share}
-              label={t("Share report")}
-              className="button"
-              onCopied={() => track("share_copy")}
-            />
-          ) : access?.owned ? (
-            <button
-              className="button subtle"
-              onClick={() =>
-                void api("/api/reports/" + m.id + "/share", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ shared: true }),
-                })
-                  .then(() => {
-                    setAccess({ public: true, owned: true, saved });
-                    track("share_publish");
-                  })
-                  .catch((e) => setActionError(e.message))
-              }
-            >
-              {t("Make public to share")}
-            </button>
-          ) : null}
+          <ReportShare key={m.id} market={m} locale={locale} url={share} access={access}
+            onVisibility={async (value) => {
+              await api("/api/reports/" + m.id + "/share", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ shared: value }),
+              });
+              setAccess({ public: value, owned: true, saved });
+            }} />
           {account?.user && (
             <button
               disabled={saved}
@@ -1572,15 +1551,6 @@ function MarketView({
               >
                 Markdown
               </a>
-              <button
-                onClick={() =>
-                  void downloadCard(m, share, locale)
-                    .then(() => track("export_png"))
-                    .catch((e) => setActionError(e.message))
-                }
-              >
-                {t("Save image")}
-              </button>
               <a
                 href={appUrl(`/api/reports/${m.id}`)}
                 download={`ghtrends-${m.topic.slug}.json`}
@@ -1618,7 +1588,7 @@ function MarketView({
           )}
         </p>
       )}
-      <nav className="report-nav" aria-label={l("Report sections", "报告章节")}>
+      <ReportReading>
         <a href="#outlook">{l("Overview", "判断概览")}</a>
         {opportunityMap?.overview && (
           <a
@@ -1633,11 +1603,11 @@ function MarketView({
           <a href="#opportunities">{l("Directions", "方向地图")}</a>
         )}
         {strategy && <a href="#strategy">{l("Strategy", "优先方向")}</a>}
-        <a href="#evidence">{l("Evidence", "趋势证据")}</a>
         <a href="#competitors">{l("Competitors", "同行")}</a>
+        <a href="#evidence">{l("Evidence", "趋势证据")}</a>
         {!!m.supply.repositories.length && <a href="#projects">{l("Projects", "相关项目")}</a>}
         <a href="#method">{l("Research scope", "研究范围")}</a>
-      </nav>
+      </ReportReading>
       <section
         id="outlook"
         className={`report-outlook ${displayKind}`}
@@ -1674,9 +1644,7 @@ function MarketView({
           </p>
           <div className="outlook-byline">
             <span>
-              {assessment.narrative.kind === "ai"
-                ? "DeepSeek Flash"
-                : "ghtrends"}{" "}
+              {"ghtrends research"}{" "}
               ·{" "}
               {assessment.narrative.kind === "ai"
                 ? l("Source-led interpretation", "基于来源的解读")
@@ -1779,8 +1747,6 @@ function MarketView({
         />
       )}
       <LandscapePanel market={m} locale={locale} />
-      <CompetitorPanel market={m} locale={locale} />
-      <SourceDocuments market={m} locale={locale} />
       {m.brief && (
         <OpportunityMap
           key={`opportunities:${m.id}`}
@@ -1919,6 +1885,8 @@ function MarketView({
           {m.demand.keyword})
         </p>
       )}
+      <CompetitorPanel market={m} locale={locale} />
+      <SourceDocuments market={m} locale={locale} />
       <div id="evidence" className="detail-columns report-evidence">
         <section className="panel demand-panel">
           <div className="panel-title">
