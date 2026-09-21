@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { selectGapSignals } from "../src/core/gaps.js";
 import type { Gap } from "../src/core/types.js";
+import { modelSources } from "../src/providers/research.js";
 import { Engine } from "../src/core/engine.js";
 import { Store } from "../src/core/store.js";
 import { createApp } from "../src/server/index.js";
@@ -109,5 +110,24 @@ test("engagement accepts bounded known events from this origin and persists anon
     for (const key of Object.keys(process.env))
       if (!(key in env)) delete process.env[key];
     Object.assign(process.env, env);
+  }
+});
+
+test("empty search outcomes remain metadata and never become citable model evidence", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-empty-search-"));
+  const store = new Store(dir);
+  const engine = new Engine(store);
+  try {
+    (engine.github as any).get = async () => ({ total_count: 0, items: [] });
+    const sources = await engine.github.ideaAlternatives(["aisvs checklist"]);
+    assert.equal(sources.length, 1);
+    assert.equal(sources[0]!.excerpt, "");
+    assert.match(sources[0]!.label, /0 returned/);
+    assert.deepEqual(modelSources(sources), []);
+    assert.match(sources[0]!.url, /github.com\/search/);
+  } finally {
+    await engine.trends.close();
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
   }
 });

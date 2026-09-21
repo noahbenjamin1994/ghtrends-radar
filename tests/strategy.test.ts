@@ -2,7 +2,10 @@ import {
   internalProseReferences,
   recoverSourceQuote,
 } from "../src/core/opportunities.js";
-import { proseLanguageMismatch } from "../src/core/i18n.js";
+import {
+  proseLanguageMismatch,
+  hasReportWordingProblem as hasNegativeWording,
+} from "../src/core/i18n.js";
 import { modelSources } from "../src/providers/research.js";
 import {
   visibleOpportunities,
@@ -330,7 +333,7 @@ test("headless backend terminology passes delivery with zero model calls and kee
     value.evidence.push({ id: "R9", quote: source.excerpt });
     const sources = [...documents, source];
     assert.ok(
-      strategyProblems(value, sources, seed, true, true).some((p) =>
+      !strategyProblems(value, sources, seed, true, true).some((p) =>
         p.startsWith("overview.zh.competition:"),
       ),
     );
@@ -521,12 +524,7 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
       if (operation === "capability-audit")
         return capabilitySample(input.directions);
       ops.push(operation!);
-      assert.equal(
-        thinking,
-        operation === "strategy" || operation === "strategy-evidence-review"
-          ? "low"
-          : false,
-      );
+      assert.equal(thinking, false);
       assert.ok(budget! >= 8000);
       if (ops.length === 1) {
         const bad = countedSample();
@@ -1221,7 +1219,7 @@ test("accepted answers and closed requests describe progress rather than current
 test("targeted copy editing changes requested prose only, preserving evidence and direction ratings", () => {
   const data = sample();
   data.opportunities[0]!.zh.competition =
-    "这个方向与现有项目不同，需要通过真实工作流比较。";
+    "这个方向不是现有项目的复刻，而是另一种需要实测的工作流。";
   const fields = proseRepairs(data);
   assert.deepEqual(
     fields.map((f) => f.path),
@@ -1392,7 +1390,7 @@ test("new reports require an overall answer and a readable customer need and off
 
 test("overall judgments validate quotes and allow only requested affirmative copy repair", () => {
   const data = sample();
-  data.overview.zh.competition = "不能用项目数量说明商业竞争。";
+  data.overview.zh.competition = "这不是商业竞争证据，而是项目数量。";
   const fields = proseRepairs(data);
   assert.deepEqual(
     fields.map((f) => f.path),
@@ -1512,11 +1510,11 @@ test("a compact reasoning blueprint is researched before a separate bilingual ev
       if (operation === "strategy-pilot") return countedSample().experimentPlan;
       if (operation === "capability-audit") return audited;
       if (operation === "strategy") {
-        assert.equal(thinking, "low");
+        assert.equal(thinking, false);
         return blueprint;
       }
       if (operation === "strategy-evidence-review") {
-        assert.equal(thinking, "low");
+        assert.equal(thinking, false);
         assert.ok(input.editablePaths.includes("overview.zh.competition"));
         return { edits: [] };
       }
@@ -1610,6 +1608,12 @@ test("section format recovery preserves completed siblings and review budget rec
     );
     assert.deepEqual(result.evidence, data.evidence);
     assert.equal(calls.filter((x) => x === "strategy-direction").length, 3);
+    assert.equal(calls.includes("strategy-evidence-review"), false);
+    // Targeted semantic recovery remains available when a check identifies a problem.
+    await (r as any).reviewStrategyMeaning(result, {
+      input: "Documentation",
+      sources: documents,
+    });
     for (const name of [
       "strategy-section-format-recovery",
       "strategy-priority",
@@ -1672,7 +1676,7 @@ test("section quote shortening uses the existing exact span instead of resending
     const longQuote =
       clause +
       " A longer comparison describes additional publishing and team review workflows.".repeat(
-        4,
+        8,
       );
     const source: ResearchSource = {
       id: "R2",
@@ -1845,7 +1849,7 @@ test("semantic review can edit prose and ratings while source quotes and identif
       id = data.opportunities[0]!.id;
     r.json = async (prompt, input: any, _budget, operation, thinking) => {
       assert.equal(operation, "strategy-evidence-review");
-      assert.equal(thinking, "low");
+      assert.equal(thinking, false);
       assert.ok(prompt.includes("preserve truth conditions"));
       assert.ok(input.editablePaths.includes("overview.zh.competition"));
       assert.ok(!input.editablePaths.includes("overview.evidence.0.quote"));
@@ -2074,7 +2078,7 @@ test("copy output recovery retries only the failed field batch and keeps complet
     const original = sample();
     const input = sample();
     input.en.summary =
-      "Current documents do not establish wider adoption; keep the proposed task conditional.";
+      "This is not established adoption but a conditional task hypothesis.";
     const calls: string[] = [];
     r.json = async (_prompt, data: any, _budget, operation, thinking) => {
       calls.push(operation!);
@@ -2352,7 +2356,7 @@ test("research reasoning stays bounded and configurable and source compaction ke
   try {
     delete process.env.GHTRENDS_RESEARCH_THINKING;
     await fixture(async (r) => {
-      assert.equal(r.strategyThinking, "low");
+      assert.equal(r.strategyThinking, false);
       process.env.GHTRENDS_RESEARCH_THINKING = "low";
       assert.equal(r.strategyThinking, "low");
       process.env.GHTRENDS_RESEARCH_THINKING = "off";
@@ -2390,7 +2394,7 @@ test("mixed citation and wording corrections preserve the rest of a complete rep
     const good = countedSample();
     const bad = structuredClone(good);
     bad.en.strategy.tradeoff =
-      "This prototype does not include dashboard editing.";
+      "This is not dashboard editing but a scoped prototype.";
     bad.evidence[0]!.quote = "A paraphrase that is absent from the source.";
     const ops: string[] = [];
     r.json = async (_prompt, input: any, _budget, op) => {
@@ -2469,7 +2473,7 @@ test("shortening an exact overlong quotation retains source context and one edit
     const raw = sample();
     const excerpt =
       "The author wrote that permission does not include third-party data. ".repeat(
-        6,
+        10,
       );
     const source = {
       id: "Q1",
@@ -2514,9 +2518,9 @@ test("copy diagnostics identify positive compounds, source IDs and overlapping l
   fixture(async (r) => {
     const data = sample();
     data.experimentPlan!.zh.measurement =
-      "测量在两个或更多不同日期回访的五名参与者人数。";
+      "测量的不是单日回访，而是五名参与者在两个独立日期的回访人数。";
     data.experimentPlan!.zh.continueIf =
-      "五位参与者中至少三位在两个或更多不同日期回访时继续。";
+      "判断的不是单日回访，而是五位参与者中至少三位在两个独立日期回访时继续。";
     data.opportunities[1]!.en.demand =
       "Request #I3 describes a concrete workflow to verify.";
     data.en.headline =
@@ -2682,4 +2686,215 @@ test("short pilot fields receive targeted length repairs after evidence review",
     assert.equal(repaired, true);
     assert.ok(output.experimentPlan.en.measurement.length <= 250);
     assert.deepEqual(output.experimentPlan.counts, counts);
+  }));
+
+test("independent report sections overlap and a failed direction waits for its siblings", async () =>
+  fixture(async (r) => {
+    const data = countedSample();
+    const started = new Set<string>();
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const expected = data.opportunities.length + 1;
+    let marketStarted!: () => void;
+    const marketStart = new Promise<void>((resolve) => {
+      marketStarted = resolve;
+    });
+    r.json = async (_prompt, input: any, _budget, operation) => {
+      if (operation === "capability-audit") {
+        await marketStart;
+        return capabilitySample(input.directions);
+      }
+      if (
+        operation === "strategy-direction" ||
+        operation === "strategy-overall"
+      ) {
+        if (operation === "strategy-overall") marketStarted();
+        started.add(
+          operation === "strategy-direction" ? input.candidate.id : "overall",
+        );
+        if (started.size === expected) release();
+        await barrier;
+        if (operation === "strategy-overall") return data;
+        return data.opportunities.find((o) => o.id === input.candidate.id);
+      }
+      if (operation === "strategy-priority") return data;
+      if (operation === "strategy-pilot") return data.experimentPlan;
+      if (operation === "strategy-evidence-review") return { edits: [] };
+      throw new Error(`Unexpected ${operation}`);
+    };
+    const result = await (r as any).writeStrategySections(
+      { input: "Documentation", sources: documents },
+      {
+        overall: {},
+        opportunities: data.opportunities,
+        recommendedId: data.recommendedId,
+      },
+    );
+    assert.equal(started.size, expected);
+    assert.equal(result.opportunities.length, data.opportunities.length);
+
+    let finishSibling!: () => void;
+    const sibling = new Promise<void>((resolve) => {
+      finishSibling = resolve;
+    });
+    let enteredSibling!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enteredSibling = resolve;
+    });
+    r.json = async (_prompt, input: any, _budget, operation) => {
+      if (operation === "strategy-direction")
+        throw new Error("Provider failed");
+      if (operation === "strategy-overall") {
+        enteredSibling();
+        await sibling;
+        return data;
+      }
+      if (operation === "capability-audit")
+        return capabilitySample(input.directions);
+      throw new Error(`Unexpected ${operation}`);
+    };
+    let settled = false;
+    const pending = (r as any)
+      .writeStrategySections(
+        { input: "Other documentation", sources: documents },
+        {
+          overall: {},
+          opportunities: data.opportunities,
+          recommendedId: data.recommendedId,
+        },
+      )
+      .finally(() => {
+        settled = true;
+      });
+    const rejected = assert.rejects(pending, /Provider failed/);
+    await entered;
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(settled, false);
+    finishSibling();
+    await rejected;
+  }));
+
+test("security terminology preserves its meaning without rejecting an otherwise valid report", () => {
+  for (const term of [
+    "不可信输入",
+    "未经授权的访问",
+    "未授权请求",
+    "不可变日志",
+    "无服务器应用",
+    "无状态服务",
+  ])
+    assert.equal(hasNegativeWording(term), false);
+  assert.equal(hasNegativeWording("不是需求证据，而是供给说明"), true);
+  const report = countedSample();
+  report.zh.strategy.wedge =
+    "在不可信技能代码进入运行环境前校验权限，并将结果写入不可变日志。";
+  assert.deepEqual(
+    strategyProblems(
+      report,
+      strategySources(seed, documents),
+      seed,
+      true,
+      true,
+    ),
+    [],
+  );
+});
+
+test("an oversized model blueprint cannot start unbounded parallel requests", async () =>
+  fixture(async (r) => {
+    r.json = async () => {
+      throw new Error("An invalid blueprint must not reach providers");
+    };
+    await assert.rejects(
+      (r as any).writeStrategySections(
+        { input: "test", sources: documents },
+        {
+          opportunities: Array.from({ length: 6 }, (_, i) => ({
+            id: String(i),
+          })),
+        },
+      ),
+      /three to five research directions/,
+    );
+  }));
+
+test("factual absence and uncertainty survive standard report delivery without cosmetic model retries", async () =>
+  fixture(async (r) => {
+    const value = countedSample();
+    value.en.strategy.assumption =
+      "Wider adoption is not confirmed; the proposed pilot tests willingness to use the adapter.";
+    value.zh.strategy.assumption =
+      "更广泛的采用尚未确认，拟议试点将检验使用这一适配器的意愿。";
+    r.json = async () => {
+      throw new Error("Factual qualifiers do not need a cosmetic retry");
+    };
+    const result = await (r as any).repairStrategyCopy(
+      value,
+      strategySources(seed, documents),
+    );
+    assert.equal(result.en.strategy.assumption, value.en.strategy.assumption);
+    assert.equal(result.zh.strategy.assumption, value.zh.strategy.assumption);
+    assert.deepEqual(
+      strategyProblems(
+        result,
+        strategySources(seed, documents),
+        seed,
+        true,
+        true,
+      ),
+      [],
+    );
+  }));
+
+test("section schema recovery patches only rejected fields and preserves accepted content", async () =>
+  fixture(async (r) => {
+    const data = countedSample();
+    let repaired = false;
+    r.json = async (_prompt, input: any, _budget, operation) => {
+      if (operation === "capability-audit")
+        return capabilitySample(input.directions);
+      if (operation === "strategy-direction") {
+        const direction = structuredClone(
+          data.opportunities.find((o) => o.id === input.candidate.id)!,
+        );
+        return direction.id === data.recommendedId
+          ? { ...direction, effort: "invalid" }
+          : direction;
+      }
+      if (operation === "strategy-section-edit") {
+        repaired = true;
+        assert.deepEqual(
+          input.requiredCorrections.map((x: any) => x.path),
+          [["effort"]],
+        );
+        return {
+          edits: [
+            { path: "effort", value: "medium" },
+            { path: "en.title", value: "An unrequested rewrite" },
+            { path: "__proto__.polluted", value: true },
+          ],
+        };
+      }
+      if (operation === "strategy-pilot") return data.experimentPlan;
+      if (operation === "strategy-priority" || operation === "strategy-overall")
+        return data;
+      throw new Error(`Unexpected ${operation}`);
+    };
+    const result = await (r as any).writeStrategySections(
+      { input: "Documentation", sources: documents },
+      {
+        overall: {},
+        opportunities: data.opportunities,
+        recommendedId: data.recommendedId,
+      },
+    );
+    assert.equal(repaired, true);
+    assert.equal(result.opportunities[0].effort, "medium");
+    assert.equal(
+      result.opportunities[0].en.title,
+      data.opportunities[0]!.en.title,
+    );
+    assert.equal(({} as any).polluted, undefined);
   }));

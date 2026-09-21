@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { hasNegativeWording } from "./i18n.js";
+import { hasReportWordingProblem as hasNegativeWording } from "./i18n.js";
 import type { Market, MarketKind, ResearchSource } from "./types.js";
 
 const prose = z.string().trim().min(8).max(500);
 const ref = z.object({
   id: z.string().max(30),
-  quote: z.string().min(8).max(300),
+  quote: z.string().min(8).max(600),
 });
 const rating = z.object({
   level: z.enum(["high", "medium", "low", "exploratory"]),

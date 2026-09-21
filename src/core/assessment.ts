@@ -2,7 +2,11 @@ import { researchLandscape, landscapeLabel } from "./landscape.js";
 import type { Market } from "./types.js";
 import { completeWeeklySeries } from "./evidence.js";
 import { resolveTopic } from "./topics.js";
-import { hasNegativeWording, hasRecoveryTimeReference } from "./i18n.js";
+import {
+  hasReportWordingProblem,
+  hasNegativeWording,
+  hasRecoveryTimeReference,
+} from "./i18n.js";
 import { text, MARKET_LABELS, type Locale } from "./i18n.js";
 
 export function outlookPresentation(kind: Market["kind"], locale: Locale) {
@@ -384,7 +388,9 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
         ...m.brief[locale].nextSteps,
       ].every(
         (v) =>
-          !hasNegativeWording(v) &&
+          !(m.brief?.strategyVersion
+            ? hasReportWordingProblem(v)
+            : hasNegativeWording(v)) &&
           !new RegExp(
             `(?:across|over|throughout)\\s+${m.metrics.points}\\b|在\\s*${m.metrics.points}\\s*(?:个|周)`,
             "i",

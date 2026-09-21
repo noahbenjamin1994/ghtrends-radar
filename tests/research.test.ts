@@ -526,6 +526,36 @@ test("synonyms use separate normalization and choose usable coverage, never the 
     const original = await trends.demand("usable", "", undefined, ["rising"]);
     assert.equal(original.keyword, "usable");
     assert.equal(original.requestedKeyword, undefined);
+    const requested: string[] = [];
+    const collect = (trends as any).collectWithFallback.bind(trends);
+    (trends as any).collectWithFallback = (keyword: string, ...args: any[]) => {
+      requested.push(keyword);
+      return collect(keyword, ...args);
+    };
+    const fast = await trends.demand("usable", "", undefined, ["rising"], true);
+    assert.equal(fast.keyword, "usable");
+    assert.deepEqual(requested, ["usable"]);
+    requested.length = 0;
+    const recovered = await trends.demand(
+      "weak",
+      "",
+      undefined,
+      ["usable", "rising"],
+      true,
+    );
+    assert.equal(recovered.keyword, "usable");
+    assert.deepEqual(requested, ["weak", "usable"]);
+    requested.length = 0;
+    (trends as any).collectWithFallback = async (keyword: string) => {
+      requested.push(keyword);
+      return { ...series(keyword, 0, 0), points: [], error: "Google Trends connection is being refreshed. Open the source or retry shortly." };
+    };
+    const outage = await trends.demand("offline", "", undefined, ["usable", "uncached"], true);
+    assert.deepEqual(requested, ["offline"]);
+    assert.equal(outage.keyword, "usable");
+    assert.equal(outage.requestedKeyword, "offline");
+    assert.match(outage.alternatives![0]!.error!, /connection/);
+
   } finally {
     await trends.close();
     store.close();
@@ -720,4 +750,22 @@ test("pipeline retries sparse supply once, preserves successful evidence on repa
     if (old === undefined) delete process.env.DEEPSEEK_API_KEY;
     else process.env.DEEPSEEK_API_KEY = old;
   }
+});
+
+test("JSON transport recovery preserves literal source text and rejects ambiguous content", () => {
+  const expected = { quote: "First line\nSecond line\twith a tab", count: 40 };
+  assert.deepEqual(
+    parseModelJson("```json\n" + JSON.stringify(expected) + "\n```"),
+    expected,
+  );
+  assert.deepEqual(
+    parseModelJson(
+      '{"quote":"First line\nSecond line\twith a tab","count":40}',
+    ),
+    expected,
+  );
+  assert.throws(() =>
+    parseModelJson('Here is the answer: ```json\n{"count":40}\n```'),
+  );
+  assert.throws(() => parseModelJson('{"quote":"cut off\n'));
 });

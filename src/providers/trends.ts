@@ -292,6 +292,7 @@ export class Trends {
     geo = "",
     onTimeline?: (evidence: DemandEvidence) => void,
     synonyms: string[] = [],
+    preferPrimary = false,
   ): Promise<DemandEvidence> {
     validateGeo(geo);
     const terms = [keyword, ...synonyms]
@@ -304,10 +305,6 @@ export class Trends {
     if (terms.length > 1) {
       // Independent normalization prevents a popular synonym rounding the primary to zero.
       const evidence: DemandEvidence[] = [];
-      for (const [i, term] of terms.entries())
-        evidence.push(
-          await this.demand(term, geo, i === 0 ? onTimeline : undefined),
-        );
       const usable = (d: DemandEvidence) => {
         const now = new Date().toISOString(),
           last = completeWeeklySeries(d, now).points.at(-1),
@@ -322,6 +319,47 @@ export class Trends {
           )
         );
       };
+      for (const [i, term] of terms.entries()) {
+        const data = await this.demand(
+          term,
+          geo,
+          i === 0 ? onTimeline : undefined,
+        );
+        evidence.push(data);
+        // The transport already retried. A different keyword cannot repair an
+        // unavailable route; retain available dated alternatives without issuing
+        // the same failing connection sequence for every synonym.
+        if (
+          preferPrimary &&
+          (data.retryAt ||
+            /connection is being refreshed|returned HTTP (?:5\d\d|408)/.test(
+              data.collectionError || data.error || "",
+            ))
+        ) {
+          for (const remaining of terms.slice(i + 1)) {
+            const saved = this.store.get<DemandEvidence>(
+              `trends:v3:${JSON.stringify([remaining])}:${geo}`,
+              true,
+            );
+            if (saved)
+              evidence.push({
+                ...saved,
+                collectionError: data.collectionError || data.error,
+                retryAt: data.retryAt,
+              });
+          }
+          break;
+        }
+        // A current, complete primary series already answers the selected query.
+        // Variants remain a recovery path for sparse or unavailable coverage.
+        if (
+          preferPrimary &&
+          !data.collectionError &&
+          !data.error &&
+          usable(data)
+        )
+          break;
+      }
       // Prefer current measured evidence, then the first usable dated snapshot.
       const current = (d: DemandEvidence) => !d.collectionError && usable(d);
       const freshIndex = current(evidence[0]!)

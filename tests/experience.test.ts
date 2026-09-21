@@ -217,7 +217,7 @@ test("multi-topic supply is deduplicated, marks incomplete unions and exposes ba
     assert.equal(supply.total, 150);
     assert.equal(supply.searches?.length, 3);
     assert.equal(supply.complete, false);
-    assert.equal(maxActive, 3);
+    assert.equal(maxActive, 5);
     assert.equal(
       new Set(supply.repositories.map((r) => r.name)).size,
       supply.repositories.length,

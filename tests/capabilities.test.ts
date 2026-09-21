@@ -416,3 +416,23 @@ test("invalid audits stop after two calls and never enter the accepted cache", a
     );
     assert.equal(calls, 4);
   }));
+
+test("capability checks retain a complete source statement beyond the preferred quote length", () => {
+  const source = {
+    ...docs[0]!,
+    excerpt:
+      "Supported checks include " +
+      "a specific documented control, ".repeat(11) +
+      "subject to the documented deployment permissions.",
+  };
+  const value = audit();
+  value.directions[0]!.facts = [{ id: source.id!, quote: source.excerpt }];
+  assert.ok(source.excerpt.length > 300 && source.excerpt.length < 600);
+  assert.deepEqual(capabilityProblems(value, [source], ["grooming-notes"]), []);
+  value.directions[0]!.facts[0]!.quote += " Invented support.";
+  assert.ok(
+    capabilityProblems(value, [source], ["grooming-notes"]).some((x) =>
+      x.includes("exact original-document quote"),
+    ),
+  );
+});

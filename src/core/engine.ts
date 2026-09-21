@@ -127,6 +127,16 @@ export class Engine {
         this.store.addHistory(options.owner, existing.id, input);
       return existing;
     }
+    let collectedPages: ReturnType<DocumentReader["collect"]> | undefined;
+    const prepareProjects = async (data: SupplyEvidence) => {
+      const projects = ai
+        ? await this.research.selectProjects(topic, data.repositories)
+        : data.repositories
+            .filter((r) => !r.relevance || r.relevance.role === "direct")
+            .slice(0, 4);
+      return { projects, gaps: await this.github.gaps(projects) };
+    };
+    let projectEvidence: ReturnType<typeof prepareProjects> | undefined;
     let initialDemand: DemandEvidence | undefined,
       initialSupply: SupplyEvidence | undefined;
     const preview = () => {
@@ -159,6 +169,7 @@ export class Engine {
             geo,
             onDemand,
             topic.plan?.trends.slice(1),
+            true,
           ),
       this.github
         .supply(topic, (data) => {
@@ -166,13 +177,29 @@ export class Engine {
           options.onProgress?.({ stage: "github", supplyCount: data.total });
           preview();
         })
-        .then((data) => (ai ? this.research.reviewSupply(topic, data) : data)),
+        .then((data) => (ai ? this.research.reviewSupply(topic, data) : data))
+        .then((data) => {
+          if (!data.error && data.repositories.length >= 3) {
+            projectEvidence = prepareProjects(data);
+            void projectEvidence.catch(() => {});
+          }
+          return data;
+        }),
       ai
         ? this.search
             .collect(topic, geo)
             .then((web) =>
               web ? this.research.reviewWeb(topic, web) : undefined,
             )
+            .then((web) => {
+              if (web && this.documents.enabled) {
+                collectedPages = this.documents.collect(searchSources(web));
+                // Original pages can load while GitHub samples are being checked.
+                // The same promise is awaited before the report uses its evidence.
+                void collectedPages.catch(() => {});
+              }
+              return web;
+            })
         : Promise.resolve(undefined),
     ]);
     if (ai && !supply.error && supply.repositories.length < 3) {
@@ -205,23 +232,19 @@ export class Engine {
       stage: "details",
       preview: analyze(topic, demand, supply),
     });
-    const selectedProjects = ai
-      ? await this.research.selectProjects(topic, supply.repositories)
-      : supply.repositories
-          .filter((r) => !r.relevance || r.relevance.role === "direct")
-          .slice(0, 4);
-    const gaps = await this.github.gaps(selectedProjects);
+    const { projects: selectedProjects, gaps } = await (
+      projectEvidence ?? prepareProjects(supply)
+    );
     const market = analyze(topic, demand, supply, gaps);
     market.gaps = marketGapSignals(market);
     market.web = web;
     if (ai) {
       options.onProgress?.({ stage: "researching", preview: market });
       try {
-        const documents = await this.github.researchSources(
+        const documentsWork = this.github.researchSources(
           selectedProjects,
           market.gaps,
         );
-        market.gaps = mergeRequestEvidence(market.gaps, documents);
         const projectNames = [
           ...new Set(
             searchSources(web)
@@ -244,16 +267,20 @@ export class Engine {
               ),
           )
           .slice(0, 2);
-        const webDocs = await this.github.researchSources(
-          projectNames.map((name) => ({ name }) as any),
-          [],
-        );
+        const [documents, webDocs] = await Promise.all([
+          documentsWork,
+          this.github.researchSources(
+            projectNames.map((name) => ({ name }) as any),
+            [],
+          ),
+        ]);
+        market.gaps = mergeRequestEvidence(market.gaps, documents);
         documents.push(...webDocs.map((s, i) => ({ ...s, id: `WR${i + 1}` })));
         if (this.documents.enabled) {
           const candidates = searchSources(web);
           const discussionReads: DocumentRead[] = [];
           const [pages, licenses, discussions] = await Promise.all([
-            this.documents.collect(candidates),
+            collectedPages ?? this.documents.collect(candidates),
             this.github.licenseSources(selectedProjects),
             this.github.discussionSources(candidates, (read) =>
               discussionReads.push(read),

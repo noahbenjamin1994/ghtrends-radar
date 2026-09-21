@@ -493,15 +493,29 @@ export class GitHub {
     try {
       const unique = new Map<string, Repo>();
       let allEnumerated = true;
-      for (const query of queries) {
-        const data = await this.get<{
-          total_count: number;
-          incomplete_results: boolean;
-          items: any[];
-        }>(
-          `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=100`,
-          21600000,
+      const searches = [];
+      // Search variants are independent. Two at a time retain API headroom;
+      // settle both before propagating errors or releasing the shared job lane.
+      for (let offset = 0; offset < queries.length; offset += 2) {
+        const batch = await Promise.allSettled(
+          queries.slice(offset, offset + 2).map(async (query) => ({
+            query,
+            data: await this.get<{
+              total_count: number;
+              incomplete_results: boolean;
+              items: any[];
+            }>(
+              `/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=100`,
+              21600000,
+            ),
+          })),
         );
+        for (const item of batch) {
+          if (item.status === "rejected") throw item.reason;
+          searches.push(item.value);
+        }
+      }
+      for (const { query, data } of searches) {
         result.searches!.push({
           query,
           url: `https://github.com/search?q=${encodeURIComponent(query)}&type=repositories`,
@@ -546,11 +560,11 @@ export class GitHub {
         relevance: repoRelevance(r, topic),
       }));
       onBase?.(structuredClone(result));
-      // Three bounded workers avoid serial head-of-line delay without flooding GitHub.
+      // Five bounded workers overlap the ten repository detail reads.
       let cursor = 0;
       await Promise.all(
         Array.from(
-          { length: Math.min(3, result.repositories.length) },
+          { length: Math.min(5, result.repositories.length) },
           async () => {
             while (cursor < Math.min(10, result.repositories.length)) {
               const index = cursor++;

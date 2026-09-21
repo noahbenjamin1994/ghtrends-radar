@@ -97,8 +97,8 @@ test("streamed research records reasoning and costs, emits safe progress, and re
       research = new Research(store);
     delete process.env.GHTRENDS_RESEARCH_THINKING;
     delete process.env.GHTRENDS_RESEARCH_REVIEW_THINKING;
-    assert.equal(research.strategyThinking, "low");
-    assert.equal(research.reviewThinking, "low");
+    assert.equal(research.strategyThinking, false);
+    assert.equal(research.reviewThinking, false);
     const run = () =>
       operationContext.run(
         { runId: "test", onActivity: (x) => activities.push(x) },

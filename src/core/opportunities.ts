@@ -1,17 +1,17 @@
 import { z } from "zod";
 import { excludedRequestUrls } from "./landscape.js";
 import {
-  hasNegativeWording,
+  hasReportWordingProblem as hasNegativeWording,
   hasRecoveryTimeReference,
   proseLanguageMismatch,
-  negativeWordingMatches,
+  reportWordingMatches as negativeWordingMatches,
 } from "./i18n.js";
 import type { Brief, ResearchSource } from "./types.js";
 
 const prose = z.string().trim().min(8).max(500);
 export const evidenceRef = z.object({
   id: z.string().max(30),
-  quote: z.string().min(8).max(300),
+  quote: z.string().min(8).max(600),
 });
 const assessment = z.object({
   level: z.enum(["high", "medium", "low", "exploratory"]),
@@ -120,7 +120,7 @@ export function proseDiagnostics(
   const negatives = negativeWordingMatches(value);
   if (negatives.length)
     problems.push(
-      `Affirmative wording: replace these exact matches, including inside compounds: ${JSON.stringify(negatives)}. Preserve the claim and comparison operators. For example 不同日期 -> 独立日期, 无关 -> 属于相邻领域; express a limited scope directly instead of using 而非.`,
+      `Direct wording: replace these rhetorical contrasts: ${JSON.stringify(negatives)}. Preserve the claim and comparison operators. Keep factual negation, uncertainty and technical terms intact; state the scoped claim directly.`,
     );
   const ids = internalProseReferences(value, sourceIds);
   const slugs = directionIds.filter(
@@ -478,7 +478,7 @@ export function opportunityProblems(
     for (const [path, value] of fields)
       if (hasNegativeWording(value) || hasRecoveryTimeReference(value))
         problems.push(
-          `${path}: rewrite this field in affirmative product prose (Chinese excludes every 不/无/未/没): ${JSON.stringify(value.slice(0, 500))}`,
+          `${path}: rewrite this field in affirmative product prose (avoid rhetorical not-X-but-Y contrasts): ${JSON.stringify(value.slice(0, 500))}`,
         );
   }
   for (const ref of map.overview?.evidence || []) {
