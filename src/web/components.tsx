@@ -534,9 +534,9 @@ export function Empty({
 }) {
   return (
     <div className="empty-state">
-      <span className="empty-orbit">↗</span>
+      <span className="empty-orbit" aria-hidden="true">↗</span>
       <h3>{title}</h3>
-      <p>{description}</p>
+      {description && <p>{description}</p>}
       {action}
     </div>
   );

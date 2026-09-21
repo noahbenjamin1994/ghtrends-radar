@@ -324,6 +324,7 @@ export const zh: Record<string, string> = {
   "Search matches can include libraries, integrations and resource lists. A topic tag does not prove a project is a direct competitor.":
     "匹配结果包括依赖库、集成项目和资料合集。核对项目服务的用户与工作流，可识别直接替代方案。",
 
+  "Sign in with the account that created this report, or explore public research.": "请使用创建报告的账户登录，或返回首页浏览公开研究。",
   "Sign in to open your private reports": "登录后查看自己的私有报告",
   "Search rising; compare alternatives": "搜索上升，比较现有方案",
   "The AI query plan could not be validated. Please refine the input.":
@@ -746,7 +747,7 @@ export const zh: Record<string, string> = {
   Unavailable: "待补充",
   "No history": "开始记录研究",
   "Ready for your first scan": "开始你的首次扫描",
-  "This report is unavailable": "打开已保存报告，或开始新扫描",
+  "This report is unavailable": "暂时无法打开这份报告",
   "This category is waiting for its first scan": "开始这个赛道的首次扫描",
   "Scan this category": "扫描这个赛道",
   "Your scan is queued": "扫描正在排队",
@@ -1121,7 +1122,7 @@ export const en: Record<string, string> = {
   "No description provided.": "View the repository for details.",
   "Not specified": "See source",
   "No history": "Start your research history",
-  "This report is unavailable": "Open a saved report or start a new scan",
+  "This report is unavailable": "This report is unavailable",
   "This category is waiting for its first scan":
     "Start the first scan for this category",
   "Scan failed.": "Please retry the scan.",

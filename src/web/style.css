@@ -185,9 +185,43 @@ small {
   color: var(--muted);
 }
 .app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   max-width: 1392px;
   margin: auto;
   padding: 0 56px;
+}
+.app-shell > main {
+  flex: 1 0 auto;
+  min-width: 0;
+}
+.app-shell > .site-header,
+.app-shell > footer {
+  flex-shrink: 0;
+}
+.app-shell > main > .empty-state {
+  max-width: 760px;
+  margin: clamp(32px, 7vh, 80px) auto 0;
+  padding: clamp(32px, 5vw, 56px) 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+.app-shell > main > .empty-state h3 {
+  font-size: clamp(1.35rem, 2.5vw, 1.8rem);
+  line-height: 1.4;
+  text-wrap: balance;
+}
+.empty-state p {
+  line-height: 1.75;
+}
+.empty-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 .brand-link {
   padding: 0;

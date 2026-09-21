@@ -1401,12 +1401,21 @@ function MarketView({
             ? t("This report is unavailable")
             : t("This category is waiting for its first scan")
         }
-        description={t(error)}
+        description={
+          path.startsWith("/report/") && account?.hosted && !account.user
+            ? t("Sign in with the account that created this report, or explore public research.")
+            : t(error)
+        }
         action={
           path.startsWith("/report/") && account?.hosted && !account.user ? (
-            <a className="button" href={loginUrl(path)}>
-              {t("Sign in to open your private reports")}
-            </a>
+            <div className="empty-actions">
+              <a className="button" href={loginUrl(path)}>
+                {t("Sign in to open your private reports")}
+              </a>
+              <button className="button subtle" onClick={() => navigate("/")}>
+                {t("Back to the radar")}
+              </button>
+            </div>
           ) : (
             <button
               className="button"
