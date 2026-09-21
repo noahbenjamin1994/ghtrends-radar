@@ -1630,7 +1630,7 @@ function MarketView({
         {strategy && <a href="#strategy">{l("Strategy", "优先方向")}</a>}
         <a href="#evidence">{l("Evidence", "趋势证据")}</a>
         <a href="#competitors">{l("Competitors", "同行")}</a>
-        <a href="#projects">{l("Projects", "相关项目")}</a>
+        {!!m.supply.repositories.length && <a href="#projects">{l("Projects", "相关项目")}</a>}
         <a href="#method">{l("Research scope", "研究范围")}</a>
       </nav>
       <section
@@ -2003,7 +2003,7 @@ function MarketView({
           </div>
         </details>
       )}
-      <section id="projects" className="panel report-projects">
+      {!!m.supply.repositories.length && <section id="projects" className="panel report-projects">
         <div className="panel-title">
           <div>
             <h3>{t("The projects shaping this space")}</h3>
@@ -2120,8 +2120,8 @@ function MarketView({
             {t("Star windows follow GitHub’s calendar buckets.")}
           </span>
         </div>
-      </section>
-      <section className="panel">
+      </section>}
+      {!!gapSignals.length && <section className="panel">
         <div className="panel-title">
           <div>
             <h3>{l("User requests and progress", "用户的问题与进展")}</h3>
@@ -2177,7 +2177,7 @@ function MarketView({
             )}
           </p>
         )}
-      </section>
+      </section>}
       <section className="panel limits-panel">
         <div className="panel-title">
           <h3>

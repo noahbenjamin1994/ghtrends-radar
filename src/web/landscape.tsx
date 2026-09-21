@@ -431,7 +431,7 @@ export function CompetitorPanel({
           "分开看开源项目、商业服务和广告，再判断自己适合从哪做起。",
         )}
       </p>
-      <div className="peer-block">
+      {m.supply.repositories.length ? <div className="peer-block">
         <h4>
           <span>01</span>
           {l("Open-source projects", "开源项目")}
@@ -499,10 +499,10 @@ export function CompetitorPanel({
         <a className="peer-more" href="#projects">
           {l("See the full project comparison", "查看完整项目对比")} ↗
         </a>
-      </div>
+      </div> : <p className="research-caption">{l("This GitHub sample returned no projects; it does not measure commercial competition or customer demand.", "本次 GitHub 检索没有返回项目；这不代表商业竞争或用户需求为空。")}</p>}
       <div className="peer-block">
         <h4>
-          <span>02</span>
+          <span>{m.supply.repositories.length ? "02" : "01"}</span>
           {l("Commercial competitors & related offers", "商业同行与相关方案")}
         </h4>
         <p className="research-caption">
