@@ -710,3 +710,61 @@
     animation: none !important;
   }
 }
+
+/* Direction details follow one reading axis, with decisions paired at the end. */
+.report-page .opportunity-detail { padding: 0; overflow: hidden; background: #fff; }
+.direction-heading { padding: 30px 34px 26px; background: #f7f8f4; }
+.report-page .direction-heading h4 { margin: 10px 0 18px; font-size: clamp(22px, 2.1vw, 28px); line-height: 1.4; text-wrap: balance; }
+.direction-sources { display: flex; align-items: baseline; gap: 12px; font-size: 12px; line-height: 1.7; }
+.direction-sources > span { flex: 0 0 auto; color: var(--report-muted); }
+.direction-sources > div { display: flex; flex-wrap: wrap; gap: 6px 18px; min-width: 0; }
+.direction-sources a { display: inline-flex; align-items: baseline; gap: 4px; color: #466753; overflow-wrap: anywhere; min-width: 0; text-decoration: underline; text-decoration-color: #c9d4c8; text-underline-offset: 4px; transition: color 150ms, text-decoration-color 150ms; }
+.direction-sources a:hover { color: #183e2e; text-decoration-color: currentColor; }
+.direction-sources svg { flex: 0 0 auto; }
+.direction-section { margin: 0 34px; padding: 28px 0; border-top: 1px solid #e8ebe3; }
+.direction-heading + .direction-section { border-top: 0; }
+.report-page .direction-section-title { display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 600; line-height: 1.5; color: var(--report-ink); margin: 0 0 20px; }
+.report-page .direction-section-title > span { font: 11px 'DM Mono', monospace; color: #889487; margin: 0; }
+.direction-facts { margin: 0; display: grid; gap: 16px; }
+.direction-facts > div { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 22px; align-items: baseline; }
+.direction-facts dt { color: #727b70; font-size: 12px; line-height: 1.8; }
+.direction-facts dd { margin: 0; max-width: 72ch; color: #394a3f; font-size: 14px; line-height: 1.85; overflow-wrap: anywhere; }
+.direction-offer dd { font-weight: 500; color: #214535; }
+.direction-evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 30px; }
+.direction-evidence-grid > div + div { padding-left: 30px; border-left: 1px solid #e8ebe3; }
+.direction-field-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; margin-bottom: 10px; }
+.opportunity-detail h6 { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.65; color: #314a3b; }
+.direction-basis { color: #7a8477; font-size: 11px; line-height: 1.6; }
+.report-page .direction-section p { margin: 0; line-height: 1.85; overflow-wrap: anywhere; }
+.direction-investment { background: #f8f8f5; padding: 20px 22px; border-radius: 10px; gap: 0; }
+.direction-investment > div { padding: 14px 0; border-bottom: 1px solid #e7e9e1; }
+.direction-investment > div:first-child { padding-top: 0; }
+.direction-investment > div:last-child { padding-bottom: 0; border-bottom: 0; }
+.direction-decisions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 24px; }
+.direction-decisions > div { padding: 20px 22px; border-radius: 10px; }
+.direction-continue { background: #f0f5ef; }
+.direction-adjust { background: #f8f5ee; }
+.direction-decisions h6 { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.direction-adjust h6 { color: #766345; }
+.report-page .direction-decisions p { font-size: 13px; }
+.direction-notes { padding: 22px 34px; background: #fafbf8; border-top: 1px solid #e8ebe3; }
+.report-page .direction-notes .footnote { font-size: 11px; line-height: 1.8; margin: 12px 0 0; max-width: 90ch; }
+.direction-notes + .deep-start { margin: 22px 34px; }
+@media (max-width: 760px) {
+  .report-page .opportunity-detail { padding: 0; border-radius: 14px; }
+  .direction-heading { padding: 24px 20px; }
+  .direction-section { margin: 0 20px; padding: 24px 0; }
+  .direction-facts > div { grid-template-columns: 1fr; gap: 5px; }
+  .direction-facts { gap: 18px; }
+  .direction-evidence-grid, .direction-decisions { grid-template-columns: 1fr; gap: 18px; }
+  .direction-evidence-grid > div + div { padding: 18px 0 0; border-left: 0; border-top: 1px solid #e8ebe3; }
+  .direction-investment { padding: 18px; gap: 0; }
+  .direction-decisions > div { padding: 18px; }
+  .direction-sources { flex-direction: column; gap: 4px; }
+  .direction-notes { padding: 20px; }
+  .direction-notes + .deep-start { margin: 20px; }
+}
+@media (max-width: 480px) {
+  .report-page .panel-title { flex-wrap: wrap; gap: 12px; }
+  .report-page .method-tag { max-width: 100%; white-space: normal; line-height: 1.6; }
+}

@@ -240,151 +240,180 @@ export function OpportunityMap({
         aria-live="polite"
         aria-labelledby="opportunity-title"
       >
-        <div className="eyebrow">{l("DIRECTION IN FOCUS", "方向详情")}</div>
-        <h4 id="opportunity-title">{p.title}</h4>
-        {fit && (
-          <FitReason result={fit} directionId={selected.id} locale={locale} />
-        )}
-        {!!selected.basedOn?.length && (
-          <div className="strategy-sources">
-            {selected.basedOn.map((ref) => {
-              const source = brief.sources.find((s) => s.id === ref.id);
-              return source ? (
-                <a
-                  key={`${ref.id}:${ref.quote}`}
-                  href={source.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={ref.quote}
-                >
-                  {l("Build on", "基于项目")} · {source.label}
-                  <ArrowUpRight size={12} />
-                </a>
-              ) : null;
-            })}
-          </div>
-        )}
-        <dl className="opportunity-explainer">
-          <div>
-            <dt>{l("Who it serves", "服务谁")}</dt>
-            <dd>{p.audience}</dd>
-          </div>
-          {p.need && (
-            <div>
-              <dt>{l("The need", "解决什么问题")}</dt>
-              <dd>{p.need}</dd>
-            </div>
+        <header className="direction-heading">
+          <div className="eyebrow">{l("DIRECTION IN FOCUS", "方向详情")}</div>
+          <h4 id="opportunity-title">{p.title}</h4>
+          {fit && (
+            <FitReason result={fit} directionId={selected.id} locale={locale} />
           )}
-          {p.service && (
-            <div>
-              <dt>{l("What you offer", "提供什么服务")}</dt>
-              <dd>{p.service}</dd>
-            </div>
+          {!!selected.basedOn?.length && (
+            <DirectionSources
+              sources={brief.sources}
+              refs={selected.basedOn}
+              label={l("Build on", "基于项目")}
+            />
           )}
-        </dl>
-        <div className="opportunity-assessments">
-          <div>
-            <h5>
-              {l("Demand & its evidence", "需求与依据")}
-              <span>{label("basis", selected.demand.basis)}</span>
-            </h5>
-            <p>{p.demand}</p>
-          </div>
-          <div>
-            <h5>
-              {l("Competition & the opening", "竞争与切入空间")}
-              <span>{label("basis", selected.competition.basis)}</span>
-            </h5>
-            <p>{p.competition}</p>
-          </div>
-        </div>
-        <div className="opportunity-resources">
-          <div>
-            <h5>{l("What you need", "需要什么资源")}</h5>
-            <p>{p.resources}</p>
-          </div>
-          <div>
-            <h5>{l("First-release estimate", "首版投入估算")}</h5>
-            <p>{p.delivery}</p>
-          </div>
-          <div>
-            <h5>{l("Keeping it useful", "持续投入")}</h5>
-            <p>{p.upkeep}</p>
-          </div>
-        </div>
-        {!!useConditions.length && (
-          <aside
-            className="opportunity-use-conditions"
-            aria-label={useCopy.title}
-          >
-            <h5>{useCopy.title}</h5>
-            <p>{useCopy.text}</p>
-            {useConditions.map((condition) => (
-              <div key={condition.url + condition.quote}>
-                <a href={condition.url} target="_blank" rel="noreferrer">
-                  {condition.project}{" "}
-                  <ArrowUpRight size={14} aria-hidden="true" />
-                </a>
-                <blockquote>{condition.quote}</blockquote>
+        </header>
+        <section
+          className="direction-section"
+          aria-labelledby="direction-offer"
+        >
+          <h5 className="direction-section-title" id="direction-offer">
+            <span aria-hidden="true">01</span>
+            {l("The proposition", "做什么")}
+          </h5>
+          <dl className="direction-facts">
+            <div>
+              <dt>{l("Who it serves", "服务谁")}</dt>
+              <dd>{p.audience}</dd>
+            </div>
+            {p.need && (
+              <div>
+                <dt>{l("The need", "解决什么问题")}</dt>
+                <dd>{p.need}</dd>
               </div>
-            ))}
-          </aside>
-        )}
-        <div className="opportunity-assessments opportunity-action">
-          <div>
-            <h5>{l("Build this first", "第一件值得做的东西")}</h5>
-            <p>{p.wedge}</p>
-          </div>
-          <div>
-            <h5>{l("A test worth running", "怎样验证值得投入")}</h5>
-            <p>{p.experiment}</p>
-            {p.successSignal && (
-              <>
-                <h5>{l("Proposed continue criteria", "建议继续条件")}</h5>
-                <p>{p.successSignal}</p>
-              </>
             )}
-            {p.pivotSignal && (
-              <>
-                <h5>{l("Proposed redirect criteria", "建议调整条件")}</h5>
-                <p>{p.pivotSignal}</p>
-              </>
+            {p.service && (
+              <div className="direction-offer">
+                <dt>{l("What you offer", "提供什么服务")}</dt>
+                <dd>{p.service}</dd>
+              </div>
             )}
+          </dl>
+        </section>
+        <section
+          className="direction-section"
+          aria-labelledby="direction-evidence"
+        >
+          <h5 className="direction-section-title" id="direction-evidence">
+            <span aria-hidden="true">02</span>
+            {l("The evidence", "为什么值得探索")}
+          </h5>
+          <div className="direction-evidence-grid">
+            <div>
+              <div className="direction-field-heading">
+                <h6>{l("Demand & its evidence", "需求与依据")}</h6>
+                <span className="direction-basis">
+                  {label("basis", selected.demand.basis)}
+                </span>
+              </div>
+              <p>{p.demand}</p>
+            </div>
+            <div>
+              <div className="direction-field-heading">
+                <h6>{l("Competition & the opening", "竞争与切入空间")}</h6>
+                <span className="direction-basis">
+                  {label("basis", selected.competition.basis)}
+                </span>
+              </div>
+              <p>{p.competition}</p>
+            </div>
           </div>
-        </div>
-        <div className="strategy-sources">
-          <span>{l("Judgment sources", "判断依据")}</span>
+        </section>
+        <section
+          className="direction-section"
+          aria-labelledby="direction-investment"
+        >
+          <h5 className="direction-section-title" id="direction-investment">
+            <span aria-hidden="true">03</span>
+            {l("The commitment", "需要投入多少")}
+          </h5>
+          <dl className="direction-facts direction-investment">
+            <div>
+              <dt>{l("Resources", "所需资源")}</dt>
+              <dd>{p.resources}</dd>
+            </div>
+            <div>
+              <dt>{l("First release", "首版投入估算")}</dt>
+              <dd>{p.delivery}</dd>
+            </div>
+            <div>
+              <dt>{l("Ongoing work", "持续投入")}</dt>
+              <dd>{p.upkeep}</dd>
+            </div>
+          </dl>
+          {!!useConditions.length && (
+            <aside
+              className="opportunity-use-conditions"
+              aria-label={useCopy.title}
+            >
+              <h6>{useCopy.title}</h6>
+              <p>{useCopy.text}</p>
+              {useConditions.map((condition) => (
+                <div key={condition.url + condition.quote}>
+                  <a href={condition.url} target="_blank" rel="noreferrer">
+                    {condition.project}{" "}
+                    <ArrowUpRight size={14} aria-hidden="true" />
+                  </a>
+                  <blockquote>{condition.quote}</blockquote>
+                </div>
+              ))}
+            </aside>
+          )}
+        </section>
+        <section
+          className="direction-section direction-validation"
+          aria-labelledby="direction-validation"
+        >
+          <h5 className="direction-section-title" id="direction-validation">
+            <span aria-hidden="true">04</span>
+            {l("The first test", "怎样验证值得投入")}
+          </h5>
+          <dl className="direction-facts">
+            <div>
+              <dt>{l("Build this first", "先做什么")}</dt>
+              <dd>{p.wedge}</dd>
+            </div>
+            <div>
+              <dt>{l("Run this test", "验证方法")}</dt>
+              <dd>{p.experiment}</dd>
+            </div>
+          </dl>
+          {(p.successSignal || p.pivotSignal) && (
+            <div className="direction-decisions">
+              {p.successSignal && (
+                <div className="direction-continue">
+                  <h6>
+                    <span aria-hidden="true">↗</span>
+                    {l("Proposed continue criteria", "建议继续条件")}
+                  </h6>
+                  <p>{p.successSignal}</p>
+                </div>
+              )}
+              {p.pivotSignal && (
+                <div className="direction-adjust">
+                  <h6>
+                    <span aria-hidden="true">↳</span>
+                    {l("Proposed redirect criteria", "建议调整条件")}
+                  </h6>
+                  <p>{p.pivotSignal}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+        <div className="direction-notes">
           {refs.length ? (
-            refs.map((r) => {
-              const s = brief.sources.find((s) => s.id === r.id);
-              return s ? (
-                <a
-                  key={r.id}
-                  href={s.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={r.quote}
-                >
-                  {s.label}
-                  <ArrowUpRight size={12} />
-                </a>
-              ) : null;
-            })
+            <DirectionSources
+              sources={brief.sources}
+              refs={refs}
+              label={l("Judgment sources", "判断依据")}
+            />
           ) : (
-            <span>
+            <p className="footnote">
               {l(
                 "Domain hypothesis · test with the experiment above",
                 "领域推演 · 按上方实验采集真实反馈",
               )}
-            </span>
+            </p>
           )}
+          <p className="footnote">
+            {l(
+              "Project documents establish features; issues record individual requests. Broader demand and adoption remain research hypotheses. Time and decision thresholds are proposed estimates.",
+              "项目文档支持功能判断，Issue 记录个体诉求；更广泛的需求与采用仍属于研究假设。工期与实验门槛均为建议估算。",
+            )}
+          </p>
         </div>
-        <p className="footnote">
-          {l(
-            "Project documents establish features; issues record individual requests. Broader demand and adoption remain research hypotheses. Time and decision thresholds are proposed estimates.",
-            "项目文档支持功能判断，Issue 记录个体诉求；更广泛的需求与采用仍属于研究假设。工期与实验门槛均为建议估算。",
-          )}
-        </p>
         <DeepStart
           key={selected.id}
           reportId={market.id}
@@ -393,5 +422,48 @@ export function OpportunityMap({
         />
       </article>
     </section>
+  );
+}
+
+function DirectionSources({
+  sources,
+  refs,
+  label,
+}: {
+  sources: Brief["sources"];
+  refs: { id: string; quote: string }[];
+  label: string;
+}) {
+  // One document may back several claims; retain every quotation on one link.
+  const documents = new Map<string, { label: string; quotes: Set<string> }>();
+  for (const ref of refs) {
+    const source = sources.find((s) => s.id === ref.id);
+    if (!source?.url) continue;
+    const entry = documents.get(source.url) || {
+      label: source.label,
+      quotes: new Set<string>(),
+    };
+    entry.quotes.add(ref.quote);
+    documents.set(source.url, entry);
+  }
+  if (!documents.size) return null;
+  return (
+    <div className="direction-sources">
+      <span>{label}</span>
+      <div>
+        {[...documents].map(([url, source]) => (
+          <a
+            key={url}
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            title={[...source.quotes].join("\n\n")}
+          >
+            {source.label}
+            <ArrowUpRight size={12} aria-hidden="true" />
+          </a>
+        ))}
+      </div>
+    </div>
   );
 }
