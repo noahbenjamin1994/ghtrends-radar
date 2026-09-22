@@ -1,3 +1,4 @@
+import { discoveryQueries, hackerNewsQuery, collectHackerNews, capDiscoveryResults } from "./public-sources.js";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -17,8 +18,8 @@ export const searchQuerySchema = z.object({
   intent: z.enum(["competition", "demand", "opensource"]),
 });
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
-export const SEARCH_VERSION = "5";
-export type SearchEngine = "google" | "duckduckgo";
+export const SEARCH_VERSION = "6";
+export type SearchEngine = "google" | "duckduckgo" | "hackernews";
 interface SearchPage {
   results: SearchResult[];
   fetchedAt: string;
@@ -426,8 +427,8 @@ export function searchProxy(raw: string): string {
   return url.href;
 }
 export function searchSources(web?: WebEvidence): ResearchSource[] {
-  return (
-    web?.queries.flatMap((q, i) => {
+  const groups = (
+    web?.queries.map((q, i) => {
       // A single brand's help pages otherwise occupy the entire model budget.
       // Keep independent websites first; GitHub repositories remain distinct.
       const usable = q.results.filter(
@@ -485,10 +486,19 @@ export function searchSources(web?: WebEvidence): ResearchSource[] {
         ...(r.relevance?.role === "direct" || r.relevance?.role === "resource"
           ? { searchRole: r.relevance.role } : {}),
         placement: r.kind,
-        excerpt: `${q.engine === "duckduckgo" ? "DuckDuckGo" : "Google"} search excerpt. Query: ${q.query}. Search market: ${q.region || web!.region}. Language: ${web!.language}. Placement: ${r.kind}. Title: ${r.title}. Snippet: ${r.excerpt}`,
+        excerpt: `${q.engine === "hackernews" ? "Hacker News / Algolia" : q.engine === "duckduckgo" ? "DuckDuckGo" : "Google"} search excerpt. Query: ${q.query}. Search market: ${q.region || web!.region}. Language: ${web!.language}. Placement: ${r.kind}. Title: ${r.title}. Snippet: ${r.excerpt}`,
       }));
     }) || []
   );
+  const output: ResearchSource[] = [], seen = new Set<string>();
+  for (let row = 0; row < 8 && output.length < 16; row++) {
+    for (const group of groups) {
+      const source = group[row];
+      if (!source || seen.has(source.url) || output.length === 16) continue;
+      seen.add(source.url); output.push(source);
+    }
+  }
+  return output;
 }
 export class GoogleSearch {
   private queue = Promise.resolve();
@@ -527,6 +537,9 @@ export class GoogleSearch {
       engines: this.mode === "api" ? ["google"] : ["google", "duckduckgo"],
       mode: this.mode,
       maxQueries: 3,
+      publicDiscovery: process.env.GHTRENDS_PUBLIC_SOURCES === "1",
+      maxHackerNewsQueries: process.env.GHTRENDS_PUBLIC_SOURCES === "1" ? 1 : 0,
+      publicSourceDeadlineMs: 6000,
       cacheHours: 6,
       fallbackCacheMinutes: 30,
       primaryAttempts: this.mode === "api" ? 1 : 2,
@@ -539,7 +552,9 @@ export class GoogleSearch {
       ? "zh-CN"
       : "en";
     const region = geo || "US";
-    const planned = scopedWebQueries(topic);
+    const discovery = process.env.GHTRENDS_PUBLIC_SOURCES === "1";
+    const scoped = scopedWebQueries(topic);
+    const planned = discovery ? discoveryQueries(topic, scoped) : scoped;
     const queries = [
       ...new Map(
         planned.flatMap((q) => {
@@ -560,9 +575,11 @@ export class GoogleSearch {
       queries: [],
     };
     if (!this.enabled) return web;
-    const results = await Promise.allSettled(
-      queries.map((q) => this.search(q.query, region, language)),
-    );
+    const hnQuery = discovery ? hackerNewsQuery(topic) : undefined;
+    const [results, hn] = await Promise.all([
+      Promise.allSettled(queries.map((q) => this.search(q.query, region, language))),
+      hnQuery ? collectHackerNews(this.store, hnQuery) : undefined,
+    ]);
     web.queries = queries.map((q, i) => {
       const result = results[i]!;
       if (result.status === "fulfilled")
@@ -576,9 +593,11 @@ export class GoogleSearch {
         retryAt: failure.retryAt,
       };
     });
+    if (hn) web.queries.push(hn);
+    if (discovery) capDiscoveryResults(web);
     const count = web.queries.filter((q) => q.state === "ready").length;
     web.state =
-      count === queries.length && count > 0
+      count === web.queries.length && count > 0
         ? "ready"
         : count
           ? "partial"

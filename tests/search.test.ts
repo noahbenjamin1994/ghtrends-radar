@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   GoogleSearch,
+  SEARCH_VERSION,
   parseSearchResults,
   parseGooglePage,
   parseDuckDuckGoPage,
@@ -932,7 +933,9 @@ test("fallback cache expires early, shared cooldowns survive instances and prima
     assert.deepEqual(calls, ["google", "duckduckgo"]);
     assert.equal(a.queries[0]!.fetchedAt, b.queries[0]!.fetchedAt);
     const cache = db
-      .prepare("select expires from cache where key like 'web-search:v5:%'")
+      .prepare(
+        `select expires from cache where key like 'web-search:v${SEARCH_VERSION}:%'`,
+      )
       .get() as any;
     assert.ok(
       cache.expires - Date.now() > 29 * 60000 &&
@@ -967,7 +970,7 @@ test("fallback cache expires early, shared cooldowns survive instances and prima
     assert.equal(recovered.queries[0]!.adCoverage, "limited");
     const refreshed = db
       .prepare(
-        "select expires from cache where expires>0 and key like 'web-search:v5:%'",
+        `select expires from cache where expires>0 and key like 'web-search:v${SEARCH_VERSION}:%'`,
       )
       .get() as any;
     assert.ok(

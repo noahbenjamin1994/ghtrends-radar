@@ -2335,7 +2335,7 @@ Each direction must name a familiar customer, task, offered artifact and concret
       capabilityAudit: undefined as CapabilityAudit | undefined,
       confidence: m.confidence,
       webCoverage: {
-        queries: m.web?.queries.map(q => ({ intent: q.intent, state: q.state, results: q.results.length })),
+        queries: m.web?.queries.map(q => ({ engine: q.engine || "google", intent: q.intent, state: q.state, results: q.results.length })),
         relevanceReview: m.web?.review?.status || "unreviewed",
         originalPages: sources.filter(s => s.documentType === "page").length,
         readLimits: m.documents?.reads.filter(r => r.status !== "read").map(r => ({ url: r.url, reason: r.status })),
@@ -2351,7 +2351,7 @@ Each direction must name a familiar customer, task, offered artifact and concret
       assignment:
         basis === "hypothesis-led"
           ? "Build a conditional domain hypothesis from the stated user task. Treat current features, demand and commercial claims as open questions. Make the experiment discriminate between plausible explanations."
-          : "Answer the original topic overall, then explore distinct customer jobs across its full scope. Treat project documents as partial evidence about software workflows. Use clearly conditional domain analysis for the wider opportunity structure. Explain the audience, need and offered service plainly before technical implementation. Directly read publisher pages support that publisher’s claims; search snippets provide discovery context. A cited pricing line keeps its billing period, currency, date and conditions. License files support examining attribution, distribution, source disclosure and third-party conditions for the proposed use. Community posts describe individual experience; accepted answers may resolve an old request. Missing page access describes source coverage, with market conclusions based on collected evidence.",
+          : "Answer the original topic overall, then explore distinct customer jobs across its full scope. Treat project documents as partial evidence about software workflows. Use clearly conditional domain analysis for the wider opportunity structure. Explain the audience, need and offered service plainly before technical implementation. Directly read publisher pages support that publisher’s claims; search snippets provide discovery context. A cited pricing line keeps its billing period, currency, date and conditions. License files support examining attribution, distribution, source disclosure and third-party conditions for the proposed use. Community posts describe individual experience; accepted answers may resolve an old request. Reddit SERP excerpts are indexed snippets, not full discussions. HN search hits are discovery leads; votes and comment counts are attention rather than independent customers. Marketplace listings establish seller offers, not verified sales, product authenticity, licensing or unmet demand. Indexed prices and ratings can be stale, conditional or seller claims; retain currency/date/variant/discount scope and never invent missing reviews or sales. Missing page access describes source coverage, with market conclusions based on collected evidence.",
     };
     const cacheKey =
       `strategy:${STRATEGY_VERSION}:` +
@@ -2360,7 +2360,7 @@ Each direction must name a familiar customer, task, offered artifact and concret
           JSON.stringify({
             ...context,
             model: this.model,
-            pipeline: "parallel-v5-evidence",
+            pipeline: "parallel-v6-public-sources",
             thinking: this.strategyThinking,
             reviewThinking: this.reviewThinking,
             promptVersion: createHash("sha256")

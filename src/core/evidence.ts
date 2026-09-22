@@ -4,10 +4,12 @@ import type { WebEvidence } from "../providers/search.js";
 const WEEK = 7 * 86400000;
 type WebQuery = WebEvidence["queries"][number];
 export function searchEngineLabel(query: WebQuery) {
-  return query.engine === "duckduckgo" ? "DuckDuckGo" : "Google";
+  return query.engine === "hackernews" ? "Hacker News / Algolia" : query.engine === "duckduckgo" ? "DuckDuckGo" : "Google";
 }
 export function searchQueryUrl(query: WebQuery, web: WebEvidence) {
-  return query.engine === "duckduckgo"
+  return query.engine === "hackernews"
+    ? `https://hn.algolia.com/?${new URLSearchParams({q:query.query})}`
+    : query.engine === "duckduckgo"
     ? `https://duckduckgo.com/?${new URLSearchParams({ q: query.query })}`
     : `https://www.google.com/search?${new URLSearchParams({ q: query.query, hl: web.language, gl: web.region.toLowerCase() })}`;
 }
