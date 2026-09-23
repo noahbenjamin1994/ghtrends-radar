@@ -143,6 +143,61 @@
   margin-bottom: 0;
   max-width: 850px;
 }
+.deep-next-step {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #cbd9cb;
+}
+.deep-next-step h3 {
+  font-size: 14px;
+  margin: 0;
+  color: #36523e;
+}
+.deep-next-step > p {
+  font-size: 17px;
+  margin-top: 10px;
+}
+.deep-next-step > .deep-success-rule {
+  font-size: 15px;
+  padding: 14px 18px;
+  background: #ffffffb3;
+  border-radius: 10px;
+  margin-top: 18px;
+}
+.deep-decision-conditions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 22px;
+  margin: 24px 0 16px;
+}
+.deep-decision-conditions dt {
+  font-size: 13px;
+  font-weight: 600;
+  color: #36523e;
+}
+.deep-decision-conditions dd {
+  margin: 8px 0 0;
+  line-height: 1.75;
+  font-size: 15px;
+}
+.deep-next-step small {
+  display: block;
+  color: #526553;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.deep-plan > summary {
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.6;
+  padding: 20px 0;
+  border-block: 1px solid #e6e8e3;
+}
+.deep-plan > summary:focus-visible {
+  outline: 2px solid #36523e;
+  outline-offset: 4px;
+}
 .deep-findings > article {
   padding: 32px 0;
   border-bottom: 1px solid #e5e7e2;

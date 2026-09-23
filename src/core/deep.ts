@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { profileSchema } from "./fit.js";
-import { hasNegativeWording, proseCounterpart } from "./i18n.js";
+import { hasReportWordingProblem, proseCounterpart } from "./i18n.js";
 import { evidenceRef, recoverSourceQuote } from "./opportunities.js";
 import { validQuote } from "./landscape.js";
 import { sourceUseConditions, projectUseCopy } from "./capabilities.js";
@@ -14,7 +14,7 @@ import type { ResearchSource } from "./types.js";
 import type { WebEvidence, SearchQuery } from "../providers/search.js";
 import type { DocumentRead } from "../providers/documents.js";
 
-export const DEEP_VERSION = "15";
+export const DEEP_VERSION = "16";
 export const deepQuestions = {
   competitors: [
     "Where is the opening among existing products?",
@@ -261,13 +261,7 @@ export function normalizeDeepBrief(
   }
   const readable = (node: unknown, key = ""): unknown => {
     if (typeof node === "string" && (key === "en" || key === "zh")) {
-      let prose =
-        key === "zh"
-          ? node
-              .replace(/不可变的?/g, "写入后保持原样的")
-              .replace(/模型无关/g, "模型可替换")
-              .replace(/无锁(?:手机|机)/g, "SIM unlocked 机型")
-          : node;
+      let prose = node;
       prose = prose
         .replace(/[（(](E\d+)[）)]/g, (whole, id) =>
           sources.some((s) => s.id === id) ? "" : whole,
@@ -329,7 +323,7 @@ export function deepCopyRepairs(raw: unknown, sources: ResearchSource[] = []) {
     if (
       typeof v === "string" &&
       (prose || pilot) &&
-      (hasNegativeWording(v) ||
+      (hasReportWordingProblem(v) ||
         v.length > maxCharacters ||
         /\bknownProjects\b/.test(v) ||
         (v.match(/\bE\d+\b/g) || []).some((id) =>
@@ -415,7 +409,7 @@ export const deepAreaLabels = {
   scope: ["First release", "首版交付"],
 } as const;
 export const deepPlanLabels = {
-  deliverable: ["Build this first", "先交付什么"],
+  deliverable: ["First deliverable or test", "先交付或验证什么"],
   resources: ["People, data & access", "人员、资料与权限"],
   effort: ["Effort estimate", "投入估算"],
   maintenance: ["Ongoing work", "后续维护"],
@@ -501,10 +495,10 @@ export function deepProblems(
     if (
       typeof v === "string" &&
       (/\.(en|zh)$/.test(path) || /^experimentPlan\.(en|zh)\./.test(path)) &&
-      hasNegativeWording(v)
+      hasReportWordingProblem(v)
     )
       problems.push(
-        `${path}: express this affirmatively, preserving its uncertainty and action: ${JSON.stringify(v)}`,
+        `${path}: use direct wording, preserving factual negation, uncertainty and conditions: ${JSON.stringify(v)}`,
       );
     else if (v && typeof v === "object")
       for (const [k, child] of Object.entries(v))

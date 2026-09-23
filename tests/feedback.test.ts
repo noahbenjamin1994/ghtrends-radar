@@ -8,9 +8,34 @@ import { Store } from "../src/core/store.js";
 import { Engine } from "../src/core/engine.js";
 import { createApp } from "../src/server/index.js";
 import { sessionKey } from "../src/server/auth.js";
-import { feedbackInputSchema } from "../src/core/feedback.js";
+import {
+  feedbackInputSchema,
+  feedbackTargetSchema,
+} from "../src/core/feedback.js";
 import type { DeepTask } from "../src/core/deep.js";
 import type { Market } from "../src/core/types.js";
+
+test("feedback validates report hashes separately from current and legacy deep IDs", () => {
+  const id = randomUUID();
+  assert.equal(
+    feedbackTargetSchema.safeParse({ kind: "deep", id }).success,
+    true,
+  );
+  assert.equal(
+    feedbackTargetSchema.safeParse({ kind: "deep", id: "ab00000000000002" })
+      .success,
+    true,
+  );
+  assert.equal(
+    feedbackTargetSchema.safeParse({ kind: "report", id }).success,
+    false,
+  );
+  assert.equal(
+    feedbackTargetSchema.safeParse({ kind: "deep", id: "../../another-user" })
+      .success,
+    false,
+  );
+});
 
 test("the browser API accepts an empty saved record and preserves HTTP errors with a null body", async () => {
   const originalFetch = globalThis.fetch;
@@ -291,7 +316,7 @@ test("feedback APIs enforce ownership, CSRF and private exports; public report s
       400,
     );
     const task: DeepTask = {
-      id: "ab00000000000002",
+      id: randomUUID(),
       owner: "alice",
       title: { en: "Focused task", zh: "专项任务" },
       request: {
@@ -314,6 +339,8 @@ test("feedback APIs enforce ownership, CSRF and private exports; public report s
     };
     engine.store.createDeepTask(task, "fixture", false);
     const deepPath = `/api/feedback/deep/${task.id}`;
+    assert.equal(await (await call(deepPath, "alice")).json(), null);
+    assert.equal((await call(deepPath, "bob")).status, 404);
     assert.equal((await call(deepPath, "bob", "POST", body)).status, 404);
     engine.store.set(
       "feedback-writes:alice",

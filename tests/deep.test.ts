@@ -27,6 +27,7 @@ import {
 import {
   runDeepResearch,
   checkDeepCorrections,
+  deepOfferQueries,
 } from "../src/providers/deep.js";
 import { deepView } from "../src/server/deep.js";
 import { CreditProviderFixture } from "./fixtures/credit-provider.js";
@@ -37,6 +38,44 @@ const copy = (
   en = "Compare three examples with a working editor.",
   zh = "与一位编辑核对三个实际样例。",
 ) => ({ en, zh });
+
+test("deep offer searches follow at most two direct substitutes, never generic advice or private addresses", () => {
+  const lead = (
+    url: string,
+    searchRole: ResearchSource["searchRole"] = "direct",
+  ): ResearchSource => ({
+    url,
+    kind: "search",
+    label: "Product",
+    excerpt: "Official offer",
+    searchIntent: "competition",
+    searchRole,
+    placement: "organic",
+  });
+  assert.deepEqual(
+    deepOfferQueries([
+      lead("https://one.example/product"),
+      lead("https://one.example/features"),
+      lead("https://advice.example/post", "resource"),
+      lead("http://127.0.0.1/internal"),
+      lead("https://github.com/search?q=trend"),
+      lead("https://apps.apple.com/us/app/a-specific-tool/id123"),
+      lead("https://two.example/"),
+      lead("https://three.example/"),
+    ]).map((q) => q.query),
+    [
+      "site:one.example pricing plans subscription features",
+      "site:two.example pricing plans subscription features",
+    ],
+  );
+  assert.deepEqual(
+    deepOfferQueries([
+      lead("https://one.example/product"),
+      lead("https://one.example/pricing"),
+    ]),
+    [],
+  );
+});
 
 test("correction decisions preserve supported claims and require every issue to be assessed", async () => {
   const corrections = [
@@ -244,7 +283,7 @@ test("focused pilots share counts, protect rendered decisions and retain legacy 
 
 test("pilot copy repairs edit paired authored text and preserve shared outcome counts", () => {
   const b = brief();
-  b.experimentPlan!.zh.measurement = "记录完整且没有遗漏评审意见。";
+  b.experimentPlan!.zh.measurement = "不是随便记录，而是完整记录评审意见。";
   const edits = deepCopyRepairs(b);
   assert.deepEqual(
     edits.map((e) => e.path),
@@ -260,6 +299,24 @@ test("pilot copy repairs edit paired authored text and preserve shared outcome c
   assert.match(result.plan.experiment.zh, /全部评审意见均完整记录/);
   assert.deepEqual(result.experimentPlan!.counts, b.experimentPlan!.counts);
   assert.deepEqual(deepCopyRepairs(result), []);
+});
+
+test("decision prose preserves absence, uncertainty and technical terms without cosmetic model edits", () => {
+  const b = brief();
+  b.answer = {
+    en: "Teams collect signals without a way to organize them; willingness to pay is unknown.",
+    zh: "团队收集信号却没有整理方法；付费意愿尚未得到验证。",
+  };
+  b.plan.resources = {
+    en: "Use a model-agnostic interface and immutable artifacts; no server is required.",
+    zh: "使用模型无关接口和不可变产物，无需服务器。",
+  };
+  b.experimentPlan!.zh.measurement = "记录完整且没有遗漏评审意见。";
+  const normalized = normalizeDeepBrief(b, [source, request]) as DeepBrief;
+  assert.deepEqual(normalized.answer, b.answer);
+  assert.deepEqual(normalized.plan.resources, b.plan.resources);
+  assert.deepEqual(deepCopyRepairs(normalized), []);
+  assert.deepEqual(deepProblems(normalized, [source, request]), []);
 });
 
 test("focused resources show only cited projects' original use conditions in both exports", () => {
@@ -522,11 +579,8 @@ test("delivery requires exact source support, original material and question-spe
   );
   const badCopy = structuredClone(b);
   badCopy.answer.zh = "这个方向不能投入。";
-  assert.ok(
-    deepProblems(badCopy, evidence.sources).some((p) =>
-      p.includes("affirmatively"),
-    ),
-  );
+  assert.deepEqual(deepProblems(badCopy, evidence.sources), []);
+  assert.deepEqual(deepCopyRepairs(badCopy), []);
   const t = task();
   const effort = structuredClone(b);
   effort.plan.effort.hoursMin = 21;
@@ -653,7 +707,13 @@ test("source checkpoints support bounded recovery with direct writing and light 
   e.research.json = async (_system, _input, _tokens, operation, thinking) => {
     assert.equal(
       thinking,
-      operation === "strategy-deep-review" ? "low" : false,
+      [
+        "strategy-deep-review",
+        "strategy-deep-write",
+        "strategy-deep-repair",
+      ].includes(operation || "")
+        ? "low"
+        : false,
     );
     calls++;
     if (operation === "strategy-deep-correction-check")
@@ -668,6 +728,10 @@ test("source checkpoints support bounded recovery with direct writing and light 
         ],
       };
     if (operation === "strategy-deep-repair") {
+      assert.ok(
+        (_input as any).schema,
+        "targeted repairs retain the generation limits",
+      );
       assert.deepEqual(
         (_input as any).requestedFields.map((f: any) => f.path),
         ["experimentPlan"],
@@ -1344,7 +1408,7 @@ test("prose-only repair preserves source IDs and quotes, while structural and ne
   ]) as DeepBrief;
   assert.equal(
     readable.answer.zh,
-    "建议采用模型可替换接口与写入后保持原样的产物，SIM unlocked 机型的实际兼容范围仍待核对。",
+    "建议采用模型无关接口与不可变产物，无锁机的实际兼容范围仍待核对。",
   );
   assert.equal(
     readable.findings[0]!.evidence[0]!.quote,
@@ -1421,7 +1485,7 @@ test("prose-only repair preserves source IDs and quotes, while structural and ne
     if (op === "strategy-deep-review") return { ready: true, corrections: [] };
     writes++;
     const b = brief();
-    b.plan.resources.en = "Use the frontend without a server.";
+    b.plan.resources.en = "Use not a server but a static frontend.";
     return b;
   };
   try {
@@ -1499,6 +1563,13 @@ test("a broad issue match stays outside selected-project research and license ev
       projectRoot,
       similarName,
       longPage,
+      {
+        ...source,
+        id: "E9",
+        kind: "search",
+        url: "https://github.com/search?q=monitoring&type=repositories",
+        excerpt: "Hardware monitoring and ML metric drift repositories.",
+      },
     ],
     reads: [],
   };
@@ -1537,7 +1608,9 @@ test("a broad issue match stays outside selected-project research and license ev
       true,
     );
     assert.ok(
-      payload.sources.every((s: any) => !["E4", "E5", "E7"].includes(s.id)),
+      payload.sources.every(
+        (s: any) => !["E4", "E5", "E7", "E9"].includes(s.id),
+      ),
     );
     checked = true;
     return brief();
@@ -1545,7 +1618,7 @@ test("a broad issue match stays outside selected-project research and license ev
   try {
     assert.equal(await runDeepResearch(e, t, () => {}), true);
     assert.equal(checked, true);
-    assert.equal(t.evidence.sources.length, 8);
+    assert.equal(t.evidence.sources.length, 9);
   } finally {
     await e.close();
     rmSync(dir, { recursive: true, force: true });
@@ -1790,7 +1863,7 @@ for (const planning of ["model", "fallback"] as const) {
       assert.equal(new Set(queries.map((q) => q.intent)).size, 3);
       assert.equal(
         queries.find((q) => q.intent === "opensource")!.query,
-        '"PostHog/posthog" documentation Google Ads source for PostHog',
+        '"PostHog/posthog" documentation',
       );
       for (const intent of ["competition", "demand"]) {
         assert.ok(
@@ -1844,7 +1917,7 @@ for (const planning of ["model", "fallback"] as const) {
       assert.equal(t.evidence!.queries.length, 4);
       assert.equal(
         t.evidence!.queries.find((q) => q.intent === "opensource")!.query,
-        '"PostHog/posthog" documentation Google Ads source for PostHog',
+        '"PostHog/posthog" documentation',
       );
     } finally {
       await e.close();
@@ -1852,6 +1925,55 @@ for (const planning of ["model", "fallback"] as const) {
     }
   });
 }
+
+test("deep model routing leaves lightweight research unchanged and records the model actually requested", async () => {
+  const env = { ...process.env },
+    originalFetch = globalThis.fetch;
+  process.env.DEEPSEEK_API_KEY = "unit-test-only";
+  process.env.DEEPSEEK_MODEL = "deepseek-flash";
+  process.env.GHTRENDS_DEEP_MODEL = "deepseek-v4-pro";
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-model-"));
+  const e = new Engine(new Store(dir));
+  const requested: string[] = [],
+    recorded: string[] = [];
+  e.store.recordCall = (call) => {
+    recorded.push(call.model!);
+  };
+  globalThis.fetch = async (_url, init) => {
+    requested.push(JSON.parse(String(init?.body)).model);
+    return new Response(
+      JSON.stringify({
+        choices: [
+          { finish_reason: "stop", message: { content: '{"ok":true}' } },
+        ],
+      }),
+      { status: 200 },
+    );
+  };
+  try {
+    for (const op of [
+      "strategy-write",
+      "deep-plan",
+      "strategy-deep-write",
+      "strategy-deep-review",
+      "web-relevance",
+    ])
+      await e.research.json("Return JSON", {}, 100, op, false);
+    assert.deepEqual(requested, [
+      "deepseek-flash",
+      "deepseek-v4-pro",
+      "deepseek-v4-pro",
+      "deepseek-v4-pro",
+      "deepseek-flash",
+    ]);
+    assert.deepEqual(recorded, requested);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env = env;
+    await e.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("the model transport always includes the JSON-mode instruction, including short prose-repair prompts", async () => {
   const env = { ...process.env },
@@ -2283,48 +2405,70 @@ for (const changed of [false, true])
     }
   });
 
-test("a referenced public project carries an explicit code and data permission check", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-terms-"));
-  const env = { ...process.env };
-  process.env.DEEPSEEK_API_KEY = "unit-test-only";
-  const e = new Engine(new Store(dir)),
-    t = task(),
-    m = sample();
-  const doc = {
-    ...source,
-    url: "https://github.com/team/drafts/blob/main/README.md",
-    kind: "project" as const,
-  };
-  m.brief!.sources = [doc];
-  m.brief!.opportunities![0]!.basedOn = [{ id: doc.id!, quote: doc.excerpt! }];
-  e.store.saveMarket(m, false, t.owner);
-  t.evidence = {
-    collectionFinished: true,
-    collectedAt: t.created,
-    queries: [],
-    githubQuery: "comments",
-    sources: [
-      doc,
-      { ...request, url: "https://github.com/team/drafts/issues/12" },
-    ],
-    reads: [],
-  };
-  e.research.json = async (_s, input, _n, op) => {
-    assert.deepEqual((input as any).assetTerms[0].licenseSources, []);
-    return op === "strategy-deep-review"
-      ? { ready: true, corrections: [] }
-      : brief();
-  };
-  try {
-    assert.equal(await runDeepResearch(e, t, () => {}), true);
-    assert.match(t.result!.checks[0]!.en, /team\/drafts.*code license.*data/);
-    assert.match(t.result!.checks[0]!.zh, /源码许可、数据/);
-  } finally {
-    await e.close();
-    process.env = env;
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
+for (const use of ["compare", "reuse", "checked"] as const)
+  test(`project permission checks follow planned reuse without duplicating an existing check (${use})`, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-terms-"));
+    const env = { ...process.env };
+    process.env.DEEPSEEK_API_KEY = "unit-test-only";
+    const e = new Engine(new Store(dir)),
+      t = task(),
+      m = sample();
+    const doc = {
+      ...source,
+      url: "https://github.com/team/drafts/blob/main/README.md",
+      kind: "project" as const,
+    };
+    m.brief!.sources = [doc];
+    m.brief!.opportunities![0]!.basedOn = [
+      { id: doc.id!, quote: doc.excerpt! },
+    ];
+    e.store.saveMarket(m, false, t.owner);
+    t.evidence = {
+      collectionFinished: true,
+      collectedAt: t.created,
+      queries: [],
+      githubQuery: "comments",
+      sources: [
+        doc,
+        { ...request, url: "https://github.com/team/drafts/issues/12" },
+      ],
+      reads: [],
+    };
+    e.research.json = async (_s, input, _n, op) => {
+      assert.deepEqual((input as any).assetTerms[0].licenseSources, []);
+      const candidate = brief();
+      if (use !== "compare")
+        candidate.plan.resources = copy(
+          "Reuse team/drafts after checking its permissions.",
+          "核对权限后复用 team/drafts。",
+        );
+      if (use === "checked")
+        candidate.checks = [
+          copy(
+            "Confirm the drafts code license and separate data terms before reuse.",
+            "复用前核对 drafts 的源码许可与数据条款。",
+          ),
+        ];
+      return op === "strategy-deep-review"
+        ? { ready: true, corrections: [] }
+        : candidate;
+    };
+    try {
+      assert.equal(await runDeepResearch(e, t, () => {}), true);
+      assert.equal(t.result!.checks.length, use === "compare" ? 0 : 1);
+      if (use === "reuse") {
+        assert.match(
+          t.result!.checks[0]!.en,
+          /team\/drafts.*code license.*data/,
+        );
+        assert.match(t.result!.checks[0]!.zh, /源码许可、数据/);
+      }
+    } finally {
+      await e.close();
+      process.env = env;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 
 test("an overlong copy edit gets its second bounded shortening pass before delivery", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-copy-limit-"));
@@ -2422,7 +2566,7 @@ test("wording edits receive the paired meaning and preserve unrequested text and
     candidate = brief();
   candidate.plan.maintenance = {
     en: "If zero testers use the queue, test the simpler composer with the same group.",
-    zh: "若无人使用队列，则请同一组试用者测试简化的编辑器。",
+    zh: "若无人使用队列，不是继续开发，而是请同一组试用者测试简化的编辑器。",
   };
   e.store.saveMarket(sample(), false, t.owner);
   t.evidence = {

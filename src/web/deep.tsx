@@ -597,6 +597,32 @@ export function DeepResearchView({
             </span>
             <h2>{result.headline[locale]}</h2>
             <p>{result.answer[locale]}</p>
+            <div className="deep-next-step">
+              <h3>{l("Your next move", "现在最值得做的一步")}</h3>
+              <p>{result.plan.deliverable[locale]}</p>
+              {result.experimentPlan && (
+                <p className="deep-success-rule">
+                  <strong>{l("Success means: ", "达标看什么：")}</strong>
+                  {result.experimentPlan[locale].measurement}
+                </p>
+              )}
+              <dl className="deep-decision-conditions">
+                <div>
+                  <dt>{l("Continue when", "什么结果值得继续")}</dt>
+                  <dd>{result.plan.continueIf[locale]}</dd>
+                </div>
+                <div>
+                  <dt>{l("Change course when", "什么结果需要调整")}</dt>
+                  <dd>{result.plan.changeIf[locale]}</dd>
+                </div>
+              </dl>
+              <small>
+                {l(
+                  "Proposed test thresholds, not validated demand.",
+                  "以上为建议验证门槛，不代表需求或付费意愿已得到证实。",
+                )}
+              </small>
+            </div>
           </section>
           <section className="deep-findings">
             {result.findings.map((f, i) => (
@@ -652,10 +678,13 @@ export function DeepResearchView({
               </article>
             ))}
           </section>
-          <section className="deep-plan">
-            <h2>
-              {l("A small, testable next step", "下一步，做一个可验证的小交付")}
-            </h2>
+          <details className="deep-plan">
+            <summary>
+              {l(
+                "Test steps, resources & effort",
+                "展开验证步骤、资源与投入估算",
+              )}
+            </summary>
             <p className="footnote">
               {l(
                 "Scope, effort and experiment thresholds are research proposals. Confirm them against your resources and real use.",
@@ -663,42 +692,47 @@ export function DeepResearchView({
               )}
             </p>
             <dl>
-              {Object.entries(deepPlanLabels).map(([key, text]) => (
-                <div key={key}>
-                  <dt>{label(text)}</dt>
-                  <dd>
-                    {key === "effort"
-                      ? deepEffortText(result.plan.effort, locale)
-                      : result.plan[
-                          key as Exclude<keyof typeof result.plan, "effort">
-                        ][locale]}
-                    {key === "resources" && useConditions.length > 0 && (
-                      <aside
-                        className="opportunity-use-conditions"
-                        aria-label={useCopy.title}
-                      >
-                        <strong>{useCopy.title}</strong>
-                        <p>{useCopy.text}</p>
-                        {useConditions.map((notice) => (
-                          <div key={notice.project + notice.quote}>
-                            <a
-                              href={notice.url}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {notice.project}
-                              <ArrowUpRight size={13} />
-                            </a>
-                            <blockquote>{notice.quote}</blockquote>
-                          </div>
-                        ))}
-                      </aside>
-                    )}
-                  </dd>
-                </div>
-              ))}
+              {Object.entries(deepPlanLabels)
+                .filter(
+                  ([key]) =>
+                    !["deliverable", "continueIf", "changeIf"].includes(key),
+                )
+                .map(([key, text]) => (
+                  <div key={key}>
+                    <dt>{label(text)}</dt>
+                    <dd>
+                      {key === "effort"
+                        ? deepEffortText(result.plan.effort, locale)
+                        : result.plan[
+                            key as Exclude<keyof typeof result.plan, "effort">
+                          ][locale]}
+                      {key === "resources" && useConditions.length > 0 && (
+                        <aside
+                          className="opportunity-use-conditions"
+                          aria-label={useCopy.title}
+                        >
+                          <strong>{useCopy.title}</strong>
+                          <p>{useCopy.text}</p>
+                          {useConditions.map((notice) => (
+                            <div key={notice.project + notice.quote}>
+                              <a
+                                href={notice.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {notice.project}
+                                <ArrowUpRight size={13} />
+                              </a>
+                              <blockquote>{notice.quote}</blockquote>
+                            </div>
+                          ))}
+                        </aside>
+                      )}
+                    </dd>
+                  </div>
+                ))}
             </dl>
-          </section>
+          </details>
           {!!result.checks.length && (
             <section className="deep-checks">
               <h2>{l("Before you commit", "投入前再核对")}</h2>
@@ -787,7 +821,22 @@ export function DeepResearchView({
                   <ArrowUpRight size={14} />
                 </a>
                 <small>
-                  {s.documentType || s.kind || "search"} ·{" "}
+                  {result &&
+                    (result.findings.some((f) =>
+                      f.evidence.some((ref) => ref.id === s.id),
+                    )
+                      ? l("Cited in findings", "结论已引用")
+                      : l(
+                          "Collected lead · not cited",
+                          "采集线索 · 未用于结论",
+                        ))}
+                  {result ? " · " : ""}
+                  {s.documentType ||
+                  s.kind === "project" ||
+                  s.kind === "request"
+                    ? l("Original material", "原始材料")
+                    : l("Search excerpt", "搜索摘要")}{" "}
+                  ·{" "}
                   {s.fetchedAt
                     ? new Date(s.fetchedAt).toLocaleDateString()
                     : l("See collection record", "见采集记录")}

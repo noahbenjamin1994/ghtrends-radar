@@ -557,7 +557,7 @@ export class DocumentReader {
           .map((s) => [s.url, s]),
       ).values(),
     ];
-    const domains = new Set<string>();
+    const domains = new Map<string, number>();
     const terms = [
       ...new Set(focus.toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) || []),
     ].filter(
@@ -590,6 +590,10 @@ export class DocumentReader {
           Number(!!hnItem(b.url)) - Number(!!hnItem(a.url)) ||
           Number(b.searchRole === "direct") -
             Number(a.searchRole === "direct") ||
+          (depth === "deep"
+            ? Number(/\/(pricing|plans)(?:[/?#]|$)/i.test(b.url)) -
+              Number(/\/(pricing|plans)(?:[/?#]|$)/i.test(a.url))
+            : 0) ||
           documentationMatch(b) - documentationMatch(a) ||
           Number(b.searchIntent === "competition") -
             Number(a.searchIntent === "competition"),
@@ -599,10 +603,10 @@ export class DocumentReader {
         if (
           host === "github.com" ||
           blockedHosts.test(host) ||
-          domains.has(host)
+          (domains.get(host) || 0) >= (depth === "deep" ? 2 : 1)
         )
           return false;
-        domains.add(host);
+        domains.set(host, (domains.get(host) || 0) + 1);
         return true;
       });
     // Retain the best-ranked original and reserve space for each observed job:

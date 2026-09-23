@@ -1058,14 +1058,16 @@ test("long repository licenses keep complete common clauses and flag the excerpt
   }));
 
 test("broad Chinese research reads features after long donor lists", () => {
-  const text = "# 热点助手\n只看真正关心的资讯。\n\n## 观众支持\n" +
+  const text =
+    "# 热点助手\n只看真正关心的资讯。\n\n## 观众支持\n" +
     "| 支持者 | 金额 | 趋势追踪 |\n".repeat(500) +
     "\n## 核心功能\n支持关键词筛选、多渠道推送和自定义订阅源。请先确认各来源的数据使用条件。\n";
   const result = researchExcerpt(text, 6000, "趋势追踪");
   assert.match(result.excerpt, /支持关键词筛选、多渠道推送/);
   assert.ok(result.excerpt.length < 6000);
   assert.ok(!result.excerpt.includes("| 支持者 |"));
-  for (const span of result.excerpt.split("\n\n[…]\n\n")) assert.ok(text.includes(span));
+  for (const span of result.excerpt.split("\n\n[…]\n\n"))
+    assert.ok(text.includes(span));
 });
 
 test("focused excerpts retain actual late integration instructions rather than only a table of contents", () => {
@@ -1476,6 +1478,25 @@ test("deep reading expands to eight independent originals while light stays at f
     assert.equal(
       new Set(deep.reads.map((r) => new URL(r.url).hostname)).size,
       8,
+    );
+  }));
+
+test("deep reading keeps a product overview and its pricing page, with two pages per host at most", async () =>
+  fixture(async (store) => {
+    const reader = new DocumentReader(store, async (url) =>
+      url.pathname === "/robots.txt" ? response("", 404) : response(html),
+    );
+    const inputs = ["overview", "features", "pricing", "blog"].map((path) => ({
+      ...candidate(`https://offer.example/${path}`),
+      searchRole: "direct" as const,
+    }));
+    const light = await reader.collect(inputs);
+    const deep = await reader.collect(inputs, "", "deep");
+    assert.equal(light.reads.length, 1);
+    assert.equal(deep.reads.length, 2);
+    assert.deepEqual(
+      deep.reads.map((r) => new URL(r.url).pathname),
+      ["/pricing", "/overview"],
     );
   }));
 

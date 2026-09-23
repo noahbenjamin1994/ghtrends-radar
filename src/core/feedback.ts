@@ -8,10 +8,16 @@ export const feedbackLabels = {
   tested: ["Ran a validation", "做过了验证"],
 } as const;
 export type FeedbackStatus = keyof typeof feedbackLabels;
-export const feedbackTargetSchema = z.object({
-  kind: z.enum(["report", "deep"]),
-  id: z.string().regex(/^[a-f0-9]{16}$/),
-});
+export const feedbackTargetSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("report"),
+    id: z.string().regex(/^[a-f0-9]{16}$/),
+  }),
+  z.object({
+    kind: z.literal("deep"),
+    id: z.union([z.string().uuid(), z.string().regex(/^[a-f0-9]{16}$/)]),
+  }),
+]);
 export type FeedbackKind = z.infer<typeof feedbackTargetSchema>["kind"];
 export const feedbackInputSchema = z
   .object({

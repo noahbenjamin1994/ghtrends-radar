@@ -273,7 +273,7 @@ export function installDeepRoutes(
           title: { en: direction!.en.title, zh: direction!.zh.title },
           geo: market ? market.geo : "",
           version: DEEP_VERSION,
-          model: engine.research.model,
+          model: engine.research.deepModel,
           created: now,
           updated: now,
           state: "queued",

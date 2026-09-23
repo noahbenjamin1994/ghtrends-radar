@@ -300,8 +300,14 @@ export function modelSources(sources: ResearchSource[], focus = "") {
 }
 export class Research {
   readonly model = process.env.DEEPSEEK_MODEL || "deepseek-flash";
+  readonly deepModel = process.env.GHTRENDS_DEEP_MODEL || this.model;
   readonly enabled = !!process.env.DEEPSEEK_API_KEY;
   constructor(private store: Store) {}
+  modelFor(operation: string) {
+    return /^(?:deep-plan$|strategy-deep-)/.test(operation)
+      ? this.deepModel
+      : this.model;
+  }
   get strategyThinking(): false | "low" {
     return process.env.GHTRENDS_RESEARCH_THINKING &&
       process.env.GHTRENDS_RESEARCH_THINKING !== "off"
@@ -593,6 +599,7 @@ export class Research {
     thinking: boolean | "low" = false,
   ) {
     const started = Date.now();
+    const model = this.modelFor(operation);
     const activity: ResearchActivity = {
       id: randomUUID(),
       operation,
@@ -614,7 +621,7 @@ export class Research {
       operation,
       started: new Date(started).toISOString(),
       durationMs: 0,
-      model: this.model,
+      model,
     };
     try {
       const root = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
@@ -629,7 +636,7 @@ export class Research {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: this.model,
+            model,
             stream: true,
             stream_options: { include_usage: true },
             thinking: { type: thinking ? "enabled" : "disabled" },
@@ -675,7 +682,7 @@ export class Research {
       }
       const data = await readCompletion(response, notify);
       call.model =
-        typeof data.model === "string" ? data.model.slice(0, 100) : this.model;
+        typeof data.model === "string" ? data.model.slice(0, 100) : model;
       call.inputTokens = tokenCount(data.usage?.prompt_tokens);
       call.outputTokens = tokenCount(data.usage?.completion_tokens);
       const reasoning = tokenCount(
@@ -693,7 +700,7 @@ export class Research {
         data.usage?.prompt_cache_hit_tokens ??
           data.usage?.prompt_tokens_details?.cached_tokens,
       );
-      call.costUsd = estimatedCost(this.model, data.usage, call.started);
+      call.costUsd = estimatedCost(model, data.usage, call.started);
       if (data.choices?.[0]?.finish_reason !== "stop") {
         call.error =
           data.choices?.[0]?.finish_reason === "length"
