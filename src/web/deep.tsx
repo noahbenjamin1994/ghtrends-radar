@@ -514,8 +514,8 @@ export function DeepResearchView({
                         "这个问题需要补充更直接的原始来源，已取得的材料保存在下方。",
                       )
                     : l(
-                        "We have not produced a conclusion that passed quality checks. The sources are saved, but they are not a completed report. You can retry below; a successful result is not guaranteed.",
-                        "目前还没有产出通过质量核对的结论。来源已经保存，但不把来源列表当成完成的报告。可在下方重试，仍需通过交付检查。",
+                        "We have not produced a conclusion that passed quality checks. The sources are saved, but they are not a completed report. Further research must pass the same delivery checks.",
+                        "目前还没有产出通过质量核对的结论。来源已经保存，但不把来源列表当成完成的报告。后续研究仍需通过相同的交付检查。",
                       )}
           </p>
           <p>
@@ -750,7 +750,11 @@ export function DeepResearchView({
           className="deep-coverage"
           aria-label={l("Evidence coverage", "证据覆盖")}
         >
-          <h2>{l("What this decision rests on", "这次判断基于什么")}</h2>
+          <h2>
+            {result
+              ? l("What this decision rests on", "这次判断基于什么")
+              : l("Research material collected", "已采集的研究材料")}
+          </h2>
           <div className="deep-coverage-grid">
             <div>
               <strong>
