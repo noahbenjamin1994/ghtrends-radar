@@ -55,6 +55,10 @@ export function activityLabel(operation: string, zh: boolean) {
       "Checking recommendations against sources",
       "核对专项建议与来源",
     ],
+    "strategy-deep-decision-check": [
+      "Checking buyer fit and decision logic",
+      "核对买家、替代方案与决策逻辑",
+    ],
   };
   const pair =
     labels[operation] ||
