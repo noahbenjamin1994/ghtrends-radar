@@ -171,147 +171,152 @@ export function DeepStart({
     }
   };
   return (
-    <details className="deep-start">
-      <summary>
-        <span>
-          {l(
-            "Make one decision with more evidence",
-            "选定一个问题，深入研究这个方向",
-          )}
-        </span>
-        <ArrowRight size={20} />
-      </summary>
-      <div className="deep-start-body">
-        <p>
-          {l(
-            "Choose what you need to decide. Receive targeted sources, a first-release scope and a concrete validation experiment.",
-            "选一个当前要做的决定。我们定向查阅来源，给出首版范围、投入估算和一个具体的验证实验。",
-          )}
-        </p>
-        <div
-          className="deep-question-options"
-          role="group"
-          aria-label={l("Your research question", "研究问题")}
-        >
-          {Object.entries(deepQuestions).map(([q, text]) => (
-            <button
-              type="button"
-              key={q}
-              aria-pressed={question === q}
+    <div className="deep-upgrade">
+      <div className="deep-upgrade-label">
+        {l("DEEP RESEARCH · ONE DECISION", "深度研究 · 做好一个决定")}
+      </div>
+      <details className="deep-start">
+        <summary>
+          <span>
+            {l(
+              "Make one decision with more evidence",
+              "选定一个问题，深入研究这个方向",
+            )}
+          </span>
+          <ArrowRight size={20} />
+        </summary>
+        <div className="deep-start-body">
+          <p>
+            {l(
+              "Choose one decision. We take more time to read official product and pricing pages, public GitHub evidence and independent community discussions, then return a scoped first release and a concrete validation experiment.",
+              "选一个当前要做的决定。我们会花更多时间查阅官方产品与价格页、GitHub 公开证据和独立社区讨论，再给出首版范围、投入估算与一个具体实验。",
+            )}
+          </p>
+          <div
+            className="deep-question-options"
+            role="group"
+            aria-label={l("Your research question", "研究问题")}
+          >
+            {Object.entries(deepQuestions).map(([q, text]) => (
+              <button
+                type="button"
+                key={q}
+                aria-pressed={question === q}
+                disabled={busy}
+                onClick={() => setQuestion(q as DeepRequest["question"])}
+              >
+                <span>
+                  {question === q ? (
+                    <Check size={16} />
+                  ) : (
+                    <span className="deep-radio" />
+                  )}
+                </span>
+                {label(text)}
+              </button>
+            ))}
+          </div>
+          <label className="deep-context">
+            {l("Useful context · optional", "补充信息 · 选填")}
+            <input
+              value={context}
+              onChange={(e) => setContext(e.target.value)}
               disabled={busy}
-              onClick={() => setQuestion(q as DeepRequest["question"])}
-            >
-              <span>
-                {question === q ? (
-                  <Check size={16} />
-                ) : (
-                  <span className="deep-radio" />
-                )}
-              </span>
-              {label(text)}
-            </button>
-          ))}
-        </div>
-        <label className="deep-context">
-          {l("Useful context · optional", "补充信息 · 选填")}
-          <input
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            disabled={busy}
-            maxLength={400}
-            placeholder={l(
-              "For example: compare these two products, or focus on repair shops",
-              "例如：希望比较的两款产品，或重点服务的门店类型",
-            )}
-          />
-        </label>
-        <div className="deep-start-footer">
-          <div>
-            <strong>
-              {paid
-                ? l(
-                    "Focused research · 1 purchased credit",
-                    "专项研究 · 使用 1 次已购次数",
-                  )
-                : account.hosted
-                  ? l(
-                      "First focused research: 1 free trial",
-                      "首次专项研究：赠送 1 次体验",
-                    )
-                  : l("Research with your own keys", "使用自己的密钥研究")}
-            </strong>
-            <p>
-              {l(
-                "Reserved at start, used on complete delivery. A collection or generation interruption returns the credit. Results stay private.",
-                "开始时预留，完整交付后使用。采集或生成中断时返还次数，结果按账户私有保存。",
+              maxLength={400}
+              placeholder={l(
+                "For example: compare these two products, or focus on repair shops",
+                "例如：希望比较的两款产品，或重点服务的门店类型",
               )}
-            </p>
-            {account.user && account.hosted && (
-              <span>
-                {l("Available now: ", "当前可用：")}
-                {remaining ?? "—"} {l("credit", "次")}
-              </span>
-            )}
-            {paid && (
+            />
+          </label>
+          <div className="deep-start-footer">
+            <div>
+              <strong>
+                {paid
+                  ? l(
+                      "Focused research · 1 purchased credit",
+                      "专项研究 · 使用 1 次已购次数",
+                    )
+                  : account.hosted
+                    ? l(
+                        "First focused research: 1 free trial",
+                        "首次专项研究：赠送 1 次体验",
+                      )
+                    : l("Research with your own keys", "使用自己的密钥研究")}
+              </strong>
               <p>
                 {l(
-                  `Up to ${account.deep.paidDailyAttempts || 10} attempts per day; each research allows three attempts.`,
-                  `每日最多 ${account.deep.paidDailyAttempts || 10} 次尝试，每项研究最多尝试 3 次。`,
+                  "Reserved at start, used on complete delivery. A collection or generation interruption returns the credit. Results stay private.",
+                  "开始时预留，完整交付后使用。采集或生成中断时返还次数，结果按账户私有保存。",
                 )}
               </p>
+              {account.user && account.hosted && (
+                <span>
+                  {l("Available now: ", "当前可用：")}
+                  {remaining ?? "—"} {l("credit", "次")}
+                </span>
+              )}
+              {paid && (
+                <p>
+                  {l(
+                    `Up to ${account.deep.paidDailyAttempts || 10} attempts per day; each research allows three attempts.`,
+                    `每日最多 ${account.deep.paidDailyAttempts || 10} 次尝试，每项研究最多尝试 3 次。`,
+                  )}
+                </p>
+              )}
+            </div>
+            {!account.user ? (
+              <a
+                className="button"
+                href={loginUrl(`/report/${reportId}#opportunities`)}
+              >
+                {l("Sign in to research", "登录后开始研究")}
+                <ArrowRight size={16} />
+              </a>
+            ) : paid && remaining === null ? (
+              <button
+                className="button secondary"
+                disabled={purchased.pending}
+                onClick={purchased.refresh}
+              >
+                {l("Confirm available credits", "核对可用次数")}
+              </button>
+            ) : remaining === 0 ? (
+              <a
+                className="button secondary"
+                href={localUrl(paid ? "/account" : "/history")}
+              >
+                {paid
+                  ? l("View my credits", "查看账户次数")
+                  : l("Open my research", "查看我的研究")}
+              </a>
+            ) : (
+              <button
+                className="button"
+                disabled={busy}
+                onClick={() => void start()}
+              >
+                {busy
+                  ? l("Saving your task…", "正在保存任务…")
+                  : paid
+                    ? l(
+                        "Confirm · use 1 purchased credit",
+                        "确认研究 · 使用 1 次已购次数",
+                      )
+                    : l("Start focused research", "开始专项研究")}
+                <ArrowRight size={16} />
+              </button>
             )}
           </div>
-          {!account.user ? (
-            <a
-              className="button"
-              href={loginUrl(`/report/${reportId}#opportunities`)}
-            >
-              {l("Sign in to research", "登录后开始研究")}
-              <ArrowRight size={16} />
-            </a>
-          ) : paid && remaining === null ? (
-            <button
-              className="button secondary"
-              disabled={purchased.pending}
-              onClick={purchased.refresh}
-            >
-              {l("Confirm available credits", "核对可用次数")}
-            </button>
-          ) : remaining === 0 ? (
-            <a
-              className="button secondary"
-              href={localUrl(paid ? "/account" : "/history")}
-            >
-              {paid
-                ? l("View my credits", "查看账户次数")
-                : l("Open my research", "查看我的研究")}
-            </a>
-          ) : (
-            <button
-              className="button"
-              disabled={busy}
-              onClick={() => void start()}
-            >
-              {busy
-                ? l("Saving your task…", "正在保存任务…")
-                : paid
-                  ? l(
-                      "Confirm · use 1 purchased credit",
-                      "确认研究 · 使用 1 次已购次数",
-                    )
-                  : l("Start focused research", "开始专项研究")}
-              <ArrowRight size={16} />
-            </button>
+          {error && (
+            <p className="error-banner" role="alert">
+              {error}{" "}
+              <a href={localUrl("/history")}>{l("My research", "我的研究")}</a>
+            </p>
           )}
         </div>
-        {error && (
-          <p className="error-banner" role="alert">
-            {error}{" "}
-            <a href={localUrl("/history")}>{l("My research", "我的研究")}</a>
-          </p>
-        )}
-      </div>
-    </details>
+      </details>
+    </div>
   );
 }
 
@@ -707,6 +712,62 @@ export function DeepResearchView({
         </>
       )}
       {task.evidence && (
+        <section
+          className="deep-coverage"
+          aria-label={l("Evidence coverage", "证据覆盖")}
+        >
+          <h2>{l("What this decision rests on", "这次判断基于什么")}</h2>
+          <div className="deep-coverage-grid">
+            <div>
+              <strong>
+                {task.evidence.reads.filter((r) => r.status === "read").length}
+              </strong>
+              <span>{l("web originals read", "已读取网页原文")}</span>
+            </div>
+            <div>
+              <strong>
+                {
+                  task.evidence.sources.filter(
+                    (s) =>
+                      s.kind === "request" ||
+                      [
+                        "hn-comment",
+                        "github-comment",
+                        "github-discussion",
+                      ].includes(s.documentType || ""),
+                  ).length
+                }
+              </strong>
+              <span>{l("request / discussion records", "诉求与讨论记录")}</span>
+            </div>
+            <div>
+              <strong>
+                {
+                  new Set(
+                    task.evidence.sources.map((s) => new URL(s.url).hostname),
+                  ).size
+                }
+              </strong>
+              <span>{l("source websites", "来源网站")}</span>
+            </div>
+          </div>
+          <p>
+            {l(
+              "Records can come from the same person. Source coverage describes research, not market demand or willingness to pay.",
+              "多条记录可能来自同一个人。来源覆盖表示研究范围，需求规模与付费意愿仍需实际验证。",
+            )}
+          </p>
+          {!!task.evidence.reads.filter((r) => r.status !== "read").length && (
+            <p>
+              {l(
+                "Some original pages could not be read; indexed excerpts remain discovery leads. Check the source details below.",
+                "部分原文读取受限，搜索摘要保留为线索。下方来源详情列出具体状态。",
+              )}
+            </p>
+          )}
+        </section>
+      )}
+      {task.evidence && (
         <details className="deep-evidence" open={task.state === "partial"}>
           <summary>
             {l("Research sources", "本次研究来源")} ·{" "}
@@ -742,6 +803,19 @@ export function DeepResearchView({
               <p key={q.query}>{q.query}</p>
             ))}
             <p>GitHub · {task.evidence.githubQuery}</p>
+            {task.evidence.reads.map((read) => (
+              <p key={read.url}>
+                <a href={read.url} target="_blank" rel="noreferrer">
+                  {new URL(read.url).hostname}
+                </a>
+                {" · "}
+                {read.status === "read"
+                  ? l("Original read", "已读取原文")
+                  : l("Original unavailable", "原文读取受限")}
+                {" · "}
+                {read.status}
+              </p>
+            ))}
             {task.evidence.web && (
               <p>
                 {l("Web collection", "网页采集")} · {task.evidence.web.state} ·{" "}

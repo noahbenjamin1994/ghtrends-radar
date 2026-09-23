@@ -403,7 +403,10 @@ export class DocumentReader {
         )
       )
         throw failure("format");
-      const parsed = pageText(r.body, original.label + " " + (original.excerpt || ""));
+      const parsed = pageText(
+        r.body,
+        original.label + " " + (original.excerpt || ""),
+      );
       return {
         ...original,
         id: undefined,
@@ -526,7 +529,9 @@ export class DocumentReader {
   async collect(
     candidates: ResearchSource[],
     focus = "",
+    depth: "light" | "deep" = "light",
   ): Promise<DocumentEvidence> {
+    const pageLimit = depth === "deep" ? 8 : 4;
     const result: DocumentEvidence = {
       version: DOCUMENT_VERSION,
       sources: [],
@@ -543,7 +548,9 @@ export class DocumentReader {
               publicSearchUrl(s.url) &&
               // This reader handles HTML/text. Keep download snippets as evidence,
               // but do not spend a four-page slot on a PDF/archive it cannot parse.
-              !/\.(?:pdf|zip|gz|tar|docx?|xlsx?|pptx?|png|jpe?g|webp|mp4)(?:$|[?#])/i.test(s.url) &&
+              !/\.(?:pdf|zip|gz|tar|docx?|xlsx?|pptx?|png|jpe?g|webp|mp4)(?:$|[?#])/i.test(
+                s.url,
+              ) &&
               !/^https?:\/\/(?:www\.)?arxiv\.org\/pdf\//i.test(s.url) &&
               !discussion(s.url),
           )
@@ -600,16 +607,18 @@ export class DocumentReader {
     // offers, first-person needs, and reusable tools. No extra page requests.
     const selected = ranked.slice(0, 1);
     for (const intent of ["demand", "competition", "opensource"] as const) {
-      if (selected.some(s => s.searchIntent === intent)) continue;
-      const source = ranked.find(s => s.searchIntent === intent && !!s.searchRole);
-      if (source && selected.length < 4) selected.push(source);
+      if (selected.some((s) => s.searchIntent === intent)) continue;
+      const source = ranked.find(
+        (s) => s.searchIntent === intent && !!s.searchRole,
+      );
+      if (source && selected.length < pageLimit) selected.push(source);
     }
     for (const source of ranked) {
-      if (selected.length === 4) break;
+      if (selected.length === pageLimit) break;
       if (!selected.includes(source)) selected.push(source);
     }
     const allowed = new Set(selected.map((s) => hostnameKey(new URL(s.url))));
-    const signal = AbortSignal.timeout(20000);
+    const signal = AbortSignal.timeout(depth === "deep" ? 40000 : 20000);
     let cursor = 0;
     const rows: { sources: ResearchSource[]; read: DocumentRead }[] = new Array(
       selected.length,
@@ -621,7 +630,9 @@ export class DocumentReader {
             s = selected[index]!;
           const key =
             `documents:${DOCUMENT_VERSION}:` +
-            createHash("sha256").update(JSON.stringify([s.url, s.label, s.excerpt])).digest("hex");
+            createHash("sha256")
+              .update(JSON.stringify([s.url, s.label, s.excerpt]))
+              .digest("hex");
           const cached = this.store.get<{
             sources: ResearchSource[];
             read: DocumentRead;

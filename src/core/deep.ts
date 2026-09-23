@@ -14,7 +14,7 @@ import type { ResearchSource } from "./types.js";
 import type { WebEvidence, SearchQuery } from "../providers/search.js";
 import type { DocumentRead } from "../providers/documents.js";
 
-export const DEEP_VERSION = "14";
+export const DEEP_VERSION = "15";
 export const deepQuestions = {
   competitors: [
     "Where is the opening among existing products?",

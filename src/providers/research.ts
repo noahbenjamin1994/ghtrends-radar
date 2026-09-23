@@ -381,7 +381,7 @@ export class Research {
         const answer = await this.json(
           CAPABILITY_PROMPT +
             (patch
-              ? "\nRepair only the supplied editablePaths. Return {edits:[{path,value}]} using the repair schema. Keep accepted fields unchanged. Replace each invalid quote with an exact contiguous source passage and its matching source ID."
+              ? "\nRepair only the supplied editablePaths. Return {edits:[{path,value}]} using the repair schema. Keep accepted fields unchanged. Replace each invalid quote with an exact contiguous source passage and its matching source ID. For a facts-array repair, preserve valid entries and remove unsupported extra entries when the remaining evidence still supports the overlap. Never reconstruct a sentence from separate table cells or join across an omission marker. Prefer a complete ordinary sentence copied directly from the original excerpt, preserving punctuation, capitalization and numbers. Return at most four selected facts; the application carries repository restrictions separately."
               : ""),
           {
             ...input,
@@ -2356,7 +2356,7 @@ Each direction must name a familiar customer, task, offered artifact and concret
       scope: m.topic.scope || "category",
       basis,
       applicationClassification: m.kind,
-      directionCount: m.topic.scope === "field" ? 5 : 3,
+      directionCount: 3,
       alternativesCheckEnabled: !!checkAlternatives,
       directionChecksEnabled: !!checkDirections,
       capabilityAudit: undefined as CapabilityAudit | undefined,

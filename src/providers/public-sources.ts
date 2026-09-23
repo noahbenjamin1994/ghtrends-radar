@@ -42,6 +42,10 @@ export function discoveryQueries(
   topic: Topic,
   original: SearchQuery[],
 ): SearchQuery[] {
+  // Focused research already plans separate official, buyer, community and
+  // open-source searches. Preserve that deliberate mix instead of collapsing
+  // both demand queries into the same discovery query.
+  if (topic.plan?.version?.startsWith("deep-")) return original;
   const profile = discoveryProfile(topic);
   const base = (
     topic.plan?.model === "curated"
@@ -68,6 +72,8 @@ export function discoveryQueries(
 
 export function hackerNewsQuery(topic: Topic): string | undefined {
   if (discoveryProfile(topic) !== "software") return;
+  if (topic.plan?.version?.startsWith("deep-"))
+    return topic.plan.githubTerms.join(" ").trim().slice(0, 100) || undefined;
   const q =
     topic.plan?.model === "curated"
       ? topic.keyword

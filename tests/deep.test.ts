@@ -1185,10 +1185,12 @@ test("private research API protects HTML, exports, CSRF, duplicate admission, da
         release = r;
       });
       return {
-        queries: ["competition", "demand", "opensource"].map((intent) => ({
-          intent,
-          query: "document comments " + intent,
-        })),
+        queries: [
+          { intent: "competition", query: "document comments competition" },
+          { intent: "demand", query: "document comments demand" },
+          { intent: "demand", query: "document comments community" },
+          { intent: "opensource", query: "document comments opensource" },
+        ],
         githubQuery: "document comments",
       };
     }
@@ -1664,7 +1666,7 @@ test("an interrupted source stage is collected again and retains collection trun
     checkpoints = 0;
   e.search.collect = async (topic) => {
     searches++;
-    assert.equal(topic.plan!.webQueries!.length, 3);
+    assert.equal(topic.plan!.webQueries!.length, 4);
     assert.ok(
       topic.plan!.webQueries!.every((q) =>
         q.query.startsWith("document comments"),
@@ -1784,7 +1786,7 @@ for (const planning of ["model", "fallback"] as const) {
     e.search.collect = async (topic) => {
       searches++;
       const queries = topic.plan!.webQueries!;
-      assert.equal(queries.length, 3);
+      assert.equal(queries.length, 4);
       assert.equal(new Set(queries.map((q) => q.intent)).size, 3);
       assert.equal(
         queries.find((q) => q.intent === "opensource")!.query,
@@ -1823,10 +1825,12 @@ for (const planning of ["model", "fallback"] as const) {
       if (op === "deep-plan") {
         if (planning === "fallback") throw new Error("planning timeout");
         return {
-          queries: ["competition", "demand", "opensource"].map((intent) => ({
-            intent,
-            query: "planned " + intent,
-          })),
+          queries: [
+            { intent: "competition", query: "planned competition" },
+            { intent: "demand", query: "planned demand" },
+            { intent: "demand", query: "planned community" },
+            { intent: "opensource", query: "planned opensource" },
+          ],
           githubQuery: "analytics connector",
         };
       }
@@ -1837,7 +1841,7 @@ for (const planning of ["model", "fallback"] as const) {
     try {
       assert.equal(await runDeepResearch(e, t, () => {}), true, t.problem);
       assert.equal(searches, 1);
-      assert.equal(t.evidence!.queries.length, 3);
+      assert.equal(t.evidence!.queries.length, 4);
       assert.equal(
         t.evidence!.queries.find((q) => q.intent === "opensource")!.query,
         "posthog documentation Google Ads source for PostHog",
@@ -1954,10 +1958,12 @@ test("paid research API keeps retry consent, repeated attempts, private output a
   e.research.json = async (_s, _i, _n, operation) => {
     if (operation === "deep-plan")
       return {
-        queries: ["competition", "demand", "opensource"].map((intent) => ({
-          intent,
-          query: "document comments " + intent,
-        })),
+        queries: [
+          { intent: "competition", query: "document comments competition" },
+          { intent: "demand", query: "document comments demand" },
+          { intent: "demand", query: "document comments community" },
+          { intent: "opensource", query: "document comments opensource" },
+        ],
         githubQuery: "document comments",
       };
     if (operation === "strategy-deep-review")

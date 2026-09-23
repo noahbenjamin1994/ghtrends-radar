@@ -1406,47 +1406,97 @@ test("pull requests and mismatched issue responses stay out of demand threads", 
 
 test("reviewed demand and open-source originals get reading space and four independent hosts load together", async () =>
   fixture(async (store) => {
-    let active = 0, peak = 0, released = false;
+    let active = 0,
+      peak = 0,
+      released = false;
     const waiting: (() => void)[] = [];
-    const reader = new DocumentReader(store, async url => {
+    const reader = new DocumentReader(store, async (url) => {
       if (url.pathname === "/robots.txt") return response("", 404);
-      active++; peak = Math.max(peak, active);
-      if (!released) await new Promise<void>(resolve => waiting.push(resolve));
+      active++;
+      peak = Math.max(peak, active);
+      if (!released)
+        await new Promise<void>((resolve) => waiting.push(resolve));
       active--;
       return response(html);
     });
     const candidates = [
-      ...["one", "two", "three", "four"].map(host => ({ ...candidate(`https://${host}.example/pricing`), searchRole: "direct" as const })),
-      { ...candidate("https://needs.example/problems", "demand"), searchRole: "resource" as const },
-      { ...candidate("https://docs.example/manual", "opensource"), searchRole: "resource" as const },
+      ...["one", "two", "three", "four"].map((host) => ({
+        ...candidate(`https://${host}.example/pricing`),
+        searchRole: "direct" as const,
+      })),
+      {
+        ...candidate("https://needs.example/problems", "demand"),
+        searchRole: "resource" as const,
+      },
+      {
+        ...candidate("https://docs.example/manual", "opensource"),
+        searchRole: "resource" as const,
+      },
     ];
     const work = reader.collect(candidates, "forms");
-    await new Promise<void>(resolve => setImmediate(resolve));
-    released = true; waiting.forEach(resolve => resolve());
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    released = true;
+    waiting.forEach((resolve) => resolve());
     const result = await work;
     assert.equal(result.reads.length, 4);
     assert.equal(peak, 4);
-    assert.ok(result.sources.some(s => s.searchIntent === "demand"));
-    assert.ok(result.sources.some(s => s.searchIntent === "opensource"));
-    assert.ok(result.sources.every(s => s.searchRole));
-    assert.equal(new Set(result.reads.map(r => new URL(r.url).hostname)).size, 4);
+    assert.ok(result.sources.some((s) => s.searchIntent === "demand"));
+    assert.ok(result.sources.some((s) => s.searchIntent === "opensource"));
+    assert.ok(result.sources.every((s) => s.searchRole));
+    assert.equal(
+      new Set(result.reads.map((r) => new URL(r.url).hostname)).size,
+      4,
+    );
+  }));
+
+test("deep reading expands to eight independent originals while light stays at four", async () =>
+  fixture(async (store) => {
+    const reader = new DocumentReader(store, async (url) =>
+      url.pathname === "/robots.txt" ? response("", 404) : response(html),
+    );
+    const inputs = Array.from({ length: 12 }, (_, i) =>
+      candidate(`https://source${i}.example/article`),
+    );
+    const light = await reader.collect(inputs);
+    const deep = await reader.collect(inputs, "", "deep");
+    assert.equal(light.reads.length, 4);
+    assert.equal(deep.reads.length, 8);
+    assert.ok(deep.reads.every((r) => r.status === "read"));
+    assert.equal(
+      new Set(deep.reads.map((r) => new URL(r.url).hostname)).size,
+      8,
+    );
   }));
 
 test("unsupported download URLs retain their snippets without using an original-page slot", async () =>
-  fixture(async store => {
+  fixture(async (store) => {
     const seen: string[] = [];
-    const reader = new DocumentReader(store, async url => {
+    const reader = new DocumentReader(store, async (url) => {
       seen.push(url.href);
-      return url.pathname === "/robots.txt" ? response("", 404) : response(html);
+      return url.pathname === "/robots.txt"
+        ? response("", 404)
+        : response(html);
     });
     const inputs = [
-      { ...candidate("https://papers.example/research.pdf", "demand"), searchRole: "resource" as const },
-      { ...candidate("https://arxiv.org/pdf/2508.06401", "demand"), searchRole: "resource" as const },
-      ...["one", "two", "three", "four"].map(host => candidate(`https://${host}.example/article`)),
+      {
+        ...candidate("https://papers.example/research.pdf", "demand"),
+        searchRole: "resource" as const,
+      },
+      {
+        ...candidate("https://arxiv.org/pdf/2508.06401", "demand"),
+        searchRole: "resource" as const,
+      },
+      ...["one", "two", "three", "four"].map((host) =>
+        candidate(`https://${host}.example/article`),
+      ),
     ];
     const before = JSON.stringify(inputs);
     const result = await reader.collect(inputs);
     assert.equal(result.reads.length, 4);
-    assert.ok(seen.every(url => !url.includes("papers.example") && !url.includes("arxiv.org")));
+    assert.ok(
+      seen.every(
+        (url) => !url.includes("papers.example") && !url.includes("arxiv.org"),
+      ),
+    );
     assert.equal(JSON.stringify(inputs), before);
   }));

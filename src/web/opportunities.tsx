@@ -234,193 +234,238 @@ export function OpportunityMap({
           </button>
         ))}
       </div>
-      <article
-        className="opportunity-detail"
-        id="opportunity-detail"
-        aria-live="polite"
-        aria-labelledby="opportunity-title"
-      >
-        <header className="direction-heading">
-          <div className="eyebrow">{l("DIRECTION IN FOCUS", "方向详情")}</div>
-          <h4 id="opportunity-title">{p.title}</h4>
-          {fit && (
-            <FitReason result={fit} directionId={selected.id} locale={locale} />
-          )}
-          {!!selected.basedOn?.length && (
-            <DirectionSources
-              sources={brief.sources}
-              refs={selected.basedOn}
-              label={l("Build on", "基于项目")}
-            />
-          )}
-        </header>
-        <section
-          className="direction-section"
-          aria-labelledby="direction-offer"
+      <details className="opportunity-detail-disclosure">
+        <summary>
+          <span>
+            <strong>
+              {l("Read the direction brief", "查看方向依据与验证方案")}
+            </strong>
+            <small>
+              {l(
+                "Audience, evidence, effort and the first test",
+                "人群、依据、投入与第一次验证",
+              )}
+            </small>
+          </span>
+          <ChevronRight size={18} aria-hidden="true" />
+        </summary>
+        <article
+          className="opportunity-detail"
+          id="opportunity-detail"
+          aria-live="polite"
+          aria-labelledby="opportunity-title"
         >
-          <h5 className="direction-section-title" id="direction-offer">
-            <span aria-hidden="true">01</span>
-            {l("The proposition", "做什么")}
-          </h5>
-          <dl className="direction-facts">
-            <div>
-              <dt>{l("Who it serves", "服务谁")}</dt>
-              <dd>{p.audience}</dd>
-            </div>
-            {p.need && (
+          <header className="direction-heading">
+            <div className="eyebrow">{l("DIRECTION IN FOCUS", "方向详情")}</div>
+            <h4 id="opportunity-title">{p.title}</h4>
+            {fit && (
+              <FitReason
+                result={fit}
+                directionId={selected.id}
+                locale={locale}
+              />
+            )}
+            {!!selected.basedOn?.length && (
+              <DirectionSources
+                sources={brief.sources}
+                refs={selected.basedOn}
+                label={l("Build on", "基于项目")}
+              />
+            )}
+          </header>
+          <section
+            className="direction-section"
+            aria-labelledby="direction-offer"
+          >
+            <h5 className="direction-section-title" id="direction-offer">
+              <span aria-hidden="true">01</span>
+              {l("The proposition", "做什么")}
+            </h5>
+            <dl className="direction-facts">
               <div>
-                <dt>{l("The need", "解决什么问题")}</dt>
-                <dd>{p.need}</dd>
+                <dt>{l("Who it serves", "服务谁")}</dt>
+                <dd>{p.audience}</dd>
               </div>
-            )}
-            {p.service && (
-              <div className="direction-offer">
-                <dt>{l("What you offer", "提供什么服务")}</dt>
-                <dd>{p.service}</dd>
-              </div>
-            )}
-          </dl>
-        </section>
-        <section
-          className="direction-section"
-          aria-labelledby="direction-evidence"
-        >
-          <h5 className="direction-section-title" id="direction-evidence">
-            <span aria-hidden="true">02</span>
-            {l("The evidence", "为什么值得探索")}
-          </h5>
-          <div className="direction-evidence-grid">
-            <div>
-              <div className="direction-field-heading">
-                <h6>{l("Demand & its evidence", "需求与依据")}</h6>
-                <span className="direction-basis">
-                  {label("basis", selected.demand.basis)}
-                </span>
-              </div>
-              <p>{p.demand}</p>
-            </div>
-            <div>
-              <div className="direction-field-heading">
-                <h6>{l("Competition & the opening", "竞争与切入空间")}</h6>
-                <span className="direction-basis">
-                  {label("basis", selected.competition.basis)}
-                </span>
-              </div>
-              <p>{p.competition}</p>
-            </div>
-          </div>
-        </section>
-        <section
-          className="direction-section"
-          aria-labelledby="direction-investment"
-        >
-          <h5 className="direction-section-title" id="direction-investment">
-            <span aria-hidden="true">03</span>
-            {l("The commitment", "需要投入多少")}
-          </h5>
-          <dl className="direction-facts direction-investment">
-            <div>
-              <dt>{l("Resources", "所需资源")}</dt>
-              <dd>{p.resources}</dd>
-            </div>
-            <div>
-              <dt>{l("First release", "首版投入估算")}</dt>
-              <dd>{p.delivery}</dd>
-            </div>
-            <div>
-              <dt>{l("Ongoing work", "持续投入")}</dt>
-              <dd>{p.upkeep}</dd>
-            </div>
-          </dl>
-          {!!useConditions.length && (
-            <aside
-              className="opportunity-use-conditions"
-              aria-label={useCopy.title}
-            >
-              <h6>{useCopy.title}</h6>
-              <p>{useCopy.text}</p>
-              {useConditions.map((condition) => (
-                <div key={condition.url + condition.quote}>
-                  <a href={condition.url} target="_blank" rel="noreferrer">
-                    {condition.project}{" "}
-                    <ArrowUpRight size={14} aria-hidden="true" />
-                  </a>
-                  <blockquote>{condition.quote}</blockquote>
-                </div>
-              ))}
-            </aside>
-          )}
-        </section>
-        <section
-          className="direction-section direction-validation"
-          aria-labelledby="direction-validation"
-        >
-          <h5 className="direction-section-title" id="direction-validation">
-            <span aria-hidden="true">04</span>
-            {l("The first test", "怎样验证值得投入")}
-          </h5>
-          <dl className="direction-facts">
-            <div>
-              <dt>{l("Build this first", "先做什么")}</dt>
-              <dd>{p.wedge}</dd>
-            </div>
-            <div>
-              <dt>{l("Run this test", "验证方法")}</dt>
-              <dd>{p.experiment}</dd>
-            </div>
-          </dl>
-          {(p.successSignal || p.pivotSignal) && (
-            <div className="direction-decisions">
-              {p.successSignal && (
-                <div className="direction-continue">
-                  <h6>
-                    <span aria-hidden="true">↗</span>
-                    {l("Proposed continue criteria", "建议继续条件")}
-                  </h6>
-                  <p>{p.successSignal}</p>
+              {p.need && (
+                <div>
+                  <dt>{l("The need", "解决什么问题")}</dt>
+                  <dd>{p.need}</dd>
                 </div>
               )}
-              {p.pivotSignal && (
-                <div className="direction-adjust">
-                  <h6>
-                    <span aria-hidden="true">↳</span>
-                    {l("Proposed redirect criteria", "建议调整条件")}
-                  </h6>
-                  <p>{p.pivotSignal}</p>
+              {p.service && (
+                <div className="direction-offer">
+                  <dt>{l("What you offer", "提供什么服务")}</dt>
+                  <dd>{p.service}</dd>
                 </div>
               )}
+            </dl>
+          </section>
+          <section
+            className="direction-section"
+            aria-labelledby="direction-evidence"
+          >
+            <h5 className="direction-section-title" id="direction-evidence">
+              <span aria-hidden="true">02</span>
+              {l("The evidence", "为什么值得探索")}
+            </h5>
+            <div className="direction-evidence-grid">
+              <div>
+                <div className="direction-field-heading">
+                  <h6>{l("Demand & its evidence", "需求与依据")}</h6>
+                  <span className="direction-basis">
+                    {label("basis", selected.demand.basis)}
+                  </span>
+                </div>
+                <p>{p.demand}</p>
+              </div>
+              <div>
+                <div className="direction-field-heading">
+                  <h6>{l("Competition & the opening", "竞争与切入空间")}</h6>
+                  <span className="direction-basis">
+                    {label("basis", selected.competition.basis)}
+                  </span>
+                </div>
+                <p>{p.competition}</p>
+              </div>
             </div>
-          )}
-        </section>
-        <div className="direction-notes">
-          {refs.length ? (
-            <DirectionSources
-              sources={brief.sources}
-              refs={refs}
-              label={l("Judgment sources", "判断依据")}
-            />
-          ) : (
+          </section>
+          <section
+            className="direction-section"
+            aria-labelledby="direction-investment"
+          >
+            <h5 className="direction-section-title" id="direction-investment">
+              <span aria-hidden="true">03</span>
+              {l("The commitment", "需要投入多少")}
+            </h5>
+            <dl className="direction-facts direction-investment">
+              <div>
+                <dt>{l("Resources", "所需资源")}</dt>
+                <dd>{p.resources}</dd>
+              </div>
+              <div>
+                <dt>{l("First release", "首版投入估算")}</dt>
+                <dd>{p.delivery}</dd>
+              </div>
+              <div>
+                <dt>{l("Ongoing work", "持续投入")}</dt>
+                <dd>{p.upkeep}</dd>
+              </div>
+            </dl>
+            {!!useConditions.length && (
+              <aside
+                className="opportunity-use-conditions"
+                aria-label={useCopy.title}
+              >
+                <h6>{useCopy.title}</h6>
+                <p>{useCopy.text}</p>
+                {useConditions.map((condition) => (
+                  <div key={condition.url + condition.quote}>
+                    <a href={condition.url} target="_blank" rel="noreferrer">
+                      {condition.project}{" "}
+                      <ArrowUpRight size={14} aria-hidden="true" />
+                    </a>
+                    <blockquote>{condition.quote}</blockquote>
+                  </div>
+                ))}
+              </aside>
+            )}
+          </section>
+          <section
+            className="direction-section direction-validation"
+            aria-labelledby="direction-validation"
+          >
+            <h5 className="direction-section-title" id="direction-validation">
+              <span aria-hidden="true">04</span>
+              {l("The first test", "怎样验证值得投入")}
+            </h5>
+            <dl className="direction-facts">
+              <div>
+                <dt>{l("Build this first", "先做什么")}</dt>
+                <dd>{p.wedge}</dd>
+              </div>
+              <div>
+                <dt>{l("Run this test", "验证方法")}</dt>
+                <dd>{p.experiment}</dd>
+              </div>
+            </dl>
+            {(p.successSignal || p.pivotSignal) && (
+              <div className="direction-decisions">
+                {p.successSignal && (
+                  <div className="direction-continue">
+                    <h6>
+                      <span aria-hidden="true">↗</span>
+                      {l("Proposed continue criteria", "建议继续条件")}
+                    </h6>
+                    <p>{p.successSignal}</p>
+                  </div>
+                )}
+                {p.pivotSignal && (
+                  <div className="direction-adjust">
+                    <h6>
+                      <span aria-hidden="true">↳</span>
+                      {l("Proposed redirect criteria", "建议调整条件")}
+                    </h6>
+                    <p>{p.pivotSignal}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+          <div className="direction-notes">
+            {refs.length ? (
+              <DirectionSources
+                sources={brief.sources}
+                refs={refs}
+                label={l("Judgment sources", "判断依据")}
+              />
+            ) : (
+              <p className="footnote">
+                {l(
+                  "Domain hypothesis · test with the experiment above",
+                  "领域推演 · 按上方实验采集真实反馈",
+                )}
+              </p>
+            )}
             <p className="footnote">
               {l(
-                "Domain hypothesis · test with the experiment above",
-                "领域推演 · 按上方实验采集真实反馈",
+                "Project documents establish features; issues record individual requests. Broader demand and adoption remain research hypotheses. Time and decision thresholds are proposed estimates.",
+                "项目文档支持功能判断，Issue 记录个体诉求；更广泛的需求与采用仍属于研究假设。工期与实验门槛均为建议估算。",
               )}
             </p>
-          )}
-          <p className="footnote">
-            {l(
-              "Project documents establish features; issues record individual requests. Broader demand and adoption remain research hypotheses. Time and decision thresholds are proposed estimates.",
-              "项目文档支持功能判断，Issue 记录个体诉求；更广泛的需求与采用仍属于研究假设。工期与实验门槛均为建议估算。",
-            )}
-          </p>
+          </div>
+        </article>
+      </details>
+      <section
+        className="strategy-experiment light-next-step"
+        id="decision"
+        aria-live="polite"
+      >
+        <div className="eyebrow">{l("YOUR NEXT STEP", "你的下一步")}</div>
+        <h4>{p.title}</h4>
+        <p>{p.experiment}</p>
+        <div className="strategy-decisions">
+          <div>
+            <h5>{l("Continue when", "建议继续的信号")}</h5>
+            <p>{p.successSignal || p.wedge}</p>
+          </div>
+          <div>
+            <h5>{l("Reconsider when", "建议调整的信号")}</h5>
+            <p>{p.pivotSignal || p.resources}</p>
+          </div>
         </div>
-        <DeepStart
-          key={selected.id}
-          reportId={market.id}
-          directionId={selected.id}
-          profile={fit?.profile}
-        />
-      </article>
+        <p className="footnote">
+          {l(
+            "Proposed experiment and thresholds. Validate with real use before committing.",
+            "以上为建议实验与门槛，按真实使用结果决定投入。",
+          )}
+        </p>
+      </section>
+      <DeepStart
+        key={selected.id}
+        reportId={market.id}
+        directionId={selected.id}
+        profile={fit?.profile}
+      />
     </section>
   );
 }

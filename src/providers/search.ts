@@ -73,6 +73,17 @@ export interface WebEvidence {
 /** Keep query expansions anchored to the user's object and its genuine synonyms.
  * Search operators and purchasing intent are discovery details, not a new scope. */
 export function scopedWebQueries(topic: Topic): SearchQuery[] {
+  if (topic.plan?.version?.startsWith("deep-") && topic.plan.webQueries?.length)
+    return [
+      ...new Map(
+        topic.plan.webQueries.flatMap((query) => {
+          const parsed = searchQuerySchema.safeParse(query);
+          return parsed.success
+            ? [[parsed.data.query.toLowerCase(), parsed.data] as const]
+            : [];
+        }),
+      ).values(),
+    ].slice(0, 4);
   const input = topic.plan?.input || topic.keyword;
   const base = topic.plan?.model === "curated" ? topic.keyword : input;
   const zh = /[\u3400-\u9fff]/.test(base);
@@ -544,6 +555,7 @@ export class GoogleSearch {
       engines: this.mode === "api" ? ["google"] : ["google", "duckduckgo"],
       mode: this.mode,
       maxQueries: 3,
+      maxDeepQueries: 4,
       publicDiscovery: process.env.GHTRENDS_PUBLIC_SOURCES === "1",
       maxHackerNewsQueries: process.env.GHTRENDS_PUBLIC_SOURCES === "1" ? 1 : 0,
       publicSourceDeadlineMs: 6000,
@@ -575,7 +587,7 @@ export class GoogleSearch {
             : [];
         }),
       ).values(),
-    ].slice(0, 3);
+    ].slice(0, topic.plan?.version?.startsWith("deep-") ? 4 : 3);
     const web: WebEvidence = {
       provider: this.mode === "api" ? "decodo-google" : "multi-search",
       version: SEARCH_VERSION,

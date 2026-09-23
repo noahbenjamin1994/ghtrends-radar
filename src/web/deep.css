@@ -420,3 +420,41 @@
   font-size: 13px;
   cursor: pointer;
 }
+.deep-coverage {
+  margin: 32px 0;
+  padding: 24px;
+  background: #f1f5ef;
+  border: 1px solid #dce5d8;
+  border-radius: 16px;
+}
+.deep-coverage h2 {
+  font-size: 18px;
+  margin: 0 0 20px;
+}
+.deep-coverage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.deep-coverage-grid > div {
+  display: grid;
+  gap: 8px;
+}
+.deep-coverage-grid strong {
+  font-size: 28px;
+  color: #24543e;
+}
+.deep-coverage-grid span,
+.deep-coverage p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #526452;
+}
+@media (max-width: 480px) {
+  .deep-coverage {
+    padding: 18px;
+  }
+  .deep-coverage-grid {
+    gap: 10px;
+  }
+}

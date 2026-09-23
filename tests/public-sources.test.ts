@@ -66,6 +66,34 @@ test("public discovery reuses three searches, preserves the object, and routes g
   assert.equal(hackerNewsQuery(topic("智能体记忆")), undefined);
 });
 
+test("focused research preserves four distinct source jobs", () => {
+  const planned = [
+    { query: "workflow official pricing", intent: "competition" as const },
+    { query: "workflow buyer problems", intent: "demand" as const },
+    { query: "workflow community reviews", intent: "demand" as const },
+    { query: "workflow open source", intent: "opensource" as const },
+  ];
+  const value: Topic = {
+    ...topic("workflow"),
+    plan: {
+      input: "workflow",
+      model: "test",
+      version: "deep-1",
+      intent: "focused research",
+      trends: [],
+      githubTopics: [],
+      githubTerms: [],
+      explanation: { en: "", zh: "" },
+      webQueries: planned,
+    },
+  };
+  assert.deepEqual(scopedWebQueries(value), planned);
+  assert.deepEqual(discoveryQueries(value, planned), planned);
+  value.plan!.input = "AI software";
+  value.plan!.githubTerms = ["document review"];
+  assert.equal(hackerNewsQuery(value), "document review");
+});
+
 test("HN uses an anonymous fixed endpoint, bounds results, caches successes and exposes honest source identity", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-public-")),
     store = new Store(dir);

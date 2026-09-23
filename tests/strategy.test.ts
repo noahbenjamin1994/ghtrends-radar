@@ -1451,7 +1451,7 @@ test("broad topics draft independent hypotheses before original evidence verifie
         assert.deepEqual(input.sources, []);
         assert.equal(input.basis, "hypothesis-led");
         assert.equal(input.intent, "Research phone opportunities");
-        assert.equal(input.directionCount, 5);
+        assert.equal(input.directionCount, 3);
         assert.equal(input.projectInventory, undefined);
       } else
         assert.ok(input.sources.some((s: ResearchSource) => s.id === "R1"));
