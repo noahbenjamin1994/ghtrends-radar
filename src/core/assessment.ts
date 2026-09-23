@@ -312,8 +312,8 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
   const reason =
     scope === "market" && (kind === "contested" || kind === "expanding")
       ? l(
-          `Source-backed competitors already serve this market; search attention ${trend}.`,
-          `来源显示已有同行服务这个市场，搜索关注度${trend}。`,
+          `Collected sources show existing alternatives; search attention for “${m.demand.keyword}” is ${trend}. Buyer demand still needs validation.`,
+          `已采集来源中可见替代方案；“${m.demand.keyword}”搜索关注度${trend}。买家需求仍需验证。`,
         )
       : scope === "market" && m.brief?.landscape
         ? m.brief.landscape[locale].competition
@@ -360,7 +360,7 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
     scope,
     basisLabel:
       scope === "market"
-        ? l("Market research assessment", "综合市场研判")
+        ? l("Source assessment · includes inference", "来源研判 · 含推断")
         : l("Search × open-source competition", "搜索趋势 × 开源竞争"),
     searchReady,
     demandNote,

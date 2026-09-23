@@ -730,6 +730,7 @@
     line-height: 1.85;
   }
   .report-page .outlook-signal {
+    order: 0;
     border-left: 0;
     border-top: 1px solid #d9dfd2;
     padding: 22px 0 0;
