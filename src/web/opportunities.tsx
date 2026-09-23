@@ -461,7 +461,7 @@ export function OpportunityMap({
         </p>
       </section>
       <DeepStart
-        key={selected.id}
+        key={market.id}
         reportId={market.id}
         directionId={selected.id}
         profile={fit?.profile}
