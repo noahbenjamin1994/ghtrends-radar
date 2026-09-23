@@ -39,6 +39,107 @@ const copy = (
   zh = "与一位编辑核对三个实际样例。",
 ) => ({ en, zh });
 
+for (const outcome of ["repair", "unresolved", "unavailable"] as const)
+  test(`independent decision review gates delivery after factual approval (${outcome})`, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ghtrends-decision-gate-"));
+    const env = { ...process.env };
+    process.env.DEEPSEEK_API_KEY = "unit-test-only";
+    const e = new Engine(new Store(dir)),
+      t = task();
+    e.store.saveMarket(sample(), false, t.owner);
+    t.evidence = {
+      collectionFinished: true,
+      collectedAt: t.created,
+      queries: [],
+      githubQuery: "comments",
+      sources: [source, request],
+      reads: [],
+    };
+    let decisions = 0,
+      repairs = 0;
+    e.research.json = async (prompt, input, _tokens, operation, thinking) => {
+      if (operation === "strategy-deep-write") return brief();
+      if (operation === "strategy-deep-review")
+        return { ready: true, corrections: [] };
+      if (operation === "strategy-deep-decision-check") {
+        decisions++;
+        assert.equal(thinking, true);
+        assert.match(prompt, /same market/);
+        assert.ok((input as any).sources.length);
+        if (outcome === "unavailable")
+          throw new Error("decision reviewer unavailable");
+        return outcome === "repair" && decisions > 1
+          ? { ready: true, corrections: [] }
+          : {
+              ready: false,
+              corrections: [
+                {
+                  paths: ["answer"],
+                  source: "E1",
+                  repair:
+                    "Label the proposed advantage as a hypothesis, not an established result.",
+                },
+              ],
+            };
+      }
+      if (operation === "strategy-deep-correction-check")
+        return {
+          decisions: [
+            {
+              index: 0,
+              action: "apply_correction",
+              reason: "The comparison has not been tested.",
+            },
+          ],
+        };
+      if (operation === "strategy-deep-repair") {
+        repairs++;
+        assert.deepEqual(
+          (input as any).requestedFields.map((f: any) => f.path),
+          ["answer"],
+        );
+        return {
+          edits: [
+            {
+              path: "answer",
+              value: copy(
+                `Test the proposed advantage with ${repairs + 2} editor examples.`,
+                `用 ${repairs + 2} 个编辑实例检验假设中的优势。`,
+              ),
+            },
+          ],
+        };
+      }
+      throw new Error(`Unexpected operation: ${operation}`);
+    };
+    try {
+      if (outcome === "unavailable") {
+        await assert.rejects(
+          runDeepResearch(e, t, () => {}),
+          /decision reviewer unavailable/,
+        );
+        assert.equal(t.result, undefined);
+      } else {
+        assert.equal(
+          await runDeepResearch(e, t, () => {}),
+          outcome === "repair",
+        );
+        assert.equal(decisions, outcome === "repair" ? 2 : 3);
+        assert.equal(repairs, outcome === "repair" ? 1 : 2);
+        if (outcome === "repair")
+          assert.match(t.result!.answer.en, /proposed advantage/);
+        else {
+          assert.equal(t.result, undefined);
+          assert.equal(t.problem, "model");
+        }
+      }
+    } finally {
+      await e.close();
+      process.env = env;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
 test("deep offer searches follow at most two direct substitutes, never generic advice or private addresses", () => {
   const lead = (
     url: string,
@@ -705,6 +806,8 @@ test("source checkpoints support bounded recovery with direct writing and light 
   experiment.en.task = "Try three edited paragraphs with their editor.";
   experiment.zh.task = "请编辑试用三个修改过的段落。";
   e.research.json = async (_system, _input, _tokens, operation, thinking) => {
+    if (operation === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     assert.equal(
       thinking,
       [
@@ -820,6 +923,8 @@ test("a quote repair edits its evidence field while preserving the rest of the d
   };
   const operations: string[] = [];
   e.research.json = async (_system, input, _tokens, operation) => {
+    if (operation === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     operations.push(operation!);
     if (operation === "strategy-deep-review")
       return { ready: true, corrections: [] };
@@ -872,6 +977,8 @@ test("a rejected child patch gets format feedback before the remaining repair at
   const operations: string[] = [];
   let repairs = 0;
   e.research.json = async (_system, input, _tokens, operation) => {
+    if (operation === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     operations.push(operation!);
     if (operation === "strategy-deep-review")
       return { ready: true, corrections: [] };
@@ -959,6 +1066,8 @@ test("a malformed semantic repair preserves factual corrections through rollback
     copies = 0;
   const checkpoints: string[][] = [];
   e.research.json = async (_s, input, _n, operation) => {
+    if (operation === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     const data = input as any;
     if (operation === "strategy-deep-review") {
       reviews++;
@@ -1066,6 +1175,8 @@ for (const mode of [
     };
     const operations: string[] = [];
     e.research.json = async (_system, input, _tokens, operation) => {
+      if (operation === "strategy-deep-decision-check")
+        return { ready: true, corrections: [] };
       operations.push(operation!);
       if (operation === "strategy-deep-correction-check")
         return {
@@ -1165,6 +1276,8 @@ for (const outcome of ["accept", "reject", "provider-error"] as const) {
     const operations: string[] = [];
     let firstReview: unknown;
     e.research.json = async (_system, input, tokens, operation, thinking) => {
+      if (operation === "strategy-deep-decision-check")
+        return { ready: true, corrections: [] };
       operations.push(operation!);
       if (operation === "strategy-deep-correction-check")
         return {
@@ -1243,6 +1356,8 @@ test("private research API protects HTML, exports, CSRF, duplicate admission, da
   let release: () => void = () => {},
     entered = false;
   e.research.json = async (_s, _i, _n, operation) => {
+    if (operation === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     if (operation === "deep-plan") {
       entered = true;
       await new Promise<void>((r) => {
@@ -1468,6 +1583,8 @@ test("prose-only repair preserves source IDs and quotes, while structural and ne
   let writes = 0,
     copies = 0;
   e.research.json = async (_system, input, _tokens, op) => {
+    if (op === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     if (op === "strategy-deep-copy") {
       copies++;
       assert.equal((input as any).fields.length, 1);
@@ -1575,6 +1692,8 @@ test("a broad issue match stays outside selected-project research and license ev
   };
   let checked = false;
   e.research.json = async (_s, input, _n, op) => {
+    if (op === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     if (op === "strategy-deep-review") return { ready: true, corrections: [] };
     const payload = input as any;
     assert.deepEqual(payload.knownProjects, ["Example/Drafts"]);
@@ -1691,6 +1810,8 @@ for (const originalFirst of [false, true]) {
     };
     let checked = false;
     e.research.json = async (_s, input, _n, op) => {
+      if (op === "strategy-deep-decision-check")
+        return { ready: true, corrections: [] };
       if (op === "deep-plan") throw new Error("Use fallback queries");
       const sources = (input as any).sources as ResearchSource[];
       const issue = sources.find((s) => s.id === "E2")!;
@@ -1792,6 +1913,8 @@ test("an interrupted source stage is collected again and retains collection trun
   };
   e.documents.collect = async () => ({ version: "1", sources: [], reads: [] });
   e.research.json = async (_s, _i, _n, op) => {
+    if (op === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     if (op === "deep-plan") throw new Error("timeout");
     if (op === "strategy-deep-write" || op === "strategy-deep-review") {
       const cited = (_i as any).sources.find((s: any) => s.url === comment.url);
@@ -1895,6 +2018,8 @@ for (const planning of ["model", "fallback"] as const) {
       reads: [],
     });
     e.research.json = async (_prompt, _input, _max, op) => {
+      if (op === "strategy-deep-decision-check")
+        return { ready: true, corrections: [] };
       if (op === "deep-plan") {
         if (planning === "fallback") throw new Error("planning timeout");
         return {
@@ -2078,6 +2203,8 @@ test("paid research API keeps retry consent, repeated attempts, private output a
   let writes = 0;
   let succeed = false;
   e.research.json = async (_s, _i, _n, operation) => {
+    if (operation === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     if (operation === "deep-plan")
       return {
         queries: [
@@ -2298,6 +2425,8 @@ test("a rejected factual correction leaves the supported draft unchanged", async
   };
   const calls: string[] = [];
   e.research.json = async (_s, _i, _n, op) => {
+    if (op === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     calls.push(op!);
     if (op === "strategy-deep-review")
       return {
@@ -2354,6 +2483,8 @@ for (const changed of [false, true])
     e.store.createDeepTask(t, "draft-test", true);
     const running = e.store.claimDeepTask(t.id, t.owner)!;
     e.research.json = async (_s, _i, _n, op) => {
+      if (op === "strategy-deep-decision-check")
+        return { ready: true, corrections: [] };
       if (op === "strategy-deep-review") throw new Error("429 transient");
       return brief();
     };
@@ -2378,6 +2509,8 @@ for (const changed of [false, true])
         };
       const calls: string[] = [];
       e.research.json = async (_s, _i, _n, op) => {
+        if (op === "strategy-deep-decision-check")
+          return { ready: true, corrections: [] };
         calls.push(op!);
         return op === "strategy-deep-review"
           ? { ready: true, corrections: [] }
@@ -2435,6 +2568,8 @@ for (const use of ["compare", "reuse", "checked"] as const)
       reads: [],
     };
     e.research.json = async (_s, input, _n, op) => {
+      if (op === "strategy-deep-decision-check")
+        return { ready: true, corrections: [] };
       assert.deepEqual((input as any).assetTerms[0].licenseSources, []);
       const candidate = brief();
       if (use !== "compare")
@@ -2487,6 +2622,8 @@ test("an overlong copy edit gets its second bounded shortening pass before deliv
   };
   let edits = 0;
   e.research.json = async (_s, _i, _n, op) => {
+    if (op === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     if (op === "strategy-deep-copy") {
       edits++;
       return {
@@ -2540,6 +2677,8 @@ test("review keeps the writer's bounded source set, including assets outside fin
   };
   let writerSources: unknown;
   e.research.json = async (_s, input, _n, op) => {
+    if (op === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     if (op === "strategy-deep-write") writerSources = (input as any).sources;
     if (op === "strategy-deep-review") {
       assert.deepEqual((input as any).sources, writerSources);
@@ -2579,6 +2718,8 @@ test("wording edits receive the paired meaning and preserve unrequested text and
   };
   let copyCalls = 0;
   e.research.json = async (_s, input, _n, operation) => {
+    if (operation === "strategy-deep-decision-check")
+      return { ready: true, corrections: [] };
     if (operation === "strategy-deep-copy") {
       copyCalls++;
       assert.deepEqual((input as any).fields, [

@@ -194,6 +194,8 @@ New light briefs deliver exactly three directions, with a concise judgment, comp
 
 Deep research covers four search jobs: official products/pricing, user problems, independent community discussion and open-source implementations. Scope and competitor questions can follow up on at most two discovered direct-product domains to find their offers. It combines the existing residential search route with public sources, reading at most eight original pages (up to two per domain, prioritizing pricing), four concurrently, with a 40-second overall reading budget. Light research retains four domains and 20 seconds. Repository-search aggregates stay outside synthesis. Reports lead with the decision, next step and observable success rule; details expand on demand and collected-but-uncited leads are labeled. Coverage counts do not establish buyers or willingness to pay. Factual negation is preserved; commercial pilots distinguish expressed interest from paid commitment.
 
+A separate, bounded high-effort decision review checks buyer/job alignment, claimed differentiation and whether the experiment supports its conclusion. Failed review cannot silently approve delivery; repairs share the same attempt limit. Missing buyer evidence may lead to an explicit pause and concrete workflow-discovery test, not an invented niche or a claim that an interview or one purchase validates subscriptions.
+
 These limits supersede the older three-to-five direction and four-domain focused-research descriptions below. Introductory and purchased credits retain complete-delivery settlement.
 
 **Purchased research**
