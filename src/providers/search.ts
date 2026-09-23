@@ -1,4 +1,9 @@
-import { discoveryQueries, hackerNewsQuery, collectHackerNews, capDiscoveryResults } from "./public-sources.js";
+import {
+  discoveryQueries,
+  hackerNewsQuery,
+  collectHackerNews,
+  capDiscoveryResults,
+} from "./public-sources.js";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -427,7 +432,7 @@ export function searchProxy(raw: string): string {
   return url.href;
 }
 export function searchSources(web?: WebEvidence): ResearchSource[] {
-  const groups = (
+  const groups =
     web?.queries.map((q, i) => {
       // A single brand's help pages otherwise occupy the entire model budget.
       // Keep independent websites first; GitHub repositories remain distinct.
@@ -484,18 +489,20 @@ export function searchSources(web?: WebEvidence): ResearchSource[] {
         fetchedAt: q.fetchedAt || web!.fetchedAt,
         searchIntent: q.intent,
         ...(r.relevance?.role === "direct" || r.relevance?.role === "resource"
-          ? { searchRole: r.relevance.role } : {}),
+          ? { searchRole: r.relevance.role }
+          : {}),
         placement: r.kind,
         excerpt: `${q.engine === "hackernews" ? "Hacker News / Algolia" : q.engine === "duckduckgo" ? "DuckDuckGo" : "Google"} search excerpt. Query: ${q.query}. Search market: ${q.region || web!.region}. Language: ${web!.language}. Placement: ${r.kind}. Title: ${r.title}. Snippet: ${r.excerpt}`,
       }));
-    }) || []
-  );
-  const output: ResearchSource[] = [], seen = new Set<string>();
+    }) || [];
+  const output: ResearchSource[] = [],
+    seen = new Set<string>();
   for (let row = 0; row < 8 && output.length < 16; row++) {
     for (const group of groups) {
       const source = group[row];
       if (!source || seen.has(source.url) || output.length === 16) continue;
-      seen.add(source.url); output.push(source);
+      seen.add(source.url);
+      output.push(source);
     }
   }
   return output;
@@ -547,13 +554,17 @@ export class GoogleSearch {
       adCoverage: this.mode === "api" ? "visible-placements" : "limited",
     };
   }
-  async collect(topic: Topic, geo: string): Promise<WebEvidence> {
+  async collect(
+    topic: Topic,
+    geo: string,
+    targeted?: SearchQuery[],
+  ): Promise<WebEvidence> {
     const language = /[\u3400-\u9fff]/.test(topic.plan?.input || topic.name)
       ? "zh-CN"
       : "en";
     const region = geo || "US";
-    const discovery = process.env.GHTRENDS_PUBLIC_SOURCES === "1";
-    const scoped = scopedWebQueries(topic);
+    const discovery = !targeted && process.env.GHTRENDS_PUBLIC_SOURCES === "1";
+    const scoped = targeted || scopedWebQueries(topic);
     const planned = discovery ? discoveryQueries(topic, scoped) : scoped;
     const queries = [
       ...new Map(
@@ -577,7 +588,9 @@ export class GoogleSearch {
     if (!this.enabled) return web;
     const hnQuery = discovery ? hackerNewsQuery(topic) : undefined;
     const [results, hn] = await Promise.all([
-      Promise.allSettled(queries.map((q) => this.search(q.query, region, language))),
+      Promise.allSettled(
+        queries.map((q) => this.search(q.query, region, language)),
+      ),
       hnQuery ? collectHackerNews(this.store, hnQuery) : undefined,
     ]);
     web.queries = queries.map((q, i) => {

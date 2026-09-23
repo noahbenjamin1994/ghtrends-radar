@@ -14,6 +14,7 @@ import {
 import { marketGapSignals, mergeRequestEvidence } from "./gaps.js";
 import { Research } from "../providers/research.js";
 import { DocumentReader, type DocumentRead } from "../providers/documents.js";
+import { opportunityEvidence } from "../providers/opportunity-evidence.js";
 import { resolveTopic, validateGeo, validateRepo, TOPICS } from "./topics.js";
 import { importDemand } from "./import.js";
 import { analyze, ALGORITHM_VERSION } from "./analyze.js";
@@ -193,7 +194,10 @@ export class Engine {
             )
             .then((web) => {
               if (web && this.documents.enabled) {
-                collectedPages = this.documents.collect(searchSources(web), topic.plan?.input || topic.keyword);
+                collectedPages = this.documents.collect(
+                  searchSources(web),
+                  topic.plan?.input || topic.keyword,
+                );
                 // Original pages can load while GitHub samples are being checked.
                 // The same promise is awaited before the report uses its evidence.
                 void collectedPages.catch(() => {});
@@ -232,9 +236,8 @@ export class Engine {
       stage: "details",
       preview: analyze(topic, demand, supply),
     });
-    const { projects: selectedProjects, gaps } = await (
-      projectEvidence ?? prepareProjects(supply)
-    );
+    const { projects: selectedProjects, gaps } = await (projectEvidence ??
+      prepareProjects(supply));
     const market = analyze(topic, demand, supply, gaps);
     market.gaps = marketGapSignals(market);
     market.web = web;
@@ -280,7 +283,11 @@ export class Engine {
           const candidates = searchSources(web);
           const discussionReads: DocumentRead[] = [];
           const [pages, licenses, discussions] = await Promise.all([
-            collectedPages ?? this.documents.collect(candidates, topic.plan?.input || topic.keyword),
+            collectedPages ??
+              this.documents.collect(
+                candidates,
+                topic.plan?.input || topic.keyword,
+              ),
             this.github.licenseSources(selectedProjects),
             this.github.discussionSources(candidates, (read) =>
               discussionReads.push(read),
@@ -299,7 +306,13 @@ export class Engine {
           documents,
           () => options.onProgress?.({ stage: "reviewing", preview: market }),
           (queries) => this.github.ideaAlternatives(queries),
-          (directions) => this.github.directionEvidence(directions),
+          opportunityEvidence(
+            topic,
+            geo,
+            this.github,
+            this.search,
+            this.documents,
+          ),
         );
       } catch {
         market.aiError =

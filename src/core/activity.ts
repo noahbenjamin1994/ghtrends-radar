@@ -27,6 +27,10 @@ export function activityLabel(operation: string, zh: boolean) {
       "核对同行已有功能",
     ],
     strategy: ["Exploring possible directions", "梳理可探索的方向"],
+    "strategy-portfolio-review": [
+      "Checking alternative opportunities",
+      "复核候选机会与取舍",
+    ],
     "strategy-direction": [
       "Comparing a direction's demand and resources",
       "分析方向的需求与投入",

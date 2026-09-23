@@ -1,3 +1,9 @@
+import {
+  preparePortfolio,
+  revisePortfolio,
+  PORTFOLIO_REVIEW_PROMPT,
+  type DirectionProbe,
+} from "../core/portfolio.js";
 import { evidenceExcerpt } from "../core/excerpts.js";
 import { requireResearchInput, inputGuidance } from "../core/preflight.js";
 import {
@@ -265,11 +271,17 @@ export function modelSources(sources: ResearchSource[], focus = "") {
         searchIntent,
         searchRole,
         placement,
-        excerpt: documentType === "page" && focus
-          ? evidenceExcerpt(excerpt!, 2600, focus + " " + label)
-          : excerpt,
-        ...(excerptTruncated !== undefined || (documentType === "page" && focus && excerpt!.length > 2600)
-          ? { excerptTruncated: !!excerptTruncated || (documentType === "page" && !!focus && excerpt!.length > 2600) }
+        excerpt:
+          documentType === "page" && focus
+            ? evidenceExcerpt(excerpt!, 2600, focus + " " + label)
+            : excerpt,
+        ...(excerptTruncated !== undefined ||
+        (documentType === "page" && focus && excerpt!.length > 2600)
+          ? {
+              excerptTruncated:
+                !!excerptTruncated ||
+                (documentType === "page" && !!focus && excerpt!.length > 2600),
+            }
           : {}),
         ...(documentType ? { documentType, publishedAt, parentUrl } : {}),
         ...(request ? { request } : {}),
@@ -1838,9 +1850,12 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
             // or selecting the correct source. Keep edits within that array.
             const citation = path.at(-1) === "quote" || path.at(-1) === "id";
             const array = path.slice(0, -2);
-            const target = citation && typeof path.at(-2) === "number" &&
+            const target =
+              citation &&
+              typeof path.at(-2) === "number" &&
               ["basedOn", "evidence"].includes(String(array.at(-1)))
-              ? array : path;
+                ? array
+                : path;
             return [target.join("."), target] as const;
           }),
         );
@@ -2043,6 +2058,9 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
             intent: context.intent,
             scope: context.scope,
             webCoverage: context.webCoverage,
+            directionCoverage: context.directionCoverage?.filter(
+              (d: any) => d.directionId === direction.id,
+            ),
             sources: modelSources(
               directionSources(direction.id).filter(
                 (s: ResearchSource) =>
@@ -2077,9 +2095,6 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
     const opportunities: any[] = directionResults.map((x) =>
       x.status === "fulfilled" ? x.value : undefined,
     );
-    const selected =
-      opportunities.find((o) => o.id === candidate.recommendedId) ||
-      opportunities[0];
     const priorityCopy = strategyResponse.shape.en.extend({
       strategy: strategySchema.omit({
         experiment: true,
@@ -2087,14 +2102,6 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
         pivotSignal: true,
       }),
     });
-    // The shared pilot owns its criteria. Earlier generated test prose is only
-    // a draft and can anchor the writer to an obsolete comparison baseline.
-    const {
-      experiment: _experiment,
-      successSignal: _success,
-      pivotSignal: _pivot,
-      ...selectedJob
-    } = selected.en;
     const priorityWork = section(
       "priority",
       strategyResponse
@@ -2110,38 +2117,55 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
         .extend({
           en: priorityCopy,
           zh: priorityCopy,
+          recommendedId: z.enum(
+            opportunities.map((o) => o.id) as [string, ...string[]],
+          ),
         }),
       {
         input: context.input,
         intent: context.intent,
         scope: context.scope,
         webCoverage: context.webCoverage,
-        sources: modelSources(directionSources(selected.id), context.input + " " + JSON.stringify(selected)),
-        capabilityCheck: context.capabilityAudit.directions.find(
-          (d: any) => d.id === selected.id,
+        sources: modelSources(
+          context.sources,
+          context.input + " buyer adoption pricing alternatives",
         ),
+        capabilityChecks: context.capabilityAudit.directions,
         candidate: {
           overall: candidate.overall,
-          selection: candidate.selection,
-          recommendedId: selected.id,
-          selected: selectedJob,
+          portfolioReview: candidate.review,
           opportunities: opportunities.map((o) => ({
             id: o.id,
             route: o.route,
             effort: o.effort,
             title: o.en.title,
             service: o.en.service,
+            audience: o.en.audience,
+            need: o.en.need,
+            wedge: o.en.wedge,
+            resources: o.en.resources,
+            demand: o.demand,
+            competition: o.competition,
+            evidence: o.basedOn,
           })),
         },
       },
       4200,
-      "Write root en/zh headline and summary about the ORIGINAL topic, then the six-field strategy for the recommended direction (angle/audience/mechanism/wedge/tradeoff/assumption). Return the supplied recommendedId, selection reasoning and at most four evidence references. Headline and summary describe the original topic's opportunity map; measurements belong in metric cards. The pilot is generated separately; omit experimentPlan and strategy experiment/successSignal/pivotSignal fields.",
+      "Compare ALL completed directions and capability checks before choosing recommendedId from their supplied IDs. Weigh demand evidence, customer adoption/payment, existing alternatives, acquisition, delivery resources and ongoing costs. Repository counts/stars and parent search attention are NOT evidence that a direction has customer demand or willingness to pay. Never use them to justify the winner. If all directions lack direct buyer evidence, explicitly say so and choose the cheapest discriminating customer experiment, not the easiest product to build. Cheap development cannot compensate for an untested buyer. Recommend the next validation, not an unproven profitable business; when evidence is tied, state that uncertainty and what would change the choice. Explain why this direction deserves testing ahead of the strongest alternative. Then write root en/zh headline and summary about the ORIGINAL topic and the six-field strategy matching your chosen direction (angle/audience/mechanism/wedge/tradeoff/assumption). Return your selected recommendedId, selection reasoning and at most four evidence references. Selection is TWO concise sentences per language: name the decisive customer/evidence tradeoff and the strongest alternative; target under 500 characters, never list every direction. Headline and summary describe the original topic's opportunity map; measurements belong in metric cards. The pilot is generated separately; omit experimentPlan and strategy experiment/successSignal/pivotSignal fields.",
     );
-    // Pilot and request readings do not depend on the overall prose.
+    // The pilot follows the final evidence-based choice, not the initial draft.
+    const experimentWork = priorityWork.then((priority) => {
+      const selected = opportunities.find(
+        (o) => o.id === priority.recommendedId,
+      );
+      if (!selected)
+        throw new Error("Priority must select a checked direction.");
+      return this.writeExperiment(context, selected);
+    });
     const summaries = await Promise.allSettled([
       priorityWork,
       marketWork,
-      this.writeExperiment(context, selected),
+      experimentWork,
       issueWork,
     ]);
     const failedSummary = summaries.find((x) => x.status === "rejected");
@@ -2314,7 +2338,7 @@ Each direction must name a familiar customer, task, offered artifact and concret
     onReview?: () => void,
     checkAlternatives?: (queries: string[]) => Promise<ResearchSource[]>,
     checkDirections?: (
-      directions: { id: string; query: string }[],
+      directions: DirectionProbe[],
     ) => Promise<ResearchSource[]>,
   ): Promise<Brief> {
     const sources = strategySources(m, [...documents, ...searchSources(m.web)]);
@@ -2335,10 +2359,17 @@ Each direction must name a familiar customer, task, offered artifact and concret
       capabilityAudit: undefined as CapabilityAudit | undefined,
       confidence: m.confidence,
       webCoverage: {
-        queries: m.web?.queries.map(q => ({ engine: q.engine || "google", intent: q.intent, state: q.state, results: q.results.length })),
+        queries: m.web?.queries.map((q) => ({
+          engine: q.engine || "google",
+          intent: q.intent,
+          state: q.state,
+          results: q.results.length,
+        })),
         relevanceReview: m.web?.review?.status || "unreviewed",
-        originalPages: sources.filter(s => s.documentType === "page").length,
-        readLimits: m.documents?.reads.filter(r => r.status !== "read").map(r => ({ url: r.url, reason: r.status })),
+        originalPages: sources.filter((s) => s.documentType === "page").length,
+        readLimits: m.documents?.reads
+          .filter((r) => r.status !== "read")
+          .map((r) => ({ url: r.url, reason: r.status })),
       },
       previousDirections: m.brief?.opportunities?.map((o) => ({
         id: o.id,
@@ -2360,11 +2391,15 @@ Each direction must name a familiar customer, task, offered artifact and concret
           JSON.stringify({
             ...context,
             model: this.model,
-            pipeline: "parallel-v6-public-sources",
+            pipeline: "portfolio-v2-hypotheses-then-evidence",
             thinking: this.strategyThinking,
             reviewThinking: this.reviewThinking,
             promptVersion: createHash("sha256")
-              .update(STRATEGY_PROMPT + STRATEGY_DRAFT_PROMPT)
+              .update(
+                STRATEGY_PROMPT +
+                  STRATEGY_DRAFT_PROMPT +
+                  PORTFOLIO_REVIEW_PROMPT,
+              )
               .digest("hex"),
             sources: sources.map(({ fetchedAt, ...s }) => s),
           }),
@@ -2387,27 +2422,16 @@ Each direction must name a familiar customer, task, offered artifact and concret
     try {
       draft = await this.json(
         STRATEGY_DRAFT_PROMPT,
-        m.topic.scope === "field"
-          ? {
-              ...context,
-              basis: "hypothesis-led",
-              sources: modelSources(
-                sources.filter(
-                  (s) => s.id === "S1" || s.id === "S2" || s.kind === "search",
-                ),
-                context.input + " competitors pricing user needs limitations",
-              ),
-              projectInventory: sources
-                .filter((s) => s.kind === "project")
-                .map((s) => ({
-                  id: s.id,
-                  name: s.label,
-                  excerpt: s.excerpt?.slice(0, 240),
-                })),
-              assignment:
-                "Begin with a standalone overall judgment of the original field, its core commercial activity, demand drivers, competitive structure and entry resources. This must answer the original topic independently of the direction list. Then map five distinct user jobs spanning at least three lifecycle stages; group specialist technical maintenance into at most one direction. Compare product, data and service opportunities for ordinary users and professionals. Current inputs measure broad attention and open-source coverage; develop clearly conditional domain hypotheses. Give everyday service names, audience, need and offer. Include an open-source contribution or complement when a relevant project document is supplied. Read project purposes and preserve phone scope. Web excerpts support broader commercial alternatives and demand clues. The map should represent both everyday customer jobs and reusable open-source assets.",
-            }
-          : { ...context, sources: modelSources(sources, context.input) },
+        {
+          input: context.input,
+          intent: context.intent,
+          scope: context.scope,
+          directionCount: context.directionCount,
+          basis: "hypothesis-led",
+          sources: [],
+          assignment:
+            "Propose plausible customer/business hypotheses for the ORIGINAL topic before looking for implementations. Named current capabilities, prices and demand remain unverified. Later stages test these candidates against collected original evidence. Consider offering the original product/access/service itself as well as adjacent tools; identify the buyer outcome and supply/operating requirements. Never assume model weights, private deployment, fine-tuning, resale permission or improved quotas are available: express such prerequisites as conditions to verify, not promised capabilities.",
+        },
         this.strategyThinking ? 16000 : 8000,
         "strategy",
         this.strategyThinking,
@@ -2415,11 +2439,20 @@ Each direction must name a familiar customer, task, offered artifact and concret
     } catch {
       draft = null;
     }
+    if (
+      (draft as any)?.candidates ||
+      !Array.isArray((draft as any)?.opportunities)
+    )
+      draft = preparePortfolio(draft, context.directionCount);
     const checks = ideaQueries.safeParse(
       (draft as { checks?: unknown } | null)?.checks,
     );
     const directions = z
-      .array(opportunitySchema.pick({ id: true, query: true }))
+      .array(
+        opportunitySchema
+          .pick({ id: true, query: true })
+          .extend({ channel: z.enum(["github", "web"]).optional() }),
+      )
       .min(3)
       .max(5)
       .safeParse((draft as any)?.opportunities);
@@ -2451,6 +2484,59 @@ Each direction must name a familiar customer, task, offered artifact and concret
         /* Existing sources remain available during search recovery. */
       }
     }
+    // One short portfolio review can replace one anchored direction before writing.
+    // Failed review leaves the valid initial shortlist; never fabricate new IDs.
+    if ((draft as any)?.candidates)
+      try {
+        const initial = draft as ReturnType<typeof preparePortfolio>;
+        const decision = await this.json(
+          PORTFOLIO_REVIEW_PROMPT,
+          {
+            input: context.input,
+            candidates: initial.candidates,
+            selectedIds: initial.selectedIds,
+            sources: modelSources(
+              sources,
+              context.input + " offers distribution pricing user needs",
+            ),
+            collectionLimits: sources
+              .filter((s) => s.directionId && !s.excerpt)
+              .map((s) => ({ directionId: s.directionId, status: s.label })),
+          },
+          2200,
+          "strategy-portfolio-review",
+          false,
+        );
+        const revised = revisePortfolio(initial, decision);
+        const replacements = revised.opportunities.filter(
+          (d) => !initial.selectedIds.includes(d.id),
+        );
+        if (checkDirections && replacements.length) {
+          try {
+            sources.push(...(await checkDirections(replacements)));
+          } catch {
+            /* Retain explicit source gaps. */
+          }
+        }
+        draft = revised;
+        this.store.set(cacheKey + ":portfolio", revised, 21600000);
+      } catch (error) {
+        this.store.recordCall({
+          provider: "deepseek",
+          operation: "strategy-portfolio-review-fallback",
+          started: new Date().toISOString(),
+          durationMs: 0,
+          error: (error instanceof Error
+            ? error.message
+            : "portfolio_review_failed"
+          ).slice(0, 300),
+        });
+      }
+    Object.assign(context, {
+      directionCoverage: sources
+        .filter((s) => s.directionId && !s.excerpt)
+        .map((s) => ({ directionId: s.directionId, status: s.label })),
+    });
     draft = groundOpportunityRatings(draft, sources);
     const initialProblems = strategyResponse.safeParse(draft).success
       ? strategyProblems(draft, sources, m, true, true)
