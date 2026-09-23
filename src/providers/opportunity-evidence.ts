@@ -60,6 +60,11 @@ export function opportunityEvidence(
                 id: prefix + (s.id || "").replace(/^D1/, ""),
                 directionId: d.id,
               }));
+              rows[i]!.push(
+                coverage(
+                  `GitHub check returned ${rows[i]!.length} source excerpts; empty results do not establish absent demand or competition`,
+                ),
+              );
             } else {
               const result = await search.collect(topic, geo, [
                 { query, intent: "competition" },
@@ -68,18 +73,35 @@ export function opportunityEvidence(
                 .filter((s) => s.placement === "organic")
                 .slice(0, 4);
               // Only one observed page per web probe; existing SSRF/robots/time limits apply.
-              const page = await documents.collect(
-                snippets.slice(0, 1),
-                `${topic.keyword} ${d.query}`,
-              );
-              rows[i] = [...snippets, ...page.sources].map((s, n) => ({
+              rows[i] = snippets.map((s, n) => ({
                 ...s,
                 id: prefix + "W" + (n + 1),
                 directionId: d.id,
               }));
+              let readStatus = "none";
+              if (snippets.length) {
+                try {
+                  const page = await documents.collect(
+                    snippets.slice(0, 1),
+                    `${topic.keyword} ${d.query}`,
+                  );
+                  rows[i]!.push(
+                    ...page.sources.map((s, n) => ({
+                      ...s,
+                      id: prefix + "W" + (snippets.length + n + 1),
+                      directionId: d.id,
+                    })),
+                  );
+                  readStatus =
+                    page.reads.map((r) => r.status).join(",") || "none";
+                } catch {
+                  // Original-page recovery must not discard successful search evidence.
+                  readStatus = "failed; indexed excerpts retained";
+                }
+              }
               rows[i]!.push(
                 coverage(
-                  `web ${result.state}; ${snippets.length} indexed excerpts; original reads: ${page.reads.map((r) => r.status).join(",") || "none"}`,
+                  `web ${result.state}; ${snippets.length} indexed excerpts; original reads: ${readStatus}`,
                 ),
               );
             }

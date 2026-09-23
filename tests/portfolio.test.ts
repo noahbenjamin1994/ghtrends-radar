@@ -188,3 +188,92 @@ test("failed commercial lookup remains missing evidence, not a fabricated source
   assert.equal(rows[0]?.excerpt, undefined);
   assert.match(rows[0]!.label, /failed/);
 });
+
+test("a failed page read retains indexed evidence and reports its missing original", async () => {
+  const collect = opportunityEvidence(
+    resolveTopic("rag"),
+    "",
+    {
+      async directionEvidence() {
+        return [];
+      },
+    },
+    {
+      enabled: true,
+      async collect() {
+        return {
+          provider: "multi-search",
+          region: "US",
+          language: "en",
+          state: "ready",
+          fetchedAt: "2026-09-23",
+          queries: [
+            {
+              query: "RAG buyer",
+              intent: "competition",
+              state: "ready",
+              results: [
+                {
+                  title: "Existing offer",
+                  url: "https://example.com/offer",
+                  excerpt: "Publisher offers hosted retrieval",
+                  kind: "organic",
+                },
+              ],
+            },
+          ],
+        };
+      },
+    },
+    {
+      async collect() {
+        throw Error("page timeout");
+      },
+    },
+  );
+  const rows = await collect([
+    { id: "hosted-rag", query: "hosted retrieval", channel: "web" },
+  ]);
+  assert.equal(rows.length, 2);
+  assert.match(rows[0]!.excerpt!, /Publisher offers hosted retrieval/);
+  assert.match(rows[1]!.label, /original reads: failed/);
+  assert.equal(rows[1]!.excerpt, undefined);
+  assert.equal(new Set(rows.map((s) => s.id)).size, 2);
+});
+
+test("empty GitHub probes remain explicit coverage gaps and stop at the shared cap", async () => {
+  let calls = 0;
+  const collect = opportunityEvidence(
+    resolveTopic("rag"),
+    "",
+    {
+      async directionEvidence() {
+        calls++;
+        return [];
+      },
+    },
+    {
+      enabled: false,
+      async collect() {
+        throw Error("unexpected");
+      },
+    },
+    {
+      async collect() {
+        throw Error("unexpected");
+      },
+    },
+  );
+  const rows = await collect(
+    Array.from({ length: 7 }, (_, i) => ({
+      id: `job-${i}`,
+      query: "retrieval",
+      channel: "github" as const,
+    })),
+  );
+  assert.equal(calls, 6);
+  assert.equal(rows.length, 7);
+  assert.ok(rows.every((s) => !s.excerpt && s.directionId));
+  assert.match(rows[0]!.label, /returned 0 source excerpts/);
+  assert.match(rows[6]!.label, /budget/);
+});

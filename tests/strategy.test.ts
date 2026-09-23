@@ -3037,3 +3037,41 @@ test("priority chooses after all directions and its actual choice owns the pilot
     assert.equal(pilotId, chosen.id);
     assert.equal(result.experimentPlan.directionId, chosen.id);
   }));
+
+test("capability audit receives late access restrictions from the original collected page", async () =>
+  fixture(async (r) => {
+    const restriction = "The platform is no longer accessible to new users.";
+    const excerpt =
+      "Acme model pricing and releases. ".repeat(120) + restriction;
+    const source: ResearchSource = {
+      id: "WP1",
+      label: "Acme pricing",
+      url: "https://example.com/pricing",
+      kind: "search",
+      documentType: "page",
+      excerpt,
+    };
+    r.json = async (_prompt, input: any) => {
+      assert.ok(input.sources[0].excerpt.includes(restriction));
+      return {
+        directions: [
+          {
+            id: "acme-training",
+            facts: [{ id: "WP1", quote: restriction }],
+            overlap: "to-check",
+            proposedWork: "Verify access before offering customer training.",
+            prerequisites: [
+              "Confirm eligibility for the vendor training platform.",
+            ],
+            nextCheck:
+              "Confirm whether a new customer can access the training endpoint.",
+          },
+        ],
+      };
+    };
+    const audit = await r.auditCapabilities(
+      { input: "Acme model", sources: [source] },
+      [{ id: "acme-training", offer: "Customer model training" }],
+    );
+    assert.equal(audit.directions[0]!.facts[0]!.quote, restriction);
+  }));

@@ -344,7 +344,9 @@ export class Research {
         mechanism: d.mechanism || d.en?.wedge,
         resources: d.resources || d.en?.resources,
       })),
-      sources: modelSources(sources, context.input),
+      // The reader already bounds excerpts. Keep late access/retirement notices
+      // intact here; topic-ranked compression can remove a decisive constraint.
+      sources: modelSources(sources),
       schema: zodToJsonSchema(capabilityAuditSchema),
     };
     const key =
@@ -2081,7 +2083,7 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
             })),
           },
           3200,
-          "Write ONLY this one direction as the root object. Preserve its id/query/job and evaluate its own demand, competition and resources. Give en and zh all eleven copy fields including need and service. route is required; an opensource route cites a real project in basedOn. Without a relevant supplied project, use product or service and keep basedOn empty. Evidence arrays may be empty for an explicitly inferred hypothesis; never insert blank or synthetic quotations. Keep its role distinct within the portfolio. Parent-topic metrics belong exclusively in the overall metric cards. Base niche ratings on this exact customer job and relevant alternatives, with wider estimates marked inferred. Attribute existing features to their real project and describe the proposed offering in future or conditional language. Preserve factual scope with affirmative sentences: name what a source DOES cover and state the proposed extension separately.",
+          "Write ONLY this one direction as the root object. Preserve its id/query/job and evaluate its own demand, competition and resources. Give en and zh all eleven copy fields including need and service. route is required; an opensource route cites a real project in basedOn. Without a relevant supplied project, use product or service and keep basedOn empty. Evidence arrays may be empty for an explicitly inferred hypothesis; never insert blank or synthetic quotations. Keep its role distinct within the portfolio. Parent-topic metrics belong exclusively in the overall metric cards. Base niche ratings on this exact customer job and relevant alternatives, with wider estimates marked inferred. Attribute existing features to their real project and describe the proposed offering in future or conditional language. When a vendor-controlled prerequisite is unavailable or unverified (such as training access, model weights or resale rights), put that specific gate in service and delivery, and start the experiment by verifying it. A generic phrase like within platform terms does not establish access. Until the gate is confirmed, offer feasibility analysis or a supported baseline, not training/deployment/resale as an available deliverable. Preserve factual scope with affirmative sentences: name what a source DOES cover and state the proposed extension separately.",
         ),
       ),
     );
@@ -2130,6 +2132,7 @@ Keep both languages equivalent. One concrete sentence per field; up to two for m
           context.sources,
           context.input + " buyer adoption pricing alternatives",
         ),
+        directionCoverage: context.directionCoverage,
         capabilityChecks: context.capabilityAudit.directions,
         candidate: {
           overall: candidate.overall,
