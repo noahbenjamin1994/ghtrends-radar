@@ -588,6 +588,8 @@ export class DocumentReader {
       .sort(
         (a, b) =>
           Number(!!hnItem(b.url)) - Number(!!hnItem(a.url)) ||
+          Number(b.searchRole === "direct") -
+            Number(a.searchRole === "direct") ||
           documentationMatch(b) - documentationMatch(a) ||
           Number(b.searchIntent === "competition") -
             Number(a.searchIntent === "competition"),

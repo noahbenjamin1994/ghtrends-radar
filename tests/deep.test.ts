@@ -1790,7 +1790,7 @@ for (const planning of ["model", "fallback"] as const) {
       assert.equal(new Set(queries.map((q) => q.intent)).size, 3);
       assert.equal(
         queries.find((q) => q.intent === "opensource")!.query,
-        "posthog documentation Google Ads source for PostHog",
+        '"PostHog/posthog" documentation Google Ads source for PostHog',
       );
       for (const intent of ["competition", "demand"]) {
         assert.ok(
@@ -1844,7 +1844,7 @@ for (const planning of ["model", "fallback"] as const) {
       assert.equal(t.evidence!.queries.length, 4);
       assert.equal(
         t.evidence!.queries.find((q) => q.intent === "opensource")!.query,
-        "posthog documentation Google Ads source for PostHog",
+        '"PostHog/posthog" documentation Google Ads source for PostHog',
       );
     } finally {
       await e.close();
