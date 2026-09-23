@@ -814,6 +814,7 @@ test("source checkpoints support bounded recovery with direct writing and light 
         "strategy-deep-review",
         "strategy-deep-write",
         "strategy-deep-repair",
+        "strategy-deep-correction-check",
       ].includes(operation || "")
         ? "low"
         : false,

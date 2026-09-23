@@ -146,11 +146,12 @@ export async function checkDeepCorrections(
     })
     .parse(
       await engine.research.json(
-        DEEP_CORRECTION_PROMPT,
+        DEEP_CORRECTION_PROMPT +
+          "\nCalling a tool a baseline or putting it in a discovery comparison does not establish buyer/job alignment. When its documented audience or job differs, a correction that explicitly labels it an adjacent reference is necessary, not stylistic. A statement elsewhere that an advantage is hypothetical does not fix a same-market comparison or unsupported price anchor. Judge the exact fields being corrected, not a charitable interpretation of the whole draft.",
         { context, corrections },
-        2200,
+        6000,
         "strategy-deep-correction-check",
-        false,
+        "low",
       ),
     ).decisions;
   if (
