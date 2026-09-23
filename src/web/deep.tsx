@@ -47,7 +47,7 @@ const stages = {
   writing: ["Turning evidence into a decision", "整理依据与投入建议"],
   reviewing: ["Checking claims against sources", "逐项核对建议与来源"],
   complete: ["Ready to read", "研究已完成"],
-  partial: ["Evidence saved · continue research", "证据已保存 · 可继续研究"],
+  partial: ["Research incomplete · sources saved", "研究尚未完成 · 来源已保存"],
 } as const;
 const creditCopy = (
   credit: DeepTaskView["credit"],
@@ -488,8 +488,8 @@ export function DeepResearchView({
         <section className="deep-partial">
           <h2>
             {l(
-              "Keep the evidence. Complete the remaining checks.",
-              "先看已取得的证据，再补齐关键核对",
+              "This research is not ready to deliver.",
+              "本次研究尚未达到交付标准",
             )}
           </h2>
           <p>
@@ -514,8 +514,8 @@ export function DeepResearchView({
                         "这个问题需要补充更直接的原始来源，已取得的材料保存在下方。",
                       )
                     : l(
-                        "The draft needs source and quality checks. Continue this research to finish them.",
-                        "报告仍需完成来源与质量核对，已采集的证据保存在下方。",
+                        "We have not produced a conclusion that passed quality checks. The sources are saved, but they are not a completed report. You can retry below; a successful result is not guaranteed.",
+                        "目前还没有产出通过质量核对的结论。来源已经保存，但不把来源列表当成完成的报告。可在下方重试，仍需通过交付检查。",
                       )}
           </p>
           <p>
@@ -802,7 +802,7 @@ export function DeepResearchView({
         </section>
       )}
       {task.evidence && (
-        <details className="deep-evidence" open={task.state === "partial"}>
+        <details className="deep-evidence">
           <summary>
             {l("Research sources", "本次研究来源")} ·{" "}
             {task.evidence.sources.length}
