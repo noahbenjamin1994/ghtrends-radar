@@ -148,9 +148,9 @@ export function researchExcerpt(text: string, limit: number, focus = "") {
   const ranked = blocks
     .map((block) => ({
       ...block,
-      score: /^(?:table of contents|contents|目录)$/i.test(block.title.trim())
+      score: /table of contents|^contents$|目录|导航|致谢|赞助|支持者|观众支持|捐赠|sponsors|acknowledg|donors/i.test(block.title.trim())
         ? 0
-        : patterns.reduce(
+        : (/features|capabilities|limitations|requirements|license|核心功能|功能介绍|使用限制|许可|部署要求/i.test(block.title) ? 3 : 0) + patterns.reduce(
             (sum, pattern, i) =>
               sum +
               (pattern.test(block.title)

@@ -292,13 +292,15 @@ export function recoverSourceQuote(
     };
     let cursor = 0;
     for (const match of source.matchAll(
-      /\[([^\]\n]+)\](?:\(https?:\/\/[^\s)]+\)|\[[^\]\n]+\])|(\*\*|__|`)([^`*_\n]+?)\2/g,
+      /\[([^\]\n]+)\](?:\([^\s)]+\)|\[[^\]\n]+\])|(\*\*|__|`)([^`*_\n]+?)\2/g,
     )) {
       append(cursor, match.index);
       const labelStart = chars.length;
       const offset = match[1] ? 1 : match[2]!.length;
       const label = match[1] || match[3]!;
-      append(match.index + offset, match.index + offset + label.length);
+      const nested = match[1] && /^(`+|\*\*|__)(.+)\1$/.exec(label);
+      const trim = nested ? nested[1]!.length : 0;
+      append(match.index + offset + trim, match.index + offset + label.length - trim);
       starts[labelStart] = match.index;
       ends[ends.length - 1] = match.index + match[0].length;
       cursor = match.index + match[0].length;
@@ -613,6 +615,7 @@ export function visibleOpportunities(
       "19",
       "20",
       "21",
+      "22",
     ].includes(brief.strategyVersion || "")
   )
     return;
@@ -637,6 +640,7 @@ export function visibleOpportunities(
       "19",
       "20",
       "21",
+      "22",
     ].includes(brief.strategyVersion || "") &&
     (!overviewSchema.safeParse(brief.overview).success ||
       !z

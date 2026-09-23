@@ -1057,6 +1057,17 @@ test("long repository licenses keep complete common clauses and flag the excerpt
     assert.equal(limited.excerptTruncated, true);
   }));
 
+test("broad Chinese research reads features after long donor lists", () => {
+  const text = "# 热点助手\n只看真正关心的资讯。\n\n## 观众支持\n" +
+    "| 支持者 | 金额 | 趋势追踪 |\n".repeat(500) +
+    "\n## 核心功能\n支持关键词筛选、多渠道推送和自定义订阅源。请先确认各来源的数据使用条件。\n";
+  const result = researchExcerpt(text, 6000, "趋势追踪");
+  assert.match(result.excerpt, /支持关键词筛选、多渠道推送/);
+  assert.ok(result.excerpt.length < 6000);
+  assert.ok(!result.excerpt.includes("| 支持者 |"));
+  for (const span of result.excerpt.split("\n\n[…]\n\n")) assert.ok(text.includes(span));
+});
+
 test("focused excerpts retain actual late integration instructions rather than only a table of contents", () => {
   const gitlab =
     "## GitLab integration\nConfigure the pipeline coverage matcher and publish the Cobertura artifact.\nUse the same project and pipeline to confirm the rendered result.\n";

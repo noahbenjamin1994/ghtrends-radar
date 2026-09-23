@@ -13,6 +13,7 @@ import {
   capabilityNotices,
   projectUseConditions,
   projectUseCopy,
+  withholdUnverifiedCapabilities,
 } from "../src/core/capabilities.js";
 import { Research } from "../src/providers/research.js";
 import { Store } from "../src/core/store.js";
@@ -80,6 +81,39 @@ const audit = () => ({
     },
   ],
 });
+
+test("residual bad quotes withhold the affected verdict, never the verified sibling or whole report", () => {
+  const raw = audit();
+  raw.directions.push({ ...structuredClone(raw.directions[0]!), id: "other" });
+  raw.directions[0]!.facts.push({ id: "R1", quote: "Invented automatic offline synchronization." });
+  const result = withholdUnverifiedCapabilities(raw, docs, ["grooming-notes", "other"])!;
+  assert.equal(result.directions[0]!.overlap, "to-check");
+  assert.deepEqual(result.directions[0]!.facts, audit().directions[0]!.facts);
+  assert.match(result.directions[0]!.proposedWork, /could not be verified/);
+  assert.deepEqual(result.directions[1], raw.directions[1]);
+  assert.equal(raw.directions[0]!.facts.length, 2);
+  assert.deepEqual(capabilityProblems(result, docs, ["grooming-notes", "other"]), []);
+  assert.equal(withholdUnverifiedCapabilities(raw, docs, ["missing"]), undefined);
+  raw.directions[0]!.proposedWork = "";
+  assert.equal(withholdUnverifiedCapabilities(raw, docs, ["grooming-notes", "other"]), undefined);
+});
+
+test("repeated unsupported quotes yield a conditional check after one repair, without caching acceptance", async () =>
+  fixture(async (r) => {
+    let calls = 0;
+    const facts = [{ id: "R1", quote: "Invented automatic offline synchronization." }];
+    r.json = async (_p, _input, _budget, op) => {
+      calls++;
+      if (op === "capability-audit-repair") return { edits: [{ path: "directions.0.facts", value: facts }] };
+      const x = audit(); x.directions[0]!.facts = facts; return x;
+    };
+    for (let n = 0; n < 2; n++) {
+      const result = await r.auditCapabilities({ input: "grooming", sources: docs }, draft);
+      assert.equal(result.directions[0]!.overlap, "to-check");
+      assert.deepEqual(result.directions[0]!.facts, []);
+    }
+    assert.equal(calls, 4);
+  }));
 async function fixture(fn: (r: Research, s: Store) => Promise<void>) {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-capabilities-")),
     store = new Store(dir);
@@ -306,6 +340,10 @@ test("audit repair exposes quote errors alongside length errors and confines edi
 });
 
 test("capability quote recovery preserves source Markdown and evidence roles", () => {
+  const relative = { ...docs[0]!, excerpt: "Worldwide (`WW`, aggregated at build time) — see [`src/geos.js`](./src/geos.js)." };
+  const rendered = audit();
+  rendered.directions[0]!.facts[0]!.quote = "Worldwide (WW, aggregated at build time) — see src/geos.js.";
+  assert.equal((normalizeCapabilityAudit(rendered, [relative]) as any).directions[0].facts[0].quote, relative.excerpt);
   const x = audit();
   x.directions[0]!.facts[0]!.quote =
     "Notebook stores pet profiles, grooming notes and visit photos.";

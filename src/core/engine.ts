@@ -247,6 +247,7 @@ export class Engine {
         const documentsWork = this.github.researchSources(
           selectedProjects,
           market.gaps,
+          topic.plan?.input || topic.keyword,
         );
         const projectNames = [
           ...new Set(
@@ -275,6 +276,7 @@ export class Engine {
           this.github.researchSources(
             projectNames.map((name) => ({ name }) as any),
             [],
+            topic.plan?.input || topic.keyword,
           ),
         ]);
         market.gaps = mergeRequestEvidence(market.gaps, documents);

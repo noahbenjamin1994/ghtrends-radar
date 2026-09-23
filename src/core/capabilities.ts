@@ -210,6 +210,37 @@ export function capabilityProblems(
   );
 }
 
+/** A failed quotation cannot support a capability verdict. Withhold the whole
+ * affected verdict before downstream prose review, not just its citation.
+ * Structural errors still fail closed; this is only for residual quote errors. */
+export function withholdUnverifiedCapabilities(
+  raw: unknown,
+  sources: ResearchSource[],
+  ids: string[],
+): CapabilityAudit | undefined {
+  const issues = capabilityIssues(raw, sources, ids);
+  if (!issues.length || issues.some((x) =>
+    !/^directions\.\d+\.facts\.\d+(?:\.quote)?$/.test(x.path))) return;
+  const result = structuredClone(raw) as CapabilityAudit;
+  const affected = new Set(issues.map((x) => Number(x.path.split(".")[1])));
+  const eligible = capabilitySources(sources);
+  for (const index of affected) {
+    const direction = result.directions[index]!;
+    direction.facts = direction.facts.filter((fact) =>
+      factSchema.safeParse(fact).success && validQuote(fact, eligible));
+    direction.overlap = "to-check";
+    direction.proposedWork =
+      "The capability comparison could not be verified. Treat this direction as a proposal, not an established gap in existing products.";
+    direction.prerequisites = [
+      "Recheck current original product documentation, reuse conditions and the customer's existing workflow before building or promising a missing feature.",
+    ];
+    direction.nextCheck =
+      "Run the proposed customer task in the closest existing product and record which steps already work and which still need manual help.";
+  }
+  if (capabilityProblems(result, sources, ids).length) return;
+  return capabilityAuditSchema.parse(result);
+}
+
 export const capabilityEditSchema = z.object({
   edits: z
     .array(

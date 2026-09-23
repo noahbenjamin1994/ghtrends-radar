@@ -33,7 +33,7 @@ import {
 export { experimentPlanSchema } from "./experiment.js";
 export type { ExperimentPlan } from "./experiment.js";
 
-export const STRATEGY_VERSION = "21";
+export const STRATEGY_VERSION = "22";
 
 /** One authored pilot supplies the summary, direction and exports. */
 export function syncExperimentPlan(raw: any) {
@@ -353,6 +353,8 @@ export function visibleStrategy(
       "17",
       "18",
       "19",
+      "20",
+      "21",
       STRATEGY_VERSION,
     ].includes(brief.strategyVersion)
   )

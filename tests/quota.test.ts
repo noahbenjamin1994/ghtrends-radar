@@ -204,6 +204,19 @@ test("failed and partial scans return credits; cooldown blocks costly normalizat
     engine.scan = async () => {
       calls++;
       const m = fresh();
+      delete m.brief;
+      m.aiError = "The AI brief is unavailable.";
+      return m;
+    };
+    r = await (await post("/api/scan", { topic: "mcp-server" })).json();
+    job = await (await get("/api/jobs/" + r.id)).json();
+    assert.equal(job.state, "failed");
+    assert.equal(job.market.id, "0123456789abcdef");
+    assert.equal(job.credit, "returned");
+    assert.equal(engine.store.usage("alice"), 0);
+    engine.scan = async () => {
+      calls++;
+      const m = fresh();
       m.demand.error = "Source needs a refresh.";
       return m;
     };
@@ -220,7 +233,7 @@ test("failed and partial scans return credits; cooldown blocks costly normalizat
       (await post("/api/scan", { topic: "mcp-server" })).status,
       503,
     );
-    assert.equal(calls, 2);
+    assert.equal(calls, 3);
     assert.equal(engine.store.usage("alice"), 0);
     engine.store.take("trends:cooldown:v1");
     engine.scan = async () => {
@@ -236,7 +249,7 @@ test("failed and partial scans return credits; cooldown blocks costly normalizat
     r = await (await post("/api/scan", { topic: "mcp-server" })).json();
     assert.equal(r.credit, "free");
     assert.equal(r.state, "complete");
-    assert.equal(calls, 3);
+    assert.equal(calls, 4);
     assert.equal(engine.store.usage("alice"), 1);
   }));
 

@@ -295,7 +295,14 @@ export function createApp(
                 },
               }),
           );
-          job.state = "complete";
+          job.state = job.market.aiError ? "failed" : "complete";
+          if (job.market.aiError) {
+            job.clarification = {
+              en: "Analysis could not be completed. Collected sources are saved in your history; please retry the research.",
+              zh: "分析未能完成。已采集的来源保留在历史记录中，请重新发起研究。",
+            };
+            job.error = job.clarification.en;
+          }
           const warnings = researchWarnings(
             job.market,
             engine.research.enabled && engine.search.enabled,
@@ -307,8 +314,9 @@ export function createApp(
           if (success && job.cacheKey && sourceEvidenceIsFresh(job.market))
             engine.store.set(job.cacheKey, job.market.id, 86400000);
 
-          engine.store.updateRun(job.id, "complete", {
+          engine.store.updateRun(job.id, job.state, {
             reportId: job.market.id,
+            error: job.error,
             warnings,
           });
           delete job.progress?.preview;
