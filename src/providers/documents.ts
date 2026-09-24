@@ -7,7 +7,7 @@ import { setTimeout as wait } from "node:timers/promises";
 import { PassThrough, Transform, Writable, type Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createBrotliDecompress, createGunzip, createInflate } from "node:zlib";
-import { Agent, request } from "undici";
+import { Agent, ProxyAgent, request } from "undici";
 import ipaddr from "ipaddr.js";
 import { load } from "cheerio";
 import type { Store } from "../core/store.js";
@@ -137,67 +137,77 @@ export async function documentBody(
   return { body: Buffer.concat(chunks).toString("utf8"), bytes };
 }
 
-/** Resolve once and pin the connection to the checked public addresses. Cookies,
- * proxy credentials and provider keys never enter this transport. */
-export const publicRequest: DocumentTransport = async (
-  url,
-  signal,
-  maxBytes,
-) => {
-  if (!publicSearchUrl(url.href)) throw failure("access");
-  const addresses = await publicAddresses(url.hostname, signal);
-  const dispatcher = new Agent({
-    connect: {
-      lookup: (_host, options, callback) => {
-        const values = addresses.filter(
-          (a) => !options.family || a.family === options.family,
-        );
-        if (!values.length)
-          return callback(new Error("document_address"), "", 4);
-        if ((options as any).all) (callback as any)(null, values);
-        else callback(null, values[0]!.address, values[0]!.family);
-      },
-    },
-  });
-  try {
-    const r = await request(url, {
-      dispatcher,
-      signal,
-      method: "GET",
-      headers: {
-        "user-agent": agentHeader,
-        accept: "text/html,text/plain,application/json;q=0.8",
-        "accept-encoding": "gzip, br, deflate",
-      },
-      headersTimeout: 7000,
-      bodyTimeout: 7000,
-    });
-    const headers = Object.fromEntries(
-      Object.entries(r.headers).map(([k, v]) => [
-        k,
-        Array.isArray(v) ? v.join(", ") : v || "",
-      ]),
-    );
-    const length = Number(headers["content-length"]);
-    if (Number.isFinite(length) && length > maxBytes) {
-      r.body.destroy();
-      throw failure("limit");
+/** Pin checked public addresses. Proxy credentials stay on the CONNECT hop;
+ * cookies and provider keys are never forwarded to the target website. */
+export const documentTransport =
+  (proxy?: string): DocumentTransport =>
+  async (url, signal, maxBytes) => {
+    if (!publicSearchUrl(url.href)) throw failure("access");
+    const addresses = await publicAddresses(url.hostname, signal);
+    const target = new URL(url);
+    // CONNECT to a validated public IP, not a hostname re-resolved by the proxy.
+    // Preserve the original Host and TLS identity; never disable certificate checks.
+    if (proxy) {
+      const address = addresses.find((a) => a.family === 4) || addresses[0]!;
+      target.hostname =
+        address.family === 6 ? `[${address.address}]` : address.address;
     }
-    const content = await documentBody(
-      r.body,
-      (headers["content-encoding"] || "").trim().toLowerCase(),
-      maxBytes,
-      signal,
-    );
-    return {
-      status: r.statusCode,
-      headers,
-      ...content,
-    };
-  } finally {
-    await dispatcher.destroy();
-  }
-};
+    const dispatcher = proxy
+      ? new ProxyAgent({ uri: proxy, requestTls: { servername: url.hostname } })
+      : new Agent({
+          connect: {
+            lookup: (_host, options, callback) => {
+              const values = addresses.filter(
+                (a) => !options.family || a.family === options.family,
+              );
+              if (!values.length)
+                return callback(new Error("document_address"), "", 4);
+              if ((options as any).all) (callback as any)(null, values);
+              else callback(null, values[0]!.address, values[0]!.family);
+            },
+          },
+        });
+    try {
+      const r = await request(target, {
+        dispatcher,
+        signal,
+        method: "GET",
+        headers: {
+          host: url.host,
+          "user-agent": agentHeader,
+          accept: "text/html,text/plain,application/json;q=0.8",
+          "accept-encoding": "gzip, br, deflate",
+        },
+        headersTimeout: 7000,
+        bodyTimeout: 7000,
+      });
+      const headers = Object.fromEntries(
+        Object.entries(r.headers).map(([k, v]) => [
+          k,
+          Array.isArray(v) ? v.join(", ") : v || "",
+        ]),
+      );
+      const length = Number(headers["content-length"]);
+      if (Number.isFinite(length) && length > maxBytes) {
+        r.body.destroy();
+        throw failure("limit");
+      }
+      const content = await documentBody(
+        r.body,
+        (headers["content-encoding"] || "").trim().toLowerCase(),
+        maxBytes,
+        signal,
+      );
+      return {
+        status: r.statusCode,
+        headers,
+        ...content,
+      };
+    } finally {
+      await dispatcher.destroy();
+    }
+  };
+export const publicRequest = documentTransport();
 
 export function pageText(html: string, focus = "") {
   const $ = load(html);
@@ -265,12 +275,76 @@ const discussion = (url: string) =>
   /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/discussions\/[1-9]\d*$/.test(url);
 
 export class DocumentReader {
+  private pagePending = new Map<
+    string,
+    Promise<{ sources: ResearchSource[]; read: DocumentRead }>
+  >();
+  private originPending = new Map<string, Promise<unknown>>();
   constructor(
     private store: Store,
     private transport: DocumentTransport = publicRequest,
   ) {}
   get enabled() {
     return process.env.GHTRENDS_SOURCE_DOCUMENTS !== "0";
+  }
+  /** Explicit HTML read: never dispatches to platform APIs, including HN. */
+  async readWeb(url: string, focus = "", signal = AbortSignal.timeout(15000)) {
+    const normalized = publicSearchUrl(url);
+    if (!normalized) throw failure("access");
+    const key =
+      "source-page:v1:" +
+      createHash("sha256")
+        .update(JSON.stringify([normalized, focus]))
+        .digest("hex");
+    const cached = this.store.get<{
+      sources: ResearchSource[];
+      read: DocumentRead;
+    }>(key);
+    if (cached) return { ...cached, cached: true };
+    const pending = this.pagePending.get(key);
+    if (pending) return { ...(await pending), cached: false };
+    const origin = new URL(normalized).origin;
+    const task = (this.originPending.get(origin) || Promise.resolve())
+      .catch(() => {})
+      .then(async () => {
+        let sources: ResearchSource[] = [],
+          status: DocumentStatus = "read";
+        try {
+          if (!this.enabled) throw failure("unavailable");
+          signal.throwIfAborted();
+          sources = [
+            await this.page(
+              { url: normalized, label: focus || new URL(normalized).hostname },
+              new Set([hostnameKey(new URL(normalized))]),
+              signal,
+            ),
+          ];
+        } catch (error) {
+          status = signal.aborted
+            ? "limit"
+            : (error as any).documentStatus || "unavailable";
+        }
+        const result = {
+          sources,
+          read: {
+            url: normalized,
+            status,
+            observedAt: new Date().toISOString(),
+          },
+        };
+      if (!signal.aborted)
+        this.store.set(key, result, status === "read" ? 3600000 : 60000);
+        return result;
+      });
+    this.originPending.set(origin, task);
+    this.pagePending.set(key, task);
+    try {
+      return { ...(await task), cached: false };
+    } finally {
+      this.pagePending.delete(key);
+      if (this.originPending.get(origin) === task)
+        this.originPending.delete(origin);
+    }
   }
   private async read(
     url: URL,

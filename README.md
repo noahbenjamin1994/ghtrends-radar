@@ -341,7 +341,22 @@ For a shared public instance, set `GHTRENDS_HOSTED=1` to keep the homepage restr
 
 ## Contributing
 
-### Model cost policy
+### Web-only source APIs
+
+Admin session required; POST additionally requires `X-CSRF-Token`. Routes live under the configured base path, e.g. `/radar/api/sources`. This collection surface never calls a platform API or LLM, and never writes reports.
+
+| Method | Route | Input | Output |
+|---|---|---|---|
+| GET | `/api/sources` | None | Configuration, limits and unsupported capabilities |
+| POST | `/api/sources/search` | `query`, optional `region: "US"`, `language: "en"` or `"zh-CN"` | Search results, engine, observation date, cache flag and duration |
+| POST | `/api/sources/read` | `url`, optional `focus` | Original excerpt, actual URL, dates, truncation and read status |
+| POST | `/api/sources/batch` | `urls` (1–8), optional `focus` | Per-page results; successful pages survive other failures |
+
+Search uses residential Google/DuckDuckGo HTML collection with a 20-second budget including queue time. HTML reads use `GHTRENDS_DOCUMENT_PROXY`, falling back to the search/Trends proxy, with a shared 15-second page/batch deadline. Limits are deadlines, not measured latency guarantees. Successful pages cache for one hour, failures for one minute; duplicates coalesce, same-origin reads serialize and batches have at most four workers. At most two distinct API requests run concurrently, with 12 new requests per admin/minute. Downloads and decoded bodies are each capped at 2 MB; excerpts at 6,000 characters with truncation labels.
+
+Results use `state: ready|partial|failed` and per-page `read.status`. Invalid input returns 400, missing authentication 401, missing admin/CSRF 403, overload 429, search timeout 504, setup/upstream failure 503. Partial page failures return 200 with explicit per-page status, never fabricated empty evidence. Caller-supplied cookies, proxies and headers are rejected. Public HTML/text only: no login, browser rendering, CAPTCHA handling or complete comment pagination. HN reads HTML here, not Firebase/Algolia. Robots and existing restricted-platform protections remain enforced. Proxy tunnels pin checked public IPs while preserving Host and verified TLS identity. Existing report workflows are not switched automatically.
+
+### Research model budgets
 
 Scheduled refreshes collect public metrics without AI. Document selection is deterministic. Remaining model calls cover planning, relevance, capabilities/issues, blueprint/sections/pilot, optional fit, deep writing and one combined review, conditional repairs, and CLI briefs. Successful caches are reused.
 

@@ -26,6 +26,7 @@ export type SearchQuery = z.infer<typeof searchQuerySchema>;
 export const SEARCH_VERSION = "6";
 export type SearchEngine = "google" | "duckduckgo" | "hackernews";
 interface SearchPage {
+  cached?: boolean;
   results: SearchResult[];
   fetchedAt: string;
   engine: SearchEngine;
@@ -629,11 +630,33 @@ export class GoogleSearch {
           : "failed";
     return web;
   }
+  /** Search HTML through residential routes only. No model or platform API. */
+  async lookupWeb(query: string, region = "US", language = "en") {
+    searchQuerySchema.parse({ query, intent: "competition" });
+    if (!/^[A-Z]{2}$/.test(region) || !["en", "zh-CN"].includes(language))
+      throw new Error("search_input");
+    if (!this.enabled || this.mode !== "direct")
+      throw new Error("search_setup");
+    if (this.pending.size >= 4) throw new Error("search_busy");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        this.search(query, region, language, 20000),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("search_timeout")), 20000);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
   private search(
     query: string,
     region: string,
     language: string,
+    budgetMs = 45000,
   ): Promise<SearchPage> {
+    const deadline = Date.now() + budgetMs;
     const identity = createHash("sha256")
       .update(
         this.mode === "api"
@@ -652,7 +675,13 @@ export class GoogleSearch {
     const key =
       `web-search:v${SEARCH_VERSION}:` +
       createHash("sha256")
-        .update(JSON.stringify([query, region, language, identity]))
+        .update(
+          JSON.stringify(
+            budgetMs === 45000
+              ? [query, region, language, identity]
+              : [query, region, language, identity, budgetMs],
+          ),
+        )
         .digest("hex");
     const cached = this.store.get<SearchPage>(key);
     if (cached) {
@@ -664,16 +693,18 @@ export class GoogleSearch {
         durationMs: 0,
         started: new Date().toISOString(),
       });
-      return Promise.resolve(cached);
+      return Promise.resolve({ ...cached, cached: true });
     }
     const existing = this.pending.get(key);
     if (existing) return existing;
     const task = this.queue.then(async () => {
+      if (Date.now() >= deadline) throw new Error("search_timeout");
       if (this.mode === "direct") {
         const wait = 1500 - (Date.now() - this.lastRequest);
         if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
         try {
-          const page = await this.direct(query, region, language);
+          if (Date.now() >= deadline) throw new Error("search_timeout");
+          const page = await this.direct(query, region, language, deadline);
           // Give the primary source another chance after a short fallback cache.
           this.store.set(
             key,
@@ -789,6 +820,7 @@ export class GoogleSearch {
     query: string,
     region: string,
     language: string,
+    deadline = Date.now() + 45000,
   ): Promise<SearchPage> {
     const routes = [
       process.env.GOOGLE_SEARCH_PROXY || process.env.GOOGLE_TRENDS_PROXY,
@@ -819,7 +851,6 @@ export class GoogleSearch {
       attempts[1] = { engine: "google", proxy: routes[1], route: 1 };
       attempts[3] = { engine: "duckduckgo", proxy: routes[1], route: 1 };
     }
-    const deadline = Date.now() + 45000;
     let failure = searchFailure(new Error("search_cooldown")),
       primaryError: string | undefined;
     const exhausted = new Map<

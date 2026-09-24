@@ -15,6 +15,7 @@ import sharp from "sharp";
 import { installAuth } from "./auth.js";
 import { installFitRoutes } from "./fit.js";
 import { installFeedbackRoutes } from "./feedback.js";
+import { installSourceRoutes } from "./sources.js";
 import { installDeepRoutes } from "./deep.js";
 import {
   installCreditAccountRoutes,
@@ -96,6 +97,7 @@ export function createApp(
   });
   installFitRoutes(app, engine, auth);
   installFeedbackRoutes(app, engine, auth);
+  installSourceRoutes(app, engine, auth);
   installCreditAccountRoutes(app, engine.store, auth, credits);
   const dailyLimit = Math.max(
     1,
