@@ -65,6 +65,7 @@ export interface Strategy {
   pivotSignal: string;
 }
 export interface ResearchSource {
+  links?: { label: string; url: string }[];
   documentType?:
     | "page"
     | "license"

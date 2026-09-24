@@ -209,6 +209,37 @@ export const documentTransport =
   };
 export const publicRequest = documentTransport();
 
+/** Navigation hints, not evidence. Never fetch additional pages automatically. */
+export function documentLinks(html: string, base: string) {
+  const $ = load(html),
+    origin = new URL(base),
+    links = new Map<string, { label: string; url: string }>();
+  for (const node of $("a[href]").toArray().slice(0, 500)) {
+    try {
+      const raw = new URL($(node).attr("href")!, origin);
+      const url = publicSearchUrl(raw.href);
+      const label = $(node).text().replace(/\s+/g, " ").trim().slice(0, 100);
+      if (
+        !url ||
+        url === origin.href ||
+        hostnameKey(raw) !== hostnameKey(origin)
+      )
+        continue;
+      if (
+        !/pricing|plans|docs|documentation|features|changelog|release|license|terms|help|support|价格|套餐|文档|功能|许可|条款|帮助/i.test(
+          raw.pathname + " " + label,
+        )
+      )
+        continue;
+      links.set(url, { label: label || raw.pathname, url });
+      if (links.size === 12) break;
+    } catch {
+      /* Malformed and non-public links stay outside the API. */
+    }
+  }
+  return [...links.values()];
+}
+
 export function pageText(html: string, focus = "") {
   const $ = load(html);
   const title = $("title")
@@ -292,7 +323,7 @@ export class DocumentReader {
     const normalized = publicSearchUrl(url);
     if (!normalized) throw failure("access");
     const key =
-      "source-page:v1:" +
+      "source-page:v2:" +
       createHash("sha256")
         .update(JSON.stringify([normalized, focus]))
         .digest("hex");
@@ -332,8 +363,8 @@ export class DocumentReader {
             observedAt: new Date().toISOString(),
           },
         };
-      if (!signal.aborted)
-        this.store.set(key, result, status === "read" ? 3600000 : 60000);
+        if (!signal.aborted)
+          this.store.set(key, result, status === "read" ? 3600000 : 60000);
         return result;
       });
     this.originPending.set(origin, task);
@@ -492,6 +523,7 @@ export class DocumentReader {
         publishedAt: parsed.publishedAt,
         excerpt: parsed.text,
         excerptTruncated: parsed.excerptTruncated,
+        links: documentLinks(r.body, url.href),
       };
     }
     throw failure("limit");

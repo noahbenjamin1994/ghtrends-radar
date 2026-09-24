@@ -61,6 +61,7 @@ export function installSourceRoutes(
         deadlineMs: 15000,
         maxBytes: 2000000,
         maxExcerptCharacters: 6000,
+        maxRelatedLinks: 12,
         successCacheSeconds: 3600,
         failureCacheSeconds: 60,
       },
@@ -138,29 +139,32 @@ export function installSourceRoutes(
                 mode: "web-only",
                 durationMs: Date.now() - started,
                 ...data,
+                cached: !!data.cached,
               };
             }
             const urls: string[] = kind === "read" ? [input.url] : input.urls;
             const results = new Array<
               Awaited<ReturnType<DocumentReader["readWeb"]>>
             >(urls.length);
+            const grouped = new Map<string, number[]>();
+            urls.forEach((url, i) => {
+              const origin = new URL(url).origin;
+              grouped.set(origin, [...(grouped.get(origin) || []), i]);
+            });
+            const lanes = [...grouped.values()];
             let cursor = 0;
-            // One worker per origin: do not burst several pages against the same site.
-            const lanes = new Map<string, Promise<unknown>>();
+            // A group occupies one worker, so repeated same-site URLs cannot
+            // consume every worker and block unrelated origins behind them.
             await Promise.all(
-              Array.from({ length: Math.min(4, urls.length) }, async () => {
-                while (cursor < urls.length) {
-                  const i = cursor++,
-                    url = urls[i]!,
-                    origin = new URL(url).origin;
-                  const work = (lanes.get(origin) || Promise.resolve()).then(
-                    () => reader.readWeb(url, input.focus, signal),
-                  );
-                  lanes.set(
-                    origin,
-                    work.catch(() => {}),
-                  );
-                  results[i] = await work;
+              Array.from({ length: Math.min(4, lanes.length) }, async () => {
+                while (cursor < lanes.length) {
+                  const lane = lanes[cursor++]!;
+                  for (const i of lane)
+                    results[i] = await reader.readWeb(
+                      urls[i]!,
+                      input.focus,
+                      signal,
+                    );
                 }
               }),
             );

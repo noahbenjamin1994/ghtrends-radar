@@ -8,6 +8,7 @@ import { Engine } from "../src/core/engine.js";
 import { Store } from "../src/core/store.js";
 import {
   DocumentReader,
+  documentLinks,
   type DocumentTransport,
 } from "../src/providers/documents.js";
 import { installSourceRoutes } from "../src/server/sources.js";
@@ -20,6 +21,85 @@ const response = (body = html, status = 200) => ({
   status,
   headers: { "content-type": "text/html" },
   bytes: body.length,
+});
+
+test("related links retain only bounded same-site document navigation", () => {
+  const links = documentLinks(
+    '<nav><a href="/pricing?utm_source=x">Plans</a><a href="/pricing">Pricing</a><a href="https://evil.example/docs">Docs</a><a href="javascript:alert(1)">Help</a><a href="/about">About</a><a href="http://127.0.0.1/docs">Docs</a><a href="/docs">Documentation</a></nav>',
+    "https://product.example/",
+  );
+  assert.deepEqual(
+    links.map((x) => x.url),
+    ["https://product.example/pricing", "https://product.example/docs"],
+  );
+  assert.equal(
+    documentLinks(
+      Array.from(
+        { length: 50 },
+        (_, i) => `<a href="/docs/${i}">Docs</a>`,
+      ).join(""),
+      "https://product.example/",
+    ).length,
+    12,
+  );
+});
+
+test("same-site batch pages do not block unrelated origins and result order stays stable", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "source-lanes-")),
+    engine = new Engine(new Store(dir));
+  const seen: string[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  const reader = new DocumentReader(engine.store, async (url) => {
+    if (url.pathname === "/robots.txt") return response("", 404);
+    seen.push(url.hostname);
+    if (url.hostname === "first.example") await gate;
+    return response();
+  });
+  const app = express();
+  app.use(express.json());
+  installSourceRoutes(
+    app,
+    engine,
+    {
+      requireAdmin: () => ({ id: "admin" }),
+      protect: () => ({ id: "admin" }),
+    } as any,
+    reader,
+  );
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((r) => server.once("listening", r));
+  const urls = [
+    ...Array.from({ length: 4 }, (_, i) => `https://first.example/${i}`),
+    "https://second.example/pricing",
+  ];
+  try {
+    const request = fetch(
+      `http://127.0.0.1:${(server.address() as any).port}/api/sources/batch`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ urls }),
+      },
+    );
+    for (let i = 0; i < 50 && !seen.includes("second.example"); i++)
+      await new Promise((r) => setTimeout(r, 5));
+    assert.ok(seen.includes("second.example"));
+    release();
+    const result = await (await request).json();
+    assert.equal(result.state, "ready");
+    assert.deepEqual(
+      result.results.map((r: any) => r.read.url),
+      urls,
+    );
+  } finally {
+    release();
+    await new Promise<void>((r) => server.close(() => r()));
+    await engine.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("source API coalesces duplicates and rejects overload without starting extra work", async () => {
