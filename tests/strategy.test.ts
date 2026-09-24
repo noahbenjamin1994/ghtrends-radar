@@ -526,7 +526,7 @@ test("strategy review repairs generic advice, verifies quotations, caches and pr
         return capabilitySample(input.directions);
       ops.push(operation!);
       assert.equal(thinking, false);
-      assert.ok(budget! >= 8000);
+      assert.ok(budget! <= 9000);
       if (ops.length === 1) {
         const bad = countedSample();
         bad.en.strategy.wedge = "Build an MVP";
@@ -635,7 +635,7 @@ test("a failed evidence review preserves measurements and leaves report delivery
     assert.equal(m.metrics.growth, null);
   }));
 
-test("explicit reasoning levels reach the API while ordinary calls stay disabled and private reasoning is discarded", async () =>
+test("legacy reasoning requests stay disabled and private reasoning is discarded", async () =>
   fixture(async (r, s) => {
     const old = globalThis.fetch;
     const requests: any[] = [];
@@ -671,16 +671,16 @@ test("explicit reasoning levels reach the API while ordinary calls stay disabled
       });
       await r.json("JSON", {}, 1800, "plan");
       await r.json("JSON", {}, 8000, "strategy", "low");
-      assert.equal(requests[2].thinking.type, "enabled");
-      assert.equal(requests[2].reasoning_effort, "low");
-      assert.equal(requests[0].thinking.type, "enabled");
-      assert.equal(requests[0].reasoning_effort, "high");
+      assert.equal(requests[2].thinking.type, "disabled");
+      assert.equal(requests[2].reasoning_effort, undefined);
+      assert.equal(requests[0].thinking.type, "disabled");
+      assert.equal(requests[0].reasoning_effort, undefined);
       assert.equal(requests[1].thinking.type, "disabled");
       const measured = s
         .adminOverview(7, 0, "")
         .models.find((row) => row.operation === "strategy")!;
       assert.equal(measured.outputTokens, 1200);
-      assert.equal(measured.reasoningTokens, 1000);
+      assert.equal(measured.reasoningTokens, 0);
       assert.equal(measured.reasoningPending, 0);
       assert.ok(
         !JSON.stringify(s.adminOverview(7, 0, "")).includes(
@@ -1584,7 +1584,7 @@ test("section format recovery preserves completed siblings and review budget rec
         });
       if (operation === "strategy-evidence-review-compact") {
         assert.equal(thinking, false);
-        assert.equal(_budget, 8500);
+        assert.equal(_budget, 3500);
         return { edits: [] };
       }
       assert.ok(["strategy-priority", "strategy-overall"].includes(operation!));
@@ -2347,18 +2347,18 @@ test("local repair separates supply counts from demand and anchors open-source l
     assert.equal(raw.opportunities[0]!.route, "opensource");
   }));
 
-test("research reasoning stays bounded and configurable and source compaction keeps the original evidence immutable", async () => {
+test("research reasoning cannot be enabled and source compaction keeps original evidence immutable", async () => {
   const old = process.env.GHTRENDS_RESEARCH_THINKING;
   try {
     delete process.env.GHTRENDS_RESEARCH_THINKING;
     await fixture(async (r) => {
       assert.equal(r.strategyThinking, false);
       process.env.GHTRENDS_RESEARCH_THINKING = "low";
-      assert.equal(r.strategyThinking, "low");
+      assert.equal(r.strategyThinking, false);
       process.env.GHTRENDS_RESEARCH_THINKING = "off";
       assert.equal(r.strategyThinking, false);
       process.env.GHTRENDS_RESEARCH_THINKING = "high";
-      assert.equal(r.strategyThinking, "low");
+      assert.equal(r.strategyThinking, false);
     });
     const original = strategySources(seed, documents);
     const before = JSON.stringify(original);

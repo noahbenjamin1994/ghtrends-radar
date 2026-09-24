@@ -284,8 +284,8 @@ export function createApp(
                 geo: job.geo,
                 keyword: job.keyword,
                 refresh: job.refresh,
-                // Curated query planning stays local; scheduled reports also
-                // benefit from cached, source-backed project-role review.
+                // Scheduled refreshes collect public metrics, never paid AI.
+                ai: job.refresh ? false : undefined,
                 owner: job.owner,
                 private: auth.hosted && !!job.owner,
                 preparedTopic: job.preparedTopic,

@@ -548,14 +548,24 @@ test("synonyms use separate normalization and choose usable coverage, never the 
     requested.length = 0;
     (trends as any).collectWithFallback = async (keyword: string) => {
       requested.push(keyword);
-      return { ...series(keyword, 0, 0), points: [], error: "Google Trends connection is being refreshed. Open the source or retry shortly." };
+      return {
+        ...series(keyword, 0, 0),
+        points: [],
+        error:
+          "Google Trends connection is being refreshed. Open the source or retry shortly.",
+      };
     };
-    const outage = await trends.demand("offline", "", undefined, ["usable", "uncached"], true);
+    const outage = await trends.demand(
+      "offline",
+      "",
+      undefined,
+      ["usable", "uncached"],
+      true,
+    );
     assert.deepEqual(requested, ["offline"]);
     assert.equal(outage.keyword, "usable");
     assert.equal(outage.requestedKeyword, "offline");
     assert.match(outage.alternatives![0]!.error!, /connection/);
-
   } finally {
     await trends.close();
     store.close();
@@ -752,6 +762,44 @@ test("pipeline retries sparse supply once, preserves successful evidence on repa
   }
 });
 
+test("metrics-only refresh never invokes a model even with a configured key", async () => {
+  const { Engine } = await import("../src/core/engine.js");
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-no-ai-"));
+  const old = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = "unit";
+  const engine = new Engine(new Store(dir));
+  let modelCalls = 0;
+  try {
+    const m: Market = JSON.parse(
+      readFileSync(new URL("../public/seed.json", import.meta.url), "utf8"),
+    )[0];
+    engine.research.json = async () => {
+      modelCalls++;
+      throw new Error("No background AI");
+    };
+    engine.github.supply = async () => m.supply;
+    engine.github.gaps = async () => [];
+    engine.trends.demand = async () => m.demand;
+    const result = await engine.scan(m.topic.slug, {
+      refresh: true,
+      ai: false,
+    });
+    assert.ok(result.id);
+    assert.equal(modelCalls, 0);
+    const selected = await engine.research.selectProjects(
+      m.topic,
+      m.supply.repositories,
+    );
+    assert.ok(selected.length <= 4);
+    assert.equal(modelCalls, 0);
+  } finally {
+    await engine.close();
+    rmSync(dir, { recursive: true, force: true });
+    if (old === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = old;
+  }
+});
+
 test("JSON transport recovery preserves literal source text and rejects ambiguous content", () => {
   const expected = { quote: "First line\nSecond line\twith a tab", count: 40 };
   assert.deepEqual(
@@ -772,10 +820,46 @@ test("JSON transport recovery preserves literal source text and rejects ambiguou
 
 test("quote formatting recovery restores blockquote markers and sentence case without changing words", async () => {
   const { recoverSourceQuote } = await import("../src/core/opportunities.js");
-  const excerpt = "And the operator holds the key, not proof of honesty.\n> Argus is not affiliated with CIS\n> or certified by another organization.";
-  assert.equal(recoverSourceQuote("The operator holds the key, not proof of honesty.", excerpt, true), "the operator holds the key, not proof of honesty.");
-  assert.equal(recoverSourceQuote("Argus is not affiliated with CIS or certified by another organization.", excerpt, true), "Argus is not affiliated with CIS\n> or certified by another organization.");
-  assert.equal(recoverSourceQuote("Argus is affiliated with CIS or certified by another organization.", excerpt, true), undefined);
-  assert.equal(recoverSourceQuote("The operator holds two keys, not proof of honesty.", excerpt, true), undefined);
-  assert.equal(recoverSourceQuote("The operator holds the key, not proof of honesty.", excerpt + "\n" + excerpt, true), undefined);
+  const excerpt =
+    "And the operator holds the key, not proof of honesty.\n> Argus is not affiliated with CIS\n> or certified by another organization.";
+  assert.equal(
+    recoverSourceQuote(
+      "The operator holds the key, not proof of honesty.",
+      excerpt,
+      true,
+    ),
+    "the operator holds the key, not proof of honesty.",
+  );
+  assert.equal(
+    recoverSourceQuote(
+      "Argus is not affiliated with CIS or certified by another organization.",
+      excerpt,
+      true,
+    ),
+    "Argus is not affiliated with CIS\n> or certified by another organization.",
+  );
+  assert.equal(
+    recoverSourceQuote(
+      "Argus is affiliated with CIS or certified by another organization.",
+      excerpt,
+      true,
+    ),
+    undefined,
+  );
+  assert.equal(
+    recoverSourceQuote(
+      "The operator holds two keys, not proof of honesty.",
+      excerpt,
+      true,
+    ),
+    undefined,
+  );
+  assert.equal(
+    recoverSourceQuote(
+      "The operator holds the key, not proof of honesty.",
+      excerpt + "\n" + excerpt,
+      true,
+    ),
+    undefined,
+  );
 });

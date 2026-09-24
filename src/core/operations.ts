@@ -5,7 +5,21 @@ export const operationContext = new AsyncLocalStorage<{
   runId: string;
   userId?: string;
   onActivity?: (activity: ResearchActivity) => void;
+  llmBudget?: { calls: number; outputTokens: number; maxCalls: number };
 }>();
+
+// Upper bounds, not generation targets. Full bilingual legacy reports need
+// more room than small JSON decisions; never spend thinking tokens.
+export function llmOutputLimit(operation: string) {
+  if (/^(plan|deep-plan|query-repair)$/.test(operation)) return 900;
+  if (operation === "strategy-deep-write") return 4500;
+  if (operation === "strategy-deep-repair") return 3000;
+  if (operation === "strategy-deep-review") return 1800;
+  if (/^strategy-(review|edit)$/.test(operation)) return 9000;
+  if (/copy|relevance|portfolio-review/.test(operation)) return 2200;
+  if (/issue-reading|evidence-review/.test(operation)) return 3500;
+  return 4000;
+}
 export interface ProviderCall {
   provider: "deepseek" | "github" | "trends" | "search" | "documents";
   operation: string;

@@ -39,6 +39,47 @@ const tail = (finish = "stop") =>
   }) +
   "data: [DONE]\r\n\r\n";
 
+test("model budgets cap output, reject excess calls before fetch and reset per run", async () => {
+  const originalFetch = globalThis.fetch;
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-budget-"));
+  const store = new Store(dir);
+  let calls = 0;
+  globalThis.fetch = async (_url, init) => {
+    calls++;
+    const body = JSON.parse(String(init?.body));
+    assert.equal(body.max_tokens, 1800);
+    assert.deepEqual(body.thinking, { type: "disabled" });
+    assert.equal(body.reasoning_effort, undefined);
+    return stream(delta({ content: '{"ready":true}' }) + tail());
+  };
+  try {
+    const research = new Research(store);
+    const call = () =>
+      research.json("Review", {}, 32000, "strategy-deep-review", "low");
+    await operationContext.run({ runId: "bounded" }, async () => {
+      for (let i = 0; i < 12; i++) await call();
+      await assert.rejects(call, /model-call budget/);
+      assert.equal(calls, 12);
+    });
+    await operationContext.run({ runId: "new" }, call);
+    assert.equal(calls, 13);
+    await operationContext.run(
+      {
+        runId: "tokens",
+        llmBudget: { calls: 0, maxCalls: 24, outputTokens: 59999 },
+      },
+      async () => {
+        await assert.rejects(call, /model-call budget/);
+      },
+    );
+    assert.equal(calls, 13);
+  } finally {
+    globalThis.fetch = originalFetch;
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("model SSE preserves fragmented UTF-8 JSON, discards reasoning text, and captures final usage", async () => {
   const phases: string[] = [];
   const response = await readCompletion(
@@ -90,13 +131,14 @@ test("streamed research records reasoning and costs, emits safe progress, and re
     assert.equal(body.stream, true);
     assert.equal(body.stream_options.include_usage, true);
     assert.equal(body.thinking.type, "disabled");
+    assert.equal(body.reasoning_effort, undefined);
     return stream(delta({ content: '{"edits":[]}' }) + tail(finish));
   };
   try {
     const activities: ResearchActivity[] = [],
       research = new Research(store);
-    delete process.env.GHTRENDS_RESEARCH_THINKING;
-    delete process.env.GHTRENDS_RESEARCH_REVIEW_THINKING;
+    process.env.GHTRENDS_RESEARCH_THINKING = "low";
+    process.env.GHTRENDS_RESEARCH_REVIEW_THINKING = "low";
     assert.equal(research.strategyThinking, false);
     assert.equal(research.reviewThinking, false);
     const run = () =>
@@ -108,7 +150,7 @@ test("streamed research records reasoning and costs, emits safe progress, and re
             { secret: "private source" },
             100,
             "issue-reading",
-            false,
+            true,
           ),
       );
     assert.deepEqual(await run(), { edits: [] });

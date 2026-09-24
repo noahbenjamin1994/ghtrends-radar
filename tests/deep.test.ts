@@ -24,11 +24,7 @@ import {
   type DeepTask,
   type DeepBrief,
 } from "../src/core/deep.js";
-import {
-  runDeepResearch,
-  checkDeepCorrections,
-  deepOfferQueries,
-} from "../src/providers/deep.js";
+import { runDeepResearch, deepOfferQueries } from "../src/providers/deep.js";
 import { deepView } from "../src/server/deep.js";
 import { CreditProviderFixture } from "./fixtures/credit-provider.js";
 import { CreditAccountClient } from "../src/server/credits.js";
@@ -40,7 +36,7 @@ const copy = (
 ) => ({ en, zh });
 
 for (const outcome of ["repair", "unresolved", "unavailable"] as const)
-  test(`independent decision review gates delivery after factual approval (${outcome})`, async () => {
+  test(`combined factual and decision review gates delivery (${outcome})`, async () => {
     const dir = mkdtempSync(join(tmpdir(), "ghtrends-decision-gate-"));
     const env = { ...process.env };
     process.env.DEEPSEEK_API_KEY = "unit-test-only";
@@ -59,11 +55,9 @@ for (const outcome of ["repair", "unresolved", "unavailable"] as const)
       repairs = 0;
     e.research.json = async (prompt, input, _tokens, operation, thinking) => {
       if (operation === "strategy-deep-write") return brief();
-      if (operation === "strategy-deep-review")
-        return { ready: true, corrections: [] };
-      if (operation === "strategy-deep-decision-check") {
+      if (operation === "strategy-deep-review") {
         decisions++;
-        assert.equal(thinking, true);
+        assert.equal(thinking, false);
         assert.match(prompt, /same market/);
         assert.ok((input as any).sources.length);
         if (outcome === "unavailable")
@@ -178,64 +172,7 @@ test("deep offer searches follow at most two direct substitutes, never generic a
   );
 });
 
-test("correction decisions preserve supported claims and require every issue to be assessed", async () => {
-  const corrections = [
-    { text: "Remove a source-supported notice.", paths: ["answer"] },
-    { text: "Correct an unsupported count.", paths: ["plan.experiment"] },
-  ];
-  let response: unknown = {
-    decisions: [
-      {
-        index: 0,
-        action: "keep_draft",
-        reason: "The original clause explicitly retains this notice.",
-      },
-      {
-        index: 1,
-        action: "apply_correction",
-        reason: "The stated count conflicts with the explicit user limit.",
-      },
-    ],
-  };
-  const engine = {
-    research: { json: async () => response },
-  } as unknown as Engine;
-  assert.deepEqual(await checkDeepCorrections(engine, {}, corrections), [
-    corrections[1],
-  ]);
-  response = {
-    decisions: [
-      { index: 0, action: "keep_draft", reason: "Supported by source." },
-    ],
-  };
-  await assert.rejects(
-    checkDeepCorrections(engine, {}, corrections),
-    /incomplete/,
-  );
-  response = {
-    decisions: [
-      { index: 0, action: "keep_draft", reason: "Supported by source." },
-      { index: 0, action: "apply_correction", reason: "Duplicate decision." },
-    ],
-  };
-  await assert.rejects(
-    checkDeepCorrections(engine, {}, corrections),
-    /incomplete/,
-  );
-  response = {
-    decisions: [
-      {
-        index: 0,
-        action: "check",
-        reason: "The source requires another read.",
-      },
-    ],
-  };
-  await assert.rejects(
-    checkDeepCorrections(engine, {}, corrections.slice(0, 1)),
-    /Invalid enum value/,
-  );
-});
+// Combined review replaces the removed review-of-review.
 const source: ResearchSource = {
   id: "E1",
   kind: "project",
@@ -808,17 +745,7 @@ test("source checkpoints support bounded recovery with direct writing and light 
   e.research.json = async (_system, _input, _tokens, operation, thinking) => {
     if (operation === "strategy-deep-decision-check")
       return { ready: true, corrections: [] };
-    assert.equal(
-      thinking,
-      [
-        "strategy-deep-review",
-        "strategy-deep-write",
-        "strategy-deep-repair",
-        "strategy-deep-correction-check",
-      ].includes(operation || "")
-        ? "low"
-        : false,
-    );
+    assert.equal(thinking, false);
     calls++;
     if (operation === "strategy-deep-correction-check")
       return {
@@ -889,7 +816,7 @@ test("source checkpoints support bounded recovery with direct writing and light 
       true,
     );
     assert.equal(reads, 0);
-    assert.equal(calls, 5);
+    assert.equal(calls, 4);
     assert.ok(checkpoints >= 4);
     assert.ok(t.result);
     assert.deepEqual(
@@ -1230,15 +1157,10 @@ for (const mode of [
           ? [
               "strategy-deep-write",
               "strategy-deep-review",
-              "strategy-deep-correction-check",
               "strategy-deep-repair",
               "strategy-deep-repair",
             ]
-          : [
-              "strategy-deep-write",
-              "strategy-deep-review",
-              "strategy-deep-correction-check",
-            ],
+          : ["strategy-deep-write", "strategy-deep-review"],
       );
       if (mode === "unrequested-patch" || mode === "unchanged-patch") {
         assert.deepEqual(t.work?.draft, brief());
@@ -1258,7 +1180,7 @@ for (const mode of [
 }
 
 for (const outcome of ["accept", "reject", "provider-error"] as const) {
-  test(`bounded review recovery retains quality checks: ${outcome}`, async () => {
+  test(`review failure without automatic recovery retains quality checks: ${outcome}`, async () => {
     const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-review-")),
       env = { ...process.env };
     process.env.DEEPSEEK_API_KEY = "unit-test-only";
@@ -1291,7 +1213,7 @@ for (const outcome of ["accept", "reject", "provider-error"] as const) {
           ],
         };
       if (operation === "strategy-deep-review") {
-        assert.equal(thinking, "low");
+        assert.equal(thinking, false);
         firstReview = input;
         throw new Error(
           outcome === "provider-error"
@@ -1314,21 +1236,15 @@ for (const outcome of ["accept", "reject", "provider-error"] as const) {
       return brief();
     };
     try {
-      if (outcome === "provider-error")
-        await assert.rejects(
-          runDeepResearch(e, t, () => {}),
-          /429/,
-        );
-      else
-        assert.equal(
-          await runDeepResearch(e, t, () => {}),
-          outcome === "accept",
-        );
+      await assert.rejects(
+        runDeepResearch(e, t, () => {}),
+        outcome === "provider-error" ? /429/ : /incomplete/,
+      );
       assert.equal(
         operations.filter((o) => o === "strategy-deep-review-recovery").length,
-        outcome === "provider-error" ? 0 : 1,
+        0,
       );
-      assert.equal(Boolean(t.result), outcome === "accept");
+      assert.equal(Boolean(t.result), false);
     } finally {
       await e.close();
       process.env = env;
@@ -1707,13 +1623,16 @@ test("a broad issue match stays outside selected-project research and license ev
       payload.sources.find((s: any) => s.id === "E2").url,
       request.url,
     );
-    assert.equal(
-      payload.sources.find((s: any) => s.id === "E3").excerpt,
-      project.excerpt,
+    const compactProject = payload.sources.find(
+      (s: any) => s.id === "E3",
+    ).excerpt;
+    assert.ok(compactProject.length <= 2000);
+    assert.ok(
+      compactProject.includes("The current release supports draft approval."),
     );
     assert.equal(
       payload.sources.find((s: any) => s.id === "E3").excerptTruncated,
-      false,
+      true,
     );
     assert.equal(
       payload.sources.find((s: any) => s.id === "E6").project,
@@ -1721,7 +1640,7 @@ test("a broad issue match stays outside selected-project research and license ev
     );
     assert.equal(
       payload.sources.find((s: any) => s.id === "E8").excerpt.length,
-      2200,
+      1400,
     );
     assert.equal(
       payload.sources.find((s: any) => s.id === "E8").excerptTruncated,
@@ -2409,7 +2328,7 @@ for (const mode of ["disconnected", "backoff"] as const) {
   });
 }
 
-test("a rejected factual correction leaves the supported draft unchanged", async () => {
+test("an interrupted repair retains its draft without falsely approving delivery", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-dispute-"));
   const env = { ...process.env };
   process.env.DEEPSEEK_API_KEY = "unit-test-only";
@@ -2454,9 +2373,12 @@ test("a rejected factual correction leaves the supported draft unchanged", async
     return brief();
   };
   try {
-    assert.equal(await runDeepResearch(e, t, () => {}), true);
-    assert.deepEqual(t.result, brief());
-    assert.equal(t.work, undefined);
+    await assert.rejects(
+      runDeepResearch(e, t, () => {}),
+      /accurate draft/,
+    );
+    assert.equal(t.result, undefined);
+    assert.deepEqual(t.work?.draft, brief());
     assert.equal(calls.length, 3);
   } finally {
     await e.close();
