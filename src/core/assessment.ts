@@ -380,23 +380,24 @@ export function marketAssessment(m: Market, locale: Locale = "en") {
           )
         : true,
     ),
-    narrative:
-      m.brief &&
-      [
-        m.brief[locale].headline || "",
-        m.brief[locale].summary,
-        ...m.brief[locale].nextSteps,
-      ].every(
-        (v) =>
-          !(m.brief?.strategyVersion
-            ? hasReportWordingProblem(v)
-            : hasNegativeWording(v)) &&
-          !new RegExp(
-            `(?:across|over|throughout)\\s+${m.metrics.points}\\b|在\\s*${m.metrics.points}\\s*(?:个|周)`,
-            "i",
-          ).test(v) &&
-          (!!recoveryTime || !hasRecoveryTimeReference(v)),
-      )
+    narrative: m.brief?.report
+      ? { ...m.brief[locale], kind: "ai" as const }
+      : m.brief &&
+          [
+            m.brief[locale].headline || "",
+            m.brief[locale].summary,
+            ...m.brief[locale].nextSteps,
+          ].every(
+            (v) =>
+              !(m.brief?.strategyVersion
+                ? hasReportWordingProblem(v)
+                : hasNegativeWording(v)) &&
+              !new RegExp(
+                `(?:across|over|throughout)\\s+${m.metrics.points}\\b|在\\s*${m.metrics.points}\\s*(?:个|周)`,
+                "i",
+              ).test(v) &&
+              (!!recoveryTime || !hasRecoveryTimeReference(v)),
+          )
         ? {
             ...m.brief[locale],
             kind: "ai" as const,

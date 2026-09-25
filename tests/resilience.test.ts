@@ -413,7 +413,7 @@ test("saved negative narratives render positive evidence in HTML and exports whi
   assert.equal(JSON.stringify(m), original);
 });
 
-test("empty source evidence still reaches hypothesis generation and preserves measured uncertainty", async () => {
+test("empty source evidence stops generation instead of inventing directions and preserves uncertainty", async () => {
   const { Engine } = await import("../src/core/engine.js");
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-pending-")),
     engine = new Engine(new Store(dir));
@@ -459,9 +459,9 @@ test("empty source evidence still reaches hypothesis generation and preserves me
   };
   try {
     const m = await engine.scan("小猫语言翻译器", { refresh: true });
-    assert.equal(briefs, 1);
-    assert.equal(m.brief?.basis, "hypothesis-led");
-    assert.equal(m.aiError, undefined);
+    assert.equal(briefs, 0);
+    assert.equal(m.brief, undefined);
+    assert.ok(m.aiError);
     assert.equal(m.kind, "uncertain");
     assert.ok(engine.store.report(m.id));
     assert.match(

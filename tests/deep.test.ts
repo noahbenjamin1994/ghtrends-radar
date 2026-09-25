@@ -1253,7 +1253,7 @@ for (const outcome of ["accept", "reject", "provider-error"] as const) {
   });
 }
 
-test("private research API protects HTML, exports, CSRF, duplicate admission, daily quota and history", async () => {
+test("retired deep API rejects new work while keeping private history, exports, CSRF and used credits", async () => {
   const env = { ...process.env },
     dir = mkdtempSync(join(tmpdir(), "ghtrends-deep-api-"));
   process.env.GHTRENDS_HOSTED = "1";
@@ -1340,75 +1340,36 @@ test("private research API protects HTML, exports, CSRF, duplicate admission, da
       (await call("/api/research", "POST", body, "alice", "bad")).status,
       403,
     );
-    assert.equal(
-      (await call("/api/research", "POST", body, "bob")).status,
-      404,
-    );
-    assert.equal(
-      (await call("/api/research", "POST", { ...body, context: "<script>" }))
-        .status,
-      400,
-    );
-    const start = await call("/api/research", "POST", body);
-    assert.equal(start.status, 202);
-    const t = await start.json();
-    assert.equal(t.owner, undefined);
-    await until(() => entered);
-    const duplicate = await call("/api/research", "POST", body);
-    assert.equal(duplicate.status, 200);
-    assert.equal((await duplicate.json()).id, t.id);
-    assert.equal(
-      (await call("/api/research", "POST", { ...body, question: "audience" }))
-        .status,
-      409,
-    );
-    assert.equal(
-      (
-        await call("/api/research", "POST", {
-          ...body,
-          requestKey: randomUUID(),
-        })
-      ).status,
-      409,
-    );
+    assert.equal((await call("/api/research", "POST", body)).status, 503);
+    assert.equal(entered, false);
+    const saved = task();
+    e.store.createDeepTask(saved, "historical", true);
+    const claimed = e.store.claimDeepTask(saved.id, "alice")!;
+    claimed.result = brief();
+    e.store.finishDeepTask(claimed, true);
     for (const path of [
-      `/api/research/${t.id}`,
-      `/api/research/${t.id}/export`,
-      `/api/research/${t.id}/export?format=json`,
-      `/research/${t.id}`,
-    ])
+      `/api/research/${saved.id}`,
+      `/api/research/${saved.id}/export`,
+      `/research/${saved.id}`,
+    ]) {
       assert.equal((await call(path, "GET", undefined, "bob")).status, 404);
-    assert.equal((await call(`/research/${t.id}`)).status, 200);
-    const html = await (await call(`/research/${t.id}`)).text();
-    assert.match(html, /noindex/);
+      assert.equal((await call(path)).status, 200);
+    }
     assert.equal(
-      (await call(`/api/research/${t.id}/retry`, "POST", undefined, "bob"))
-        .status,
-      404,
+      (await call(`/api/research/${saved.id}/retry`, "POST", {})).status,
+      503,
     );
-    release();
-    await until(() => e.store.deepTask(t.id, "alice")?.state === "complete");
-    const result = await (await call(`/api/research/${t.id}`)).json();
-    assert.equal(result.credit, "used");
-    assert.ok(result.result);
-    assert.equal(e.store.usage("alice"), 0);
     const account = await (await call("/api/account")).json();
+    assert.equal(account.deep.enabled, false);
+    assert.equal(account.deep.paidAvailable, false);
+    assert.equal(account.checkoutUrl, null);
     assert.equal(account.deep.allowance.used, 1);
-    assert.equal(account.deep.allowance.remaining, 0);
     const list = await (await call("/api/research")).json();
     assert.equal(list.tasks.length, 1);
     assert.equal(list.tasks[0].owner, undefined);
-    const md = await call(`/api/research/${t.id}/export?lang=zh`);
-    assert.equal(md.status, 200);
-    assert.match(await md.text(), /保留草稿comments意见/);
-    assert.equal(
-      (
-        await call("/api/research", "POST", {
-          ...body,
-          requestKey: randomUUID(),
-        })
-      ).status,
-      409,
+    assert.match(
+      await (await call(`/api/research/${saved.id}/export?lang=zh`)).text(),
+      /保留草稿评审意见/,
     );
   } finally {
     release();
@@ -2102,7 +2063,7 @@ test("deleting private research removes its contents while preserving used trial
   }
 });
 
-test("paid research API keeps retry consent, repeated attempts, private output and actual completion aligned", async () => {
+test("retired paid research accepts no new reservations and preserves purchased balance", async () => {
   const env = { ...process.env };
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-paid-api-"));
   process.env.GHTRENDS_HOSTED = "1";
@@ -2174,70 +2135,18 @@ test("paid research API keeps retry consent, repeated attempts, private output a
   try {
     const input = { ...task().request, funding: "pack" };
     assert.equal((await call("/api/research", input, false)).status, 401);
-    const start = await call("/api/research", input);
-    assert.equal(start.status, 202);
-    const saved = await start.json();
-    await until(
-      () => e.store.deepTask(saved.id, "alice")?.credit === "returned",
-    );
-    assert.equal(provider.reservations, 1);
+    assert.equal((await call("/api/research", input)).status, 503);
+    assert.equal((await call("/api/research", input)).status, 503);
+    assert.equal(provider.reservations, 0);
     assert.equal(provider.consumed, 0);
+    assert.equal(provider.balance(), 10);
+    assert.equal(writes, 0);
     assert.equal(e.store.deepAllowance("alice", true).remaining, 1);
-    const duplicate = await call("/api/research", input);
-    assert.equal((await duplicate.json()).id, saved.id);
-    assert.equal(provider.reservations, 1);
-    assert.equal(
-      (await call(`/api/research/${saved.id}/retry`, {})).status,
-      400,
-    );
-    assert.equal(
-      (
-        await call(`/api/research/${saved.id}/retry`, {
-          funding: "pack",
-          fromAttempt: 1,
-        })
-      ).status,
-      202,
-    );
-    await until(
-      () => e.store.deepTask(saved.id, "alice")?.credit === "returned",
-    );
-    assert.equal(e.store.deepTask(saved.id, "alice")?.attempts, 2);
-    assert.equal(provider.reservations, 2);
-    // A delayed duplicate from attempt one must not start attempt three.
-    const repeated = await call(`/api/research/${saved.id}/retry`, {
-      funding: "pack",
-      fromAttempt: 1,
-    });
-    assert.equal((await repeated.json()).attempts, 2);
-    assert.equal(provider.reservations, 2);
-    succeed = true;
-    await call(`/api/research/${saved.id}/retry`, {
-      funding: "pack",
-      fromAttempt: 2,
-    });
-    await until(() => e.store.deepTask(saved.id, "alice")?.credit === "used");
-    const final = await (await call(`/api/research/${saved.id}`)).json();
-    assert.equal(final.state, "complete");
-    assert.equal(final.funding, "pack");
-    assert.equal(final.attempts, 3);
-    assert.ok(final.result);
-    assert.equal(provider.consumed, 1);
-    assert.equal(provider.releases, 2);
-    assert.equal(provider.balance(), 9);
-    assert.equal(writes, 3);
-    const receipt = e.store.deepPayment(saved.id)!.receipt!;
-    const exported = await (
-      await call(`/api/research/${saved.id}/export?format=json`)
-    ).text();
-    assert.ok(!exported.includes(receipt.reservation_id));
-    assert.ok(!exported.includes(receipt.lot_id));
-    assert.equal(
-      (await call(`/api/research/${saved.id}`, undefined, false)).status,
-      401,
-    );
     const balance = await (await call("/api/account/credits")).json();
-    assert.equal(balance.data.balance.available, 9);
+    assert.equal(balance.data.balance.available, 10);
+    const account = await (await call("/api/account")).json();
+    assert.equal(account.deep.paidAvailable, false);
+    assert.equal(account.checkoutUrl, null);
   } finally {
     app.locals.stopDeepResearch?.();
     app.locals.stopCollector?.();

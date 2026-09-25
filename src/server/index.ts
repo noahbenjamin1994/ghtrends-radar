@@ -9,6 +9,7 @@ import { ENGAGEMENT_EVENTS, type EngagementEvent } from "../core/engagement.js";
 import { marketGapSignals, selectGapSignals } from "../core/gaps.js";
 import express from "express";
 import { operationContext } from "../core/operations.js";
+import { REPORT_DEADLINE_MS } from "../core/report-contract.js";
 import { mergeActivity } from "../core/activity.js";
 import { streamSnapshot } from "./stream.js";
 import sharp from "sharp";
@@ -268,10 +269,15 @@ export function createApp(
         job.state = "running";
         engine.store.updateRun(job.id, "running");
         try {
+          if (!job.refresh && Date.now() - job.created >= REPORT_DEADLINE_MS)
+            throw new Error(
+              "The one-minute research window expired. Please retry; this attempt's credit is returned.",
+            );
           job.market = await operationContext.run(
             {
               runId: job.id,
               userId: job.owner,
+              llmBudget: { calls: 0, outputTokens: 0, maxCalls: 1 },
               onActivity: (activity) => {
                 job.progress = {
                   stage: job.progress?.stage || "interpreting",
@@ -291,6 +297,9 @@ export function createApp(
                 owner: job.owner,
                 private: auth.hosted && !!job.owner,
                 preparedTopic: job.preparedTopic,
+                deadlineAt: job.refresh
+                  ? undefined
+                  : job.created + REPORT_DEADLINE_MS,
                 onProgress: (progress) => {
                   job.progress = { ...job.progress, ...progress };
                   engine.store.set("job:" + job.id, job, 3600000);
@@ -950,7 +959,7 @@ export function createApp(
         )
           return r.status(202).json(job);
       const cacheKey =
-        "research:v1:" +
+        "research:single-1:" +
         createHash("sha256")
           .update(
             JSON.stringify([
@@ -999,11 +1008,14 @@ export function createApp(
       if (
         [...jobs.values()].filter((j) =>
           ["queued", "running"].includes(j.state),
-        ).length >= 12
+        ).length >= 1
       )
         return r
           .status(429)
-          .json({ error: "The scan queue is full. Please try again shortly." });
+          .json({
+            error:
+              "Research is busy. Please retry shortly; no credit was reserved.",
+          });
       for (const [id, j] of jobs)
         if (
           Date.now() - j.created > 3600000 &&
@@ -1061,11 +1073,14 @@ export function createApp(
       if (
         [...jobs.values()].filter((j) =>
           ["queued", "running"].includes(j.state),
-        ).length >= 12
+        ).length >= 1
       )
         return r
           .status(429)
-          .json({ error: "The scan queue is full. Please try again shortly." });
+          .json({
+            error:
+              "Research is busy. Please retry shortly; no credit was reserved.",
+          });
       const job: Job = {
         id: randomUUID(),
         state: "queued",

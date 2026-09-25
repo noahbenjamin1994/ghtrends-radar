@@ -1156,15 +1156,10 @@ export function AdminView({ account }: { account: Account | null }) {
               </dd>
               <dt>{l("Research generation", "研究生成模式")}</dt>
               <dd>
-                {data.configuration.researchReviewThinking === "low"
-                  ? l(
-                      "Light reasoning for final review; direct extraction and writing",
-                      "最终复核：轻量思考 · 资料提取与正文：直接生成",
-                    )
-                  : l(
-                      "Direct generation with evidence review",
-                      "直接生成 · 保留证据复核",
-                    )}
+                {l(
+                  "One report write · thinking disabled · local citation checks",
+                  "一次正文生成 · thinking 关闭 · 本地引用校验",
+                )}
               </dd>
               <dt>{l("Daily research allowance", "每人每日研究额度")}</dt>
               <dd>{data.configuration.dailyLimit}</dd>

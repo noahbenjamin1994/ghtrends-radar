@@ -2,6 +2,7 @@ import { BusyMark } from "../ui/loading.js";
 import { InspirationDeck } from "./inspiration.js";
 import { ScopeReview } from "./preflight.js";
 import { DeepResearchView } from "./deep.js";
+import { DomainReport } from "./domain-report.js";
 import { AccountView } from "./credits.js";
 import { ResearchFeedback } from "./feedback.js";
 import {
@@ -617,7 +618,9 @@ export function App() {
                 <div>
                   <div className="eyebrow">
                     <span className="live-dot" />
-                    {t("THE OPEN-SOURCE OPPORTUNITY RADAR")}
+                    {locale === "zh"
+                      ? "从领域证据发现方向"
+                      : "DOMAIN EVIDENCE → PRODUCT DIRECTIONS"}
                   </div>
                   <h1>{t("Research your next idea")}</h1>
                 </div>
@@ -628,8 +631,8 @@ export function App() {
                     )}
                     <br />
                     {locale === "zh"
-                      ? "免费轻量报告，先找到方向。深度研究，再决定投入。"
-                      : "Start with a free light brief. Go deeper before you invest."}
+                      ? "先看整个领域，再从证据中找到方向。确认开始后，目标 1 分钟内交付。"
+                      : "Understand the field, then find directions in the evidence. Target: within one minute after confirmation."}
                   </p>
                   <div className="source-chips">
                     <span>
@@ -1497,11 +1500,11 @@ function MarketView({
               : t(m.topic.name)}
           </h1>
           <p className="report-edition">
-            <strong>{l("FREE LIGHT BRIEF", "免费轻量报告")}</strong>
+            <strong>{l("DOMAIN REPORT", "领域研究报告")}</strong>
             <span>·</span> {m.asOf.slice(0, 10)} <span>·</span>
             {l(
-              "A clear judgment, focused directions, one next step",
-              "一个判断、精选方向、一个下一步",
+              "Understand the field. Derive directions from evidence.",
+              "先看整个领域，再从证据中拆出方向",
             )}
           </p>
         </div>
@@ -1607,571 +1610,587 @@ function MarketView({
           )}
         </p>
       )}
-      <ReportReading>
-        <a href="#outlook">{l("Overview", "判断概览")}</a>
-        {visibleOpportunities(m.brief) && (
-          <a href="#opportunities">{l("Directions", "方向地图")}</a>
-        )}
-        <a href="#decision">{l("Next step", "下一步")}</a>
-        <a href="#appendix">{l("Evidence appendix", "证据附录")}</a>
-      </ReportReading>
-      <section
-        id="outlook"
-        className={`report-outlook ${displayKind}`}
-        style={
-          {
-            "--outlook-accent": presentation.color,
-            "--outlook-wash": presentation.wash,
-          } as React.CSSProperties
-        }
-      >
-        <div className="outlook-copy">
-          <div className="outlook-meta">
-            {l("THE OPPORTUNITY IN FOCUS", "这次，机会在哪里")}
-          </div>
-          <h2>
-            {opportunityMap?.overview &&
-            assessment.narrative.kind === "ai" &&
-            assessment.narrative.headline
-              ? assessment.narrative.headline
-              : opportunityMap
-                ? l(
-                    `${opportunityMap.opportunities.length} directions. Find your way in.`,
-                    `${opportunityMap.opportunities.length} 个细分方向，找到适合你的切入点`,
-                  )
-                : assessment.narrative.kind === "ai" &&
-                    assessment.narrative.headline
-                  ? assessment.narrative.headline
-                  : assessment.title}
-          </h2>
-          <p className="outlook-summary">
-            {assessment.narrative.kind === "ai"
-              ? assessment.narrative.summary
-              : assessment.summary}
-          </p>
-          <div className="outlook-byline">
-            <span>
-              {"ghtrends research"} ·{" "}
-              {assessment.narrative.kind === "ai"
-                ? l("Source-led interpretation", "基于来源的解读")
-                : l("Collected evidence", "采集证据摘要")}
-            </span>
-            <span>
-              {new Date(m.asOf).toLocaleDateString(
-                locale === "zh" ? "zh-CN" : "en-US",
-              )}
-            </span>
-          </div>
-        </div>
-        <aside className="outlook-signal">
-          <div className="outlook-verdict">
-            <span className="outlook-verdict-caption">
-              {assessment.basisLabel}
-            </span>
-            <h3>{assessment.landscape}</h3>
-            <p>{assessment.reason}</p>
-          </div>
-          <div className="outlook-momentum">
-            <span>{l("Search momentum", "搜索动向")}</span>
-            <strong>
-              {m.metrics.emerging ? (
-                t("Low-base rise")
-              ) : (
-                <Growth
-                  value={assessment.searchReady ? m.metrics.growth : null}
-                />
-              )}
-            </strong>
-          </div>
-          <span className="outlook-window">
-            {t("Last 8 complete weeks vs previous 8")}
-          </span>
-          <Sparkline
-            values={demandPoints.slice(-26).map((p) => p.value)}
-            color={m.metrics.trend === "falling" ? "#a65c42" : "#277c81"}
-            height={70}
-            domain={[0, 100]}
-          />
-          <a href={m.demand.sourceUrl} target="_blank" rel="noreferrer">
-            Google Trends <ExternalLink size={12} />
-          </a>
-        </aside>
-      </section>
-      {m.aiError && (
-        <div className="report-delivery-note" role="alert">
-          <strong>{l("Analysis is incomplete", "分析正文尚未完成")}</strong>
-          <div>
-            {l(
-              "The overview, directions and validation plan could not be completed. The collected sources below remain available; update this research to retry the analysis.",
-              "整体机会、方向分析和验证计划未能完成。下方保留已采集的来源数据，可点击「更新研究」重新生成分析。",
+      {m.brief?.report ? (
+        <DomainReport market={m} locale={locale} />
+      ) : (
+        <>
+          <ReportReading>
+            <a href="#outlook">{l("Overview", "判断概览")}</a>
+            {visibleOpportunities(m.brief) && (
+              <a href="#opportunities">{l("Directions", "方向地图")}</a>
             )}
-          </div>
-        </div>
-      )}
-      <div className="report-facts">
-        <div>
-          <span>{l("Year over year", "同比搜索变化")}</span>
-          <strong>
-            <Growth value={m.metrics.yearOverYear} />
-          </strong>
-          <small>
-            {l("Same 8 weeks, one year apart", "与去年相同的 8 周比较")}
-          </small>
-        </div>
-        <div>
-          <span>{l("Open-source alternatives", "同类开源项目")}</span>
-          <strong>
-            {m.supply.error ? "—" : number(m.competition?.direct ?? 0)}
-            <em>{l("projects", "个")}</em>
-          </strong>
-          <small>
-            {l("Reviewed GitHub search matches", "当前 GitHub 检索与审核范围")}
-          </small>
-        </div>
-        <div>
-          <span>{l("Open-source competition", "开源竞争程度")}</span>
-          <strong>
-            {competitionPressure(m)}
-            <em>/ 100</em>
-          </strong>
-          <small>{t("pressure." + (m.competition?.level || "pending"))}</small>
-        </div>
-        <div>
-          <span>{l("Search coverage", "搜索数据覆盖")}</span>
-          <strong>
-            {m.metrics.points}
-            <em>{l("weeks", "周")}</em>
-          </strong>
-          <small>
-            {t(m.confidence)} · {t("evidence confidence")}
-          </small>
-        </div>
-      </div>
-      {m.brief && (
-        <OpportunityMap
-          key={`opportunities:${m.id}`}
-          market={m}
-          locale={locale}
-        />
-      )}
-      {!opportunityMap &&
-        (strategy ? (
-          <section className="strategy-section" id="decision">
-            <div className="report-section-heading">
-              <div>
-                <div className="eyebrow">
-                  {l("FIRST DIRECTION · A DEEPER LOOK", "优先方向 · 深入一步")}
-                </div>
-                <h3>{strategy.angle}</h3>
+            <a href="#decision">{l("Next step", "下一步")}</a>
+            <a href="#appendix">{l("Evidence appendix", "证据附录")}</a>
+          </ReportReading>
+          <section
+            id="outlook"
+            className={`report-outlook ${displayKind}`}
+            style={
+              {
+                "--outlook-accent": presentation.color,
+                "--outlook-wash": presentation.wash,
+              } as React.CSSProperties
+            }
+          >
+            <div className="outlook-copy">
+              <div className="outlook-meta">
+                {l("THE OPPORTUNITY IN FOCUS", "这次，机会在哪里")}
               </div>
-              <span className="strategy-basis">
-                {m.brief?.basis === "source-led"
-                  ? l("Source-led hypothesis", "基于来源的策略假设")
-                  : l("Domain hypothesis", "领域知识推演")}
-              </span>
-            </div>
-            <p className="strategy-audience">{strategy.audience}</p>
-            <div className="strategy-reasoning">
-              <div>
-                <h4>{l("The mechanism", "关键洞察")}</h4>
-                <p>{strategy.mechanism}</p>
-              </div>
-              <div>
-                <h4>{l("The first useful artifact", "第一件值得做的东西")}</h4>
-                <p>{strategy.wedge}</p>
-              </div>
-            </div>
-            <details className="strategy-tradeoffs">
-              <summary>
-                {l("The tradeoff & the assumption", "这条路的取舍与关键假设")}
-              </summary>
-              <div className="strategy-reasoning">
-                <div>
-                  <h4>{l("Deliberate tradeoff", "主动取舍")}</h4>
-                  <p>{strategy.tradeoff}</p>
-                </div>
-                <div>
-                  <h4>{l("What must hold true", "成立条件")}</h4>
-                  <p>{strategy.assumption}</p>
-                </div>
-              </div>
-            </details>
-            <div className="strategy-experiment">
-              <div className="eyebrow">
-                {l("THE DECIDING EXPERIMENT", "用一次实验决定投入")}
-              </div>
-              <p>{strategy.experiment}</p>
-              <div className="strategy-decisions">
-                <div>
-                  <h4>{l("Continue when", "建议继续的信号")}</h4>
-                  <p>{strategy.successSignal}</p>
-                </div>
-                <div>
-                  <h4>{l("Change direction when", "建议转向的信号")}</h4>
-                  <p>{strategy.pivotSignal}</p>
-                </div>
-              </div>
-            </div>
-            <div className="strategy-sources">
-              <span>{l("Premise sources", "推演依据")}</span>
-              {m.brief?.evidence
-                ?.filter(
-                  (ref, index, refs) =>
-                    refs.findIndex((r) => r.id === ref.id) === index,
-                )
-                .map((ref) => {
-                  const source = m.brief!.sources.find((s) => s.id === ref.id);
-                  return source ? (
-                    <a
-                      key={ref.id}
-                      title={ref.quote}
-                      href={source.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {source.label}
-                      <ExternalLink size={12} />
-                    </a>
-                  ) : null;
-                })}
-            </div>
-            <p className="footnote">
-              {l(
-                "AI strategy hypothesis. The thresholds are proposed experiment criteria; actual outcomes determine the next decision.",
-                "以上为 AI 提出的策略假设。数字门槛属于建议实验标准，真实结果用于决定下一步。",
-              )}
-            </p>
-          </section>
-        ) : (
-          <section className="report-actions-section" id="decision">
-            <div className="report-section-heading">
-              <div>
-                <div className="eyebrow">
-                  {l("YOUR NEXT MOVE", "下一步怎么做")}
-                </div>
-                <h3>
-                  {l(
-                    "Turn the signal into a small experiment",
-                    "把判断变成一次小验证",
+              <h2>
+                {opportunityMap?.overview &&
+                assessment.narrative.kind === "ai" &&
+                assessment.narrative.headline
+                  ? assessment.narrative.headline
+                  : opportunityMap
+                    ? l(
+                        `${opportunityMap.opportunities.length} directions. Find your way in.`,
+                        `${opportunityMap.opportunities.length} 个细分方向，找到适合你的切入点`,
+                      )
+                    : assessment.narrative.kind === "ai" &&
+                        assessment.narrative.headline
+                      ? assessment.narrative.headline
+                      : assessment.title}
+              </h2>
+              <p className="outlook-summary">
+                {assessment.narrative.kind === "ai"
+                  ? assessment.narrative.summary
+                  : assessment.summary}
+              </p>
+              <div className="outlook-byline">
+                <span>
+                  {"ghtrends research"} ·{" "}
+                  {assessment.narrative.kind === "ai"
+                    ? l("Source-led interpretation", "基于来源的解读")
+                    : l("Collected evidence", "采集证据摘要")}
+                </span>
+                <span>
+                  {new Date(m.asOf).toLocaleDateString(
+                    locale === "zh" ? "zh-CN" : "en-US",
                   )}
-                </h3>
+                </span>
               </div>
-              <span>{l("A practical starting point", "从具体行动开始")}</span>
             </div>
-            <ol className="report-next-steps">
-              {assessment.narrative.nextSteps.slice(0, 3).map((step, i) => (
-                <li key={step}>
-                  <span>{String(i + 1).padStart(2, "0")}</span>
-                  <p>{step}</p>
-                </li>
-              ))}
-            </ol>
+            <aside className="outlook-signal">
+              <div className="outlook-verdict">
+                <span className="outlook-verdict-caption">
+                  {assessment.basisLabel}
+                </span>
+                <h3>{assessment.landscape}</h3>
+                <p>{assessment.reason}</p>
+              </div>
+              <div className="outlook-momentum">
+                <span>{l("Search momentum", "搜索动向")}</span>
+                <strong>
+                  {m.metrics.emerging ? (
+                    t("Low-base rise")
+                  ) : (
+                    <Growth
+                      value={assessment.searchReady ? m.metrics.growth : null}
+                    />
+                  )}
+                </strong>
+              </div>
+              <span className="outlook-window">
+                {t("Last 8 complete weeks vs previous 8")}
+              </span>
+              <Sparkline
+                values={demandPoints.slice(-26).map((p) => p.value)}
+                color={m.metrics.trend === "falling" ? "#a65c42" : "#277c81"}
+                height={70}
+                domain={[0, 100]}
+              />
+              <a href={m.demand.sourceUrl} target="_blank" rel="noreferrer">
+                Google Trends <ExternalLink size={12} />
+              </a>
+            </aside>
           </section>
-        ))}
-      {m.demand.retryAt && (
-        <p className="admin-note">
-          {t("Google Trends refresh window")}:{" "}
-          {new Date(m.demand.retryAt).toLocaleString(
-            locale === "zh" ? "zh-CN" : "en",
+          {m.aiError && (
+            <div className="report-delivery-note" role="alert">
+              <strong>{l("Analysis is incomplete", "分析正文尚未完成")}</strong>
+              <div>
+                {l(
+                  "The overview, directions and validation plan could not be completed. The collected sources below remain available; update this research to retry the analysis.",
+                  "整体机会、方向分析和验证计划未能完成。下方保留已采集的来源数据，可点击「更新研究」重新生成分析。",
+                )}
+              </div>
+            </div>
           )}
-          {" · "}
-          {m.demand.points.length
-            ? t("Using the dated source snapshot")
-            : t("Source collection is pending; refresh after this time")}
-        </p>
-      )}
-      {m.demand.selectionReason && (
-        <p className="admin-note">
-          {t(m.demand.selectionReason)} ({m.demand.requestedKeyword} →{" "}
-          {m.demand.keyword})
-        </p>
-      )}
-      <details className="report-appendix" id="appendix">
-        <summary>
-          <span>
-            <strong>{l("Open the evidence appendix", "展开证据附录")}</strong>
-            <small>
-              {l(
-                "Whole-topic analysis, competitors, source documents, projects, requests and method",
-                "整体分析、同行、来源原文、相关项目、用户请求与研究方法",
-              )}
-            </small>
-          </span>
-          <ChevronDown size={18} aria-hidden="true" />
-        </summary>
-        <div className="report-appendix-content">
-          {m.brief && !researchLandscape(m) && (
-            <TopicOverview
-              brief={m.brief}
+          <div className="report-facts">
+            <div>
+              <span>{l("Year over year", "同比搜索变化")}</span>
+              <strong>
+                <Growth value={m.metrics.yearOverYear} />
+              </strong>
+              <small>
+                {l("Same 8 weeks, one year apart", "与去年相同的 8 周比较")}
+              </small>
+            </div>
+            <div>
+              <span>{l("Open-source alternatives", "同类开源项目")}</span>
+              <strong>
+                {m.supply.error ? "—" : number(m.competition?.direct ?? 0)}
+                <em>{l("projects", "个")}</em>
+              </strong>
+              <small>
+                {l(
+                  "Reviewed GitHub search matches",
+                  "当前 GitHub 检索与审核范围",
+                )}
+              </small>
+            </div>
+            <div>
+              <span>{l("Open-source competition", "开源竞争程度")}</span>
+              <strong>
+                {competitionPressure(m)}
+                <em>/ 100</em>
+              </strong>
+              <small>
+                {t("pressure." + (m.competition?.level || "pending"))}
+              </small>
+            </div>
+            <div>
+              <span>{l("Search coverage", "搜索数据覆盖")}</span>
+              <strong>
+                {m.metrics.points}
+                <em>{l("weeks", "周")}</em>
+              </strong>
+              <small>
+                {t(m.confidence)} · {t("evidence confidence")}
+              </small>
+            </div>
+          </div>
+          {m.brief && (
+            <OpportunityMap
+              key={`opportunities:${m.id}`}
+              market={m}
               locale={locale}
-              topic={m.topic.plan?.input || m.topic.name}
             />
           )}
-          <LandscapePanel market={m} locale={locale} />
-          <CompetitorPanel market={m} locale={locale} />
-          <SourceDocuments market={m} locale={locale} />
-          <div id="evidence" className="detail-columns report-evidence">
-            <section className="panel demand-panel">
-              <div className="panel-title">
-                <h3>{t("What demand looks like")}</h3>
-                <a href={m.demand.sourceUrl} target="_blank" rel="noreferrer">
-                  Google Trends <ExternalLink size={13} />
-                </a>
-              </div>
-              <div className="chart-caption">
-                <span>
-                  {t("Relative search interest for “")}
-                  {m.demand.keyword}”
-                </span>
-                <span>
-                  {demandPoints.length}
-                  {t("complete observations")}
-                </span>
-              </div>
-              <div className="large-chart">
-                <div className="chart-grid">
-                  <span>100</span>
-                  <span>50</span>
-                  <span>0</span>
-                </div>
-                <Sparkline
-                  values={demandPoints.map((p) => p.value)}
-                  color={topicColor(m.topic.slug)}
-                  height={180}
-                  fill
-                  domain={[0, 100]}
-                />
-              </div>
-              <div className="chart-dates">
-                <span>
-                  {demandPoints[0]?.date.slice(0, 10) || t("No history")}
-                </span>
-                <span>{demandPoints.at(-1)?.date.slice(0, 10)}</span>
-              </div>
-              <p className="footnote">
-                {t(
-                  "Original values are relative Google Trends indices on a 0–100 scale, not search counts.",
-                )}
-              </p>
-            </section>
-            <aside className="panel report-reading">
-              <div className="eyebrow">
-                {l("READING THE EVIDENCE", "如何读这些信号")}
-              </div>
-              <h3>
-                {l("The facts behind the recommendation", "这份判断的依据")}
-              </h3>
-              {(m.reasons.length ? m.reasons : assessment.facts)
-                .slice(0, 3)
-                .map((f, i) => (
-                  <div className="reading-fact" key={f}>
-                    <span>{i + 1}</span>
-                    <p>{t(f)}</p>
-                  </div>
-                ))}
-              <p className="footnote">
-                {l(
-                  "Search attention, open-source alternatives and customer demand are distinct research signals. Validate your audience through direct conversations.",
-                  "搜索关注度、开源替代项目与客户需求分别提供研究线索。可通过直接交流核实目标用户的需求。",
-                )}
-              </p>
-            </aside>
-          </div>
-          {!!m.demand.alternatives?.length && (
-            <details className="panel">
-              <summary>{t("Related search terms")}</summary>
-              <div className="panel-title">
-                <div>
-                  <h3>{t("Related search terms")}</h3>
-                  <p>
-                    {t(
-                      "Measured separately; normalized indices are not added.",
-                    )}
-                  </p>
-                </div>
-              </div>
-              <div className="synonym-series">
-                {[m.demand, ...m.demand.alternatives].map((d, i) => (
-                  <article key={d.keyword}>
-                    <strong>{d.keyword}</strong>
-                    <small>
-                      {i === 0 ? t("Primary query") : t("Related search terms")}
-                    </small>
-                    <Sparkline
-                      values={completeWeeklySeries(d, m.asOf).points.map(
-                        (p) => p.value,
-                      )}
-                      color={i === 0 ? topicColor(m.topic.slug) : "#8963b0"}
-                      height={110}
-                      domain={[0, 100]}
-                    />
-                    <small>{t("Relative search interest")} · 0–100</small>
-                  </article>
-                ))}
-              </div>
-            </details>
-          )}
-          {!!m.supply.repositories.length && (
-            <section id="projects" className="panel report-projects">
-              <div className="panel-title">
-                <div>
-                  <h3>{t("The projects shaping this space")}</h3>
-                  <p>
-                    {t(
-                      "Direct alternatives appear first, followed by other matching projects.",
-                    )}
-                  </p>
-                </div>
-                <a href={m.supply.sourceUrl} target="_blank" rel="noreferrer">
-                  {t("View search")}
-                  <ExternalLink size={13} />
-                </a>
-              </div>
-              <p className="footnote">
-                {t(
-                  "Search matches can include libraries, integrations and resource lists. A topic tag does not prove a project is a direct competitor.",
-                )}
-              </p>
-              {m.competition && (
-                <details className="project-review">
-                  <summary>
-                    {t("Review project roles")} · {m.competition.sampled}
-                  </summary>
-                  {m.supply.repositories.map((r) => (
-                    <div className="project-review-row" key={r.name}>
-                      <a href={r.url} target="_blank" rel="noreferrer">
-                        {r.name}
-                      </a>
-                      <span>
-                        {t("role." + (r.relevance?.role || "unclear"))} ·{" "}
-                        {t(
-                          r.relevance?.method === "model"
-                            ? "AI review"
-                            : "Metadata rules",
-                        )}
-                      </span>
-                      <small>
-                        {r.relevance?.method === "model"
-                          ? r.relevance.reason
-                          : t(
-                              r.relevance?.reason ||
-                                "Project role awaiting closer review",
-                            )}
-                      </small>
+          {!opportunityMap &&
+            (strategy ? (
+              <section className="strategy-section" id="decision">
+                <div className="report-section-heading">
+                  <div>
+                    <div className="eyebrow">
+                      {l("A DIRECTION TO CONSIDER", "可考虑的方向")}
                     </div>
-                  ))}
-                </details>
-              )}
-              {(m.supply.searches?.length || 0) > 1 && (
-                <div className="search-scopes">
-                  <p>
-                    {t(
-                      "Counts are deduplicated across topic searches; incomplete searches show a lower bound.",
+                    <h3>{strategy.angle}</h3>
+                  </div>
+                  <span className="strategy-basis">
+                    {m.brief?.basis === "source-led"
+                      ? l("Source-led hypothesis", "基于来源的策略假设")
+                      : l("Domain hypothesis", "领域知识推演")}
+                  </span>
+                </div>
+                <p className="strategy-audience">{strategy.audience}</p>
+                <div className="strategy-reasoning">
+                  <div>
+                    <h4>{l("The mechanism", "关键洞察")}</h4>
+                    <p>{strategy.mechanism}</p>
+                  </div>
+                  <div>
+                    <h4>
+                      {l("The first useful artifact", "第一件值得做的东西")}
+                    </h4>
+                    <p>{strategy.wedge}</p>
+                  </div>
+                </div>
+                <details className="strategy-tradeoffs">
+                  <summary>
+                    {l(
+                      "The tradeoff & the assumption",
+                      "这条路的取舍与关键假设",
                     )}
-                  </p>
-                  {m.supply.searches!.map((source) => (
+                  </summary>
+                  <div className="strategy-reasoning">
+                    <div>
+                      <h4>{l("Deliberate tradeoff", "主动取舍")}</h4>
+                      <p>{strategy.tradeoff}</p>
+                    </div>
+                    <div>
+                      <h4>{l("What must hold true", "成立条件")}</h4>
+                      <p>{strategy.assumption}</p>
+                    </div>
+                  </div>
+                </details>
+                <div className="strategy-experiment">
+                  <div className="eyebrow">
+                    {l("THE DECIDING EXPERIMENT", "用一次实验决定投入")}
+                  </div>
+                  <p>{strategy.experiment}</p>
+                  <div className="strategy-decisions">
+                    <div>
+                      <h4>{l("Continue when", "建议继续的信号")}</h4>
+                      <p>{strategy.successSignal}</p>
+                    </div>
+                    <div>
+                      <h4>{l("Change direction when", "建议转向的信号")}</h4>
+                      <p>{strategy.pivotSignal}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="strategy-sources">
+                  <span>{l("Premise sources", "推演依据")}</span>
+                  {m.brief?.evidence
+                    ?.filter(
+                      (ref, index, refs) =>
+                        refs.findIndex((r) => r.id === ref.id) === index,
+                    )
+                    .map((ref) => {
+                      const source = m.brief!.sources.find(
+                        (s) => s.id === ref.id,
+                      );
+                      return source ? (
+                        <a
+                          key={ref.id}
+                          title={ref.quote}
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {source.label}
+                          <ExternalLink size={12} />
+                        </a>
+                      ) : null;
+                    })}
+                </div>
+                <p className="footnote">
+                  {l(
+                    "AI strategy hypothesis. The thresholds are proposed experiment criteria; actual outcomes determine the next decision.",
+                    "以上为 AI 提出的策略假设。数字门槛属于建议实验标准，真实结果用于决定下一步。",
+                  )}
+                </p>
+              </section>
+            ) : (
+              <section className="report-actions-section" id="decision">
+                <div className="report-section-heading">
+                  <div>
+                    <div className="eyebrow">
+                      {l("YOUR NEXT MOVE", "下一步怎么做")}
+                    </div>
+                    <h3>
+                      {l(
+                        "Turn the signal into a small experiment",
+                        "把判断变成一次小验证",
+                      )}
+                    </h3>
+                  </div>
+                  <span>
+                    {l("A practical starting point", "从具体行动开始")}
+                  </span>
+                </div>
+                <ol className="report-next-steps">
+                  {assessment.narrative.nextSteps.slice(0, 3).map((step, i) => (
+                    <li key={step}>
+                      <span>{String(i + 1).padStart(2, "0")}</span>
+                      <p>{step}</p>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ))}
+          {m.demand.retryAt && (
+            <p className="admin-note">
+              {t("Google Trends refresh window")}:{" "}
+              {new Date(m.demand.retryAt).toLocaleString(
+                locale === "zh" ? "zh-CN" : "en",
+              )}
+              {" · "}
+              {m.demand.points.length
+                ? t("Using the dated source snapshot")
+                : t("Source collection is pending; refresh after this time")}
+            </p>
+          )}
+          {m.demand.selectionReason && (
+            <p className="admin-note">
+              {t(m.demand.selectionReason)} ({m.demand.requestedKeyword} →{" "}
+              {m.demand.keyword})
+            </p>
+          )}
+          <details className="report-appendix" id="appendix">
+            <summary>
+              <span>
+                <strong>
+                  {l("Open the evidence appendix", "展开证据附录")}
+                </strong>
+                <small>
+                  {l(
+                    "Whole-topic analysis, competitors, source documents, projects, requests and method",
+                    "整体分析、同行、来源原文、相关项目、用户请求与研究方法",
+                  )}
+                </small>
+              </span>
+              <ChevronDown size={18} aria-hidden="true" />
+            </summary>
+            <div className="report-appendix-content">
+              {m.brief && !researchLandscape(m) && (
+                <TopicOverview
+                  brief={m.brief}
+                  locale={locale}
+                  topic={m.topic.plan?.input || m.topic.name}
+                />
+              )}
+              <LandscapePanel market={m} locale={locale} />
+              <CompetitorPanel market={m} locale={locale} />
+              <SourceDocuments market={m} locale={locale} />
+              <div id="evidence" className="detail-columns report-evidence">
+                <section className="panel demand-panel">
+                  <div className="panel-title">
+                    <h3>{t("What demand looks like")}</h3>
                     <a
-                      href={source.url}
+                      href={m.demand.sourceUrl}
                       target="_blank"
                       rel="noreferrer"
-                      key={source.query}
                     >
-                      <code>{source.query.split(" fork:")[0]}</code>
-                      <ExternalLink size={12} />
+                      Google Trends <ExternalLink size={13} />
                     </a>
-                  ))}
-                </div>
-              )}
-              {[...m.supply.repositories]
-                .sort(
-                  (a, b) =>
-                    Number(b.relevance?.role === "direct") -
-                    Number(a.relevance?.role === "direct"),
-                )
-                .slice(0, 10)
-                .map((r) => (
-                  <RepoRow
-                    key={r.name}
-                    repo={r}
-                    selected={selected.includes(r.name)}
-                    onSelect={() =>
-                      setSelected((current) =>
-                        current.includes(r.name)
-                          ? current.filter((n) => n !== r.name)
-                          : current.length < 6
-                            ? [...current, r.name]
-                            : current,
-                      )
-                    }
-                    watched={watch.includes(r.name)}
-                    onWatch={() => onWatch(r.name)}
-                    onView={() => navigate("/repo/" + r.name)}
-                  />
-                ))}
-              {!m.supply.repositories.length && (
-                <Empty
-                  title={t("No matching projects returned")}
-                  description={t(
-                    "A narrow topic or unavailable source can leave this view empty. Check the evidence notes below.",
-                  )}
-                />
-              )}
-              <div className="panel-bottom">
-                <button
-                  className="text-link"
-                  disabled={selected.length < 2}
-                  onClick={() =>
-                    navigate("/compare?repos=" + selected.join(","))
-                  }
-                >
-                  {t("Compare selected projects")} ({selected.length}/6)
-                  <GitCompareArrows size={16} />
-                </button>
-                <span className="footnote">
-                  {t("Star windows follow GitHub’s calendar buckets.")}
-                </span>
-              </div>
-            </section>
-          )}
-          {!!gapSignals.length && (
-            <section className="panel">
-              <div className="panel-title">
-                <div>
-                  <h3>{l("User requests and progress", "用户的问题与进展")}</h3>
-                  <p>
-                    {l(
-                      "Public requests from relevant projects. Review the original report and current version.",
-                      "来自相关项目的公开请求，结合原文与当前版本继续核对。",
+                  </div>
+                  <div className="chart-caption">
+                    <span>
+                      {t("Relative search interest for “")}
+                      {m.demand.keyword}”
+                    </span>
+                    <span>
+                      {demandPoints.length}
+                      {t("complete observations")}
+                    </span>
+                  </div>
+                  <div className="large-chart">
+                    <div className="chart-grid">
+                      <span>100</span>
+                      <span>50</span>
+                      <span>0</span>
+                    </div>
+                    <Sparkline
+                      values={demandPoints.map((p) => p.value)}
+                      color={topicColor(m.topic.slug)}
+                      height={180}
+                      fill
+                      domain={[0, 100]}
+                    />
+                  </div>
+                  <div className="chart-dates">
+                    <span>
+                      {demandPoints[0]?.date.slice(0, 10) || t("No history")}
+                    </span>
+                    <span>{demandPoints.at(-1)?.date.slice(0, 10)}</span>
+                  </div>
+                  <p className="footnote">
+                    {t(
+                      "Original values are relative Google Trends indices on a 0–100 scale, not search counts.",
                     )}
                   </p>
-                </div>
-                <span className="method-tag">
-                  {gapSignals.length}
-                  {t("signals")}
-                  {requestAuthors.size > 0 &&
-                    ` · ${requestAuthors.size} ${l("identified authors", "位已识别发起者")}`}
-                </span>
+                </section>
+                <aside className="panel report-reading">
+                  <div className="eyebrow">
+                    {l("READING THE EVIDENCE", "如何读这些信号")}
+                  </div>
+                  <h3>
+                    {l("The facts behind the recommendation", "这份判断的依据")}
+                  </h3>
+                  {(m.reasons.length ? m.reasons : assessment.facts)
+                    .slice(0, 3)
+                    .map((f, i) => (
+                      <div className="reading-fact" key={f}>
+                        <span>{i + 1}</span>
+                        <p>{t(f)}</p>
+                      </div>
+                    ))}
+                  <p className="footnote">
+                    {l(
+                      "Search attention, open-source alternatives and customer demand are distinct research signals. Validate your audience through direct conversations.",
+                      "搜索关注度、开源替代项目与客户需求分别提供研究线索。可通过直接交流核实目标用户的需求。",
+                    )}
+                  </p>
+                </aside>
               </div>
-              {gapSignals.length ? (
-                <>
-                  <div className="gap-grid gap-grid-research">
-                    {gapSignals.slice(0, 3).map((g) => (
-                      <RequestCard
-                        key={g.url}
-                        gap={g}
-                        brief={m.brief}
-                        locale={locale}
-                      />
+              {!!m.demand.alternatives?.length && (
+                <details className="panel">
+                  <summary>{t("Related search terms")}</summary>
+                  <div className="panel-title">
+                    <div>
+                      <h3>{t("Related search terms")}</h3>
+                      <p>
+                        {t(
+                          "Measured separately; normalized indices are not added.",
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="synonym-series">
+                    {[m.demand, ...m.demand.alternatives].map((d, i) => (
+                      <article key={d.keyword}>
+                        <strong>{d.keyword}</strong>
+                        <small>
+                          {i === 0
+                            ? t("Primary query")
+                            : t("Related search terms")}
+                        </small>
+                        <Sparkline
+                          values={completeWeeklySeries(d, m.asOf).points.map(
+                            (p) => p.value,
+                          )}
+                          color={i === 0 ? topicColor(m.topic.slug) : "#8963b0"}
+                          height={110}
+                          domain={[0, 100]}
+                        />
+                        <small>{t("Relative search interest")} · 0–100</small>
+                      </article>
                     ))}
                   </div>
-                  {gapSignals.length > 3 && (
-                    <details className="request-more">
+                </details>
+              )}
+              {!!m.supply.repositories.length && (
+                <section id="projects" className="panel report-projects">
+                  <div className="panel-title">
+                    <div>
+                      <h3>{t("The projects shaping this space")}</h3>
+                      <p>
+                        {t(
+                          "Direct alternatives appear first, followed by other matching projects.",
+                        )}
+                      </p>
+                    </div>
+                    <a
+                      href={m.supply.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {t("View search")}
+                      <ExternalLink size={13} />
+                    </a>
+                  </div>
+                  <p className="footnote">
+                    {t(
+                      "Search matches can include libraries, integrations and resource lists. A topic tag does not prove a project is a direct competitor.",
+                    )}
+                  </p>
+                  {m.competition && (
+                    <details className="project-review">
                       <summary>
-                        {l("View more requests", "查看更多请求")} ·{" "}
-                        {gapSignals.length - 3}
+                        {t("Review project roles")} · {m.competition.sampled}
                       </summary>
+                      {m.supply.repositories.map((r) => (
+                        <div className="project-review-row" key={r.name}>
+                          <a href={r.url} target="_blank" rel="noreferrer">
+                            {r.name}
+                          </a>
+                          <span>
+                            {t("role." + (r.relevance?.role || "unclear"))} ·{" "}
+                            {t(
+                              r.relevance?.method === "model"
+                                ? "AI review"
+                                : "Metadata rules",
+                            )}
+                          </span>
+                          <small>
+                            {r.relevance?.method === "model"
+                              ? r.relevance.reason
+                              : t(
+                                  r.relevance?.reason ||
+                                    "Project role awaiting closer review",
+                                )}
+                          </small>
+                        </div>
+                      ))}
+                    </details>
+                  )}
+                  {(m.supply.searches?.length || 0) > 1 && (
+                    <div className="search-scopes">
+                      <p>
+                        {t(
+                          "Counts are deduplicated across topic searches; incomplete searches show a lower bound.",
+                        )}
+                      </p>
+                      {m.supply.searches!.map((source) => (
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          key={source.query}
+                        >
+                          <code>{source.query.split(" fork:")[0]}</code>
+                          <ExternalLink size={12} />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {[...m.supply.repositories]
+                    .sort(
+                      (a, b) =>
+                        Number(b.relevance?.role === "direct") -
+                        Number(a.relevance?.role === "direct"),
+                    )
+                    .slice(0, 10)
+                    .map((r) => (
+                      <RepoRow
+                        key={r.name}
+                        repo={r}
+                        selected={selected.includes(r.name)}
+                        onSelect={() =>
+                          setSelected((current) =>
+                            current.includes(r.name)
+                              ? current.filter((n) => n !== r.name)
+                              : current.length < 6
+                                ? [...current, r.name]
+                                : current,
+                          )
+                        }
+                        watched={watch.includes(r.name)}
+                        onWatch={() => onWatch(r.name)}
+                        onView={() => navigate("/repo/" + r.name)}
+                      />
+                    ))}
+                  {!m.supply.repositories.length && (
+                    <Empty
+                      title={t("No matching projects returned")}
+                      description={t(
+                        "A narrow topic or unavailable source can leave this view empty. Check the evidence notes below.",
+                      )}
+                    />
+                  )}
+                  <div className="panel-bottom">
+                    <button
+                      className="text-link"
+                      disabled={selected.length < 2}
+                      onClick={() =>
+                        navigate("/compare?repos=" + selected.join(","))
+                      }
+                    >
+                      {t("Compare selected projects")} ({selected.length}/6)
+                      <GitCompareArrows size={16} />
+                    </button>
+                    <span className="footnote">
+                      {t("Star windows follow GitHub’s calendar buckets.")}
+                    </span>
+                  </div>
+                </section>
+              )}
+              {!!gapSignals.length && (
+                <section className="panel">
+                  <div className="panel-title">
+                    <div>
+                      <h3>
+                        {l("User requests and progress", "用户的问题与进展")}
+                      </h3>
+                      <p>
+                        {l(
+                          "Public requests from relevant projects. Review the original report and current version.",
+                          "来自相关项目的公开请求，结合原文与当前版本继续核对。",
+                        )}
+                      </p>
+                    </div>
+                    <span className="method-tag">
+                      {gapSignals.length}
+                      {t("signals")}
+                      {requestAuthors.size > 0 &&
+                        ` · ${requestAuthors.size} ${l("identified authors", "位已识别发起者")}`}
+                    </span>
+                  </div>
+                  {gapSignals.length ? (
+                    <>
                       <div className="gap-grid gap-grid-research">
-                        {gapSignals.slice(3).map((g) => (
+                        {gapSignals.slice(0, 3).map((g) => (
                           <RequestCard
                             key={g.url}
                             gap={g}
@@ -2180,223 +2199,255 @@ function MarketView({
                           />
                         ))}
                       </div>
-                    </details>
+                      {gapSignals.length > 3 && (
+                        <details className="request-more">
+                          <summary>
+                            {l("View more requests", "查看更多请求")} ·{" "}
+                            {gapSignals.length - 3}
+                          </summary>
+                          <div className="gap-grid gap-grid-research">
+                            {gapSignals.slice(3).map((g) => (
+                              <RequestCard
+                                key={g.url}
+                                gap={g}
+                                brief={m.brief}
+                                locale={locale}
+                              />
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </>
+                  ) : (
+                    <p className="muted">
+                      {t(
+                        "No issue signals were returned for this scan. This does not establish the absence of unmet demand.",
+                      )}
+                    </p>
                   )}
-                </>
-              ) : (
-                <p className="muted">
-                  {t(
-                    "No issue signals were returned for this scan. This does not establish the absence of unmet demand.",
-                  )}
-                </p>
+                </section>
               )}
-            </section>
-          )}
-          <section className="panel limits-panel">
-            <div className="panel-title">
-              <h3>
-                <Info size={18} />
-                {t("Know the boundaries")}
-              </h3>
-              <a
-                href={appUrl(`/api/reports/${m.id}`)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {t("Download evidence JSON")}
-                <ExternalLink size={13} />
-              </a>
-            </div>
-            <ul>
-              {assessment.scopeNotes.map((l) => (
-                <li key={l}>{t(l)}</li>
-              ))}
-            </ul>
-            {access?.public && (
-              <div className="embed-box">
-                <div>
-                  <strong>
-                    {t("Put this finding where others can discover it.")}
-                  </strong>
-                  <p>{t("Share a permanent snapshot of the evidence.")}</p>
+              <section className="panel limits-panel">
+                <div className="panel-title">
+                  <h3>
+                    <Info size={18} />
+                    {t("Know the boundaries")}
+                  </h3>
+                  <a
+                    href={appUrl(`/api/reports/${m.id}`)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t("Download evidence JSON")}
+                    <ExternalLink size={13} />
+                  </a>
                 </div>
-                <CopyButton
-                  value={`[![${t(m.topic.name)}: ${t(m.headline)}](${location.origin}${localUrl(`/api/cards/${m.id}.png?v=2`)})](${share})`}
-                  label={t("Copy README card")}
-                />
-              </div>
-            )}
-          </section>
-          <section id="method" className="report-method">
-            <div className="report-section-heading">
-              <div>
-                <div className="eyebrow">{l("RESEARCH NOTES", "研究记录")}</div>
-                <h3>{l("Scope, sources & method", "范围、来源与方法")}</h3>
-              </div>
-            </div>
-            {m.topic.plan && (
-              <details className="panel query-plan">
-                <summary>
-                  {t("How we understood your search")}: {m.topic.plan.input}
-                </summary>
-                <p>{assessment.queryExplanation}</p>
-                <div>
-                  <strong>Google Trends</strong>
-                  <p>{m.topic.plan.trends.join(" · ")}</p>
-                  <strong>GitHub</strong>
-                  <p>{(m.topic.queries || [m.topic.query]).join(" · ")}</p>
-                </div>
-                <small>
-                  {m.topic.plan.model === "curated"
-                    ? t("Curated search scope")
-                    : m.topic.plan.model}{" "}
-                  · {t("You can edit the demand keyword and scan again.")}
-                </small>
-              </details>
-            )}
-            {m.supply.recovery && (
-              <details className="panel">
-                <summary>
-                  {l("AI improved the search coverage", "AI 已优化检索覆盖")}
-                </summary>
-                <p>{m.supply.recovery.explanation[locale]}</p>
-                <p>{m.supply.recovery.addedQueries.join(" · ")}</p>
-              </details>
-            )}
-            <details className="panel">
-              <summary>
-                {l("Search windows & source queries", "搜索窗口与来源查询")}
-              </summary>
-              <div className="research-scope">
-                <span>
-                  {t("Measured search term")}:{" "}
-                  <strong>{m.demand.keyword}</strong>
-                </span>
-                <span>
-                  {t("GitHub search scope")}:{" "}
-                  {(m.topic.queries || [m.topic.query]).map((q) => (
-                    <code key={q}>{q}</code>
+                <ul>
+                  {assessment.scopeNotes.map((l) => (
+                    <li key={l}>{t(l)}</li>
                   ))}
-                </span>
-              </div>
-              <div className="search-direction">
-                <strong>
-                  {t("Search direction")}:{" "}
-                  {t("trend." + (m.metrics.trend || "unknown"))}
-                </strong>
-                <span>
-                  {t("Direction basis")}:{" "}
-                  {t("basis." + (m.metrics.directionBasis || "recent-windows"))}
-                </span>
-                <span>
-                  {t("4-week change")}: {pct(m.metrics.shortGrowth ?? null)}
-                </span>
-                <span>
-                  {t("13-week change")}: {pct(m.metrics.quarterGrowth ?? null)}
-                </span>
-              </div>
-              {m.metrics.windows?.main && (
-                <p className="footnote">
-                  {t("Measured windows")}:{" "}
-                  {m.metrics.windows.main.recentStart.slice(0, 10)}–
-                  {m.metrics.windows.main.recentEnd.slice(0, 10)} /{" "}
-                  {m.metrics.windows.main.baselineStart.slice(0, 10)}–
-                  {m.metrics.windows.main.baselineEnd.slice(0, 10)} (
-                  {t("recent / baseline")})
-                </p>
-              )}
-            </details>
-            {m.competition && (
-              <details className="panel competition-evidence">
-                <summary>{t("How competition is assessed")}</summary>
-                <p>
-                  {t(
-                    "Independent alternatives, maintained project adoption signals, and established leaders determine pressure. Project roles keep resources and integrations in their own groups.",
-                  )}
-                </p>
-                <dl className="competition-breakdown">
-                  <div>
-                    <dt>{t("Independent alternatives")}</dt>
-                    <dd>
-                      {m.competition.breadth.toFixed(1)} /{" "}
-                      {COMPETITION_POLICY.breadthWeight}
-                    </dd>
+                </ul>
+                {access?.public && (
+                  <div className="embed-box">
+                    <div>
+                      <strong>
+                        {t("Put this finding where others can discover it.")}
+                      </strong>
+                      <p>{t("Share a permanent snapshot of the evidence.")}</p>
+                    </div>
+                    <CopyButton
+                      value={`[![${t(m.topic.name)}: ${t(m.headline)}](${location.origin}${localUrl(`/api/cards/${m.id}.png?v=2`)})](${share})`}
+                      label={t("Copy README card")}
+                    />
                   </div>
-                  <div>
-                    <dt>{t("Established alternatives")}</dt>
-                    <dd>
-                      {m.competition.incumbency.toFixed(1)} /{" "}
-                      {COMPETITION_POLICY.incumbencyWeight}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{t("Leading project strength")}</dt>
-                    <dd>
-                      {m.competition.dominance.toFixed(1)} /{" "}
-                      {COMPETITION_POLICY.dominanceWeight}
-                    </dd>
-                  </div>
-                </dl>
-                <p>
-                  {t("Roles in the inspected sample")}: {t("role.direct")}{" "}
-                  {m.competition.direct} · {t("role.adjacent")}{" "}
-                  {m.competition.adjacent} · {t("role.resource")}{" "}
-                  {m.competition.resources} · {t("role.unclear")}{" "}
-                  {m.competition.unclear}
-                </p>
-                <p>
-                  {t("Matching active projects")}:{" "}
-                  {m.supply.complete ? "" : "≥"}
-                  {number(m.supply.total)} ·{" "}
-                  {t("Original search filters shown below.")}
-                </p>
-                <p>
-                  {t(
-                    m.competition.enumerated
-                      ? "All matches in this search scope were inspected."
-                      : "The inspected projects form a sample; the displayed pressure is a lower bound.",
-                  )}
-                </p>
-                {!!m.competition.unclear && (
-                  <p>
-                    {t("The range includes projects whose role awaits review.")}
-                  </p>
                 )}
-                {m.supply.review?.status === "fallback" && (
-                  <p>
-                    {t(
-                      "Roles use local metadata rules. A refreshed scan can add AI review.",
-                    )}
-                  </p>
-                )}
-                <p>
-                  {t("Top 3 owner attention share")}:{" "}
-                  {m.concentration === null
-                    ? "—"
-                    : (m.concentration * 100).toFixed(0) + "%"}
-                </p>
-              </details>
-            )}
-            <details className="panel reasoning-panel">
-              <summary>{t("Method and detailed evidence")}</summary>
-              <div className="panel-title">
-                <h3>{t("Behind the classification")}</h3>
-                <span className="method-tag">v{m.version}</span>
-              </div>
-              {m.reasons.map((r, i) => (
-                <div className="reason" key={r}>
-                  <span>{String(i + 1).padStart(2, "0")}</span>
-                  <p>{t(r)}</p>
+              </section>
+              <section id="method" className="report-method">
+                <div className="report-section-heading">
+                  <div>
+                    <div className="eyebrow">
+                      {l("RESEARCH NOTES", "研究记录")}
+                    </div>
+                    <h3>{l("Scope, sources & method", "范围、来源与方法")}</h3>
+                  </div>
                 </div>
-              ))}
-              <button className="text-link" onClick={() => navigate("/docs")}>
-                {t("Read the full method")}
-                <ArrowUpRight size={15} />
-              </button>
-            </details>{" "}
-          </section>
-        </div>
-      </details>
+                {m.topic.plan && (
+                  <details className="panel query-plan">
+                    <summary>
+                      {t("How we understood your search")}: {m.topic.plan.input}
+                    </summary>
+                    <p>{assessment.queryExplanation}</p>
+                    <div>
+                      <strong>Google Trends</strong>
+                      <p>{m.topic.plan.trends.join(" · ")}</p>
+                      <strong>GitHub</strong>
+                      <p>{(m.topic.queries || [m.topic.query]).join(" · ")}</p>
+                    </div>
+                    <small>
+                      {m.topic.plan.model === "curated"
+                        ? t("Curated search scope")
+                        : m.topic.plan.model}{" "}
+                      · {t("You can edit the demand keyword and scan again.")}
+                    </small>
+                  </details>
+                )}
+                {m.supply.recovery && (
+                  <details className="panel">
+                    <summary>
+                      {l(
+                        "AI improved the search coverage",
+                        "AI 已优化检索覆盖",
+                      )}
+                    </summary>
+                    <p>{m.supply.recovery.explanation[locale]}</p>
+                    <p>{m.supply.recovery.addedQueries.join(" · ")}</p>
+                  </details>
+                )}
+                <details className="panel">
+                  <summary>
+                    {l("Search windows & source queries", "搜索窗口与来源查询")}
+                  </summary>
+                  <div className="research-scope">
+                    <span>
+                      {t("Measured search term")}:{" "}
+                      <strong>{m.demand.keyword}</strong>
+                    </span>
+                    <span>
+                      {t("GitHub search scope")}:{" "}
+                      {(m.topic.queries || [m.topic.query]).map((q) => (
+                        <code key={q}>{q}</code>
+                      ))}
+                    </span>
+                  </div>
+                  <div className="search-direction">
+                    <strong>
+                      {t("Search direction")}:{" "}
+                      {t("trend." + (m.metrics.trend || "unknown"))}
+                    </strong>
+                    <span>
+                      {t("Direction basis")}:{" "}
+                      {t(
+                        "basis." +
+                          (m.metrics.directionBasis || "recent-windows"),
+                      )}
+                    </span>
+                    <span>
+                      {t("4-week change")}: {pct(m.metrics.shortGrowth ?? null)}
+                    </span>
+                    <span>
+                      {t("13-week change")}:{" "}
+                      {pct(m.metrics.quarterGrowth ?? null)}
+                    </span>
+                  </div>
+                  {m.metrics.windows?.main && (
+                    <p className="footnote">
+                      {t("Measured windows")}:{" "}
+                      {m.metrics.windows.main.recentStart.slice(0, 10)}–
+                      {m.metrics.windows.main.recentEnd.slice(0, 10)} /{" "}
+                      {m.metrics.windows.main.baselineStart.slice(0, 10)}–
+                      {m.metrics.windows.main.baselineEnd.slice(0, 10)} (
+                      {t("recent / baseline")})
+                    </p>
+                  )}
+                </details>
+                {m.competition && (
+                  <details className="panel competition-evidence">
+                    <summary>{t("How competition is assessed")}</summary>
+                    <p>
+                      {t(
+                        "Independent alternatives, maintained project adoption signals, and established leaders determine pressure. Project roles keep resources and integrations in their own groups.",
+                      )}
+                    </p>
+                    <dl className="competition-breakdown">
+                      <div>
+                        <dt>{t("Independent alternatives")}</dt>
+                        <dd>
+                          {m.competition.breadth.toFixed(1)} /{" "}
+                          {COMPETITION_POLICY.breadthWeight}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{t("Established alternatives")}</dt>
+                        <dd>
+                          {m.competition.incumbency.toFixed(1)} /{" "}
+                          {COMPETITION_POLICY.incumbencyWeight}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{t("Leading project strength")}</dt>
+                        <dd>
+                          {m.competition.dominance.toFixed(1)} /{" "}
+                          {COMPETITION_POLICY.dominanceWeight}
+                        </dd>
+                      </div>
+                    </dl>
+                    <p>
+                      {t("Roles in the inspected sample")}: {t("role.direct")}{" "}
+                      {m.competition.direct} · {t("role.adjacent")}{" "}
+                      {m.competition.adjacent} · {t("role.resource")}{" "}
+                      {m.competition.resources} · {t("role.unclear")}{" "}
+                      {m.competition.unclear}
+                    </p>
+                    <p>
+                      {t("Matching active projects")}:{" "}
+                      {m.supply.complete ? "" : "≥"}
+                      {number(m.supply.total)} ·{" "}
+                      {t("Original search filters shown below.")}
+                    </p>
+                    <p>
+                      {t(
+                        m.competition.enumerated
+                          ? "All matches in this search scope were inspected."
+                          : "The inspected projects form a sample; the displayed pressure is a lower bound.",
+                      )}
+                    </p>
+                    {!!m.competition.unclear && (
+                      <p>
+                        {t(
+                          "The range includes projects whose role awaits review.",
+                        )}
+                      </p>
+                    )}
+                    {m.supply.review?.status === "fallback" && (
+                      <p>
+                        {t(
+                          "Roles use local metadata rules. A refreshed scan can add AI review.",
+                        )}
+                      </p>
+                    )}
+                    <p>
+                      {t("Top 3 owner attention share")}:{" "}
+                      {m.concentration === null
+                        ? "—"
+                        : (m.concentration * 100).toFixed(0) + "%"}
+                    </p>
+                  </details>
+                )}
+                <details className="panel reasoning-panel">
+                  <summary>{t("Method and detailed evidence")}</summary>
+                  <div className="panel-title">
+                    <h3>{t("Behind the classification")}</h3>
+                    <span className="method-tag">v{m.version}</span>
+                  </div>
+                  {m.reasons.map((r, i) => (
+                    <div className="reason" key={r}>
+                      <span>{String(i + 1).padStart(2, "0")}</span>
+                      <p>{t(r)}</p>
+                    </div>
+                  ))}
+                  <button
+                    className="text-link"
+                    onClick={() => navigate("/docs")}
+                  >
+                    {t("Read the full method")}
+                    <ArrowUpRight size={15} />
+                  </button>
+                </details>{" "}
+              </section>
+            </div>
+          </details>
+        </>
+      )}
       <ResearchFeedback
         key={`feedback:${m.id}`}
         kind="report"

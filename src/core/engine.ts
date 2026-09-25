@@ -13,7 +13,11 @@ import {
 } from "../providers/search.js";
 import { marketGapSignals, mergeRequestEvidence } from "./gaps.js";
 import { Research } from "../providers/research.js";
-import { DocumentReader, type DocumentRead } from "../providers/documents.js";
+import {
+  DocumentReader,
+  documentTransport,
+  type DocumentRead,
+} from "../providers/documents.js";
 import { opportunityEvidence } from "../providers/opportunity-evidence.js";
 import { resolveTopic, validateGeo, validateRepo, TOPICS } from "./topics.js";
 import { importDemand } from "./import.js";
@@ -24,6 +28,8 @@ import {
   searchEvidenceIsFresh,
 } from "./evidence.js";
 import { STRATEGY_VERSION } from "./strategy.js";
+import { singleReport } from "../providers/report.js";
+import { REPORT_DEADLINE_MS } from "./report-contract.js";
 import type { Market, DemandEvidence, SupplyEvidence, Topic } from "./types.js";
 export interface ScanProgress {
   stage:
@@ -53,7 +59,14 @@ export class Engine {
     this.trends = new Trends(store);
     this.research = new Research(store);
     this.search = new GoogleSearch(store);
-    this.documents = new DocumentReader(store);
+    this.documents = new DocumentReader(
+      store,
+      documentTransport(
+        process.env.GHTRENDS_DOCUMENT_PROXY ||
+          process.env.GOOGLE_SEARCH_PROXY ||
+          process.env.GOOGLE_TRENDS_PROXY,
+      ),
+    );
     const seed = fileURLToPath(
       new URL("../../web-dist/seed.json", import.meta.url),
     );
@@ -85,9 +98,12 @@ export class Engine {
       owner?: string;
       private?: boolean;
       preparedTopic?: Topic;
+      deadlineAt?: number;
     } = {},
   ): Promise<Market> {
     requireResearchInput(input);
+    const reportDeadline =
+      options.deadlineAt || Date.now() + REPORT_DEADLINE_MS;
     const ai = options.ai !== false && this.research.enabled && !options.demand;
     if (ai) options.onProgress?.({ stage: "interpreting" });
     const topic =
@@ -100,6 +116,12 @@ export class Engine {
             )
           : resolveTopic(input, options.keyword)),
       geo = validateGeo(options.geo ?? "");
+    if (ai)
+      return singleReport(this, input, topic, {
+        ...options,
+        geo,
+        deadlineAt: reportDeadline,
+      });
     const existing = this.store.market(topic.slug, geo, topic.keyword);
     if (
       !options.refresh &&

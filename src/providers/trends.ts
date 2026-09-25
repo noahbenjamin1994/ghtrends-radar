@@ -1,6 +1,7 @@
 import { completeWeeklySeries } from "../core/evidence.js";
 import { demandMetrics } from "../core/analyze.js";
 import type { ProviderCall } from "../core/operations.js";
+import { operationContext, operationSignal } from "../core/operations.js";
 import { fetch as request, ProxyAgent, Dispatcher } from "undici";
 import type { DemandEvidence, InterestPoint } from "../core/types.js";
 import { Store } from "../core/store.js";
@@ -172,6 +173,7 @@ export class Trends {
     });
     await preceding;
     try {
+      operationContext.getStore()?.signal?.throwIfAborted();
       const until = this.cooldown();
       if (until > Date.now()) throw this.cooldownError(until);
       await new Promise((resolve) =>
@@ -225,7 +227,7 @@ export class Trends {
             Referer: ORIGIN + "/trends/explore",
             ...(this.cookie ? { Cookie: this.cookie } : {}),
           },
-          signal: AbortSignal.timeout(optional ? 7000 : 15000),
+          signal: operationSignal(optional ? 7000 : 15000),
         });
         call.status = r.status;
         if (!r.ok) call.error = `http_${r.status}`;

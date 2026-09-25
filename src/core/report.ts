@@ -21,6 +21,7 @@ import { text, localeUrl, type Locale } from "./i18n.js";
 import { marketAssessment, competitionPressure } from "./assessment.js";
 import { visibleStrategy, strategyRows } from "./strategy.js";
 import { projectUseConditions, projectUseCopy } from "./capabilities.js";
+import { reportSections } from "./report-contract.js";
 const cell = (s: string) => s.replaceAll("|", "\\|").replace(/[\r\n]+/g, " ");
 const documentLink = (label: string, url: string) =>
   `[${cell(label).replace(/[\\\[\]<>]/g, "\\$&")}]` +
@@ -60,6 +61,51 @@ export function marketMarkdown(
 ): string {
   const t = (s: string) => text(s, locale),
     a = marketAssessment(m, locale);
+  if (m.brief?.report) {
+    const report = m.brief.report;
+    const refs = (items: { id: string; quote: string }[]) =>
+      items.flatMap((ref) => {
+        const source = m.brief!.sources.find((s) => s.id === ref.id);
+        return source
+          ? [documentLink(source.label, source.url), documentQuote(ref.quote)]
+          : [];
+      });
+    return [
+      `# ${report.headline[locale]}`,
+      m.asOf,
+      report.overview[locale],
+      ...reportSections.flatMap(([key, en, zh]) => [
+        `## ${locale === "zh" ? zh : en}`,
+        report[key].summary[locale],
+        ...refs(report[key].evidence),
+      ]),
+      `## ${locale === "zh" ? "从证据中拆出的方向（进入假设）" : "Evidence-derived directions (hypotheses)"}`,
+      ...report.directions.flatMap((d) => [
+        `### ${d.title[locale]}`,
+        ...[d.task, d.existingSupply, d.entry, d.uncertainty].map(
+          (v) => v[locale],
+        ),
+        ...refs(d.evidence),
+      ]),
+      ...(!report.directions.length
+        ? [
+            locale === "zh"
+              ? "本轮证据不足以支持具体方向。"
+              : "Current evidence does not support a specific direction.",
+          ]
+        : []),
+      `## ${locale === "zh" ? "下一步" : "Next step"}`,
+      report.nextStep[locale],
+      `## ${locale === "zh" ? "本轮边界" : "Limitations"}`,
+      ...report.limitations.map((v) => v[locale]),
+      `## ${locale === "zh" ? "来源" : "Sources"}`,
+      ...m.brief.sources.flatMap((s) => [
+        documentLink(s.label, s.url),
+        `${s.fetchedAt || ""}${s.excerptTruncated ? " · excerpt truncated" : ""}`,
+        documentQuote(s.excerpt || ""),
+      ]),
+    ].join("\n\n");
+  }
   const strategy =
     a.narrative.kind === "ai" ? visibleStrategy(m.brief, locale) : undefined;
   const map = visibleOpportunities(m.brief);

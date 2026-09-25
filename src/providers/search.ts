@@ -12,6 +12,7 @@ import { z } from "zod";
 import type { Store } from "../core/store.js";
 import type { ResearchSource, Topic } from "../core/types.js";
 import type { ProviderCall } from "../core/operations.js";
+import { operationContext, operationSignal } from "../core/operations.js";
 
 export const searchQuerySchema = z.object({
   query: z
@@ -381,6 +382,8 @@ export type SearchTransport = (input: {
 }) => Promise<DirectResponse>;
 const directRequest: SearchTransport = (input) =>
   new Promise((resolve, reject) => {
+    const signal = operationContext.getStore()?.signal;
+    signal?.throwIfAborted();
     const child = spawn(
       process.env.GHTRENDS_SEARCH_PYTHON || "python3",
       [
@@ -404,6 +407,7 @@ const directRequest: SearchTransport = (input) =>
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
       if (error) {
         child.kill("SIGKILL");
         reject(error);
@@ -419,6 +423,8 @@ const directRequest: SearchTransport = (input) =>
       () => finish(new Error("search_timeout")),
       (input.timeoutMs || 18000) + 1000,
     );
+    const abort = () => finish(new Error("search_timeout"));
+    signal?.addEventListener("abort", abort, { once: true });
     child.once("error", () => finish(new Error("search_runtime")));
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
@@ -571,6 +577,7 @@ export class GoogleSearch {
     topic: Topic,
     geo: string,
     targeted?: SearchQuery[],
+    budgetMs = 45000,
   ): Promise<WebEvidence> {
     const language = /[\u3400-\u9fff]/.test(topic.plan?.input || topic.name)
       ? "zh-CN"
@@ -602,7 +609,7 @@ export class GoogleSearch {
     const hnQuery = discovery ? hackerNewsQuery(topic) : undefined;
     const [results, hn] = await Promise.all([
       Promise.allSettled(
-        queries.map((q) => this.search(q.query, region, language)),
+        queries.map((q) => this.search(q.query, region, language, budgetMs)),
       ),
       hnQuery ? collectHackerNews(this.store, hnQuery) : undefined,
     ]);
@@ -698,6 +705,7 @@ export class GoogleSearch {
     const existing = this.pending.get(key);
     if (existing) return existing;
     const task = this.queue.then(async () => {
+      operationContext.getStore()?.signal?.throwIfAborted();
       if (Date.now() >= deadline) throw new Error("search_timeout");
       if (this.mode === "direct") {
         const wait = 1500 - (Date.now() - this.lastRequest);
@@ -754,7 +762,7 @@ export class GoogleSearch {
               locale: language === "zh-CN" ? "zh-cn" : "en-us",
               page_count: 1,
             }),
-            signal: AbortSignal.timeout(35000),
+            signal: operationSignal(35000),
             redirect: "error",
           },
         );

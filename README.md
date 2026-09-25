@@ -2,6 +2,8 @@
 
 # ghtrends ↗
 
+> v0.27: one domain report, no light/deep tiers. Assess search demand, commercial supply, open-source supply and user needs first; derive 0–3 directions from evidence, never invent gaps first. Target: one minute after scope confirmation, with a 55-second server deadline (18s collection, 9s original pages, up to 25s writing). One report-writing call, at most 3,600 output tokens, thinking disabled, no model repair loop. Scope preparation happens before confirmation. Failed delivery returns the attempt's credit; the deadline is not a guaranteed success SLA. Historical reports and purchased-credit records remain readable; new deep tasks, retries and research-pack purchase links are closed. Legacy focused-research sections below describe historical behavior.
+
 **English · [简体中文](README.zh-CN.md)**
 
 ### Know where to build.

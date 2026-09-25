@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Skeleton, loadingStyles } from "../ui/loading.js";
+import { reportSections } from "../core/report-contract.js";
 import {
   documentStatusLabel,
   adCollectionMessage,
@@ -267,6 +268,34 @@ export function renderDocument(
   } else {
     content = `<h1>${e(titles[path]?.replace(" · ghtrends", "") || "Repository intelligence")}</h1><p>${e("Browse public reports without an account. Sign in to run AI-assisted scans and keep your history and watchlist across devices.")} ${link("/docs", "CLI / MCP")}</p>`;
   }
+  if (m?.brief?.report) {
+    const report = m.brief.report;
+    const citations = (refs: { id: string; quote: string }[]) =>
+      refs
+        .map((ref) => {
+          const source = m.brief!.sources.find((s) => s.id === ref.id);
+          return source
+            ? `<blockquote>${escapeHtml(ref.quote)} ${link(source.url, source.label)}</blockquote>`
+            : "";
+        })
+        .join("");
+    content =
+      `<h1>${escapeHtml(report.headline[locale])}</h1><p>${escapeHtml(m.asOf)}</p><p>${escapeHtml(report.overview[locale])}</p>` +
+      reportSections
+        .map(
+          ([key, en, zh]) =>
+            `<section><h2>${locale === "zh" ? zh : en}</h2><p>${escapeHtml(report[key].summary[locale])}</p>${citations(report[key].evidence)}</section>`,
+        )
+        .join("") +
+      `<h2>${locale === "zh" ? "从证据中拆出的方向（进入假设）" : "Evidence-derived directions (hypotheses)"}</h2>` +
+      report.directions
+        .map(
+          (d) =>
+            `<section><h3>${escapeHtml(d.title[locale])}</h3>${[d.task, d.existingSupply, d.entry, d.uncertainty].map((v) => `<p>${escapeHtml(v[locale])}</p>`).join("")}${citations(d.evidence)}</section>`,
+        )
+        .join("") +
+      `<h2>${locale === "zh" ? "下一步" : "Next step"}</h2><p>${escapeHtml(report.nextStep[locale])}</p><h2>${locale === "zh" ? "本轮边界" : "Limitations"}</h2>${list(report.limitations.map((v) => v[locale]))}`;
+  }
   const other = locale === "zh" ? "en" : "zh",
     switchUrl = new URL(identity);
   switchUrl.searchParams.set("lang", other);
@@ -289,10 +318,17 @@ export function renderDocument(
       : {}),
     isPartOf: { "@type": "WebSite", name: "ghtrends", url: base },
   };
-  const initialSkeleton = renderToStaticMarkup(createElement(Skeleton, {
-    variant: path === "/" ? "home" : /^\/(report|market|repo|research)\//.test(path) ? "report" : "list",
-    text: locale === "zh" ? "正在准备页面…" : "Preparing the page…",
-  }));
+  const initialSkeleton = renderToStaticMarkup(
+    createElement(Skeleton, {
+      variant:
+        path === "/"
+          ? "home"
+          : /^\/(report|market|repo|research)\//.test(path)
+            ? "report"
+            : "list",
+      text: locale === "zh" ? "正在准备页面…" : "Preparing the page…",
+    }),
+  );
   const boot = `<div class="boot-shell"><header class="boot-header"><a class="boot-brand" href="${escapeHtml(localeUrl(base, locale))}" aria-label="ghtrends"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="20" cy="20" r="14"/><path d="m8 28 11-12 7 7L36 6"/><circle cx="36" cy="6" r="3" fill="currentColor" stroke="none"/></svg><span>gh<b>trends</b></span></a><div class="boot-nav" aria-hidden="true"><span class="skeleton-block skeleton-tab"></span><span class="skeleton-block skeleton-tab"></span><span class="skeleton-block skeleton-tab"></span></div><div class="boot-actions" aria-hidden="true"><span class="skeleton-block"></span><span class="skeleton-block"></span></div></header><main>${initialSkeleton}<p class="boot-help">${locale === "zh" ? "加载时间较长？" : "Taking longer than expected?"} <a href="${escapeHtml(localeUrl(identity, locale))}">${locale === "zh" ? "重新加载" : "Reload"}</a></p></main></div>`;
   return template
     .replace(
@@ -320,5 +356,8 @@ export function renderDocument(
       "</head>",
       `<meta name="description" content="${escapeHtml(description)}"><link rel="canonical" href="${escapeHtml(canonical)}">${(["en", "zh"] as const).map((l) => `<link rel="alternate" hreflang="${l === "zh" ? "zh-CN" : "en"}" href="${escapeHtml(localeUrl(identity, l))}">`).join("")}${noindex ? '<meta name="robots" content="noindex,follow">' : ""}<meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(canonical)}"><meta property="og:type" content="website"><meta property="og:site_name" content="ghtrends"><meta property="og:locale" content="${locale === "zh" ? "zh_CN" : "en_US"}"><meta property="og:image" content="${escapeHtml(image)}"><meta property="og:image:alt" content="${escapeHtml(title)}"><meta name="twitter:card" content="summary_large_image"><script type="application/ld+json">${JSON.stringify(schema).replaceAll("<", "\\u003c")}</script></head>`,
     )
-    .replace('<div id="root"></div>', `<div id="root">${boot}<noscript>${content}</noscript></div>`);
+    .replace(
+      '<div id="root"></div>',
+      `<div id="root">${boot}<noscript>${content}</noscript></div>`,
+    );
 }

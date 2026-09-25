@@ -9,7 +9,6 @@ import {
 import type { Brief, Market } from "../core/types.js";
 import { fitLabel, type SavedFit } from "../core/fit.js";
 import { FitReason, PersonalFit } from "./fit.js";
-import { DeepStart } from "./deep.js";
 import { projectUseConditions, projectUseCopy } from "../core/capabilities.js";
 
 export function TopicOverview({
@@ -460,12 +459,6 @@ export function OpportunityMap({
           )}
         </p>
       </section>
-      <DeepStart
-        key={market.id}
-        reportId={market.id}
-        directionId={selected.id}
-        profile={fit?.profile}
-      />
     </section>
   );
 }

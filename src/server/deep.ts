@@ -39,8 +39,8 @@ const messages: Record<string, [string, string]> = {
     "请从个人历史打开专项研究。",
   ],
   deep_disabled: [
-    "Focused research is being prepared for this deployment.",
-    "本站正在准备专项研究服务。",
+    "Reports now use one unified workflow. Start a new report from the home page; historical research and credits remain available.",
+    "报告已统一为一种流程。请从首页开始新报告；历史研究与已有权益保留。",
   ],
   deep_active: [
     "Your research is in progress. Open it from your history.",
@@ -86,8 +86,8 @@ export function installDeepRoutes(
 ) {
   let running = false,
     stopped = false;
-  const enabled =
-    process.env.GHTRENDS_DEEP_RESEARCH === "1" && engine.research.enabled;
+  // Historical tasks and billing remain readable. No new deep tier, retries or sales.
+  const enabled = false;
   const capacity = Math.max(
     1,
     Math.min(

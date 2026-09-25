@@ -1,6 +1,7 @@
 import { selectGapSignals } from "../core/gaps.js";
 import { createHash } from "node:crypto";
 import type { ProviderCall } from "../core/operations.js";
+import { operationSignal } from "../core/operations.js";
 import type { DocumentRead } from "./documents.js";
 import { githubToken } from "./github-auth.js";
 import { Store } from "../core/store.js";
@@ -290,7 +291,7 @@ export class GitHub {
           "User-Agent": "ghtrends/0.4.1",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        signal: AbortSignal.timeout(25000),
+        signal: operationSignal(25000),
       });
       call.status = response.status;
       call.rateBucket =
@@ -473,6 +474,7 @@ export class GitHub {
   async supply(
     topic: Topic,
     onBase?: (supply: SupplyEvidence) => void,
+    baseOnly = false,
   ): Promise<SupplyEvidence> {
     const since = new Date(Date.now() - POLICY.activeDays * 86400000)
       .toISOString()
@@ -560,6 +562,7 @@ export class GitHub {
         relevance: repoRelevance(r, topic),
       }));
       onBase?.(structuredClone(result));
+      if (baseOnly) return result;
       // Five bounded workers overlap the ten repository detail reads.
       let cursor = 0;
       await Promise.all(

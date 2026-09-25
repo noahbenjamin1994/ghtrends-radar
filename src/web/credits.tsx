@@ -239,8 +239,8 @@ function AccountDetails({ account }: { account: Account }) {
       <div className="credits-next">
         <p>
           {say(
-            "Each focused research starts with a question you choose from a report.",
-            "从报告中选定一个方向和问题，再开始专项研究。",
+            "One report workflow. Historical research and purchased credit records remain available; new research-pack purchases are closed.",
+            "现在只有一种报告流程。历史研究与已购权益记录保留，暂不开放新的研究包购买。",
           )}
         </p>
         <a href={localUrl("/history")}>

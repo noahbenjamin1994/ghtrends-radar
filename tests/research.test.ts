@@ -681,7 +681,7 @@ test("one failed relevance batch preserves source-quoted reviews from the other 
   }
 });
 
-test("pipeline retries sparse supply once, preserves successful evidence on repair failure, and saves to its owner", async () => {
+test("one-minute pipeline does not expand sparse supply and preserves private source snapshots", async () => {
   const { Engine } = await import("../src/core/engine.js");
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-repair-flow-")),
     old = process.env.DEEPSEEK_API_KEY;
@@ -738,11 +738,10 @@ test("pipeline retries sparse supply once, preserves successful evidence on repa
       private: true,
       owner: "alice",
     });
-    assert.equal(calls, 2);
-    assert.equal(result.supply.total, 1);
-    assert.deepEqual(result.supply.recovery?.addedQueries, [
-      '"cat translator" in:name,description',
-    ]);
+    assert.equal(calls, 1);
+    assert.equal(result.supply.total, 0);
+    assert.equal(result.supply.recovery, undefined);
+    assert.ok(result.aiError);
     assert.equal(engine.store.canRead(result.id, "alice"), true);
     assert.equal(engine.store.canRead(result.id, "other"), false);
     fail = true;
@@ -753,7 +752,7 @@ test("pipeline retries sparse supply once, preserves successful evidence on repa
     });
     assert.equal(failed.supply.total, 0);
     assert.equal(failed.supply.error, undefined);
-    assert.equal(calls, 4);
+    assert.equal(calls, 2);
   } finally {
     await engine.close();
     rmSync(dir, { recursive: true, force: true });

@@ -916,9 +916,30 @@ test("original source documents survive report persistence and appear in both ex
     engine.github.researchSources = async () => [];
     engine.github.licenseSources = async () => [];
     engine.github.discussionSources = async () => [];
-    engine.search.collect = async () => undefined as any;
+    engine.search.collect = async () => ({
+      provider: "multi-search",
+      region: "US",
+      language: "en",
+      state: "ready",
+      fetchedAt: "2026-09-18T00:00:00Z",
+      queries: [
+        {
+          query: "vendor pricing",
+          intent: "competition",
+          state: "ready",
+          results: [
+            {
+              title: "Search result",
+              url: "https://vendor.example/pricing",
+              excerpt: "Search excerpt",
+              kind: "organic",
+            },
+          ],
+        },
+      ],
+    });
     const documents = {
-      version: "1",
+      version: "4",
       sources: [
         {
           ...candidate("https://vendor.example/pricing"),
@@ -936,9 +957,15 @@ test("original source documents survive report persistence and appear in both ex
         },
       ],
     };
-    engine.documents.collect = async () => documents;
-    engine.research.insights = async (_m, sources) => {
-      assert.ok(sources?.some((s) => s.documentType === "page"));
+    engine.documents.readWeb = async () => ({
+      sources: documents.sources,
+      read: documents.reads[0]!,
+      cached: false,
+    });
+    engine.research.json = async (_m, input: any) => {
+      assert.ok(
+        input.sources?.some((s: ResearchSource) => s.documentType === "page"),
+      );
       throw new Error("simulated writing interruption");
     };
     const m = await engine.scan("mcp-servers", {

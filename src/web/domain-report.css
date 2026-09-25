@@ -1,0 +1,151 @@
+.domain-report {
+  max-width: 1000px;
+  margin: 24px auto 0;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.domain-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  border-bottom: 1px solid var(--line, #ddd);
+  padding: 12px 0;
+  font-size: 13px;
+}
+.domain-nav a {
+  color: inherit;
+  text-decoration: none;
+}
+.domain-overview {
+  padding: 32px;
+  background: #f2f6f4;
+  border-radius: 16px;
+  margin: 24px 0;
+}
+.domain-overview h2 {
+  font-size: clamp(24px, 3vw, 36px);
+  line-height: 1.35;
+  margin: 12px 0 16px;
+}
+.domain-overview p {
+  font-size: 17px;
+  max-width: 780px;
+}
+.domain-overview small,
+.domain-section-title small,
+.domain-sources small {
+  color: #626c66;
+}
+.domain-evidence {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 28px;
+}
+.domain-evidence article {
+  padding: 22px 0;
+  border-bottom: 1px solid #deded8;
+  min-width: 0;
+}
+.domain-section-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.domain-report h3 {
+  font-size: 18px;
+  margin: 0;
+}
+.domain-report h3 span {
+  font-size: 12px;
+  color: #777;
+  margin-right: 12px;
+  font-weight: 400;
+}
+.domain-citations {
+  font-size: 13px;
+  margin-top: 14px;
+}
+.domain-report summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+.domain-report a {
+  color: #276956;
+}
+.domain-citations blockquote {
+  margin: 10px 0;
+  padding: 0 16px;
+  border-left: 2px solid #b0c8bd;
+}
+.domain-directions {
+  margin-top: 40px;
+}
+.domain-directions h2 {
+  margin: 8px 0;
+  font-size: 25px;
+}
+.domain-direction {
+  border: 1px solid #deded8;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 18px 0;
+}
+.domain-direction dl {
+  margin: 18px 0 0;
+}
+.domain-direction dl > div {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 16px;
+  margin: 10px 0;
+}
+.domain-direction dt {
+  color: #666;
+  font-size: 13px;
+}
+.domain-direction dd {
+  margin: 0;
+}
+.domain-next {
+  padding: 24px;
+  background: #f6f3ec;
+  border-radius: 12px;
+  margin: 24px 0;
+}
+.domain-next p {
+  margin-bottom: 0;
+}
+.domain-limits {
+  font-size: 14px;
+  margin: 28px 0;
+}
+.domain-sources {
+  border-top: 1px solid #deded8;
+  padding: 12px 0;
+  font-size: 13px;
+}
+.domain-sources li {
+  margin: 12px 0;
+}
+.domain-sources small {
+  display: block;
+}
+@media (max-width: 640px) {
+  .domain-evidence {
+    grid-template-columns: 1fr;
+  }
+  .domain-overview,
+  .domain-direction,
+  .domain-next {
+    padding: 20px;
+  }
+  .domain-direction dl > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .domain-nav {
+    gap: 14px;
+  }
+}

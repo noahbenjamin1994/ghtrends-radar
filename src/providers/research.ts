@@ -601,6 +601,7 @@ export class Research {
     thinking = false;
     maxTokens = Math.min(maxTokens, llmOutputLimit(operation));
     const scope = operationContext.getStore();
+    scope?.signal?.throwIfAborted();
     if (scope) {
       const budget = (scope.llmBudget ||= {
         calls: 0,
@@ -680,15 +681,18 @@ export class Research {
               { role: "user", content: JSON.stringify(input) },
             ],
           }),
-          signal: AbortSignal.timeout(
-            thinking
-              ? 240000
-              : operation.startsWith("strategy")
-                ? 120000
-                : operation === "plan"
-                  ? 7500
-                  : 25000,
-          ),
+          signal: AbortSignal.any([
+            ...(scope?.signal ? [scope.signal] : []),
+            AbortSignal.timeout(
+              thinking
+                ? 240000
+                : operation.startsWith("strategy")
+                  ? 120000
+                  : operation === "plan"
+                    ? 7500
+                    : 25000,
+            ),
+          ]),
         },
       );
       call.status = response.status;

@@ -6,7 +6,15 @@ export const operationContext = new AsyncLocalStorage<{
   userId?: string;
   onActivity?: (activity: ResearchActivity) => void;
   llmBudget?: { calls: number; outputTokens: number; maxCalls: number };
+  signal?: AbortSignal;
 }>();
+
+export function operationSignal(ms: number) {
+  const signal = operationContext.getStore()?.signal;
+  return signal
+    ? AbortSignal.any([signal, AbortSignal.timeout(ms)])
+    : AbortSignal.timeout(ms);
+}
 
 // Upper bounds, not generation targets. Full bilingual legacy reports need
 // more room than small JSON decisions; never spend thinking tokens.
