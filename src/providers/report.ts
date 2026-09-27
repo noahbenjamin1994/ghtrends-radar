@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Engine, ScanProgress } from "../core/engine.js";
+import type { Trends } from "./trends.js";
 import { analyze } from "../core/analyze.js";
 import { operationContext } from "../core/operations.js";
 import {
@@ -130,6 +131,7 @@ export async function singleReport(
     private?: boolean;
     deadlineAt?: number;
     onProgress?: (p: ScanProgress) => void;
+    trends?: Trends;
   },
 ): Promise<Market> {
   const started = Date.now();
@@ -170,7 +172,7 @@ export async function singleReport(
   let collecting = true;
   await reportPhase(Math.min(18000, remaining()), async () => {
     await Promise.allSettled([
-      engine.trends
+      (options.trends || engine.trends)
         .demand(topic.keyword, options.geo, (d) => {
           if (collecting) demand = structuredClone(d);
         })

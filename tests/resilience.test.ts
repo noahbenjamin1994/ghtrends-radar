@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MockAgent, setGlobalDispatcher, getGlobalDispatcher } from "undici";
-import { Trends } from "../src/providers/trends.js";
+import { Trends, researchSessionProxy } from "../src/providers/trends.js";
 import { Research } from "../src/providers/research.js";
 import { Store } from "../src/core/store.js";
 import { analyze } from "../src/core/analyze.js";
@@ -38,6 +38,56 @@ async function fixture(
     rmSync(dir, { recursive: true, force: true });
   }
 }
+
+test("each research gets fresh sticky exits while its token sequence keeps one session", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-session-"));
+  const store = new Store(dir);
+  const primaryUrl =
+    "http://user-country-us-session-oldone-sessionduration-30:secret@gate.decodo.com:7000";
+  const backupUrl =
+    "http://user-country-us-session-oldtwo-sessionduration-30:secret@gate.decodo.com:7000";
+  const trends = new Trends(store, {
+    proxy: primaryUrl,
+    cooldownKey: "test-primary-cooldown",
+    routeName: "primary",
+  });
+  (trends as any).fallback = new Trends(store, {
+    proxy: backupUrl,
+    cooldownKey: "test-backup-cooldown",
+  });
+  store.set("test-primary-cooldown", { until: Date.now() + 60000 }, 60000);
+  store.set("test-backup-cooldown", { until: Date.now() + 60000 }, 60000);
+  assert.equal(trends.status().retryAt, null);
+  const first = trends.forResearch();
+  const second = trends.forResearch();
+  try {
+    const route = (collector: Trends, backup = false) =>
+      backup ? (collector as any).fallback : collector;
+    const proxy = (collector: Trends, backup = false) =>
+      new URL(route(collector, backup).proxy);
+    for (const collector of [first, second]) {
+      for (const backup of [false, true]) {
+        const url = proxy(collector, backup);
+        assert.match(url.username, /-country-us-session-[a-f0-9]{12}-sessionduration-30/);
+        assert.equal(url.password, "secret");
+        assert.notEqual(route(collector, backup).cooldownKey,
+          backup ? "test-backup-cooldown" : "test-primary-cooldown");
+        assert.equal(proxy(collector, backup).username, url.username);
+      }
+      assert.notEqual(proxy(collector).username, proxy(collector, true).username);
+    }
+    assert.notEqual(proxy(first).username, proxy(second).username);
+    assert.notEqual(proxy(first, true).username, proxy(second, true).username);
+    assert.notEqual((first as any).cooldownKey, (second as any).cooldownKey);
+    assert.equal(researchSessionProxy("http://example.com:7000"), "http://example.com:7000");
+  } finally {
+    await first.close();
+    await second.close();
+    await trends.close();
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("429 stops synonym requests immediately and the cooldown survives a new collector", async () => {
   await fixture(async (store, trends, mock) => {

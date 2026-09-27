@@ -5,7 +5,7 @@ import { operationContext, operationSignal } from "../core/operations.js";
 import { fetch as request, ProxyAgent, Dispatcher } from "undici";
 import type { DemandEvidence, InterestPoint } from "../core/types.js";
 import { Store } from "../core/store.js";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { validateGeo } from "../core/topics.js";
 const ORIGIN = "https://trends.google.com";
 // Count HTTP bytes before decompression. Provider billing also includes TLS;
@@ -89,6 +89,21 @@ export function parseTimeline(data: any, index = 0): InterestPoint[] {
       partial: p.isPartial === true || p.isPartial === "true",
     }));
 }
+function isStickyDecodoProxy(raw: string): boolean {
+  const url = new URL(raw);
+  return url.hostname === "gate.decodo.com" && url.port === "7000" &&
+    /-session-[a-z0-9]+/i.test(decodeURIComponent(url.username));
+}
+/** A fresh sticky exit for one research; Google cookies and widget tokens stay on it. */
+export function researchSessionProxy(raw: string): string {
+  if (!isStickyDecodoProxy(raw)) return raw;
+  const url = new URL(raw);
+  url.username = decodeURIComponent(url.username).replace(
+    /-session-[a-z0-9]+/i,
+    `-session-${randomBytes(6).toString("hex")}`,
+  );
+  return url.href;
+}
 export class Trends {
   private cookie = "";
   private queue = Promise.resolve();
@@ -115,12 +130,21 @@ export class Trends {
   }
   private dispatcher: ProxyAgent | undefined;
   private routeName: "primary" | "backup";
+  private readonly proxy?: string;
+  private readonly sessionScoped: boolean;
   constructor(
     private store: Store,
-    route?: { proxy?: string; cooldownKey?: string },
+    route?: {
+      proxy?: string;
+      cooldownKey?: string;
+      routeName?: "primary" | "backup";
+      sessionScoped?: boolean;
+    },
   ) {
-    this.routeName = route ? "backup" : "primary";
+    this.routeName = route?.routeName || (route ? "backup" : "primary");
     const proxy = route ? route.proxy : process.env.GOOGLE_TRENDS_PROXY;
+    this.proxy = proxy;
+    this.sessionScoped = !!route?.sessionScoped;
     this.cooldownKey =
       route?.cooldownKey ||
       (proxy
@@ -142,12 +166,30 @@ export class Trends {
     if (!route && proxy && fallback && fallback !== proxy)
       this.fallback = new Trends(store, { proxy: fallback });
   }
+  forResearch(): Trends {
+    if (!this.proxy || this.sessionScoped) return this;
+    const fresh = researchSessionProxy(this.proxy);
+    if (fresh === this.proxy) return this;
+    const trends = new Trends(this.store, {
+      proxy: fresh,
+      routeName: "primary",
+      sessionScoped: true,
+    });
+    if (this.fallback?.proxy)
+      trends.fallback = new Trends(this.store, {
+        proxy: researchSessionProxy(this.fallback.proxy),
+        sessionScoped: true,
+      });
+    return trends;
+  }
   status() {
     const now = Date.now();
-    const routes = [
-      this.cooldown(),
-      ...(this.fallback ? [this.fallback.cooldown()] : []),
-    ];
+    // Cooling an old sticky IP must not block a new research on a new session.
+    const rotating = !this.sessionScoped && this.proxy &&
+      isStickyDecodoProxy(this.proxy);
+    const routes = rotating
+      ? [0, ...(this.fallback ? [0] : [])]
+      : [this.cooldown(), ...(this.fallback ? [this.fallback.cooldown()] : [])];
     const until = routes.every((until) => until > now)
       ? Math.min(...routes)
       : 0;

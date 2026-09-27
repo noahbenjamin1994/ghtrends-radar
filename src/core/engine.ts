@@ -48,6 +48,18 @@ export interface ScanProgress {
   topic?: Topic;
   activities?: ResearchActivity[];
 }
+type ScanOptions = {
+  geo?: string;
+  keyword?: string;
+  refresh?: boolean;
+  demand?: DemandEvidence;
+  onProgress?: (progress: ScanProgress) => void;
+  ai?: boolean;
+  owner?: string;
+  private?: boolean;
+  preparedTopic?: Topic;
+  deadlineAt?: number;
+};
 export class Engine {
   github: GitHub;
   trends: Trends;
@@ -86,22 +98,20 @@ export class Engine {
       )
         store.saveMarket(analyze(m.topic, m.demand, m.supply, m.gaps));
   }
-  async scan(
-    input: string,
-    options: {
-      geo?: string;
-      keyword?: string;
-      refresh?: boolean;
-      demand?: DemandEvidence;
-      onProgress?: (progress: ScanProgress) => void;
-      ai?: boolean;
-      owner?: string;
-      private?: boolean;
-      preparedTopic?: Topic;
-      deadlineAt?: number;
-    } = {},
-  ): Promise<Market> {
+  async scan(input: string, options: ScanOptions = {}): Promise<Market> {
     requireResearchInput(input);
+    const trends = options.demand ? this.trends : this.trends.forResearch();
+    try {
+      return await this.scanWithTrends(input, options, trends);
+    } finally {
+      if (trends !== this.trends) await trends.close();
+    }
+  }
+  private async scanWithTrends(
+    input: string,
+    options: ScanOptions,
+    trends: Trends,
+  ): Promise<Market> {
     const reportDeadline =
       options.deadlineAt || Date.now() + REPORT_DEADLINE_MS;
     const ai = options.ai !== false && this.research.enabled && !options.demand;
@@ -121,6 +131,7 @@ export class Engine {
         ...options,
         geo,
         deadlineAt: reportDeadline,
+        trends,
       });
     const existing = this.store.market(topic.slug, geo, topic.keyword);
     if (
@@ -187,7 +198,7 @@ export class Engine {
             onDemand(data);
             return data;
           })
-        : this.trends.demand(
+        : trends.demand(
             topic.keyword,
             geo,
             onDemand,
