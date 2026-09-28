@@ -110,13 +110,17 @@ test("a challenged research gives each search request a fresh exit and publishes
       (w) => progress.push(w),
     );
     assert.equal(web.state, "ready");
-    assert.deepEqual(
-      calls.map((c) => c.engine),
-      ["duckduckgo", "brave", "duckduckgo", "brave"],
-    );
+    assert.equal(calls.filter((c) => c.engine === "duckduckgo").length, 2);
+    assert.equal(calls.filter((c) => c.engine === "brave").length, 2);
     assert.ok(calls.every((c) => c.proxy !== proxy));
     assert.equal(new Set(calls.map((c) => c.proxy)).size, calls.length);
-    assert.ok(calls.every((c) => /country-us-session-[a-f0-9]{12}-sessionduration-30/.test(decodeURIComponent(new URL(c.proxy).username))));
+    assert.ok(
+      calls.every((c) =>
+        /country-us-session-[a-f0-9]{12}-sessionduration-30/.test(
+          decodeURIComponent(new URL(c.proxy).username),
+        ),
+      ),
+    );
     assert.equal(web.queries[0]!.query, '"token relay" pricing');
     assert.equal(web.queries[0]!.engine, "brave");
     assert.equal(progress[0].state, "partial");
@@ -357,9 +361,15 @@ test("report search uses a new exit instead of the Trends exit", async () => {
     );
     assert.equal(web.state, "ready");
     assert.equal(web.queries[0]?.results.length, 1);
-    assert.deepEqual(calls.map((call) => call.engine), ["duckduckgo"]);
+    assert.deepEqual(
+      calls.map((call) => call.engine),
+      ["duckduckgo"],
+    );
     assert.notEqual(calls[0]?.proxy, researchProxy);
-    assert.match(decodeURIComponent(new URL(calls[0]!.proxy).username), /country-us-session-[a-f0-9]{12}-sessionduration-30/);
+    assert.match(
+      decodeURIComponent(new URL(calls[0]!.proxy).username),
+      /country-us-session-[a-f0-9]{12}-sessionduration-30/,
+    );
   } finally {
     old === undefined
       ? delete process.env.GOOGLE_SEARCH_PROXY
@@ -377,11 +387,12 @@ test("research search changes exit after a 429 without cooling the next query", 
   const researchProxy =
     "http://user-country-us-session-research-sessionduration-30:secret@gate.decodo.com:7000";
   const calls: { engine: string; proxy: string }[] = [];
-  const search = new GoogleSearch(store, async ({ engine, proxy }) => {
+  const search = new GoogleSearch(store, async ({ engine, proxy, query }) => {
     calls.push({ engine, proxy });
-    if (calls.length === 1) return { status: 202 };
-    if (calls.length === 2) return { status: 429 };
-    return { status: 200, html: engine === "google" ? mobile : duck };
+    if (query.includes("reviews")) return { status: 200, html: duck };
+    if (engine === "duckduckgo") return { status: 202 };
+    if (engine === "brave") return { status: 429 };
+    return { status: 200, html: mobile };
   });
   try {
     const web = await search.collect(
@@ -395,15 +406,66 @@ test("research search changes exit after a 429 without cooling the next query", 
       researchProxy,
     );
     assert.equal(web.state, "ready");
-    assert.deepEqual(calls.map((call) => call.engine), [
-      "duckduckgo",
-      "brave",
-      "google",
-      "duckduckgo",
-    ]);
+    assert.equal(
+      calls.filter((call) => call.engine === "duckduckgo").length,
+      2,
+    );
+    assert.equal(calls.filter((call) => call.engine === "brave").length, 1);
+    assert.equal(calls.filter((call) => call.engine === "google").length, 1);
     assert.equal(new Set(calls.map((call) => call.proxy)).size, calls.length);
     assert.ok(calls.every((call) => call.proxy !== researchProxy));
   } finally {
+    saved === undefined
+      ? delete process.env.GOOGLE_SEARCH_PROXY
+      : (process.env.GOOGLE_SEARCH_PROXY = saved);
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test("three research queries collect concurrently on separate exits", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-parallel-"));
+  const store = new Store(dir);
+  const saved = process.env.GOOGLE_SEARCH_PROXY;
+  process.env.GOOGLE_SEARCH_PROXY =
+    "http://user-country-us-session-configured-sessionduration-30:secret@gate.decodo.com:7000";
+  const researchProxy =
+    "http://user-country-us-session-research-sessionduration-30:secret@gate.decodo.com:7000";
+  const proxies: string[] = [];
+  let active = 0,
+    maxActive = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const search = new GoogleSearch(store, async ({ proxy }) => {
+    proxies.push(proxy);
+    active++;
+    maxActive = Math.max(maxActive, active);
+    if (active === 3) release();
+    await gate;
+    active--;
+    return { status: 200, html: duck };
+  });
+  const timer = setTimeout(release, 500);
+  try {
+    const web = await search.collect(
+      seed.topic,
+      "US",
+      [
+        { query: "phone transfer pricing", intent: "competition" },
+        { query: "phone transfer reviews", intent: "demand" },
+        { query: "phone transfer github", intent: "opensource" },
+      ],
+      3000,
+      researchProxy,
+    );
+    assert.equal(web.state, "ready");
+    assert.equal(proxies.length, 3);
+    assert.equal(maxActive, 3);
+    assert.equal(new Set(proxies).size, 3);
+    assert.ok(proxies.every((proxy) => proxy !== researchProxy));
+  } finally {
+    clearTimeout(timer);
     saved === undefined
       ? delete process.env.GOOGLE_SEARCH_PROXY
       : (process.env.GOOGLE_SEARCH_PROXY = saved);

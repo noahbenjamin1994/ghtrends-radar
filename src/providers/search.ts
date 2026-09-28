@@ -808,13 +808,18 @@ export class GoogleSearch {
     const pendingKey = key + ":" + scope;
     const existing = this.pending.get(pendingKey);
     if (existing) return existing;
-    const task = (this.queues.get(scope) || Promise.resolve()).then(
+    // Fresh research exits allow the three bounded queries to collect together.
+    const preceding = researchProxy
+      ? Promise.resolve()
+      : this.queues.get(scope) || Promise.resolve();
+    const task = preceding.then(
       async () => {
         operationContext.getStore()?.signal?.throwIfAborted();
         if (Date.now() >= deadline) throw new Error("search_timeout");
         if (this.mode === "direct") {
-          const wait =
-            1500 - (Date.now() - (this.lastRequests.get(scope) || 0));
+          const wait = researchProxy
+            ? 0
+            : 1500 - (Date.now() - (this.lastRequests.get(scope) || 0));
           if (wait > 0)
             await new Promise((resolve) => setTimeout(resolve, wait));
           try {
@@ -835,7 +840,7 @@ export class GoogleSearch {
             );
             return page;
           } finally {
-            this.lastRequests.set(scope, Date.now());
+            if (!researchProxy) this.lastRequests.set(scope, Date.now());
           }
         }
         const cooling = this.store.get<{ error: string; retryAt: string }>(
@@ -935,13 +940,7 @@ export class GoogleSearch {
       () => {},
       () => {},
     );
-    this.queues.set(scope, settled);
-    void settled.then(() => {
-      if (scope !== "default" && this.queues.get(scope) === settled) {
-        this.queues.delete(scope);
-        this.lastRequests.delete(scope);
-      }
-    });
+    if (!researchProxy) this.queues.set(scope, settled);
     this.pending.set(pendingKey, task);
     void task.finally(() => this.pending.delete(pendingKey)).catch(() => {});
     return task;
