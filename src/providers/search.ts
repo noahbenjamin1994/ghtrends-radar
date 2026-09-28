@@ -13,6 +13,7 @@ import type { Store } from "../core/store.js";
 import type { ResearchSource, Topic } from "../core/types.js";
 import type { ProviderCall } from "../core/operations.js";
 import { operationContext, operationSignal } from "../core/operations.js";
+import { researchSessionProxy } from "./trends.js";
 
 export const searchQuerySchema = z.object({
   query: z
@@ -24,7 +25,7 @@ export const searchQuerySchema = z.object({
   intent: z.enum(["competition", "demand", "opensource"]),
 });
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
-export const SEARCH_VERSION = "7";
+export const SEARCH_VERSION = "8";
 export type SearchEngine = "google" | "duckduckgo" | "brave" | "hackernews";
 interface SearchPage {
   query?: string;
@@ -1003,9 +1004,11 @@ export class GoogleSearch {
           .digest("hex")
           .slice(0, 24),
         cooldown = `web-search:cooldown:${engine}:${identity}`;
-      const cooling = this.store.get<{ error: string; retryAt: string }>(
-        cooldown,
-      );
+      // Research searches use a new sticky exit for every HTTP request. A
+      // challenge on an old exit must not cool down the next fresh exit.
+      const cooling = researchProxy
+        ? null
+        : this.store.get<{ error: string; retryAt: string }>(cooldown);
       if (cooling) {
         failure = searchFailure(new Error(cooling.error), cooling.retryAt);
         if (engine === "google") primaryError = failure.message;
@@ -1031,7 +1034,7 @@ export class GoogleSearch {
           query: engine === "brave" ? fallbackQuery! : query,
           region,
           language,
-          proxy,
+          proxy: researchProxy ? researchSessionProxy(proxy) : proxy,
           cookies: engine === "google" ? { CONSENT: "YES+" } : {},
           timeoutMs,
         });
@@ -1077,11 +1080,12 @@ export class GoogleSearch {
             : 60000;
         const retryAt = new Date(Date.now() + delay).toISOString();
         failure = searchFailure(new Error(call.error), retryAt);
-        exhausted.set(cooldown, { error: call.error, retryAt, delay });
+        if (!researchProxy)
+          exhausted.set(cooldown, { error: call.error, retryAt, delay });
         if (call.error === "search_runtime") break;
         // An account/proxy error affects every engine on this route. Try a
         // separately configured route, while pausing this one across engines.
-        if ([401, 402, 407].includes(call.status || 0)) {
+        if (!researchProxy && [401, 402, 407].includes(call.status || 0)) {
           for (const affected of ["google", "duckduckgo", "brave"])
             this.store.set(
               `web-search:cooldown:${affected}:${identity}`,

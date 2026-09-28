@@ -81,13 +81,14 @@ test("Brave preserves organic snippets and rejects verification pages and unsafe
   );
 });
 
-test("a challenged research uses Brave on the same exit and publishes each completed query", async () => {
+test("a challenged research gives each search request a fresh exit and publishes completed queries", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-progress-")),
     store = new Store(dir);
   const saved = process.env.GOOGLE_SEARCH_PROXY;
   process.env.GOOGLE_SEARCH_PROXY =
     "http://configured:secret@proxy.example:7000";
-  const proxy = "http://user-session-one:secret@proxy.example:7000";
+  const proxy =
+    "http://user-country-us-session-one-sessionduration-30:secret@gate.decodo.com:7000";
   const calls: { engine: string; proxy: string; query: string }[] = [],
     progress: any[] = [];
   const search = new GoogleSearch(store, async (input) => {
@@ -111,9 +112,11 @@ test("a challenged research uses Brave on the same exit and publishes each compl
     assert.equal(web.state, "ready");
     assert.deepEqual(
       calls.map((c) => c.engine),
-      ["duckduckgo", "brave", "brave"],
+      ["duckduckgo", "brave", "duckduckgo", "brave"],
     );
-    assert.ok(calls.every((c) => c.proxy === proxy));
+    assert.ok(calls.every((c) => c.proxy !== proxy));
+    assert.equal(new Set(calls.map((c) => c.proxy)).size, calls.length);
+    assert.ok(calls.every((c) => /country-us-session-[a-f0-9]{12}-sessionduration-30/.test(decodeURIComponent(new URL(c.proxy).username))));
     assert.equal(web.queries[0]!.query, '"token relay" pricing');
     assert.equal(web.queries[0]!.engine, "brave");
     assert.equal(progress[0].state, "partial");
@@ -332,7 +335,7 @@ test("single-page Google requests use the purchased rotating gateway while prese
     /search_proxy/,
   );
 });
-test("report search keeps its research exit and uses the working organic index first", async () => {
+test("report search uses a new exit instead of the Trends exit", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-sticky-search-"));
   const store = new Store(dir);
   const old = process.env.GOOGLE_SEARCH_PROXY;
@@ -354,11 +357,56 @@ test("report search keeps its research exit and uses the working organic index f
     );
     assert.equal(web.state, "ready");
     assert.equal(web.queries[0]?.results.length, 1);
-    assert.deepEqual(calls, [{ engine: "duckduckgo", proxy: researchProxy }]);
+    assert.deepEqual(calls.map((call) => call.engine), ["duckduckgo"]);
+    assert.notEqual(calls[0]?.proxy, researchProxy);
+    assert.match(decodeURIComponent(new URL(calls[0]!.proxy).username), /country-us-session-[a-f0-9]{12}-sessionduration-30/);
   } finally {
     old === undefined
       ? delete process.env.GOOGLE_SEARCH_PROXY
       : (process.env.GOOGLE_SEARCH_PROXY = old);
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test("research search changes exit after a 429 without cooling the next query", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-429-"));
+  const store = new Store(dir);
+  const saved = process.env.GOOGLE_SEARCH_PROXY;
+  process.env.GOOGLE_SEARCH_PROXY =
+    "http://user-country-us-session-configured-sessionduration-30:secret@gate.decodo.com:7000";
+  const researchProxy =
+    "http://user-country-us-session-research-sessionduration-30:secret@gate.decodo.com:7000";
+  const calls: { engine: string; proxy: string }[] = [];
+  const search = new GoogleSearch(store, async ({ engine, proxy }) => {
+    calls.push({ engine, proxy });
+    if (calls.length === 1) return { status: 202 };
+    if (calls.length === 2) return { status: 429 };
+    return { status: 200, html: engine === "google" ? mobile : duck };
+  });
+  try {
+    const web = await search.collect(
+      seed.topic,
+      "US",
+      [
+        { query: "phone transfer pricing", intent: "competition" },
+        { query: "phone transfer reviews", intent: "demand" },
+      ],
+      12000,
+      researchProxy,
+    );
+    assert.equal(web.state, "ready");
+    assert.deepEqual(calls.map((call) => call.engine), [
+      "duckduckgo",
+      "brave",
+      "google",
+      "duckduckgo",
+    ]);
+    assert.equal(new Set(calls.map((call) => call.proxy)).size, calls.length);
+    assert.ok(calls.every((call) => call.proxy !== researchProxy));
+  } finally {
+    saved === undefined
+      ? delete process.env.GOOGLE_SEARCH_PROXY
+      : (process.env.GOOGLE_SEARCH_PROXY = saved);
     store.close();
     rmSync(dir, { recursive: true, force: true });
   }
