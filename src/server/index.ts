@@ -308,10 +308,15 @@ export function createApp(
           );
           job.state = job.market.aiError ? "failed" : "complete";
           if (job.market.aiError) {
-            job.clarification = {
-              en: "Analysis could not be completed. Collected sources are saved in your history; please retry the research.",
-              zh: "分析未能完成。已采集的来源保留在历史记录中，请重新发起研究。",
-            };
+            job.clarification = job.market.web?.state === "failed"
+              ? {
+                  en: "Web sources could not be collected. Available Trends and GitHub evidence is saved in your history; your research credit was returned.",
+                  zh: "网页来源采集未完成。已取得的趋势与 GitHub 材料保存在历史记录中，本次研究次数已返还。",
+                }
+              : {
+                  en: "Analysis could not be completed. Collected sources are saved in your history; please retry the research.",
+                  zh: "分析未能完成。已采集的来源保留在历史记录中，请重新发起研究。",
+                };
             job.error = job.clarification.en;
           }
           const warnings = researchWarnings(

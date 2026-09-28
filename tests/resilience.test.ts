@@ -61,6 +61,8 @@ test("each research gets fresh sticky exits while its token sequence keeps one s
   const first = trends.forResearch();
   const second = trends.forResearch();
   try {
+    assert.equal(trends.researchProxy(), undefined);
+    assert.equal(first.researchProxy(), (first as any).proxy);
     const route = (collector: Trends, backup = false) =>
       backup ? (collector as any).fallback : collector;
     const proxy = (collector: Trends, backup = false) =>

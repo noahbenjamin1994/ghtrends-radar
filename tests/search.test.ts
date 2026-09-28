@@ -194,6 +194,37 @@ test("single-page Google requests use the purchased rotating gateway while prese
     /search_proxy/,
   );
 });
+test("report search keeps its research exit and uses the working organic index first", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-sticky-search-"));
+  const store = new Store(dir);
+  const old = process.env.GOOGLE_SEARCH_PROXY;
+  process.env.GOOGLE_SEARCH_PROXY = "http://fallback:secret@proxy.example:7000";
+  const researchProxy =
+    "http://user-country-us-session-fresh-sessionduration-30:secret@gate.decodo.com:7000";
+  const calls: { engine: string; proxy: string }[] = [];
+  const search = new GoogleSearch(store, async (input) => {
+    calls.push({ engine: input.engine, proxy: input.proxy });
+    return { status: 200, html: duck, bytes: 8000 };
+  });
+  try {
+    const web = await search.collect(
+      seed.topic,
+      "US",
+      [{ query: "phone transfer pricing", intent: "competition" }],
+      16000,
+      researchProxy,
+    );
+    assert.equal(web.state, "ready");
+    assert.equal(web.queries[0]?.results.length, 1);
+    assert.deepEqual(calls, [{ engine: "duckduckgo", proxy: researchProxy }]);
+  } finally {
+    old === undefined
+      ? delete process.env.GOOGLE_SEARCH_PROXY
+      : (process.env.GOOGLE_SEARCH_PROXY = old);
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 test("direct search reuses residential routes, caches results, records traffic and cools challenged routes", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-direct-")),
     store = new Store(dir);

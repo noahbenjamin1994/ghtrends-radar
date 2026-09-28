@@ -182,6 +182,9 @@ export class Trends {
       });
     return trends;
   }
+  researchProxy(): string | undefined {
+    return this.sessionScoped ? this.proxy : undefined;
+  }
   status() {
     const now = Date.now();
     // Cooling an old sticky IP must not block a new research on a new session.

@@ -578,6 +578,7 @@ export class GoogleSearch {
     geo: string,
     targeted?: SearchQuery[],
     budgetMs = 45000,
+    researchProxy?: string,
   ): Promise<WebEvidence> {
     const language = /[\u3400-\u9fff]/.test(topic.plan?.input || topic.name)
       ? "zh-CN"
@@ -609,7 +610,9 @@ export class GoogleSearch {
     const hnQuery = discovery ? hackerNewsQuery(topic) : undefined;
     const [results, hn] = await Promise.all([
       Promise.allSettled(
-        queries.map((q) => this.search(q.query, region, language, budgetMs)),
+        queries.map((q) =>
+          this.search(q.query, region, language, budgetMs, researchProxy),
+        ),
       ),
       hnQuery ? collectHackerNews(this.store, hnQuery) : undefined,
     ]);
@@ -662,6 +665,7 @@ export class GoogleSearch {
     region: string,
     language: string,
     budgetMs = 45000,
+    researchProxy?: string,
   ): Promise<SearchPage> {
     const deadline = Date.now() + budgetMs;
     const identity = createHash("sha256")
@@ -712,7 +716,13 @@ export class GoogleSearch {
         if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
         try {
           if (Date.now() >= deadline) throw new Error("search_timeout");
-          const page = await this.direct(query, region, language, deadline);
+          const page = await this.direct(
+            query,
+            region,
+            language,
+            deadline,
+            researchProxy,
+          );
           // Give the primary source another chance after a short fallback cache.
           this.store.set(
             key,
@@ -829,20 +839,23 @@ export class GoogleSearch {
     region: string,
     language: string,
     deadline = Date.now() + 45000,
+    researchProxy?: string,
   ): Promise<SearchPage> {
-    const routes = [
-      process.env.GOOGLE_SEARCH_PROXY || process.env.GOOGLE_TRENDS_PROXY,
-      process.env.GOOGLE_SEARCH_PROXY_FALLBACK ||
-        process.env.GOOGLE_TRENDS_PROXY_FALLBACK,
-    ]
-      .filter((p): p is string => !!p)
-      .map(searchProxy)
-      .filter((p, i, a) => a.indexOf(p) === i);
+    const routes = researchProxy
+      ? [researchProxy]
+      : [
+          process.env.GOOGLE_SEARCH_PROXY || process.env.GOOGLE_TRENDS_PROXY,
+          process.env.GOOGLE_SEARCH_PROXY_FALLBACK ||
+            process.env.GOOGLE_TRENDS_PROXY_FALLBACK,
+        ]
+          .filter((p): p is string => !!p)
+          .map(searchProxy)
+          .filter((p, i, a) => a.indexOf(p) === i);
     const first = routes[0];
     if (!first) throw new Error("search_proxy");
     // Give Google one fresh-exit retry, retaining the rotating pool's country.
     // Then use an independent index, with its own bounded retry/cooldown.
-    const rotating =
+    const rotating = !researchProxy &&
       new URL(first).hostname === "gate.decodo.com" &&
       new URL(first).port === "7000";
     const candidates = [{ proxy: first, route: 0 }];
@@ -851,7 +864,12 @@ export class GoogleSearch {
         proxy: rotating ? first : routes[1]!,
         route: rotating ? 0 : 1,
       });
-    const attempts = (["google", "duckduckgo"] as const).flatMap((engine) =>
+    // The report's sticky exit has already shown Google verification failures;
+    // collect one independent organic index before spending its short budget.
+    const engines = researchProxy
+      ? (["duckduckgo", "google"] as const)
+      : (["google", "duckduckgo"] as const);
+    const attempts = engines.flatMap((engine) =>
       candidates.map((candidate) => ({ engine, ...candidate })),
     );
     // A separate configured route can recover a primary proxy-account error.

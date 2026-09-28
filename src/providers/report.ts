@@ -189,7 +189,13 @@ export async function singleReport(
           if (collecting) supply = s;
         }),
       engine.search
-        .collect(topic, options.geo, scopedWebQueries(topic), 16000)
+        .collect(
+          topic,
+          options.geo,
+          scopedWebQueries(topic),
+          16000,
+          options.trends?.researchProxy(),
+        )
         .then((w) => {
           if (collecting) web = w;
         }),
@@ -351,7 +357,24 @@ export async function singleReport(
       reviewed: false,
       basis: "source-led",
     };
-  } catch {
+  } catch (error) {
+    const issues = (error as { issues?: { path?: (string | number)[]; code?: string }[] })
+      .issues;
+    const reason = Array.isArray(issues)
+      ? issues.slice(0, 4).map((issue) => `${issue.path?.join(".")}:${issue.code}`).join(",")
+      : error instanceof Error &&
+          [
+            "Report citation does not match the collected source.",
+            "Observed finding requires source evidence.",
+            "No topic evidence available.",
+            "report_deadline",
+          ].includes(error.message)
+        ? error.message
+        : "report_write_failed";
+    console.warn("Report delivery rejected", {
+      runId: operationContext.getStore()?.runId,
+      reason,
+    });
     market.aiError =
       "The report could not be completed within the time and evidence limits. This attempt's credit is returned.";
   }
