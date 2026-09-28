@@ -222,8 +222,8 @@ test("a validated partial report is delivered with refunded credit; no report re
           ? {
               model: "test",
               generatedAt: new Date().toISOString(),
-              en: { summary: text.en },
-              zh: { summary: text.zh },
+              en: { summary: text.en, nextSteps: [] },
+              zh: { summary: text.zh, nextSteps: [] },
               sources: [],
               report: {
                 headline: text,
