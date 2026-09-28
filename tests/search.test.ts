@@ -81,7 +81,7 @@ test("Brave preserves organic snippets and rejects verification pages and unsafe
   );
 });
 
-test("a challenged research gives each search request a fresh exit and publishes completed queries", async () => {
+test("research queries start with Brave on fresh exits and publish completed queries", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-progress-")),
     store = new Store(dir);
   const saved = process.env.GOOGLE_SEARCH_PROXY;
@@ -110,7 +110,7 @@ test("a challenged research gives each search request a fresh exit and publishes
       (w) => progress.push(w),
     );
     assert.equal(web.state, "ready");
-    assert.equal(calls.filter((c) => c.engine === "duckduckgo").length, 2);
+    assert.equal(calls.filter((c) => c.engine === "duckduckgo").length, 0);
     assert.equal(calls.filter((c) => c.engine === "brave").length, 2);
     assert.ok(calls.every((c) => c.proxy !== proxy));
     assert.equal(new Set(calls.map((c) => c.proxy)).size, calls.length);
@@ -157,7 +157,7 @@ test("concurrent researches do not share in-flight requests or block one another
     }
     await gate;
     active--;
-    return { status: 200, html: duck };
+    return { status: 200, html: brave };
   });
   const timer = setTimeout(release, 200);
   try {
@@ -349,7 +349,7 @@ test("report search uses a new exit instead of the Trends exit", async () => {
   const calls: { engine: string; proxy: string }[] = [];
   const search = new GoogleSearch(store, async (input) => {
     calls.push({ engine: input.engine, proxy: input.proxy });
-    return { status: 200, html: duck, bytes: 8000 };
+    return { status: 200, html: brave, bytes: 8000 };
   });
   try {
     const web = await search.collect(
@@ -363,7 +363,7 @@ test("report search uses a new exit instead of the Trends exit", async () => {
     assert.equal(web.queries[0]?.results.length, 1);
     assert.deepEqual(
       calls.map((call) => call.engine),
-      ["duckduckgo"],
+      ["brave"],
     );
     assert.notEqual(calls[0]?.proxy, researchProxy);
     assert.match(
@@ -387,11 +387,15 @@ test("research search changes exit after a 429 without cooling the next query", 
   const researchProxy =
     "http://user-country-us-session-research-sessionduration-30:secret@gate.decodo.com:7000";
   const calls: { engine: string; proxy: string }[] = [];
+  let braveCalls = 0;
   const search = new GoogleSearch(store, async ({ engine, proxy, query }) => {
     calls.push({ engine, proxy });
-    if (query.includes("reviews")) return { status: 200, html: duck };
+    if (query.includes("reviews")) return { status: 200, html: brave };
     if (engine === "duckduckgo") return { status: 202 };
-    if (engine === "brave") return { status: 429 };
+    if (engine === "brave")
+      return ++braveCalls === 1
+        ? { status: 429 }
+        : { status: 200, html: brave };
     return { status: 200, html: mobile };
   });
   try {
@@ -408,10 +412,10 @@ test("research search changes exit after a 429 without cooling the next query", 
     assert.equal(web.state, "ready");
     assert.equal(
       calls.filter((call) => call.engine === "duckduckgo").length,
-      2,
+      0,
     );
-    assert.equal(calls.filter((call) => call.engine === "brave").length, 1);
-    assert.equal(calls.filter((call) => call.engine === "google").length, 1);
+    assert.equal(calls.filter((call) => call.engine === "brave").length, 3);
+    assert.equal(calls.filter((call) => call.engine === "google").length, 0);
     assert.equal(new Set(calls.map((call) => call.proxy)).size, calls.length);
     assert.ok(calls.every((call) => call.proxy !== researchProxy));
   } finally {
@@ -444,7 +448,7 @@ test("three research queries collect concurrently on separate exits", async () =
     if (active === 3) release();
     await gate;
     active--;
-    return { status: 200, html: duck };
+    return { status: 200, html: brave };
   });
   const timer = setTimeout(release, 500);
   try {

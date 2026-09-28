@@ -981,7 +981,7 @@ export class GoogleSearch {
     // collect one independent organic index before spending its short budget.
     const engines =
       researchProxy && fallbackQuery
-        ? (["duckduckgo", "brave", "google"] as const)
+        ? (["brave", "brave", "duckduckgo", "google"] as const)
         : (["google", "duckduckgo"] as const);
     const attempts = engines.flatMap((engine) =>
       candidates.map((candidate) => ({ engine, ...candidate })),
