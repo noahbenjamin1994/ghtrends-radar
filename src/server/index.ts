@@ -306,8 +306,8 @@ export function createApp(
                 },
               }),
           );
-          job.state = job.market.aiError ? "failed" : "complete";
-          if (job.market.aiError) {
+          job.state = job.market.aiError && !job.market.brief?.report ? "failed" : "complete";
+          if (job.state === "failed") {
             job.clarification = job.market.web?.state === "failed"
               ? {
                   en: "Web sources could not be collected. Available Trends and GitHub evidence is saved in your history; your research credit was returned.",

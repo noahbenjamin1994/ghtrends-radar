@@ -63,25 +63,28 @@ test("each research gets fresh sticky exits while its token sequence keeps one s
   try {
     assert.equal(trends.researchProxy(), undefined);
     assert.equal(first.researchProxy(), (first as any).proxy);
-    const route = (collector: Trends, backup = false) =>
-      backup ? (collector as any).fallback : collector;
-    const proxy = (collector: Trends, backup = false) =>
-      new URL(route(collector, backup).proxy);
+    const proxy = (collector: Trends) => new URL((collector as any).proxy);
     for (const collector of [first, second]) {
-      for (const backup of [false, true]) {
-        const url = proxy(collector, backup);
-        assert.match(url.username, /-country-us-session-[a-f0-9]{12}-sessionduration-30/);
-        assert.equal(url.password, "secret");
-        assert.notEqual(route(collector, backup).cooldownKey,
-          backup ? "test-backup-cooldown" : "test-primary-cooldown");
-        assert.equal(proxy(collector, backup).username, url.username);
-      }
-      assert.notEqual(proxy(collector).username, proxy(collector, true).username);
+      const url = proxy(collector);
+      assert.match(
+        url.username,
+        /-country-us-session-[a-f0-9]{12}-sessionduration-30/,
+      );
+      assert.equal(url.password, "secret");
+      assert.notEqual((collector as any).cooldownKey, "test-primary-cooldown");
+      assert.equal(proxy(collector).username, url.username);
+      assert.equal(
+        (collector as any).fallback,
+        undefined,
+        "research must not switch exits on 429",
+      );
     }
     assert.notEqual(proxy(first).username, proxy(second).username);
-    assert.notEqual(proxy(first, true).username, proxy(second, true).username);
     assert.notEqual((first as any).cooldownKey, (second as any).cooldownKey);
-    assert.equal(researchSessionProxy("http://example.com:7000"), "http://example.com:7000");
+    assert.equal(
+      researchSessionProxy("http://example.com:7000"),
+      "http://example.com:7000",
+    );
   } finally {
     await first.close();
     await second.close();

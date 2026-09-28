@@ -307,7 +307,7 @@ function SearchEvidence({
                     .replace("T", " ")
                     .slice(0, 16)}{" "}
                   UTC
-                  {q.engine === "duckduckgo"
+                  {(q.engine === "duckduckgo" || q.engine === "brave")
                     ? zh
                       ? " · 备用搜索 · 自然结果"
                       : " · Fallback · Organic results"

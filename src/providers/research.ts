@@ -663,7 +663,8 @@ export class Research {
             stream_options: { include_usage: true },
             thinking: { type: "disabled" },
             ...(!thinking &&
-            (operation === "strategy-deep-correction-check" ||
+            (operation === "report-write" ||
+              operation === "strategy-deep-correction-check" ||
               operation === "strategy-deep-copy" ||
               operation === "strategy-copy" ||
               operation === "direction-fit-copy")

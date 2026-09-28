@@ -21,6 +21,8 @@ import {
   parseSearchResults,
   parseGooglePage,
   parseDuckDuckGoPage,
+  parseBravePage,
+  phraseSearchQuery,
   searchProxy,
   publicSearchUrl,
   searchSources,
@@ -39,6 +41,142 @@ const seed: Market = JSON.parse(
 )[0];
 const mobile = `<html><body><form><input name="q"></form><div class="zMzFAb"><a class="fuLhoc" href="/url?q=https%3A%2F%2Ftools.example%2Fcompare%3Futm_source%3Dgoogle&amp;sa=U"><span class="CVA68e">Compare phones</span></a><div class="taTFJ"><span class="FrIlee">Check <b>model compatibility</b> before purchase.</span></div></div></body></html>`;
 const duck = `<html><body><form><input name="q"></form><table><tr><td><a class='result-link' href='//duckduckgo.com/l/?uddg=https%3A%2F%2Ftools.example%2Fpricing%3Futm_source%3Dddg'>Phone transfer pricing</a></td></tr><tr><td class='result-snippet'>Repair shop plans start at <b>$20</b> per month.</td></tr><tr><td class='link-text'>tools.example</td></tr></table></body></html>`;
+const brave = `<html><body><div class="snippet" data-type="web"><a href="https://tools.example/pricing?utm_source=brave"><div class="title search-snippet-title">Token relay plans</div></a><div class="generic-snippet"><div class="content">The starter plan does not include bulk requests.</div></div></div><div class="snippet" data-type="ad"><a href="https://ads.example"><div class="search-snippet-title">Paid offer</div></a></div></body></html>`;
+
+test("Brave preserves organic snippets and rejects verification pages and unsafe links", () => {
+  assert.deepEqual(parseBravePage(brave), [
+    {
+      title: "Token relay plans",
+      url: "https://tools.example/pricing",
+      excerpt: "The starter plan does not include bulk requests.",
+      kind: "organic",
+    },
+  ]);
+  assert.throws(
+    () => parseBravePage("<title>Verify you are human</title>"),
+    /search_challenge/,
+  );
+  assert.throws(
+    () =>
+      parseBravePage(
+        brave.replace(
+          "https://tools.example/pricing?utm_source=brave",
+          "http://127.0.0.1/",
+        ),
+      ),
+    /search_format/,
+  );
+  assert.throws(
+    () => parseBravePage("<html>Unexpected layout</html>"),
+    /search_format/,
+  );
+  assert.deepEqual(parseBravePage('<input name="q">No results found'), []);
+  assert.equal(
+    phraseSearchQuery("open source token relay project", "token relay"),
+    'open source "token relay" project',
+  );
+  assert.equal(
+    phraseSearchQuery('"token relay" pricing', "token relay"),
+    '"token relay" pricing',
+  );
+});
+
+test("a challenged research uses Brave on the same exit and publishes each completed query", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-progress-")),
+    store = new Store(dir);
+  const saved = process.env.GOOGLE_SEARCH_PROXY;
+  process.env.GOOGLE_SEARCH_PROXY =
+    "http://configured:secret@proxy.example:7000";
+  const proxy = "http://user-session-one:secret@proxy.example:7000";
+  const calls: { engine: string; proxy: string; query: string }[] = [],
+    progress: any[] = [];
+  const search = new GoogleSearch(store, async (input) => {
+    calls.push(input);
+    return input.engine === "duckduckgo"
+      ? { status: 202, html: "challenge" }
+      : { status: 200, html: brave };
+  });
+  try {
+    const web = await search.collect(
+      { ...seed.topic, keyword: "token relay" },
+      "US",
+      [
+        { query: "token relay pricing", intent: "competition" },
+        { query: "token relay problems", intent: "demand" },
+      ],
+      10000,
+      proxy,
+      (w) => progress.push(w),
+    );
+    assert.equal(web.state, "ready");
+    assert.deepEqual(
+      calls.map((c) => c.engine),
+      ["duckduckgo", "brave", "brave"],
+    );
+    assert.ok(calls.every((c) => c.proxy === proxy));
+    assert.equal(web.queries[0]!.query, '"token relay" pricing');
+    assert.equal(web.queries[0]!.engine, "brave");
+    assert.equal(progress[0].state, "partial");
+    assert.equal(progress[0].queries[1].state, "pending");
+    assert.match(searchSources(web)[0]!.excerpt!, /Brave search excerpt/);
+  } finally {
+    saved === undefined
+      ? delete process.env.GOOGLE_SEARCH_PROXY
+      : (process.env.GOOGLE_SEARCH_PROXY = saved);
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("concurrent researches do not share in-flight requests or block one another's exits", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ghtrends-search-sessions-")),
+    store = new Store(dir);
+  const saved = process.env.GOOGLE_SEARCH_PROXY;
+  process.env.GOOGLE_SEARCH_PROXY =
+    "http://configured:secret@proxy.example:7000";
+  const proxies: string[] = [];
+  let overlapped = false,
+    active = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const search = new GoogleSearch(store, async ({ proxy }) => {
+    proxies.push(proxy);
+    active++;
+    if (active === 2) {
+      overlapped = true;
+      release();
+    }
+    await gate;
+    active--;
+    return { status: 200, html: duck };
+  });
+  const timer = setTimeout(release, 200);
+  try {
+    await Promise.all(
+      ["one", "two"].map((session) =>
+        search.collect(
+          seed.topic,
+          "US",
+          [{ query: "same query", intent: "competition" }],
+          3000,
+          `http://user-session-${session}:secret@proxy.example:7000`,
+        ),
+      ),
+    );
+    assert.equal(proxies.length, 2);
+    assert.equal(overlapped, true);
+    assert.notEqual(proxies[0], proxies[1]);
+  } finally {
+    clearTimeout(timer);
+    saved === undefined
+      ? delete process.env.GOOGLE_SEARCH_PROXY
+      : (process.env.GOOGLE_SEARCH_PROXY = saved);
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 test("current sponsored group markup yields ads without relabeling neighboring organic results", () => {
   // Structural reduction of the CRM browser sample, 2026-09-18. Tracking and
   // account attributes removed. A group label alone is not an ad-card boundary.

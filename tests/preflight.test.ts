@@ -202,6 +202,62 @@ test("identical preparations share one plan, preserve owner/region/keyword, and 
     );
   }));
 
+test("a validated partial report is delivered with refunded credit; no report remains failed", async () =>
+  setup(async ({ engine, post, get }) => {
+    const topic = resolveTopic("mcp");
+    engine.research.plan = async () => topic;
+    for (const deliverable of [true, false]) {
+      engine.scan = async () => {
+        const market: Market = JSON.parse(
+          readFileSync(new URL("../public/seed.json", import.meta.url), "utf8"),
+        )[0];
+        market.aiError = "Some sections are incomplete.";
+        const text = { en: "Analysis is incomplete.", zh: "部分分析未完成。" };
+        const finding = {
+          status: "missing" as const,
+          summary: text,
+          evidence: [],
+        };
+        market.brief = deliverable
+          ? {
+              model: "test",
+              generatedAt: new Date().toISOString(),
+              en: { summary: text.en },
+              zh: { summary: text.zh },
+              sources: [],
+              report: {
+                headline: text,
+                overview: text,
+                demandTrend: finding,
+                commercialSupply: finding,
+                openSourceSupply: finding,
+                userNeeds: finding,
+                directions: [],
+                nextStep: text,
+                limitations: [text],
+              },
+            }
+          : undefined;
+        return market;
+      };
+      const input = {
+        topic: deliverable ? "MCP tools" : "MCP services",
+        geo: "US",
+      };
+      const scope = await (await post("/api/preflight", input)).json();
+      const response = await post("/api/scan", {
+        ...input,
+        preflightId: scope.id,
+      });
+      assert.equal(response.status, 202);
+      const job = await response.json();
+      const completed = await (await get("/api/jobs/" + job.id)).json();
+      assert.equal(completed.state, deliverable ? "complete" : "failed");
+      assert.equal(completed.credit, "returned");
+      assert.equal(engine.store.usage("alice"), 0);
+    }
+  }));
+
 test("semantic clarification stays before reservation and keeps actionable choices", async () =>
   setup(async ({ engine, post }) => {
     engine.research.plan = async () => {

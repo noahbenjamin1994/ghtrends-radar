@@ -342,7 +342,7 @@ export function marketMarkdown(
             "",
             `### ${cell(q.query)}`,
             q.state === "ready"
-              ? `${searchEngineLabel(q)} · ${q.fetchedAt || m.web!.fetchedAt} · ${q.region || m.web!.region}${q.engine === "duckduckgo" ? (locale === "zh" ? " · 备用搜索 · 自然结果" : " · Fallback · Organic results") : ""}`
+              ? `${searchEngineLabel(q)} · ${q.fetchedAt || m.web!.fetchedAt} · ${q.region || m.web!.region}${q.engine === "duckduckgo" || q.engine === "brave" ? (locale === "zh" ? " · 备用搜索 · 自然结果" : " · Fallback · Organic results") : ""}`
               : locale === "zh"
                 ? "采集已暂停 · 可更新研究后重试"
                 : "Collection stopped · update research to retry",

@@ -4,14 +4,22 @@ import type { WebEvidence } from "../providers/search.js";
 const WEEK = 7 * 86400000;
 type WebQuery = WebEvidence["queries"][number];
 export function searchEngineLabel(query: WebQuery) {
-  return query.engine === "hackernews" ? "Hacker News / Algolia" : query.engine === "duckduckgo" ? "DuckDuckGo" : "Google";
+  return query.engine === "hackernews"
+    ? "Hacker News / Algolia"
+    : query.engine === "duckduckgo"
+      ? "DuckDuckGo"
+      : query.engine === "brave"
+        ? "Brave"
+        : "Google";
 }
 export function searchQueryUrl(query: WebQuery, web: WebEvidence) {
   return query.engine === "hackernews"
-    ? `https://hn.algolia.com/?${new URLSearchParams({q:query.query})}`
+    ? `https://hn.algolia.com/?${new URLSearchParams({ q: query.query })}`
     : query.engine === "duckduckgo"
-    ? `https://duckduckgo.com/?${new URLSearchParams({ q: query.query })}`
-    : `https://www.google.com/search?${new URLSearchParams({ q: query.query, hl: web.language, gl: web.region.toLowerCase() })}`;
+      ? `https://duckduckgo.com/?${new URLSearchParams({ q: query.query })}`
+      : query.engine === "brave"
+        ? `https://search.brave.com/search?${new URLSearchParams({ q: query.query })}`
+        : `https://www.google.com/search?${new URLSearchParams({ q: query.query, hl: web.language, gl: web.region.toLowerCase() })}`;
 }
 export function adSampleQueries(web?: WebEvidence) {
   return (
@@ -91,7 +99,10 @@ export function searchEvidenceIsFresh(web?: WebEvidence, now = Date.now()) {
         q.state === "ready" &&
         Number.isFinite(age) &&
         age >= -60000 &&
-        age < (q.engine === "duckduckgo" ? 30 * 60000 : 6 * 3600000)
+        age <
+          (q.engine === "duckduckgo" || q.engine === "brave"
+            ? 30 * 60000
+            : 6 * 3600000)
       );
     })
   );
@@ -106,14 +117,22 @@ export function searchCollectionMessage(
     return zh
       ? "网页搜索需要管理员配置采集服务。"
       : "Web search requires a configured collection service.";
-  const fallback = web.queries.some(
-    (q) => q.state === "ready" && q.engine === "duckduckgo",
-  );
+  const fallback = [
+    ...new Set(
+      web.queries
+        .filter(
+          (q) =>
+            q.state === "ready" &&
+            (q.engine === "duckduckgo" || q.engine === "brave"),
+        )
+        .map(searchEngineLabel),
+    ),
+  ].join(" / ");
   if (web.state === "ready")
     return fallback
       ? zh
-        ? "已由 DuckDuckGo 补充网页证据；每组查询标注实际来源与采集时间。"
-        : "DuckDuckGo supplied fallback web evidence. Each query identifies its source and collection time."
+        ? `已由 ${fallback} 补充网页证据；每组查询标注实际来源与采集时间。`
+        : `${fallback} supplied fallback web evidence. Each query identifies its source and collection time.`
       : "";
   const challenge = web.queries.some((q) =>
     /challenge|http_429/.test(q.error || ""),

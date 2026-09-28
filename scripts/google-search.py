@@ -1,11 +1,11 @@
-"""Fixed-origin Google / DuckDuckGo transport. Credentials arrive on stdin, never in argv.
+"""Fixed-origin search transport. Credentials arrive on stdin, never in argv.
 
 The mobile endpoint is also used by SearXNG's Google engine. This independent
 transport uses curl_cffi's Android TLS profile; it executes no downloaded code.
 """
 import json
 import sys
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlencode, quote
 
 
 def main():
@@ -15,7 +15,7 @@ def main():
     query, region, language = data["query"], data["region"], data["language"]
     proxy = data["proxy"]
     engine = data.get("engine", "google")
-    if engine not in ("google", "duckduckgo"):
+    if engine not in ("google", "duckduckgo", "brave"):
         raise ValueError("engine")
     if not isinstance(query, str) or not 2 <= len(query) <= 160:
         raise ValueError("query")
@@ -46,7 +46,7 @@ def main():
                    "Accept": "*/*"}
         profile = "chrome99_android"
         cookies = {"CONSENT": "YES+"}
-    else:
+    elif engine == "duckduckgo":
         endpoint = "https://lite.duckduckgo.com/lite/"
         # kl is a supported market, not an arbitrary country/language pairing.
         # Other requested regions use worldwide results, identified in the report.
@@ -57,15 +57,22 @@ def main():
         headers = {"Accept-Language": "zh-CN,zh;q=0.9,en;q=0.5" if language == "zh-CN" else "en-US,en;q=0.9"}
         profile = "chrome"
         cookies = {}
+    else:
+        endpoint = "https://search.brave.com/search"
+        params = {"q": query, "source": "web"}
+        headers = {"Accept-Language": "zh-CN,zh;q=0.9,en;q=0.5" if language == "zh-CN" else "en-US,en;q=0.9"}
+        profile = "chrome"
+        cookies = {"country": region.lower(), "useLocation": "0"}
+    endpoint += "?" + urlencode(params, quote_via=quote)
     with requests.Session() as session:
         response = session.get(
-            endpoint, params=params, headers=headers, cookies=cookies,
+            endpoint, headers=headers, cookies=cookies,
             proxy=proxy, impersonate=profile, timeout=timeout_ms / 1000,
             allow_redirects=False, content_callback=receive,
         )
         print(json.dumps({
             "status": response.status_code,
-            "region": region.upper() if engine == "google" or region.upper() in markets else "GLOBAL",
+            "region": region.upper() if engine in ("google", "brave") or region.upper() in markets else "GLOBAL",
             "bytes": response.download_size + response.header_size + response.request_size,
             "html": b"".join(chunks).decode("utf-8", errors="replace"),
             "cookies": {c.name: c.value for c in response.cookies.jar

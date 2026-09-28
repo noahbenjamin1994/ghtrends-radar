@@ -91,8 +91,11 @@ export function parseTimeline(data: any, index = 0): InterestPoint[] {
 }
 function isStickyDecodoProxy(raw: string): boolean {
   const url = new URL(raw);
-  return url.hostname === "gate.decodo.com" && url.port === "7000" &&
-    /-session-[a-z0-9]+/i.test(decodeURIComponent(url.username));
+  return (
+    url.hostname === "gate.decodo.com" &&
+    url.port === "7000" &&
+    /-session-[a-z0-9]+/i.test(decodeURIComponent(url.username))
+  );
 }
 /** A fresh sticky exit for one research; Google cookies and widget tokens stay on it. */
 export function researchSessionProxy(raw: string): string {
@@ -175,11 +178,8 @@ export class Trends {
       routeName: "primary",
       sessionScoped: true,
     });
-    if (this.fallback?.proxy)
-      trends.fallback = new Trends(this.store, {
-        proxy: researchSessionProxy(this.fallback.proxy),
-        sessionScoped: true,
-      });
+    // A research owns one exit for its entire lifetime, including retries.
+    // Background/manual collection may still use the configured backup route.
     return trends;
   }
   researchProxy(): string | undefined {
@@ -188,8 +188,8 @@ export class Trends {
   status() {
     const now = Date.now();
     // Cooling an old sticky IP must not block a new research on a new session.
-    const rotating = !this.sessionScoped && this.proxy &&
-      isStickyDecodoProxy(this.proxy);
+    const rotating =
+      !this.sessionScoped && this.proxy && isStickyDecodoProxy(this.proxy);
     const routes = rotating
       ? [0, ...(this.fallback ? [0] : [])]
       : [this.cooldown(), ...(this.fallback ? [this.fallback.cooldown()] : [])];

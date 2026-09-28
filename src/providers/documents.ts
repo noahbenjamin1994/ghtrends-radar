@@ -318,6 +318,11 @@ export class DocumentReader {
   get enabled() {
     return process.env.GHTRENDS_SOURCE_DOCUMENTS !== "0";
   }
+  forResearch(proxy?: string) {
+    return proxy
+      ? new DocumentReader(this.store, documentTransport(proxy))
+      : this;
+  }
   /** Explicit HTML read: never dispatches to platform APIs, including HN. */
   async readWeb(url: string, focus = "", signal = AbortSignal.timeout(15000)) {
     const normalized = publicSearchUrl(url);

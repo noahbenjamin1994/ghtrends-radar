@@ -7,6 +7,8 @@ import { Engine } from "../src/core/engine.js";
 import { Store } from "../src/core/store.js";
 import {
   parseReport,
+  parseReportDraft,
+  reportCitations,
   REPORT_PROMPT,
   reportSections,
   type ReportContent,
@@ -17,6 +19,7 @@ import {
   finalizeReport,
 } from "../src/providers/report.js";
 import { operationContext } from "../src/core/operations.js";
+import { researchWarnings } from "../src/core/evidence.js";
 import { marketMarkdown } from "../src/core/report.js";
 import { renderDocument } from "../src/server/html.js";
 import type { Market, ResearchSource } from "../src/core/types.js";
@@ -152,6 +155,7 @@ test("one report write, short input, private snapshot, bilingual exports and no 
     assert.equal(max, 3600);
     assert.equal(thinking, false);
     assert.ok(JSON.stringify(input).length < 20000);
+    assert.doesNotMatch(JSON.stringify((input as any).outputSchema), /"\$ref"/);
     return draft();
   };
   try {
@@ -199,6 +203,119 @@ test("one report write, short input, private snapshot, bilingual exports and no 
     assert.equal(failed.brief, undefined);
     assert.notEqual(failed.id, report.id);
     assert.ok(engine.store.report(report.id)?.brief?.report);
+  } finally {
+    await engine.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("citation IDs restore exact source text and reject invented references", () => {
+  const refs = reportCitations([
+    source,
+    {
+      ...source,
+      id: "S2",
+      excerpt:
+        "不支持评论搜索，也未授权转售。\n" +
+        "Long original paragraph with preserved punctuation. ".repeat(20),
+    },
+  ]);
+  for (const ref of Object.values(refs)) {
+    const original =
+      ref.id === "S1"
+        ? source.excerpt!
+        : "不支持评论搜索，也未授权转售。\n" +
+          "Long original paragraph with preserved punctuation. ".repeat(20);
+    assert.ok(original.includes(ref.quote));
+    assert.ok(ref.quote.length >= 8 && ref.quote.length <= 280);
+  }
+  const raw = {
+    ...draft(),
+    commercialSupply: { status: "observed", summary: text, evidence: ["S1Q1"] },
+  };
+  const parsed = parseReportDraft(raw, refs);
+  assert.deepEqual(parsed.commercialSupply.evidence, [
+    { id: "S1", quote: source.excerpt },
+  ]);
+  assert.match(parsed.commercialSupply.evidence[0]!.quote, /does not support/);
+  raw.commercialSupply.evidence = ["S99Q1"];
+  assert.throws(() => parseReportDraft(raw, refs), /citation ID/);
+});
+
+test("interrupted queries and a blank model section retain valid material without charging", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "report-partial-search-"));
+  const engine = new Engine(new Store(dir));
+  const base: Market = JSON.parse(
+    readFileSync(new URL("../public/seed.json", import.meta.url), "utf8"),
+  )[0];
+  engine.trends.demand = async () => base.demand;
+  engine.github.supply = async () => base.supply;
+  engine.search.collect = async (
+    _topic,
+    _geo,
+    _queries,
+    _budget,
+    _proxy,
+    onProgress,
+  ) => {
+    onProgress?.({
+      provider: "multi-search",
+      region: "US",
+      language: "en",
+      fetchedAt: new Date().toISOString(),
+      state: "partial",
+      queries: [
+        {
+          query: "sample pricing",
+          intent: "competition",
+          state: "ready",
+          engine: "brave",
+          results: [
+            {
+              title: "Sample plans",
+              url: "https://sample.example/plans",
+              excerpt: "Plans for sample customers.",
+              kind: "organic",
+            },
+          ],
+        },
+        {
+          query: "sample problems",
+          intent: "demand",
+          state: "pending",
+          results: [],
+        },
+      ],
+    });
+    throw new Error("search_timeout");
+  };
+  engine.documents.readWeb = async (url) => ({
+    sources: [],
+    read: { url, status: "unavailable", observedAt: new Date().toISOString() },
+    cached: false,
+  });
+  engine.research.json = async () => ({
+    ...draft(),
+    openSourceSupply: { summary: { en: "", zh: "" }, evidence: [] },
+  });
+  try {
+    const out = await singleReport(engine, "sample topic", base.topic, {
+      geo: "US",
+      private: true,
+    });
+    assert.ok(out.brief?.report);
+    assert.ok(out.aiError);
+    assert.equal(out.brief.report.openSourceSupply.status, "missing");
+    assert.match(out.brief.report.openSourceSupply.summary.zh, /分析未能完成/);
+    assert.deepEqual(out.brief.report.directions, []);
+    assert.ok(researchWarnings(out, true).includes(out.aiError));
+    assert.equal(out.web?.state, "partial");
+    assert.equal(out.web?.queries[0]?.results.length, 1);
+    assert.equal(out.web?.queries[1]?.state, "failed");
+    assert.equal(out.web?.queries[1]?.error, "search_timeout");
+    assert.ok(
+      out.brief?.sources.some((s) => s.url === "https://sample.example/plans"),
+    );
   } finally {
     await engine.close();
     rmSync(dir, { recursive: true, force: true });

@@ -36,6 +36,14 @@ export function DomainReport({
     );
   return (
     <div className="domain-report">
+      {market.aiError && (
+        <div className="report-delivery-note" role="alert">
+          {l(
+            "Some analysis is incomplete. Completed sections and sources are retained; this attempt does not use a research credit.",
+            "部分分析未完成，已保留可用章节与来源；本次不计研究次数。",
+          )}
+        </div>
+      )}
       <nav className="domain-nav" aria-label={l("Report sections", "报告章节")}>
         <a href="#outlook">{l("Overview", "整体判断")}</a>
         <a href="#evidence">{l("Four perspectives", "四类证据")}</a>

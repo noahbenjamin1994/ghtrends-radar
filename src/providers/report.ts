@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import type { Engine, ScanProgress } from "../core/engine.js";
 import type { Trends } from "./trends.js";
 import { analyze } from "../core/analyze.js";
@@ -8,6 +9,9 @@ import {
   REPORT_PROMPT,
   REPORT_VERSION,
   parseReport,
+  parseReportDraft,
+  reportCitations,
+  reportDraftSchema,
   type ReportContent,
 } from "../core/report-contract.js";
 import { STRATEGY_VERSION } from "../core/strategy.js";
@@ -23,32 +27,34 @@ import { DOCUMENT_VERSION } from "./documents.js";
 
 /** Measurements are rendered by code, not rewritten into a different time window. */
 export function finalizeReport(
-  report: ReportContent,
+  report: Omit<ReportContent, "demandTrend">,
   market: Market,
   sources: ResearchSource[],
 ) {
-  const value = structuredClone(report);
   const growth = market.metrics.growth;
   const missing =
     !!market.demand.error || !!market.demand.collectionError || growth === null;
   const change = growth === null ? "" : `${Math.abs(growth * 100).toFixed(1)}%`;
-  value.demandTrend = {
-    status: missing ? "missing" : "observed",
-    summary: missing
-      ? {
-          en: "A reliable search-interest comparison is unavailable in this collection. This is not zero demand.",
-          zh: "本轮没有取得可用的搜索趋势比较，不能解读为零需求。",
-        }
-      : {
-          en: `Relative interest for “${market.demand.keyword}” ${growth! < 0 ? "fell" : "rose"} ${change}: last 8 complete weeks versus the previous 8, not the full history. Search attention is not paying demand.`,
-          zh: `“${market.demand.keyword}”最近8个完整周较此前8周${growth! < 0 ? "下降" : "上升"}${change}；并非整个历史区间的变化，搜索关注不等于付费需求。`,
+  const value: ReportContent = {
+    ...structuredClone(report),
+    demandTrend: {
+      status: missing ? "missing" : "observed",
+      summary: missing
+        ? {
+            en: "A reliable search-interest comparison is unavailable in this collection. This is not zero demand.",
+            zh: "本轮没有取得可用的搜索趋势比较，不能解读为零需求。",
+          }
+        : {
+            en: `Relative interest for “${market.demand.keyword}” ${growth! < 0 ? "fell" : "rose"} ${change}: last 8 complete weeks versus the previous 8, not the full history. Search attention is not paying demand.`,
+            zh: `“${market.demand.keyword}”最近8个完整周较此前8周${growth! < 0 ? "下降" : "上升"}${change}；并非整个历史区间的变化，搜索关注不等于付费需求。`,
+          },
+      evidence: [
+        {
+          id: "S1",
+          quote: sources.find((s) => s.id === "S1")!.excerpt!.slice(0, 260),
         },
-    evidence: [
-      {
-        id: "S1",
-        quote: sources.find((s) => s.id === "S1")!.excerpt!.slice(0, 260),
-      },
-    ],
+      ],
+    },
   };
   const userEvidence = (id: string) => {
     const source = sources.find((s) => s.id === id);
@@ -170,7 +176,7 @@ export async function singleReport(
   };
   options.onProgress?.({ stage: "sources", topic });
   let collecting = true;
-  await reportPhase(Math.min(18000, remaining()), async () => {
+  await reportPhase(Math.min(22000, remaining()), async () => {
     await Promise.allSettled([
       (options.trends || engine.trends)
         .demand(topic.keyword, options.geo, (d) => {
@@ -193,8 +199,11 @@ export async function singleReport(
           topic,
           options.geo,
           scopedWebQueries(topic),
-          16000,
+          20000,
           options.trends?.researchProxy(),
+          (partial) => {
+            if (collecting) web = structuredClone(partial);
+          },
         )
         .then((w) => {
           if (collecting) web = w;
@@ -202,6 +211,17 @@ export async function singleReport(
     ]);
   }).catch(() => {});
   collecting = false;
+  // A phase deadline preserves completed queries and closes the remaining ones.
+  if (web.queries.some((q) => q.state === "pending")) {
+    web.queries = web.queries.map((q) =>
+      q.state === "pending"
+        ? { ...q, state: "failed", error: "search_timeout" }
+        : q,
+    );
+    web.state = web.queries.some((q) => q.state === "ready")
+      ? "partial"
+      : "failed";
+  }
   const market = analyze(topic, demand, supply, []);
   market.web = web;
   options.onProgress?.({
@@ -214,7 +234,7 @@ export async function singleReport(
   const candidates = searchSources(web);
   const pages: ResearchSource[] = [];
   const reads: NonNullable<Market["documents"]>["reads"] = [];
-  const reader = engine.documents;
+  const reader = engine.documents.forResearch(options.trends?.researchProxy());
   const urls: string[] = [];
   const hosts = new Set<string>();
   // Alternate commercial and user-demand results; don't spend all slots on vendors.
@@ -311,6 +331,7 @@ export async function singleReport(
       excerptTruncated: !!s.excerptTruncated || (s.excerpt?.length || 0) > 1200,
     }));
   options.onProgress?.({ stage: "brief", preview: market });
+  const citations = reportCitations(sources);
   try {
     if (!pages.length && !repos.length && !snippets.length)
       throw new Error("No topic evidence available.");
@@ -330,13 +351,35 @@ export async function singleReport(
             search: web.state,
             pageReads: reads,
           },
-          sources,
+          sources: sources.map(({ excerpt: _excerpt, ...source }) => ({
+            ...source,
+            citations: Object.entries(citations)
+              .filter(([, ref]) => ref.id === source.id)
+              .map(([id, ref]) => ({ id, text: ref.quote })),
+          })),
+          outputSchema: zodToJsonSchema(reportDraftSchema, {
+            $refStrategy: "none",
+          }),
         },
         3600,
         "report-write",
         false,
       );
-      return finalizeReport(parseReport(raw, sources), market, sources);
+      return parseReport(
+        finalizeReport(
+          parseReportDraft(raw, citations, (sections) => {
+            market.aiError =
+              "Some analysis sections are incomplete. Collected evidence is retained; this attempt's credit is returned.";
+            console.warn("Report sections incomplete", {
+              runId: operationContext.getStore()?.runId,
+              sections,
+            });
+          }),
+          market,
+          sources,
+        ),
+        sources,
+      );
     });
     market.brief = {
       report,
@@ -358,13 +401,18 @@ export async function singleReport(
       basis: "source-led",
     };
   } catch (error) {
-    const issues = (error as { issues?: { path?: (string | number)[]; code?: string }[] })
-      .issues;
+    const issues = (
+      error as { issues?: { path?: (string | number)[]; code?: string }[] }
+    ).issues;
     const reason = Array.isArray(issues)
-      ? issues.slice(0, 4).map((issue) => `${issue.path?.join(".")}:${issue.code}`).join(",")
+      ? issues
+          .slice(0, 4)
+          .map((issue) => `${issue.path?.join(".")}:${issue.code}`)
+          .join(",")
       : error instanceof Error &&
           [
             "Report citation does not match the collected source.",
+            "Report citation ID is not in the collected source.",
             "Observed finding requires source evidence.",
             "No topic evidence available.",
             "report_deadline",
