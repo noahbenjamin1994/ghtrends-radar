@@ -14,6 +14,7 @@ import type { ResearchSource, Topic } from "../core/types.js";
 import type { ProviderCall } from "../core/operations.js";
 import { operationContext, operationSignal } from "../core/operations.js";
 import { researchSessionProxy } from "./trends.js";
+import { exitLabel, traced } from "./scope.js";
 
 export const searchQuerySchema = z.object({
   query: z
@@ -450,7 +451,7 @@ export type SearchTransport = (input: {
   cookies: Record<string, string>;
   timeoutMs?: number;
 }) => Promise<DirectResponse>;
-const directRequest: SearchTransport = (input) =>
+const rawDirectRequest: SearchTransport = (input) =>
   new Promise((resolve, reject) => {
     const signal = operationContext.getStore()?.signal;
     signal?.throwIfAborted();
@@ -507,6 +508,30 @@ const directRequest: SearchTransport = (input) =>
     child.stdin.on("error", () => {});
     child.stdin.end(JSON.stringify(input));
   });
+// Every outbound search leaves a span. The wrapper adds no behaviour: it cannot
+// change the result, and a reporting failure cannot fail a search.
+const directRequest: SearchTransport = traced(
+  "search.direct",
+  rawDirectRequest,
+  ([input], result) => ({
+    target: input.query,
+    // The gateway is known; which residential address it exits from is not
+    // reported back by the transport. Left explicit rather than guessed.
+    actorPlanned: exitLabel(input.proxy),
+    actorActual: exitLabel(input.proxy),
+    phase: result?.status ? "response" : "connect",
+    evidence: {
+      engine: input.engine,
+      region: result?.region || input.region,
+      language: input.language,
+      http_status: result?.status ?? null,
+      bytes: result?.bytes ?? null,
+      exit_ip: null,
+    },
+  }),
+  (result) => result?.error,
+);
+
 // A mobile search is one stateless request. On Decodo's rotating gateway, keep
 // country targeting and release the Trends-specific sticky session parameters.
 // Other proxy providers retain their configured URL verbatim.

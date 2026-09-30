@@ -14,6 +14,7 @@ import type { Store } from "../core/store.js";
 import type { ProviderCall } from "../core/operations.js";
 import type { ResearchSource } from "../core/types.js";
 import { publicSearchUrl } from "./search.js";
+import { exitLabel, traced } from "./scope.js";
 
 // robots-parser is CommonJS; its default-export declaration differs under NodeNext.
 const robotsParser = createRequire(import.meta.url)("robots-parser") as (
@@ -139,7 +140,7 @@ export async function documentBody(
 
 /** Pin checked public addresses. Proxy credentials stay on the CONNECT hop;
  * cookies and provider keys are never forwarded to the target website. */
-export const documentTransport =
+const rawDocumentTransport =
   (proxy?: string): DocumentTransport =>
   async (url, signal, maxBytes) => {
     if (!publicSearchUrl(url.href)) throw failure("access");
@@ -304,6 +305,31 @@ const hnItem = (url: string) => {
 };
 const discussion = (url: string) =>
   /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/discussions\/[1-9]\d*$/.test(url);
+
+// Every page read leaves a span. The wrapper is transparent: same return value,
+// same thrown error, and a reporting failure cannot fail a read.
+export function documentTransport(proxy?: string): DocumentTransport {
+  // Function declaration, not const: it is referenced above its own definition.
+  return traced(
+    "document.read",
+    rawDocumentTransport(proxy),
+    ([url], result) => ({
+      target: url.href,
+      // Known: which gateway. Unknown: which residential address behind it —
+      // the transport does not report the exit, so it is null, not invented.
+      actorPlanned: exitLabel(proxy),
+      actorActual: exitLabel(proxy),
+      phase: result ? "response" : "connect",
+      evidence: {
+        host: url.hostname,
+        http_status: result?.status ?? null,
+        bytes: result?.bytes ?? null,
+        content_type: result?.headers?.["content-type"] ?? null,
+        exit_ip: null,
+      },
+    }),
+  );
+}
 
 export class DocumentReader {
   private pagePending = new Map<
