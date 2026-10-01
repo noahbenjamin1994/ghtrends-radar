@@ -308,6 +308,13 @@ const discussion = (url: string) =>
 
 // Every page read leaves a span. The wrapper is transparent: same return value,
 // same thrown error, and a reporting failure cannot fail a read.
+// No exit_ip field. It is obtainable — the exit is bound to the TCP connection to
+// the gateway, so a probe on the same dispatcher would report the real one — but it
+// costs a full CONNECT + TLS round trip (~1-2s) before every request, and knowing
+// which residential address a failure used changes nothing: the pool rotates, you
+// cannot pick an address, and the remedy is already "retry on a new exit". The signal
+// that does matter, the whole pool being blocked, shows up as a failure rate here.
+// A field that is always null is worse than no field: it reads as lost data.
 export function documentTransport(proxy?: string): DocumentTransport {
   // Function declaration, not const: it is referenced above its own definition.
   return traced(
@@ -315,8 +322,7 @@ export function documentTransport(proxy?: string): DocumentTransport {
     rawDocumentTransport(proxy),
     ([url], result) => ({
       target: url.href,
-      // Known: which gateway. Unknown: which residential address behind it —
-      // the transport does not report the exit, so it is null, not invented.
+      // The gateway, not the exit. See the note above documentTransport.
       actorPlanned: exitLabel(proxy),
       actorActual: exitLabel(proxy),
       phase: result ? "response" : "connect",
@@ -325,7 +331,6 @@ export function documentTransport(proxy?: string): DocumentTransport {
         http_status: result?.status ?? null,
         bytes: result?.bytes ?? null,
         content_type: result?.headers?.["content-type"] ?? null,
-        exit_ip: null,
       },
     }),
   );

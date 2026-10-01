@@ -515,8 +515,7 @@ const directRequest: SearchTransport = traced(
   rawDirectRequest,
   ([input], result) => ({
     target: input.query,
-    // The gateway is known; which residential address it exits from is not
-    // reported back by the transport. Left explicit rather than guessed.
+    // The gateway, not the exit. See the note above documentTransport in documents.ts.
     actorPlanned: exitLabel(input.proxy),
     actorActual: exitLabel(input.proxy),
     phase: result?.status ? "response" : "connect",
@@ -526,7 +525,6 @@ const directRequest: SearchTransport = traced(
       language: input.language,
       http_status: result?.status ?? null,
       bytes: result?.bytes ?? null,
-      exit_ip: null,
     },
   }),
   (result) => result?.error,
