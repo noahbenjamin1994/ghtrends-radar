@@ -135,8 +135,11 @@ test("schema and citation failures recover but never bypass evidence validation"
       globalThis.fetch = async () => {
         calls++;
         const bad = draft();
-        if (failure === "schema") bad.headline = { ...text, en: "" };
-        else
+        if (failure === "schema") {
+          bad.commercialSupply = null as any;
+          bad.openSourceSupply = null as any;
+          bad.userNeeds = null as any;
+        } else
           bad.commercialSupply = {
             status: "observed",
             summary: text,
@@ -296,5 +299,32 @@ test("repeated invented citations remain a failed report rather than a false suc
     assert.equal(calls, 2);
     assert.equal(result.brief, undefined);
     assert.equal(result.analysisError?.code, "report_citation");
+  });
+});
+
+test("malformed JSON followed by one malformed direction delivers validated findings with a refund warning", async () => {
+  await harness(async ({ run }) => {
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      if (calls === 1)
+        return reply(
+          '{"limitations":[{"en":"first","zh":"第一"},"overview":{"en":"wrong nesting","zh":"错误嵌套"}]}',
+        );
+      const raw = {
+        ...draft(),
+        directions: [
+          { title: { en: "Broken direction", zh: text, task: text } },
+        ],
+      };
+      return reply(JSON.stringify(raw));
+    };
+    const result = await run();
+    assert.equal(calls, 2);
+    assert.ok(result.brief?.report);
+    assert.deepEqual(result.brief.report.directions, []);
+    assert.ok(result.aiError);
+    assert.equal(result.analysisError, undefined);
+    assert.ok(researchWarnings(result, true).includes(result.aiError));
   });
 });

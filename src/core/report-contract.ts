@@ -90,13 +90,61 @@ export function parseReportDraft(
     raw && typeof raw === "object" && !Array.isArray(raw)
       ? ({ ...raw } as Record<string, unknown>)
       : undefined;
-  const incomplete = input
+  const incomplete: string[] = input
     ? fields.filter((key) => !draftFinding.safeParse(input[key]).success)
     : [];
+  // Optional entries must not discard otherwise valid domain findings. Drop an
+  // invalid direction as a whole; never guess how misplaced fields were meant
+  // to nest or invent the missing wording. All retained citations are checked.
+  if (input && incomplete.length < fields.length) {
+    const missingCopy = {
+      headline: {
+        en: "Collected evidence with gaps in the analysis",
+        zh: "已取得研究材料，部分分析尚未完成",
+      },
+      overview: {
+        en: "Completed findings and sources are retained. Incomplete analysis cannot support an entry decision.",
+        zh: "已保留完成的分析与来源；未完成的分析不能作为进入决策依据。",
+      },
+      nextStep: {
+        en: "Review the retained sources; complete the missing analysis before making an entry decision.",
+        zh: "先核对已保留的来源，在作出进入决策前补齐分析缺项。",
+      },
+    };
+    for (const key of ["headline", "overview", "nextStep"] as const) {
+      if (!bilingual.safeParse(input[key]).success) {
+        incomplete.push(key);
+        input[key] = missingCopy[key];
+      }
+    }
+    for (const key of ["directions", "limitations"] as const) {
+      const schema = reportDraftSchema.shape[key];
+      if (schema.safeParse(input[key]).success) continue;
+      incomplete.push(key);
+      const entries = Array.isArray(input[key]) ? input[key] : [];
+      input[key] = entries
+        .filter((entry) => schema.element.safeParse(entry).success)
+        .slice(0, key === "directions" ? 3 : 4);
+      if (key === "limitations" && !(input[key] as unknown[]).length)
+        input[key] = [
+          {
+            en: "Part of the generated analysis was incomplete; only validated sections are retained.",
+            zh: "部分生成内容不完整，仅保留通过核验的分析。",
+          },
+        ];
+    }
+  }
+  const incompleteFindings = incomplete.filter((key) =>
+    fields.includes(key as (typeof fields)[number]),
+  );
   // Preserve valid findings, but never invent a missing analysis or recommend
   // an entry direction from a structurally incomplete report.
-  if (input && incomplete.length > 0 && incomplete.length < fields.length) {
-    for (const key of incomplete)
+  if (
+    input &&
+    incompleteFindings.length > 0 &&
+    incompleteFindings.length < fields.length
+  ) {
+    for (const key of incompleteFindings)
       input[key] = {
         status: "missing",
         evidence: [],

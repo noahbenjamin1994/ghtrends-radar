@@ -321,3 +321,86 @@ test("interrupted queries and a blank model section retain valid material withou
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("one malformed optional direction cannot discard validated core findings", () => {
+  const refs = reportCitations([source]);
+  const direction = {
+    title: text,
+    task: text,
+    existingSupply: text,
+    entry: text,
+    uncertainty: text,
+    evidence: ["S1Q1"],
+  };
+  const raw = {
+    ...draft(),
+    commercialSupply: { status: "observed", summary: text, evidence: ["S1Q1"] },
+    directions: [
+      direction,
+      { title: { en: "Broken direction", zh: text, task: text } },
+    ],
+    limitations: [text, { overview: text }],
+  };
+  let incomplete: string[] = [];
+  const parsed = parseReportDraft(raw, refs, (sections) => {
+    incomplete = sections;
+  });
+  assert.equal(parsed.commercialSupply.status, "observed");
+  assert.equal(parsed.directions.length, 1);
+  assert.deepEqual(parsed.directions[0]!.title, text);
+  assert.equal(parsed.limitations.length, 1);
+  assert.deepEqual(incomplete, ["directions", "limitations"]);
+  assert.equal(
+    (raw.directions[1]!.title.zh as any).en,
+    text.en,
+    "raw evidence is not mutated",
+  );
+  assert.throws(
+    () =>
+      parseReportDraft(
+        { ...raw, directions: [{ ...direction, evidence: ["S999Q1"] }] },
+        refs,
+      ),
+    /citation ID/,
+  );
+});
+
+test("optional-field salvage never manufactures a report with no valid core findings", () => {
+  assert.throws(() =>
+    parseReportDraft(
+      {
+        commercialSupply: null,
+        openSourceSupply: null,
+        userNeeds: null,
+        directions: [{}],
+        limitations: [{}],
+      },
+      {},
+    ),
+  );
+});
+
+test("invalid headline or next step retains actual findings and explicitly marks incomplete analysis", () => {
+  const refs = reportCitations([source]);
+  let incomplete: string[] = [];
+  const parsed = parseReportDraft(
+    {
+      ...draft(),
+      headline: { en: "", zh: "" },
+      nextStep: null,
+      commercialSupply: {
+        status: "observed",
+        summary: text,
+        evidence: ["S1Q1"],
+      },
+    },
+    refs,
+    (fields) => {
+      incomplete = fields;
+    },
+  );
+  assert.deepEqual(incomplete, ["headline", "nextStep"]);
+  assert.equal(parsed.commercialSupply.status, "observed");
+  assert.match(parsed.headline.zh, /部分分析尚未完成/);
+  assert.match(parsed.nextStep.zh, /补齐分析缺项/);
+});
