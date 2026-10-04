@@ -16,6 +16,11 @@ export function mergeActivity(
 }
 export function activityLabel(operation: string, zh: boolean) {
   const labels: Record<string, [string, string]> = {
+    "report-write": ["Writing the evidence-based report", "根据证据生成报告"],
+    "report-recover": [
+      "Regenerating analysis from collected sources",
+      "使用已采集来源重新生成分析",
+    ],
     plan: ["Understanding your topic", "理解研究主题"],
     "web-relevance": [
       "Checking search result relevance",

@@ -282,6 +282,7 @@ export interface Market {
   score: number | null;
   brief?: Brief;
   aiError?: string;
+  analysisError?: { code: string; attempts: number };
   web?: import("../providers/search.js").WebEvidence;
   documents?: import("../providers/documents.js").DocumentEvidence;
 }

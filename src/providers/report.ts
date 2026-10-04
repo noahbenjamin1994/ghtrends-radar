@@ -25,6 +25,47 @@ import type {
 import { searchSources, scopedWebQueries, type WebEvidence } from "./search.js";
 import { DOCUMENT_VERSION } from "./documents.js";
 
+/** Safe error categories for progress and recovery; raw answers stay private. */
+export function reportFailure(error: unknown) {
+  const e = error as {
+    code?: string;
+    message?: string;
+    issues?: { path?: (string | number)[]; code?: string }[];
+  };
+  if (Array.isArray(e?.issues))
+    return {
+      code: "report_schema",
+      detail: e.issues
+        .slice(0, 8)
+        .map((issue) => `${issue.path?.join(".")}:${issue.code}`)
+        .join(","),
+      retryable: true,
+    };
+  if (
+    [
+      "Report citation does not match the collected source.",
+      "Report citation ID is not in the collected source.",
+      "Observed finding requires source evidence.",
+    ].includes(e?.message || "")
+  )
+    return { code: "report_citation", detail: e.message!, retryable: true };
+  if (e?.message === "No topic evidence available.")
+    return { code: "no_evidence", detail: "no_evidence", retryable: false };
+  const code = e?.message === "report_deadline" ? "model_timeout" : e?.code;
+  if (
+    code &&
+    /^(invalid_response|output_limit|completion_status|model_timeout|model_stream_error|network_error|http_\d{3})$/.test(
+      code,
+    )
+  )
+    return { code, detail: code, retryable: !/^http_4(?!08|29)/.test(code) };
+  return {
+    code: "report_write_failed",
+    detail: "report_write_failed",
+    retryable: false,
+  };
+}
+
 /** Measurements are rendered by code, not rewritten into a different time window. */
 export function finalizeReport(
   report: Omit<ReportContent, "demandTrend">,
@@ -332,54 +373,96 @@ export async function singleReport(
     }));
   options.onProgress?.({ stage: "brief", preview: market });
   const citations = reportCitations(sources);
+  let attempts = 0;
+  const failures: ReturnType<typeof reportFailure>[] = [];
+  const diagnosticId = operationContext.getStore()?.runId || randomUUID();
+  const request = {
+    input,
+    search: {
+      keyword: demand.keyword,
+      region: options.geo || "WORLDWIDE",
+      trend: market.metrics.trend,
+    },
+    coverage: {
+      trends: demand.error || demand.collectionError || "collected",
+      repositories: supply.error || "sample only",
+      search: web.state,
+      pageReads: reads,
+    },
+    sources: sources.map(({ excerpt: _excerpt, ...source }) => ({
+      ...source,
+      citations: Object.entries(citations)
+        .filter(([, ref]) => ref.id === source.id)
+        .map(([id, ref]) => ({ id, text: ref.quote })),
+    })),
+    outputSchema: zodToJsonSchema(reportDraftSchema, { $refStrategy: "none" }),
+  };
   try {
     if (!pages.length && !repos.length && !snippets.length)
       throw new Error("No topic evidence available.");
-    const report = await reportPhase(Math.min(25000, remaining()), async () => {
-      const raw = await engine.research.json(
-        REPORT_PROMPT,
-        {
-          input,
-          search: {
-            keyword: demand.keyword,
-            region: options.geo || "WORLDWIDE",
-            trend: market.metrics.trend,
-          },
-          coverage: {
-            trends: demand.error || demand.collectionError || "collected",
-            repositories: supply.error || "sample only",
-            search: web.state,
-            pageReads: reads,
-          },
-          sources: sources.map(({ excerpt: _excerpt, ...source }) => ({
-            ...source,
-            citations: Object.entries(citations)
-              .filter(([, ref]) => ref.id === source.id)
-              .map(([id, ref]) => ({ id, text: ref.quote })),
-          })),
-          outputSchema: zodToJsonSchema(reportDraftSchema, {
-            $refStrategy: "none",
-          }),
-        },
-        3600,
-        "report-write",
-        false,
-      );
-      return parseReport(
-        finalizeReport(
-          parseReportDraft(raw, citations, (sections) => {
+    const report = await reportPhase(remaining(), async () => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        // Reserve time for one recovery without extending the original deadline.
+        const budget = Math.min(
+          25000,
+          remaining() - (attempt === 0 && remaining() >= 16000 ? 8000 : 0),
+        );
+        if (budget <= 0) throw new Error("report_deadline");
+        attempts++;
+        try {
+          const raw = await reportPhase(budget, () =>
+            engine.research.json(
+              REPORT_PROMPT +
+                (attempt
+                  ? "\nThe previous attempt was rejected. Generate a fresh concise report from the ORIGINAL sources and schema. Use valid JSON with escaped string values and only supplied citation IDs. Do not invent evidence to fill missing sections."
+                  : ""),
+              attempt
+                ? { ...request, previousFailure: failures.at(-1)?.detail }
+                : request,
+              3600,
+              attempt ? "report-recover" : "report-write",
+              false,
+            ),
+          );
+          let incomplete: string[] = [];
+          const result = parseReport(
+            finalizeReport(
+              parseReportDraft(raw, citations, (sections) => {
+                incomplete = sections;
+              }),
+              market,
+              sources,
+            ),
+            sources,
+          );
+          if (incomplete.length) {
             market.aiError =
               "Some analysis sections are incomplete. Collected evidence is retained; this attempt's credit is returned.";
             console.warn("Report sections incomplete", {
-              runId: operationContext.getStore()?.runId,
-              sections,
+              runId: diagnosticId,
+              sections: incomplete,
             });
-          }),
-          market,
-          sources,
-        ),
-        sources,
-      );
+          }
+          return result;
+        } catch (error) {
+          const failure = reportFailure(error);
+          failures.push(failure);
+          console.warn("Report attempt rejected", {
+            runId: diagnosticId,
+            attempt: attempts,
+            ...failure,
+          });
+          if (
+            attempt === 1 ||
+            !failure.retryable ||
+            remaining() < 1500 ||
+            operationContext.getStore()?.signal?.aborted
+          )
+            throw error;
+          options.onProgress?.({ stage: "brief", preview: market });
+        }
+      }
+      throw new Error("report_deadline");
     });
     market.brief = {
       report,
@@ -401,36 +484,36 @@ export async function singleReport(
       basis: "source-led",
     };
   } catch (error) {
-    const issues = (
-      error as { issues?: { path?: (string | number)[]; code?: string }[] }
-    ).issues;
-    const reason = Array.isArray(issues)
-      ? issues
-          .slice(0, 4)
-          .map((issue) => `${issue.path?.join(".")}:${issue.code}`)
-          .join(",")
-      : error instanceof Error &&
-          [
-            "Report citation does not match the collected source.",
-            "Report citation ID is not in the collected source.",
-            "Observed finding requires source evidence.",
-            "No topic evidence available.",
-            "report_deadline",
-          ].includes(error.message)
-        ? error.message
-        : "report_write_failed";
+    const reason = reportFailure(error);
     console.warn("Report delivery rejected", {
       runId: operationContext.getStore()?.runId,
-      reason,
+      reason: reason.code,
     });
+    market.analysisError = { code: reason.code, attempts };
     market.aiError =
-      "The report could not be completed within the time and evidence limits. This attempt's credit is returned.";
+      reason.code === "model_timeout"
+        ? "Analysis did not finish within the time limit. Collected sources are retained; this attempt's credit is returned."
+        : "Analysis could not produce a validated report. Collected sources are retained; this attempt's credit is returned.";
   }
   // Unique snapshots never overwrite a historical report or its ownership.
   market.id = createHash("sha256")
     .update(`${REPORT_VERSION}:${options.owner || ""}:${randomUUID()}`)
     .digest("hex")
     .slice(0, 16);
+  try {
+    engine.store.recordModelDiagnostic(`${diagnosticId}:delivery`, {
+      runId: diagnosticId,
+      reportId: market.id,
+      attempts,
+      failures,
+      delivered: !!market.brief?.report,
+      error: market.analysisError,
+    });
+  } catch {
+    console.warn("Report diagnostic could not be saved", {
+      runId: diagnosticId,
+    });
+  }
   engine.store.saveMarket(market, !options.private, options.owner);
   if (options.owner) engine.store.addHistory(options.owner, market.id, input);
   return market;

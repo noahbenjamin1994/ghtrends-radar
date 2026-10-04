@@ -645,6 +645,33 @@ export class Research {
       durationMs: 0,
       model,
     };
+    let completion: any;
+    let diagnosticDetail: string | undefined;
+    const request = {
+      model,
+      stream: true,
+      stream_options: { include_usage: true },
+      thinking: { type: "disabled" },
+      ...(!thinking &&
+      (/^report-(write|recover)$/.test(operation) ||
+        operation === "strategy-deep-correction-check" ||
+        operation === "strategy-deep-copy" ||
+        operation === "strategy-copy" ||
+        operation === "direction-fit-copy")
+        ? { temperature: 0 }
+        : {}),
+      response_format: { type: "json_object" },
+      max_tokens: maxTokens,
+      messages: [
+        {
+          role: "system",
+          content: /\bjson\b/i.test(system)
+            ? system
+            : `${system}\nReturn a JSON object.`,
+        },
+        { role: "user", content: JSON.stringify(input) },
+      ],
+    };
     try {
       const root = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
       if (new URL(root).protocol !== "https:")
@@ -657,31 +684,7 @@ export class Research {
             Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            model,
-            stream: true,
-            stream_options: { include_usage: true },
-            thinking: { type: "disabled" },
-            ...(!thinking &&
-            (operation === "report-write" ||
-              operation === "strategy-deep-correction-check" ||
-              operation === "strategy-deep-copy" ||
-              operation === "strategy-copy" ||
-              operation === "direction-fit-copy")
-              ? { temperature: 0 }
-              : {}),
-            response_format: { type: "json_object" },
-            max_tokens: maxTokens,
-            messages: [
-              {
-                role: "system",
-                content: /\bjson\b/i.test(system)
-                  ? system
-                  : `${system}\nReturn a JSON object.`,
-              },
-              { role: "user", content: JSON.stringify(input) },
-            ],
-          }),
+          body: JSON.stringify(request),
           signal: AbortSignal.any([
             ...(scope?.signal ? [scope.signal] : []),
             AbortSignal.timeout(
@@ -699,11 +702,13 @@ export class Research {
       call.status = response.status;
       if (!response.ok) {
         call.error = `http_${response.status}`;
+        await response.body?.cancel().catch(() => {});
         throw new Error(
           `AI research is temporarily unavailable (${response.status}).`,
         );
       }
       const data = await readCompletion(response, notify);
+      completion = data;
       call.model =
         typeof data.model === "string" ? data.model.slice(0, 100) : model;
       call.inputTokens = tokenCount(data.usage?.prompt_tokens);
@@ -736,7 +741,9 @@ export class Research {
       }
       try {
         return parseModelJson(data.choices[0].message.content);
-      } catch {
+      } catch (error) {
+        diagnosticDetail =
+          error instanceof Error ? error.message : "model_json_error";
         call.error = "invalid_response";
         throw Object.assign(
           new Error(
@@ -746,10 +753,63 @@ export class Research {
         );
       }
     } catch (e) {
-      call.error ||= call.status ? "invalid_response" : "network_error";
-      throw e;
+      const error = e as Error & { code?: string; completion?: unknown };
+      completion ||= error.completion;
+      diagnosticDetail ||= error.message;
+      call.error ||=
+        scope?.signal?.aborted ||
+        error.name === "AbortError" ||
+        error.name === "TimeoutError"
+          ? "model_timeout"
+          : error.message?.startsWith("model_stream") ||
+              error.message === "incomplete_model_stream"
+            ? "model_stream_error"
+            : error instanceof SyntaxError && call.status
+              ? "invalid_response"
+              : "network_error";
+      throw Object.assign(
+        new Error(
+          call.error === "invalid_response" || call.error === "output_limit"
+            ? "The AI response could not be validated. Please try again."
+            : "The analysis service could not complete its response. Please try again.",
+        ),
+        { code: call.error },
+      );
     } finally {
       call.durationMs = Date.now() - started;
+      if (/^report-(write|recover)$/.test(operation)) {
+        // Persist the exact request and answer, but no credentials or reasoning.
+        const content =
+          completion?.choices?.[0]?.message?.content ??
+          completion?.content ??
+          "";
+        try {
+          this.store.recordModelDiagnostic(
+            `${scope?.runId || "local"}:${activity.id}`,
+            {
+              runId: scope?.runId,
+              operation,
+              started: call.started,
+              request,
+              status: call.status,
+              model: call.model,
+              finish:
+                completion?.choices?.[0]?.finish_reason ?? completion?.finish,
+              response:
+                typeof content === "string" ? content.slice(0, 300000) : null,
+              responseTruncated:
+                typeof content === "string" && content.length > 300000,
+              error: call.error,
+              detail: diagnosticDetail?.slice(0, 1000),
+            },
+          );
+        } catch {
+          console.warn("Model diagnostic could not be saved", {
+            runId: scope?.runId,
+            operation,
+          });
+        }
+      }
       this.store.recordCall(call);
       notify(call.error ? "retrying" : "complete");
     }

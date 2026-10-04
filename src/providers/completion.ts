@@ -68,6 +68,12 @@ export async function readCompletion(
       usage,
       choices: [{ finish_reason: finish, message: { content } }],
     };
+  } catch (error) {
+    // Keep the partial answer for private diagnostics, never the reasoning stream.
+    throw Object.assign(
+      new Error(error instanceof Error ? error.message : "model_stream_error"),
+      { completion: { model, usage, finish, content } },
+    );
   } finally {
     await reader.cancel().catch(() => {});
     reader.releaseLock();

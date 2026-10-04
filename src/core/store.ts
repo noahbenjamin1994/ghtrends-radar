@@ -810,6 +810,11 @@ export class Store {
     this.db
       .prepare("DELETE FROM cache WHERE expires<? AND key NOT LIKE 'trends:%'")
       .run(Date.now() - 86400000);
+    this.db
+      .prepare(
+        "DELETE FROM cache WHERE key LIKE 'model-diagnostic:%' AND expires<?",
+      )
+      .run(Date.now());
   }
   recordEvent(event: EngagementEvent) {
     this.db
@@ -1022,6 +1027,21 @@ export class Store {
     this.db
       .prepare("INSERT OR REPLACE INTO cache VALUES(?,?,?)")
       .run(key, JSON.stringify(value), Date.now() + ttlMs);
+  }
+  /** Private replay records: never included in reports, exports or admin summaries. */
+  recordModelDiagnostic(id: string, value: unknown) {
+    this.set("model-diagnostic:" + id, value, 7 * 86400000);
+    // Bound both age and volume independently of the general cache retention.
+    this.db
+      .prepare(
+        "DELETE FROM cache WHERE key LIKE 'model-diagnostic:%' AND expires<?",
+      )
+      .run(Date.now());
+    this.db
+      .prepare(
+        "DELETE FROM cache WHERE key IN (SELECT key FROM cache WHERE key LIKE 'model-diagnostic:%' ORDER BY expires DESC,key DESC LIMIT -1 OFFSET 200)",
+      )
+      .run();
   }
   saveMarket(m: Market, isPublic = true, owner?: string) {
     this.db.exec("BEGIN IMMEDIATE");
