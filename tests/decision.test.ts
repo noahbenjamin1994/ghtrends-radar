@@ -61,7 +61,13 @@ const draft = () => ({
     { title: text, workaround: null, quotes: ["S4Q1"] },
   ],
   commercial: [
-    { name: "Acme", audience: text, pricing: text, gap: text, evidence: ["S3Q1"] },
+    {
+      name: "Acme",
+      audience: text,
+      pricing: text,
+      gap: text,
+      evidence: ["S3Q1"],
+    },
   ],
   openSource: [
     { name: "ghost/not-collected", capability: text, evidence: ["S3Q1"] },
@@ -194,7 +200,11 @@ test("failed collection is reported as a gap and makes directions tentative, nev
       observedAt: new Date().toISOString(),
     },
   ];
-  const d = finalizeDecision(parseDecisionDraft(draft(), citations), m, sources);
+  const d = finalizeDecision(
+    parseDecisionDraft(draft(), citations),
+    m,
+    sources,
+  );
   assert.equal(d.coverage.supply, "partial");
   assert.equal(d.directions[0]!.tentative, true);
   assert.deepEqual(
@@ -217,13 +227,22 @@ test("invalid entries are dropped whole, unknown citations reject the draft", ()
   assert.deepEqual(incomplete, ["commercial", "nextStep"]);
   raw.pains[0].quotes = ["S99Q1"];
   assert.throws(() => parseDecisionDraft(raw, citations), /citation ID/);
-  assert.throws(() => parseDecisionDraft({ ...draft(), verdict: null }, citations));
+  assert.throws(() =>
+    parseDecisionDraft({ ...draft(), verdict: null }, citations),
+  );
 });
 
 test("the previous report shape is derived and passes its own citation check", () => {
   const m = withPages();
-  const d = finalizeDecision(parseDecisionDraft(draft(), citations), m, sources);
-  const legacy = parseReport(finalizeReport(legacyReport(d), m, sources), sources);
+  const d = finalizeDecision(
+    parseDecisionDraft(draft(), citations),
+    m,
+    sources,
+  );
+  const legacy = parseReport(
+    finalizeReport(legacyReport(d), m, sources),
+    sources,
+  );
   assert.equal(legacy.headline.zh, "换个切法");
   assert.equal(legacy.directions.length, 1);
   assert.equal(legacy.userNeeds.status, "observed");

@@ -15,6 +15,7 @@ import { streamSnapshot } from "./stream.js";
 import sharp from "sharp";
 import { installAuth } from "./auth.js";
 import { installFitRoutes } from "./fit.js";
+import { installRevisionRoutes } from "./revisions.js";
 import { installFeedbackRoutes } from "./feedback.js";
 import { installSourceRoutes } from "./sources.js";
 import { installDeepRoutes } from "./deep.js";
@@ -25,7 +26,7 @@ import {
 } from "./credits.js";
 import { marketCard } from "../core/card.js";
 import { isIP } from "node:net";
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -68,6 +69,9 @@ interface Job {
   credit?: "reserved" | "used" | "returned" | "free";
   cacheKey?: string;
   preparedTopic?: Topic;
+  /** The report's address, known before any evidence is collected. */
+  reportId?: string;
+  cancelled?: boolean;
 }
 export function createApp(
   engine = new Engine(),
@@ -98,6 +102,7 @@ export function createApp(
   });
   installFitRoutes(app, engine, auth);
   installFeedbackRoutes(app, engine, auth);
+  installRevisionRoutes(app, engine, auth);
   installSourceRoutes(app, engine, auth);
   installCreditAccountRoutes(app, engine.store, auth, credits);
   const dailyLimit = Math.max(
@@ -118,6 +123,7 @@ export function createApp(
           TOPICS.some((t) => t.slug === m.topic.slug),
       );
   const jobs = new Map<string, Job>();
+  const aborts = new Map<string, AbortController>();
   const preparations = new Map<
     string,
     { key: string; promise: Promise<PreflightResult> }
@@ -271,12 +277,15 @@ export function createApp(
         try {
           if (!job.refresh && Date.now() - job.created >= REPORT_DEADLINE_MS)
             throw new Error(
-              "The one-minute research window expired. Please retry; this attempt's credit is returned.",
+              "The research window expired before it could start. Please retry; this attempt's credit is returned.",
             );
+          const abort = new AbortController();
+          aborts.set(job.id, abort);
           job.market = await operationContext.run(
             {
               runId: job.id,
               userId: job.owner,
+              signal: abort.signal,
               llmBudget: { calls: 0, outputTokens: 0, maxCalls: 1 },
               onActivity: (activity) => {
                 job.progress = {
@@ -297,6 +306,7 @@ export function createApp(
                 owner: job.owner,
                 private: auth.hosted && !!job.owner,
                 preparedTopic: job.preparedTopic,
+                reportId: job.reportId,
                 deadlineAt: job.refresh
                   ? undefined
                   : job.created + REPORT_DEADLINE_MS,
@@ -306,6 +316,11 @@ export function createApp(
                 },
               }),
           );
+          if (job.cancelled) {
+            // The owner changed the question; nothing from this run is kept.
+            if (job.owner) engine.store.removeHistory(job.owner, job.market.id);
+            throw new Error("Research cancelled.");
+          }
           job.state =
             job.market.aiError && !job.market.brief?.report
               ? "failed"
@@ -360,6 +375,7 @@ export function createApp(
           job.choices = (e as any).choices;
           job.clarification = (e as any).clarification;
         }
+        aborts.delete(job.id);
         engine.store.set("job:" + job.id, job, 3600000);
         if (job.refresh) nextBackgroundAt = Date.now() + 35000;
       }
@@ -704,6 +720,18 @@ export function createApp(
       if (!/^[a-f0-9]{16}$/.test(id))
         return r.status(400).json({ error: "Invalid report ID." });
       const m = engine.store.report(id);
+      if (!m) {
+        // Still being researched: the address exists before the report does.
+        const jobId = engine.store.get<string>("report-job:" + id);
+        const job = jobId
+          ? jobs.get(jobId) || engine.store.get<Job>("job:" + jobId)
+          : null;
+        if (job && job.owner === auth.user(q)?.id && !job.cancelled)
+          return r
+            .status(202)
+            .set("Cache-Control", "no-store")
+            .json({ pending: true, job: job.id });
+      }
       if (!m || !engine.store.canRead(m.id, auth.user(q)?.id))
         return r.status(404).json({ error: "Report not found." });
       r.vary("Cookie");
@@ -1109,6 +1137,7 @@ export function createApp(
         created: Date.now(),
         cacheKey,
         credit: auth.hosted ? "reserved" : "free",
+        reportId: randomBytes(8).toString("hex"),
       };
       reserve(user.id, job.id, "scan");
       jobs.set(job.id, job);
@@ -1121,8 +1150,57 @@ export function createApp(
         created: new Date(job.created).toISOString(),
       });
       engine.store.set("job:" + job.id, job, 3600000);
+      engine.store.set("report-job:" + job.reportId, job.id, 3600000);
       void processJobs();
       return r.status(202).json(job);
+    }),
+  );
+  // Changing the question early starts over; this run is not charged.
+  app.post(
+    "/api/jobs/:id/cancel",
+    safe((q, r) => {
+      const user = auth.protect(q),
+        job = jobs.get(String(q.params.id));
+      if (!job || job.owner !== user.id)
+        return r.status(404).json({ error: "Scan not found." });
+      if (job.state === "queued") {
+        job.state = "failed";
+        job.cancelled = true;
+        job.error = "Research cancelled.";
+        job.credit = auth.hosted ? "returned" : "free";
+        engine.store.settleUsage(job.id, false);
+        engine.store.updateRun(job.id, "failed", { error: job.error });
+        engine.store.set("job:" + job.id, job, 3600000);
+      } else if (job.state === "running") {
+        job.cancelled = true;
+        aborts.get(job.id)?.abort();
+      }
+      return r.json({ ok: true });
+    }),
+  );
+  app.get(
+    "/api/researches",
+    safe((q, r) => {
+      const user = auth.requireUser(q);
+      return r.set("Cache-Control", "no-store").json({
+        items: engine.store.researches(user.id),
+        running: [...jobs.values()]
+          .filter(
+            (j) =>
+              j.owner === user.id &&
+              !j.cancelled &&
+              ["queued", "running"].includes(j.state),
+          )
+          .map((j) => ({
+            id: j.reportId,
+            job: j.id,
+            input: j.input || j.topic,
+            framing: j.preparedTopic?.plan?.framing,
+            created: j.created,
+            lanes: j.progress?.lanes,
+            stage: j.progress?.stage,
+          })),
+      });
     }),
   );
   app.get("/api/jobs/:id", (q, r) => {
@@ -1369,11 +1447,12 @@ export function createApp(
       r.status(
         invalid
           ? 400
-          : status && [401, 403, 404, 422, 429, 503].includes(status)
+          : status && [401, 403, 404, 409, 422, 429, 503].includes(status)
             ? status
             : 502,
       ).json({
         error: error.message,
+        code: (error as any).code,
         retryAt: (error as any).retryAt,
         guidance: (error as any).guidance,
         clarification: (error as any).clarification,

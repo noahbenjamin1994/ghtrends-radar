@@ -1,3 +1,4 @@
+import type { Revision } from "./decision.js";
 import type { EngagementEvent } from "./engagement.js";
 import type {
   FeedbackKind,
@@ -43,6 +44,7 @@ export class Store {
       CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,name TEXT NOT NULL,created TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS user_reports(user_id TEXT NOT NULL,report_id TEXT NOT NULL,input TEXT NOT NULL,created TEXT NOT NULL,PRIMARY KEY(user_id,report_id));
       CREATE TABLE IF NOT EXISTS report_owners(report_id TEXT PRIMARY KEY,user_id TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS report_revisions(report_id TEXT PRIMARY KEY,owner TEXT NOT NULL,payload TEXT NOT NULL,updated TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS user_watch(user_id TEXT NOT NULL,repo TEXT NOT NULL,created TEXT NOT NULL,PRIMARY KEY(user_id,repo));
       CREATE TABLE IF NOT EXISTS usage_daily(user_id TEXT NOT NULL,day TEXT NOT NULL,count INTEGER NOT NULL,PRIMARY KEY(user_id,day));
       CREATE TABLE IF NOT EXISTS usage_reservations(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,day TEXT NOT NULL,kind TEXT NOT NULL,state TEXT NOT NULL,created TEXT NOT NULL);
@@ -1125,6 +1127,59 @@ export class Store {
         geo: m.geo,
         headline: m.headline,
         kind: m.kind,
+        public: !!r.public,
+      };
+    });
+  }
+  /** The owner's corrections to a delivered report; the report itself is immutable. */
+  revision(id: string): Revision | null {
+    const row = this.db
+      .prepare("SELECT payload FROM report_revisions WHERE report_id=?")
+      .get(id) as { payload: string } | undefined;
+    return row ? (JSON.parse(row.payload) as Revision) : null;
+  }
+  saveRevision(id: string, owner: string, revision: Revision) {
+    const updated = new Date().toISOString();
+    this.db
+      .prepare(
+        "INSERT INTO report_revisions VALUES(?,?,?,?) ON CONFLICT(report_id) DO UPDATE SET payload=excluded.payload,updated=excluded.updated WHERE owner=excluded.owner",
+      )
+      .run(
+        id,
+        owner,
+        JSON.stringify({ ...revision, updatedAt: updated }),
+        updated,
+      );
+  }
+  /** Home list: what was researched, the verdict, and what the owner did next. */
+  researches(user: string) {
+    return (
+      this.db
+        .prepare(
+          "SELECT h.input,h.created,m.payload,v.public,r.payload AS revision FROM user_reports h JOIN markets m ON m.id=h.report_id JOIN report_visibility v ON v.report_id=m.id LEFT JOIN report_owners o ON o.report_id=m.id LEFT JOIN report_revisions r ON r.report_id=m.id AND r.owner=h.user_id WHERE h.user_id=? AND (v.public=1 OR o.user_id=h.user_id) ORDER BY h.created DESC LIMIT 100",
+        )
+        .all(user) as {
+        input: string;
+        created: string;
+        payload: string;
+        public: number;
+        revision: string | null;
+      }[]
+    ).map((r) => {
+      const m = JSON.parse(r.payload) as Market;
+      const revision = r.revision ? (JSON.parse(r.revision) as Revision) : null;
+      const decision = revision?.decision || m.brief?.decision;
+      return {
+        id: m.id,
+        input: r.input,
+        created: r.created,
+        framing: m.topic.plan?.framing,
+        verdict: decision?.verdict.kind,
+        actionable: !!decision?.nextStep,
+        status: revision?.status,
+        // Collected without a validated report: shown as unfinished, not legacy.
+        failed: !m.brief?.report,
+        legacy: !decision && !!m.brief?.report,
         public: !!r.public,
       };
     });

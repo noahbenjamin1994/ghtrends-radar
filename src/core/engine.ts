@@ -76,6 +76,8 @@ type ScanOptions = {
   private?: boolean;
   preparedTopic?: Topic;
   deadlineAt?: number;
+  /** Pre-assigned so a research has one address from its first second. */
+  reportId?: string;
 };
 export class Engine {
   github: GitHub;

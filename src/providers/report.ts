@@ -18,6 +18,8 @@ import {
   legacyReport,
   parseDecisionDraft,
   userEvidence as isUserEvidence,
+  type Decision,
+  type Revision,
 } from "../core/decision.js";
 import type { LaneItem, Lanes } from "../core/engine.js";
 import { STRATEGY_VERSION } from "../core/strategy.js";
@@ -189,6 +191,7 @@ export async function singleReport(
     owner?: string;
     private?: boolean;
     deadlineAt?: number;
+    reportId?: string;
     onProgress?: (p: ScanProgress) => void;
     trends?: Trends;
   },
@@ -296,8 +299,10 @@ export async function singleReport(
     );
     return result;
   };
-  const progress = (stage: ScanProgress["stage"], extra: ScanProgress = { stage }) =>
-    options.onProgress?.({ ...extra, stage, topic, lanes: lanes() });
+  const progress = (
+    stage: ScanProgress["stage"],
+    extra: ScanProgress = { stage },
+  ) => options.onProgress?.({ ...extra, stage, topic, lanes: lanes() });
   let collecting = true;
   progress("sources");
   await reportPhase(Math.min(COLLECT_MS, remaining()), async () => {
@@ -407,7 +412,10 @@ export async function singleReport(
                     ?.searchIntent,
                 })),
               );
-              progress("researching", { stage: "researching", preview: market });
+              progress("researching", {
+                stage: "researching",
+                preview: market,
+              });
             }
           }),
         );
@@ -604,10 +612,12 @@ export async function singleReport(
         : "Analysis could not produce a validated report. Collected sources are retained; this attempt's credit is returned.";
   }
   // Unique snapshots never overwrite a historical report or its ownership.
-  market.id = createHash("sha256")
-    .update(`${REPORT_VERSION}:${options.owner || ""}:${randomUUID()}`)
-    .digest("hex")
-    .slice(0, 16);
+  market.id =
+    options.reportId ||
+    createHash("sha256")
+      .update(`${REPORT_VERSION}:${options.owner || ""}:${randomUUID()}`)
+      .digest("hex")
+      .slice(0, 16);
   try {
     engine.store.recordModelDiagnostic(`${diagnosticId}:delivery`, {
       runId: diagnosticId,
@@ -625,4 +635,68 @@ export async function singleReport(
   engine.store.saveMarket(market, !options.private, options.owner);
   if (options.owner) engine.store.addHistory(options.owner, market.id, input);
   return market;
+}
+
+/**
+ * Judge again after the owner changed the evidence. The owner can remove a
+ * quote or add a supplier; conclusions still come only from what remains.
+ */
+export async function rejudgeReport(
+  engine: Engine,
+  market: Market,
+  revision: Revision,
+  note = "",
+): Promise<{ decision: Decision; excluded: string[] }> {
+  const brief = market.brief;
+  if (!brief?.decision) throw new Error("report_not_decision");
+  const sources = [...brief.sources, ...(revision.sources || [])];
+  const excluded = [
+    ...new Set([
+      ...(revision.excluded || []),
+      ...revision.dismissed.map((key) => key.slice(key.indexOf(":") + 1)),
+    ]),
+  ];
+  const citations = reportCitations(sources);
+  for (const cid of excluded) delete citations[cid];
+  const request = {
+    input: market.topic.plan?.input || market.topic.name,
+    search: {
+      keyword: market.demand.keyword,
+      region: market.geo || "WORLDWIDE",
+      trend: market.metrics.trend,
+    },
+    readerCorrections: {
+      removedAsIrrelevant: excluded.length,
+      addedSuppliers: (revision.sources || []).map((s) => s.label),
+      note,
+    },
+    sources: sources.map(({ excerpt: _excerpt, ...source }) => ({
+      ...source,
+      citations: Object.entries(citations)
+        .filter(([, ref]) => ref.id === source.id)
+        .map(([id, ref]) => ({ id, text: ref.quote })),
+    })),
+    outputSchema: zodToJsonSchema(decisionDraftSchema, {
+      $refStrategy: "none",
+    }),
+  };
+  const raw = await reportPhase(WRITE_MS, () =>
+    engine.research.json(
+      DECISION_PROMPT +
+        "\nThe reader corrected the evidence of an earlier report. Quotes they removed as irrelevant are absent from the citations; do not reconstruct them. Suppliers they added are included as sources; list one only when its source supports it. Judge again from what remains.",
+      request,
+      6500,
+      "report-rejudge",
+      false,
+    ),
+  );
+  const decision = finalizeDecision(
+    parseDecisionDraft(raw, citations),
+    market,
+    sources,
+  );
+  const added = new Set((revision.sources || []).map((s) => s.id));
+  for (const row of decision.commercial)
+    if (row.evidence.some((q) => added.has(q.id))) row.added = true;
+  return { decision, excluded };
 }
