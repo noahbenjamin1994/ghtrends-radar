@@ -183,8 +183,11 @@ test("one report write, short input, private snapshot, bilingual exports and no 
     assert.equal(engine.store.canRead(report.id), false);
     assert.equal(engine.store.canRead(report.id, "qa"), true);
     const md = marketMarkdown(report, undefined, "zh");
-    for (const [, , heading] of reportSections) assert.ok(md.includes(heading));
-    assert.match(md, /本轮证据不足以支持具体方向/);
+    for (const heading of ["判断", "谁在疼", "谁在做", "时机", "口子"])
+      assert.ok(md.includes("## " + heading), heading);
+    assert.match(md, /证据不足，判断不了/);
+    assert.match(md, /没有方向/);
+    assert.doesNotMatch(md, /## 下一步/);
     const html = renderDocument(
       readFileSync(new URL("../index.html", import.meta.url), "utf8"),
       {
@@ -305,4 +308,3 @@ test("interrupted queries and a blank model section retain valid material withou
     rmSync(dir, { recursive: true, force: true });
   }
 });
-

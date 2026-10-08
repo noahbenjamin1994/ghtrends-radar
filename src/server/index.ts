@@ -1178,6 +1178,19 @@ export function createApp(
       return r.json({ ok: true });
     }),
   );
+  app.get("/api/sample", (_q, r) => {
+    const market = engine.store.sampleReport();
+    r.set("Cache-Control", "public,max-age=300").json(
+      market
+        ? {
+            market,
+            revision: engine.store.revision(market.id)
+              ? { ...engine.store.revision(market.id), followups: [] }
+              : null,
+          }
+        : null,
+    );
+  });
   app.get(
     "/api/researches",
     safe((q, r) => {

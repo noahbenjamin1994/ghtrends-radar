@@ -1,3 +1,4 @@
+import { verdictLabel } from "./decision.js";
 import {
   documentStatusLabel,
   adCollectionMessage,
@@ -61,6 +62,123 @@ export function marketMarkdown(
 ): string {
   const t = (s: string) => text(s, locale),
     a = marketAssessment(m, locale);
+  if (m.brief?.decision) {
+    // Same six sections, same order, as the page.
+    const d = m.brief.decision;
+    const l = (en: string, zh: string) => (locale === "zh" ? zh : en);
+    const quote = (ref: { id: string; quote: string }) => {
+      const source = m.brief!.sources.find((s) => s.id === ref.id);
+      return source
+        ? [documentQuote(ref.quote), documentLink(source.label, source.url)]
+        : [];
+    };
+    const rows = [...d.commercial, ...d.openSource];
+    const name = (id: string) => rows.find((r) => r.id === id)?.name || id;
+    const gaps = (lane: string) =>
+      d.coverage.gaps
+        .filter((g) => g.lane === lane)
+        .map((g) => `${g.label} (${g.reason})`)
+        .join(l("; ", "；"));
+    const framing = m.topic.plan?.framing;
+    return [
+      `# ${framing ? `${framing.who[locale]}${l(": ", "：")}${framing.task[locale]}` : m.topic.plan?.input || m.topic.name}`,
+      m.asOf,
+      `## ${l("Verdict", "判断")}: ${verdictLabel[d.verdict.kind][locale]}`,
+      d.verdict.reason[locale],
+      `## ${l("Who is in pain", "谁在疼")}`,
+      ...(d.pains.length
+        ? d.pains.flatMap((p) => [
+            `### ${p.title[locale]}`,
+            ...p.quotes.flatMap(quote),
+            ...(p.workaround
+              ? [
+                  `${l("Today they", "他们现在")}${l(" ", "：")}${p.workaround[locale]}`,
+                ]
+              : []),
+          ])
+        : [
+            l(
+              "Nobody was found describing this problem in their own words. That is not proof the problem doesn't exist.",
+              "没找到有人用自己的话说这个问题。这不代表问题不存在。",
+            ),
+          ]),
+      ...(gaps("pains")
+        ? [`${l("Not collected: ", "没采到：")}${gaps("pains")}`]
+        : []),
+      `## ${l("Who serves them", "谁在做")}`,
+      ...(d.commercial.length
+        ? [
+            [
+              `| ${l("Commercial", "商业")} | ${l("Serves", "服务谁")} | ${l("Price", "收费")} | ${l("Leaves open", "没接住什么")} |`,
+              "|---|---|---|---|",
+              ...d.commercial.map(
+                (c) =>
+                  `| ${cell(c.name)} | ${cell(c.audience[locale])} | ${cell(c.pricing?.[locale] || l("not published", "未公开"))} | ${cell(c.gap?.[locale] || "")} |`,
+              ),
+            ].join("\n"),
+          ]
+        : []),
+      ...(d.openSource.length
+        ? [
+            [
+              `| ${l("Open source", "开源")} | ${l("Does", "能力")} | ${l("Last push", "最近提交")} | ${l("License", "许可")} |`,
+              "|---|---|---|---|",
+              ...d.openSource.map(
+                (o) =>
+                  `| ${o.url ? `[${cell(o.name)}](${o.url})` : cell(o.name)} | ${cell(o.capability[locale])} | ${o.pushedAt?.slice(0, 10) || ""} | ${o.license === undefined ? "" : o.license || l("none stated", "未声明")} |`,
+              ),
+            ].join("\n"),
+          ]
+        : []),
+      ...(!rows.length
+        ? [
+            l(
+              "No product or project serving these people was read this time.",
+              "这次没读到在服务这群人的产品或项目。",
+            ),
+          ]
+        : []),
+      ...(gaps("supply")
+        ? [
+            `${l("This list may be incomplete. Not collected: ", "这张表可能不全。没采到：")}${gaps("supply")}`,
+          ]
+        : []),
+      `## ${l("Timing", "时机")}`,
+      d.timing.summary[locale],
+      `## ${l("What's left open", "口子")}`,
+      ...(d.directions.length
+        ? d.directions.flatMap((x, i) => [
+            `### ${i + 1}. ${x.title[locale]}${x.tentative ? l(" (unconfirmed)", "（待核实）") : ""}`,
+            `- ${l("For", "给谁")}${l(": ", "：")}${x.audience[locale]}`,
+            `- ${l("Answers", "接哪条痛")}${l(": ", "：")}${d.pains.find((p) => p.id === x.pain)?.title[locale] || x.pain}`,
+            `- ${l("Why it's open", "为什么空着")}${l(": ", "：")}${x.whyOpen[locale]} (${x.supply.map(name).join(", ")})`,
+            `- ${l("Not yet known", "还不确定")}${l(": ", "：")}${x.uncertainty[locale]}`,
+          ])
+        : [
+            l(
+              "No direction: an opening needs a pain that existing supply doesn't cover.",
+              "没有方向：口子需要一条现有供给没接住的痛点。",
+            ),
+          ]),
+      ...(d.nextStep
+        ? [
+            `## ${l("Next step", "下一步")}`,
+            d.nextStep.who[locale],
+            ...d.nextStep.where.map((w) => documentLink(w.label, w.url)),
+            d.nextStep.ask[locale],
+            `- ${l("Counts as a yes", "算成")}${l(": ", "：")}${d.nextStep.success[locale]}`,
+            `- ${l("Counts as a no", "算败")}${l(": ", "：")}${d.nextStep.fail[locale]}`,
+          ]
+        : []),
+      `${l("Only real people and payment can confirm: ", "以下需要真人和付款才能确认：")}${d.unverified.map((u) => u[locale]).join(l("; ", "；"))}`,
+      `## ${l("Sources", "来源")}`,
+      ...m.brief.sources.flatMap((s) => [
+        documentLink(s.label, s.url),
+        `${s.fetchedAt || ""}${s.excerptTruncated ? " · excerpt truncated" : ""}`,
+        documentQuote(s.excerpt || ""),
+      ]),
+    ].join("\n\n");
+  }
   if (m.brief?.report) {
     const report = m.brief.report;
     const refs = (items: { id: string; quote: string }[]) =>

@@ -1151,6 +1151,20 @@ export class Store {
         updated,
       );
   }
+  /** The newest publicly shared decision report, shown to visitors as the sample. */
+  sampleReport(): Market | null {
+    const rows = this.db
+      .prepare(
+        "SELECT m.payload FROM markets m JOIN report_visibility v ON v.report_id=m.id JOIN report_owners o ON o.report_id=m.id WHERE v.public=1 ORDER BY m.created DESC LIMIT 40",
+      )
+      .all() as { payload: string }[];
+    for (const row of rows) {
+      const market = JSON.parse(row.payload) as Market;
+      const decision = market.brief?.decision;
+      if (decision && decision.verdict.kind !== "insufficient") return market;
+    }
+    return null;
+  }
   /** Home list: what was researched, the verdict, and what the owner did next. */
   researches(user: string) {
     return (

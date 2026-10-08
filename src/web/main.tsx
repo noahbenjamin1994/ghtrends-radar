@@ -5,7 +5,7 @@ import "@fontsource-variable/archivo";
 import "@fontsource/dm-mono/400.css";
 import "./style.css";
 import "./report.css";
-import { App } from "./App.js";
+import { Root } from "./radar/app.js";
 if (!document.getElementById("loading-styles")) {
   const style = document.createElement("style");
   style.id = "loading-styles";
@@ -14,6 +14,6 @@ if (!document.getElementById("loading-styles")) {
 }
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <Root />
   </React.StrictMode>,
 );

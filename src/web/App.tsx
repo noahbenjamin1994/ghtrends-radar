@@ -86,7 +86,19 @@ import { completeWeeklySeries } from "../core/evidence.js";
 import { visibleStrategy } from "../core/strategy.js";
 import { appUrl, routeUrl, currentRoute } from "./paths.js";
 const SOURCE = "https://github.com/noahbenjamin1994/ghtrends-radar";
-export function App() {
+/**
+ * The earlier interface. Inside the new shell it renders only the pages that
+ * still belong to it (public tracks, earlier reports, account, admin, docs).
+ */
+export function App({
+  embedded = false,
+  onResearch,
+  onNavigate,
+}: {
+  embedded?: boolean;
+  onResearch?: (input: string) => void;
+  onNavigate?: () => void;
+} = {}) {
   const [path, setPath] = useState(currentRoute()),
     [markets, setMarkets] = useState<Market[]>([]),
     [topics, setTopics] = useState<Topic[]>([]),
@@ -129,7 +141,9 @@ export function App() {
         if (a.user) {
           const rows = await api<string[]>("/api/watch");
           setWatch(rows);
-          const pending = sessionStorage.getItem("ghtrends:job");
+          const pending = embedded
+            ? null
+            : sessionStorage.getItem("ghtrends:job");
           if (pending) {
             setJob({ id: pending, state: "running", topic: "" });
             setScanning(true);
@@ -199,6 +213,7 @@ export function App() {
     setPath(routeUrl(url));
     setMobileMenu(false);
     window.scrollTo({ top: 0, behavior: "instant" });
+    onNavigate?.();
   };
   useEffect(() => {
     const pop = () => {
@@ -255,6 +270,7 @@ export function App() {
   };
   const scan = async (input: string, demandKeyword?: string, region = geo) => {
     if (!input.trim()) return;
+    if (embedded && onResearch) return onResearch(input);
     const version = ++preparationVersion.current;
     setPreparationContext({
       keyword: demandKeyword || keyword.trim() || undefined,
@@ -454,8 +470,8 @@ export function App() {
       .sort()
       .at(-1);
   return (
-    <div className="app-shell">
-      <header className="site-header">
+    <div className={embedded ? "app-shell is-embedded" : "app-shell"}>
+      <header className="site-header" hidden={embedded}>
         <button
           className="brand-link"
           onClick={() => navigate("/")}
@@ -1209,7 +1225,7 @@ export function App() {
           />
         )}
       </main>
-      <footer>
+      <footer hidden={embedded}>
         <Logo />
         <span>{t("Built for the curious. Open for everyone.")}</span>
         <div>

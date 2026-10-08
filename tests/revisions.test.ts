@@ -287,3 +287,68 @@ test("an added supplier is read from its own page before the report is judged ag
     assert.equal(view.revision.sources[0].id, "S4");
   });
 });
+
+test("a research has one address from the first second, can be cancelled, and is listed", async () => {
+  await harness(async ({ post, get, engine, id }) => {
+    let release!: (m: Market) => void;
+    let options: any;
+    engine.scan = async (_input, o) => {
+      options = o;
+      return new Promise<Market>((resolve) => (release = resolve));
+    };
+    engine.research.plan = async (input) => ({
+      ...engine.store.report(id)!.topic,
+      slug: "custom-forms",
+      name: input,
+      keyword: input,
+      aliases: [],
+    });
+    const started = await post("/api/scan", {
+      topic: "self-hosted forms",
+      geo: "",
+    });
+    assert.equal(started.status, 202);
+    const job = await started.json();
+    assert.match(job.reportId, /^[a-f0-9]{16}$/);
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(options.reportId, job.reportId);
+    assert.deepEqual(await get(`/api/reports/${job.reportId}`), {
+      pending: true,
+      job: job.id,
+    });
+    const list = await get("/api/researches");
+    assert.equal(list.running[0].id, job.reportId);
+    assert.equal(list.running[0].input, "self-hosted forms");
+    // Listed research carries the verdict and what the owner did next.
+    engine.store.addHistory("local", id, "sample");
+    await post(`/api/reports/${id}/revision`, { status: "parked" });
+    const mine = (await get("/api/researches")).items;
+    assert.deepEqual(
+      mine.map((x: any) => [x.id, x.verdict, x.status, x.actionable, x.legacy]),
+      [[id, "reframe", "parked", true, false]],
+    );
+    assert.equal((await post(`/api/jobs/${job.id}/cancel`)).status, 200);
+    release({ ...engine.store.report(id)!, id: job.reportId });
+    await new Promise((r) => setTimeout(r, 30));
+    const done = await get(`/api/jobs/${job.id}`);
+    assert.equal(done.state, "failed");
+    assert.equal((await get("/api/researches")).running.length, 0);
+    const gone = await fetch(
+      (started.url || "").replace("/api/scan", `/api/reports/${job.reportId}`),
+    );
+    assert.equal(gone.status, 404);
+  });
+});
+
+test("the visitor sample is the newest shared report that reached a verdict", async () => {
+  await harness(async ({ get, engine, id }) => {
+    assert.equal(
+      await get("/api/sample"),
+      null,
+      "unowned seeds are not samples",
+    );
+    const owned = { ...engine.store.report(id)!, id: "aaaaaaaaaaaaaaa3" };
+    engine.store.saveMarket(owned, true, "someone");
+    assert.equal((await get("/api/sample")).market.id, "aaaaaaaaaaaaaaa3");
+  });
+});

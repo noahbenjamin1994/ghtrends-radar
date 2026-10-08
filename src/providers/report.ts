@@ -247,9 +247,16 @@ export async function singleReport(
       const read = reads.find((r) => r.url === url);
       if (read?.status === "read") {
         const text = pages.find((p) => p.url === url || p.parentUrl === url);
+        const words = text?.excerpt?.replace(/\s+/g, " ").trim() || "";
+        // End on a whole sentence or word; a clipped word reads as a glitch.
+        const sentence = /^.{40,170}?[.!?。！？](?=\s|$)/u.exec(words)?.[0];
         return {
           state: "read",
-          quote: text?.excerpt?.replace(/\s+/g, " ").trim().slice(0, 150),
+          quote:
+            sentence ||
+            (words.length > 150
+              ? words.slice(0, 150).replace(/\s+\S*$/, "") + "…"
+              : words),
         };
       }
       if (read) return { state: "failed" };
@@ -267,6 +274,10 @@ export async function singleReport(
             host: host(r.url),
             kind: q.intent === "opensource" ? "repository" : "page",
             ...page(r.url),
+            // Repository facts come from the GitHub sample, not a page read.
+            ...(supply.repositories.some((repo) => repo.url === r.url)
+              ? { state: "read" as const }
+              : {}),
           });
     }
     for (const r of supply.repositories.slice(0, 4))
