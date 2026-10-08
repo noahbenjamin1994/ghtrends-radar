@@ -27,9 +27,12 @@ export interface QueryPlan {
   explanation: { en: string; zh: string };
   ambiguity?: { en: string; zh: string };
   webQueries?: import("../providers/search.js").SearchQuery[];
+  /** The input restated as who is doing what; shown as the research title. */
+  framing?: { who: { en: string; zh: string }; task: { en: string; zh: string } };
 }
 export interface Brief {
   report?: import("./report-contract.js").ReportContent;
+  decision?: import("./decision.js").Decision;
   capabilityAudit?: import("./capabilities.js").CapabilityAudit;
   experimentPlan?: import("./strategy.js").ExperimentPlan;
   model: string;

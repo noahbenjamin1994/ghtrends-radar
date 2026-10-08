@@ -13,14 +13,13 @@ import type { Market } from "../src/core/types.js";
 
 const text = { en: "Available evidence is limited.", zh: "现有证据有限。" };
 const draft = () => ({
-  headline: text,
-  overview: text,
-  commercialSupply: { status: "limited", summary: text, evidence: [] },
-  openSourceSupply: { status: "limited", summary: text, evidence: [] },
-  userNeeds: { status: "missing", summary: text, evidence: [] },
-  directions: [],
-  nextStep: text,
-  limitations: [text],
+  verdict: { kind: "insufficient", reason: text },
+  pains: [] as unknown[],
+  commercial: [] as unknown[],
+  openSource: [] as unknown[],
+  directions: [] as unknown[],
+  nextStep: null,
+  unverified: [text],
 });
 const reply = (content: string, finish = "stop") =>
   Response.json({
@@ -135,16 +134,11 @@ test("schema and citation failures recover but never bypass evidence validation"
       globalThis.fetch = async () => {
         calls++;
         const bad = draft();
-        if (failure === "schema") {
-          bad.commercialSupply = null as any;
-          bad.openSourceSupply = null as any;
-          bad.userNeeds = null as any;
-        } else
-          bad.commercialSupply = {
-            status: "observed",
-            summary: text,
-            evidence: ["S99Q1"] as any,
-          };
+        if (failure === "schema") bad.verdict = null as any;
+        else
+          bad.commercial = [
+            { name: "Sample", audience: text, evidence: ["S99Q1"] },
+          ];
         return reply(JSON.stringify(calls === 1 ? bad : draft()));
       };
       const result = await run();
@@ -292,7 +286,9 @@ test("repeated invented citations remain a failed report rather than a false suc
     globalThis.fetch = async () => {
       calls++;
       const raw = draft();
-      raw.commercialSupply.evidence = ["S999Q1"] as any;
+      raw.commercial = [
+        { name: "Sample", audience: text, evidence: ["S999Q1"] },
+      ];
       return reply(JSON.stringify(raw));
     };
     const result = await run();
@@ -309,7 +305,7 @@ test("malformed JSON followed by one malformed direction delivers validated find
       calls++;
       if (calls === 1)
         return reply(
-          '{"limitations":[{"en":"first","zh":"第一"},"overview":{"en":"wrong nesting","zh":"错误嵌套"}]}',
+          '{"unverified":[{"en":"first","zh":"第一"},"verdict":{"en":"wrong nesting","zh":"错误嵌套"}]}',
         );
       const raw = {
         ...draft(),

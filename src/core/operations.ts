@@ -19,7 +19,9 @@ export function operationSignal(ms: number) {
 // Upper bounds, not generation targets. Full bilingual legacy reports need
 // more room than small JSON decisions; never spend thinking tokens.
 export function llmOutputLimit(operation: string) {
-  if (/^(plan|deep-plan|query-repair)$/.test(operation)) return 900;
+  if (/^(plan|deep-plan|query-repair)$/.test(operation)) return 1100;
+  if (/^report-(write|recover|rejudge)$/.test(operation)) return 6500;
+  if (operation === "report-ask") return 1200;
   if (operation === "strategy-deep-write") return 4500;
   if (operation === "strategy-deep-repair") return 3000;
   if (operation === "strategy-deep-review") return 1800;

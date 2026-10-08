@@ -31,7 +31,24 @@ import { STRATEGY_VERSION } from "./strategy.js";
 import { singleReport } from "../providers/report.js";
 import { REPORT_DEADLINE_MS } from "./report-contract.js";
 import type { Market, DemandEvidence, SupplyEvidence, Topic } from "./types.js";
+export interface LaneItem {
+  label: string;
+  url?: string;
+  host?: string;
+  kind: "page" | "repository" | "trend" | "search";
+  state: "found" | "reading" | "read" | "failed";
+  /** First words of a page that was actually read. */
+  quote?: string;
+  count?: number;
+}
+/** Live collection state, one lane per question the report answers. */
+export interface Lanes {
+  pains: LaneItem[];
+  supply: LaneItem[];
+  timing: LaneItem[];
+}
 export interface ScanProgress {
+  lanes?: Lanes;
   stage:
     | "interpreting"
     | "sources"

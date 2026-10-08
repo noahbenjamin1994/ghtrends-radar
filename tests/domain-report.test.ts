@@ -7,9 +7,6 @@ import { Engine } from "../src/core/engine.js";
 import { Store } from "../src/core/store.js";
 import {
   parseReport,
-  parseReportDraft,
-  reportCitations,
-  REPORT_PROMPT,
   reportSections,
   type ReportContent,
 } from "../src/core/report-contract.js";
@@ -18,6 +15,7 @@ import {
   reportPhase,
   finalizeReport,
 } from "../src/providers/report.js";
+import { DECISION_PROMPT } from "../src/core/decision.js";
 import { operationContext } from "../src/core/operations.js";
 import { researchWarnings } from "../src/core/evidence.js";
 import { marketMarkdown } from "../src/core/report.js";
@@ -41,6 +39,16 @@ function draft(): ReportContent {
     limitations: [text],
   };
 }
+/** What the model returns: the decision draft, citations by ID only. */
+const decisionDraft = () => ({
+  verdict: { kind: "insufficient", reason: text },
+  pains: [] as unknown[],
+  commercial: [] as unknown[],
+  openSource: [] as unknown[],
+  directions: [] as unknown[],
+  nextStep: null,
+  unverified: [text],
+});
 const source: ResearchSource = {
   id: "S1",
   label: "Example",
@@ -51,8 +59,8 @@ const source: ResearchSource = {
 test("report follows four perspectives and does not force three directions", () => {
   assert.equal(reportSections.length, 4);
   assert.equal(parseReport(draft(), [source]).directions.length, 0);
-  assert.match(REPORT_PROMPT, /Do not invent three ideas first/);
-  assert.match(REPORT_PROMPT, /Preserve negation/);
+  assert.match(DECISION_PROMPT, /Do not invent three ideas first/);
+  assert.match(DECISION_PROMPT, /Preserve negation/);
 });
 test("observations require references and quotes retain original negation", () => {
   const raw = draft();
@@ -152,11 +160,11 @@ test("one report write, short input, private snapshot, bilingual exports and no 
   engine.research.json = async (_prompt, input, max, operation, thinking) => {
     calls++;
     assert.equal(operation, "report-write");
-    assert.equal(max, 3600);
+    assert.equal(max, 6500);
     assert.equal(thinking, false);
     assert.ok(JSON.stringify(input).length < 20000);
     assert.doesNotMatch(JSON.stringify((input as any).outputSchema), /"\$ref"/);
-    return draft();
+    return decisionDraft();
   };
   try {
     const report = await singleReport(
@@ -168,6 +176,9 @@ test("one report write, short input, private snapshot, bilingual exports and no 
     assert.equal(calls, 1);
     assert.equal(report.aiError, undefined);
     assert.ok(report.brief?.report);
+    assert.equal(report.brief?.decision?.verdict.kind, "insufficient");
+    assert.deepEqual(report.brief?.decision?.directions, []);
+    assert.equal(report.brief?.decision?.nextStep, null);
     assert.notEqual(report.id, base.id);
     assert.equal(engine.store.canRead(report.id), false);
     assert.equal(engine.store.canRead(report.id, "qa"), true);
@@ -207,39 +218,6 @@ test("one report write, short input, private snapshot, bilingual exports and no 
     await engine.close();
     rmSync(dir, { recursive: true, force: true });
   }
-});
-
-test("citation IDs restore exact source text and reject invented references", () => {
-  const refs = reportCitations([
-    source,
-    {
-      ...source,
-      id: "S2",
-      excerpt:
-        "不支持评论搜索，也未授权转售。\n" +
-        "Long original paragraph with preserved punctuation. ".repeat(20),
-    },
-  ]);
-  for (const ref of Object.values(refs)) {
-    const original =
-      ref.id === "S1"
-        ? source.excerpt!
-        : "不支持评论搜索，也未授权转售。\n" +
-          "Long original paragraph with preserved punctuation. ".repeat(20);
-    assert.ok(original.includes(ref.quote));
-    assert.ok(ref.quote.length >= 8 && ref.quote.length <= 280);
-  }
-  const raw = {
-    ...draft(),
-    commercialSupply: { status: "observed", summary: text, evidence: ["S1Q1"] },
-  };
-  const parsed = parseReportDraft(raw, refs);
-  assert.deepEqual(parsed.commercialSupply.evidence, [
-    { id: "S1", quote: source.excerpt },
-  ]);
-  assert.match(parsed.commercialSupply.evidence[0]!.quote, /does not support/);
-  raw.commercialSupply.evidence = ["S99Q1"];
-  assert.throws(() => parseReportDraft(raw, refs), /citation ID/);
 });
 
 test("interrupted queries and a blank model section retain valid material without charging", async () => {
@@ -295,8 +273,8 @@ test("interrupted queries and a blank model section retain valid material withou
     cached: false,
   });
   engine.research.json = async () => ({
-    ...draft(),
-    openSourceSupply: { summary: { en: "", zh: "" }, evidence: [] },
+    ...decisionDraft(),
+    openSource: [{ name: "broken", capability: { en: "", zh: "" } }],
   });
   try {
     const out = await singleReport(engine, "sample topic", base.topic, {
@@ -306,8 +284,14 @@ test("interrupted queries and a blank model section retain valid material withou
     assert.ok(out.brief?.report);
     assert.ok(out.aiError);
     assert.equal(out.brief.report.openSourceSupply.status, "missing");
-    assert.match(out.brief.report.openSourceSupply.summary.zh, /分析未能完成/);
+    assert.deepEqual(out.brief.decision?.openSource, []);
     assert.deepEqual(out.brief.report.directions, []);
+    assert.equal(out.brief.decision?.coverage.supply, "partial");
+    assert.ok(
+      out.brief.decision?.coverage.gaps.some(
+        (g) => g.lane === "pains" && g.label === "sample problems",
+      ),
+    );
     assert.ok(researchWarnings(out, true).includes(out.aiError));
     assert.equal(out.web?.state, "partial");
     assert.equal(out.web?.queries[0]?.results.length, 1);
@@ -322,85 +306,3 @@ test("interrupted queries and a blank model section retain valid material withou
   }
 });
 
-test("one malformed optional direction cannot discard validated core findings", () => {
-  const refs = reportCitations([source]);
-  const direction = {
-    title: text,
-    task: text,
-    existingSupply: text,
-    entry: text,
-    uncertainty: text,
-    evidence: ["S1Q1"],
-  };
-  const raw = {
-    ...draft(),
-    commercialSupply: { status: "observed", summary: text, evidence: ["S1Q1"] },
-    directions: [
-      direction,
-      { title: { en: "Broken direction", zh: text, task: text } },
-    ],
-    limitations: [text, { overview: text }],
-  };
-  let incomplete: string[] = [];
-  const parsed = parseReportDraft(raw, refs, (sections) => {
-    incomplete = sections;
-  });
-  assert.equal(parsed.commercialSupply.status, "observed");
-  assert.equal(parsed.directions.length, 1);
-  assert.deepEqual(parsed.directions[0]!.title, text);
-  assert.equal(parsed.limitations.length, 1);
-  assert.deepEqual(incomplete, ["directions", "limitations"]);
-  assert.equal(
-    (raw.directions[1]!.title.zh as any).en,
-    text.en,
-    "raw evidence is not mutated",
-  );
-  assert.throws(
-    () =>
-      parseReportDraft(
-        { ...raw, directions: [{ ...direction, evidence: ["S999Q1"] }] },
-        refs,
-      ),
-    /citation ID/,
-  );
-});
-
-test("optional-field salvage never manufactures a report with no valid core findings", () => {
-  assert.throws(() =>
-    parseReportDraft(
-      {
-        commercialSupply: null,
-        openSourceSupply: null,
-        userNeeds: null,
-        directions: [{}],
-        limitations: [{}],
-      },
-      {},
-    ),
-  );
-});
-
-test("invalid headline or next step retains actual findings and explicitly marks incomplete analysis", () => {
-  const refs = reportCitations([source]);
-  let incomplete: string[] = [];
-  const parsed = parseReportDraft(
-    {
-      ...draft(),
-      headline: { en: "", zh: "" },
-      nextStep: null,
-      commercialSupply: {
-        status: "observed",
-        summary: text,
-        evidence: ["S1Q1"],
-      },
-    },
-    refs,
-    (fields) => {
-      incomplete = fields;
-    },
-  );
-  assert.deepEqual(incomplete, ["headline", "nextStep"]);
-  assert.equal(parsed.commercialSupply.status, "observed");
-  assert.match(parsed.headline.zh, /部分分析尚未完成/);
-  assert.match(parsed.nextStep.zh, /补齐分析缺项/);
-});

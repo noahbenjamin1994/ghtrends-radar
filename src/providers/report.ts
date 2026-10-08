@@ -6,14 +6,20 @@ import { analyze } from "../core/analyze.js";
 import { operationContext } from "../core/operations.js";
 import {
   REPORT_DEADLINE_MS,
-  REPORT_PROMPT,
   REPORT_VERSION,
   parseReport,
-  parseReportDraft,
   reportCitations,
-  reportDraftSchema,
   type ReportContent,
 } from "../core/report-contract.js";
+import {
+  DECISION_PROMPT,
+  decisionDraftSchema,
+  finalizeDecision,
+  legacyReport,
+  parseDecisionDraft,
+  userEvidence as isUserEvidence,
+} from "../core/decision.js";
+import type { LaneItem, Lanes } from "../core/engine.js";
 import { STRATEGY_VERSION } from "../core/strategy.js";
 import type {
   DemandEvidence,
@@ -26,6 +32,16 @@ import { searchSources, scopedWebQueries, type WebEvidence } from "./search.js";
 import { DOCUMENT_VERSION } from "./documents.js";
 
 /** Safe error categories for progress and recovery; raw answers stay private. */
+const seconds = (name: string, fallback: number) =>
+  Math.max(1, Number(process.env[name]) || fallback) * 1000;
+/** Phase budgets inside the overall deadline. Collection never eats the write. */
+const COLLECT_MS = seconds("GHTRENDS_COLLECT_SECONDS", 25);
+const READ_MS = seconds("GHTRENDS_READ_SECONDS", 20);
+const WRITE_MS = seconds("GHTRENDS_WRITE_SECONDS", 80);
+const WRITE_RESERVE_MS = 24000;
+const RECOVERY_RESERVE_MS = 8000;
+const READ_PAGES = 6;
+
 export function reportFailure(error: unknown) {
   const e = error as {
     code?: string;
@@ -97,13 +113,9 @@ export function finalizeReport(
       ],
     },
   };
-  const userEvidence = (id: string) => {
-    const source = sources.find((s) => s.id === id);
-    return (
-      source?.kind === "request" ||
-      (source?.documentType === "page" && source.searchIntent === "demand")
-    );
-  };
+  // One definition of first-hand user evidence for both report shapes.
+  const userEvidence = (id: string) =>
+    isUserEvidence(sources.find((s) => s.id === id));
   if (!value.userNeeds.evidence.some((ref) => userEvidence(ref.id))) {
     value.userNeeds = {
       status: "missing",
@@ -215,16 +227,89 @@ export async function singleReport(
     state: "failed",
     queries: [],
   };
-  options.onProgress?.({ stage: "sources", topic });
+  const pages: ResearchSource[] = [];
+  const reads: NonNullable<Market["documents"]>["reads"] = [];
+  const opened = new Set<string>();
+  const host = (url: string) => {
+    try {
+      return new URL(url).hostname.replace(/^(www|m)\./, "");
+    } catch {
+      return url;
+    }
+  };
+  // The page shows what was actually found, as it is found; never a fake bar.
+  const lanes = (): Lanes => {
+    const result: Lanes = { pains: [], supply: [], timing: [] };
+    const page = (url: string): Pick<LaneItem, "state" | "quote"> => {
+      const read = reads.find((r) => r.url === url);
+      if (read?.status === "read") {
+        const text = pages.find((p) => p.url === url || p.parentUrl === url);
+        return {
+          state: "read",
+          quote: text?.excerpt?.replace(/\s+/g, " ").trim().slice(0, 150),
+        };
+      }
+      if (read) return { state: "failed" };
+      return { state: opened.has(url) ? "reading" : "found" };
+    };
+    for (const q of web.queries) {
+      const lane = q.intent === "demand" ? result.pains : result.supply;
+      if (q.state === "failed")
+        lane.push({ label: q.query, state: "failed", kind: "search" });
+      for (const r of q.results.filter((r) => r.kind === "organic").slice(0, 4))
+        if (![...result.pains, ...result.supply].some((i) => i.url === r.url))
+          lane.push({
+            label: r.title,
+            url: r.url,
+            host: host(r.url),
+            kind: q.intent === "opensource" ? "repository" : "page",
+            ...page(r.url),
+          });
+    }
+    for (const r of supply.repositories.slice(0, 4))
+      if (!result.supply.some((i) => i.url === r.url))
+        result.supply.push({
+          label: r.name,
+          url: r.url,
+          host: "github.com",
+          kind: "repository",
+          state: "read",
+        });
+    if (supply.error)
+      result.supply.push({ label: "GitHub", state: "failed", kind: "search" });
+    const weeks = demand.points.filter((p) => !p.partial).length;
+    result.timing.push(
+      weeks
+        ? {
+            label: demand.keyword,
+            url: demand.sourceUrl,
+            host: "trends.google.com",
+            kind: "trend",
+            state: "read",
+            count: weeks,
+          }
+        : {
+            label: demand.keyword,
+            kind: "trend",
+            state: collecting ? "reading" : "failed",
+          },
+    );
+    return result;
+  };
+  const progress = (stage: ScanProgress["stage"], extra: ScanProgress = { stage }) =>
+    options.onProgress?.({ ...extra, stage, topic, lanes: lanes() });
   let collecting = true;
-  await reportPhase(Math.min(22000, remaining()), async () => {
+  progress("sources");
+  await reportPhase(Math.min(COLLECT_MS, remaining()), async () => {
     await Promise.allSettled([
       (options.trends || engine.trends)
         .demand(topic.keyword, options.geo, (d) => {
           if (collecting) demand = structuredClone(d);
         })
         .then((d) => {
-          if (collecting) demand = d;
+          if (!collecting) return;
+          demand = d;
+          progress("sources");
         }),
       engine.github
         .supply(
@@ -233,7 +318,9 @@ export async function singleReport(
           true,
         )
         .then((s) => {
-          if (collecting) supply = s;
+          if (!collecting) return;
+          supply = s;
+          progress("sources");
         }),
       engine.search
         .collect(
@@ -243,11 +330,15 @@ export async function singleReport(
           20000,
           options.trends?.researchProxy(),
           (partial) => {
-            if (collecting) web = structuredClone(partial);
+            if (!collecting) return;
+            web = structuredClone(partial);
+            progress("sources");
           },
         )
         .then((w) => {
-          if (collecting) web = w;
+          if (!collecting) return;
+          web = w;
+          progress("sources");
         }),
     ]);
   }).catch(() => {});
@@ -265,7 +356,7 @@ export async function singleReport(
   }
   const market = analyze(topic, demand, supply, []);
   market.web = web;
-  options.onProgress?.({
+  progress("details", {
     stage: "details",
     preview: market,
     supplyCount: supply.repositories.length,
@@ -273,8 +364,6 @@ export async function singleReport(
   });
   // Keep source roles and dates explicit. A search snippet is never a read page.
   const candidates = searchSources(web);
-  const pages: ResearchSource[] = [];
-  const reads: NonNullable<Market["documents"]>["reads"] = [];
   const reader = engine.documents.forResearch(options.trends?.researchProxy());
   const urls: string[] = [];
   const hosts = new Set<string>();
@@ -287,7 +376,7 @@ export async function singleReport(
   );
   for (let i = 0; i < Math.max(commercial.length, needs.length); i++) {
     for (const source of [commercial[i], needs[i]]) {
-      if (!source || urls.length >= 4) continue;
+      if (!source || urls.length >= READ_PAGES) continue;
       const host = new URL(source.url).hostname;
       if (!hosts.has(host)) {
         hosts.add(host);
@@ -296,28 +385,35 @@ export async function singleReport(
     }
   }
   let reading = true;
-  if (remaining() > 24000 && reader.enabled)
-    await reportPhase(Math.min(9000, remaining() - 24000), async () => {
-      await Promise.allSettled(
-        urls.map(async (url) => {
-          const result = await reader.readWeb(
-            url,
-            input,
-            operationContext.getStore()!.signal!,
-          );
-          if (reading) {
-            reads.push(result.read);
-            pages.push(
-              ...result.sources.map((s) => ({
-                ...s,
-                searchIntent: candidates.find((c) => c.url === url)
-                  ?.searchIntent,
-              })),
+  if (remaining() > WRITE_RESERVE_MS && reader.enabled) {
+    for (const url of urls) opened.add(url);
+    progress("researching", { stage: "researching", preview: market });
+    await reportPhase(
+      Math.min(READ_MS, remaining() - WRITE_RESERVE_MS),
+      async () => {
+        await Promise.allSettled(
+          urls.map(async (url) => {
+            const result = await reader.readWeb(
+              url,
+              input,
+              operationContext.getStore()!.signal!,
             );
-          }
-        }),
-      );
-    }).catch(() => {});
+            if (reading) {
+              reads.push(result.read);
+              pages.push(
+                ...result.sources.map((s) => ({
+                  ...s,
+                  searchIntent: candidates.find((c) => c.url === url)
+                    ?.searchIntent,
+                })),
+              );
+              progress("researching", { stage: "researching", preview: market });
+            }
+          }),
+        );
+      },
+    ).catch(() => {});
+  }
   reading = false;
   for (const url of urls)
     if (!reads.some((read) => read.url === url))
@@ -364,14 +460,14 @@ export async function singleReport(
       seen.add(s.url);
       return true;
     })
-    .slice(0, 13)
+    .slice(0, 16)
     .map((s, i) => ({
       ...s,
       id: `S${i + 1}`,
       excerpt: (s.excerpt || "").slice(0, 1200),
       excerptTruncated: !!s.excerptTruncated || (s.excerpt?.length || 0) > 1200,
     }));
-  options.onProgress?.({ stage: "brief", preview: market });
+  progress("brief", { stage: "brief", preview: market });
   const citations = reportCitations(sources);
   let attempts = 0;
   const failures: ReturnType<typeof reportFailure>[] = [];
@@ -395,46 +491,56 @@ export async function singleReport(
         .filter(([, ref]) => ref.id === source.id)
         .map(([id, ref]) => ({ id, text: ref.quote })),
     })),
-    outputSchema: zodToJsonSchema(reportDraftSchema, { $refStrategy: "none" }),
+    outputSchema: zodToJsonSchema(decisionDraftSchema, {
+      $refStrategy: "none",
+    }),
   };
   try {
     if (!pages.length && !repos.length && !snippets.length)
       throw new Error("No topic evidence available.");
-    const report = await reportPhase(remaining(), async () => {
+    const written = await reportPhase(remaining(), async () => {
       for (let attempt = 0; attempt < 2; attempt++) {
         // Reserve time for one recovery without extending the original deadline.
         const budget = Math.min(
-          25000,
-          remaining() - (attempt === 0 && remaining() >= 16000 ? 8000 : 0),
+          WRITE_MS,
+          remaining() -
+            (attempt === 0 && remaining() >= RECOVERY_RESERVE_MS * 2
+              ? RECOVERY_RESERVE_MS
+              : 0),
         );
         if (budget <= 0) throw new Error("report_deadline");
         attempts++;
         try {
           const raw = await reportPhase(budget, () =>
             engine.research.json(
-              REPORT_PROMPT +
+              DECISION_PROMPT +
                 (attempt
                   ? "\nThe previous attempt was rejected. Generate a fresh concise report from the ORIGINAL sources and schema. Use valid JSON with escaped string values and only supplied citation IDs. Do not invent evidence to fill missing sections."
                   : ""),
               attempt
                 ? { ...request, previousFailure: failures.at(-1)?.detail }
                 : request,
-              3600,
+              6500,
               attempt ? "report-recover" : "report-write",
               false,
             ),
           );
           let incomplete: string[] = [];
-          const result = parseReport(
-            finalizeReport(
-              parseReportDraft(raw, citations, (sections) => {
-                incomplete = sections;
-              }),
-              market,
-              sources,
-            ),
+          const decision = finalizeDecision(
+            parseDecisionDraft(raw, citations, (sections) => {
+              incomplete = sections;
+            }),
+            market,
             sources,
           );
+          // Older exports read the previous shape; it is checked the same way.
+          const result = {
+            decision,
+            report: parseReport(
+              finalizeReport(legacyReport(decision), market, sources),
+              sources,
+            ),
+          };
           if (incomplete.length) {
             market.aiError =
               "Some analysis sections are incomplete. Collected evidence is retained; this attempt's credit is returned.";
@@ -459,13 +565,15 @@ export async function singleReport(
             operationContext.getStore()?.signal?.aborted
           )
             throw error;
-          options.onProgress?.({ stage: "brief", preview: market });
+          progress("brief", { stage: "brief", preview: market });
         }
       }
       throw new Error("report_deadline");
     });
+    const { decision, report } = written;
     market.brief = {
       report,
+      decision,
       model: engine.research.model,
       generatedAt: stamp(),
       strategyVersion: STRATEGY_VERSION,
