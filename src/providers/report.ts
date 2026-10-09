@@ -96,6 +96,7 @@ export const onTopic = (s: ResearchSource) => {
       .includes(subject)
   );
 };
+const thread = (url: string) => url.split("?")[0]!.replace(/\/$/, "");
 /** Without a chosen forum: Chinese is asked where Chinese speakers post. */
 const forumSite = (query: string, index: number) =>
   CJK.test(query)
@@ -862,10 +863,14 @@ export async function singleReport(
       kind: "project",
       excerpt: `${r.description}\nLicense: ${r.license || "unknown"}; last push: ${r.pushedAt}; stars: ${r.stars}. Repository metadata only; stars do not establish usage or buying demand.`,
     }));
+  // A marketplace result is a listing or off the subject, never a web page.
+  const vendors = commercial.filter(
+    (s) => !MARKET.test(new URL(s.url).hostname),
+  );
   const snippets = [
-    commercial[0],
+    vendors[0],
     needs[0],
-    commercial[1],
+    vendors[1],
     needs[1],
     candidates.find((s) => s.searchIntent === "opensource"),
   ].filter((s): s is ResearchSource => !!s);
@@ -875,7 +880,8 @@ export async function singleReport(
   const forum = [...needs, ...scoped.filter((s) => s.searchIntent === "demand")]
     .filter(
       (s, i, all) =>
-        all.findIndex((o) => o.url === s.url) === i &&
+        // Reddit serves one thread again under a translation parameter.
+        all.findIndex((o) => thread(o.url) === thread(s.url)) === i &&
         FORUM.test(new URL(s.url).hostname) &&
         onTopic(s) &&
         !pages.some((p) => p.url === s.url),
