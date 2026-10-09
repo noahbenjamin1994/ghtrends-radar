@@ -13,7 +13,7 @@ export interface Opened {
   source: ResearchSource;
   quote?: string;
 }
-export type Working = null | "rejudge" | "supply" | "more" | "ask";
+export type Working = null | "rejudge" | "supply" | "ask";
 
 /** The original text around a quote, without leaving the report. */
 export function SourceDrawer({
@@ -393,7 +393,7 @@ export function Report({
                     </button>
                     {row.added && (
                       <span className="rd-tag">
-                        {l("added by you", "用户补充")}
+                        {l("added later", "后续补充")}
                       </span>
                     )}
                   </td>

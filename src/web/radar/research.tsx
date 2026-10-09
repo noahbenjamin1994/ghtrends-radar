@@ -5,11 +5,15 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { effectiveDecision, type Revision } from "../../core/decision.js";
+import {
+  effectiveDecision,
+  type Followup,
+  type Revision,
+} from "../../core/decision.js";
 import type { LaneItem, Lanes, ScanProgress } from "../../core/engine.js";
 import type { Market, Topic } from "../../core/types.js";
 import type { Account } from "../account.js";
-import { api, watchResearch } from "../api.js";
+import { api, apiLines, watchResearch } from "../api.js";
 import { track } from "../engagement.js";
 import { locale } from "../i18n.js";
 import { appUrl } from "../paths.js";
@@ -47,9 +51,45 @@ export const started = new Map<string, Job>();
 interface RevisionView {
   revision: Revision | null;
   followupsLeft: number;
-  supplier?: string | null;
-  more?: { q: string; site: string }[];
 }
+type Step = NonNullable<Followup["steps"]>[number] | { tool: "rejudge" };
+const SITE_NAMES: Record<string, string> = {
+  reddit: "Reddit",
+  hackernews: "Hacker News",
+  stackoverflow: "Stack Overflow",
+  v2ex: "V2EX",
+  linuxdo: "LINUX DO",
+  zhihu: l("Zhihu", "知乎"),
+  tieba: l("Tieba", "贴吧"),
+};
+const host = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+};
+/** One thing the analyst did, in the reader's words. */
+const stepText = (s: Step, now = false) =>
+  s.tool === "rejudge"
+    ? l(
+        "Reassessing the report with the new sources…",
+        "正在根据新来源重新评估报告…",
+      )
+    : s.tool === "search"
+      ? l(
+          `${now ? "Searching" : "Searched"} ${SITE_NAMES[s.site || ""] || "the web"}: ${s.text}`,
+          `${now ? "正在检索" : "检索"}${SITE_NAMES[s.site || ""] || "全网"}：${s.text}`,
+        ) + (now ? "…" : "")
+      : s.tool === "read"
+        ? l(
+            `${now ? "Reading" : "Read"} ${host(s.text)}`,
+            `${now ? "正在读取" : "读取"} ${host(s.text)}`,
+          ) + (now ? "…" : "")
+        : l(
+            `${now ? "Looking up" : "Looked up"} ${host(s.text)}`,
+            `${now ? "正在查找" : "查找"} ${host(s.text)}`,
+          ) + (now ? "…" : "");
 type View =
   | { kind: "loading" }
   | { kind: "missing" }
@@ -260,6 +300,7 @@ export function Research({
   } | null>(null);
   const [opened, setOpened] = useState<Opened | null>(null);
   const [working, setWorking] = useState<Working>(null);
+  const [step, setStep] = useState<Step | null>(null);
   const [original, setOriginal] = useState(false);
   const [error, setError] = useState("");
   const [question, setQuestion] = useState("");
@@ -425,32 +466,23 @@ export function Research({
       })
       .finally(() => setWorking(null));
   };
-  const moreResearch = (searches: { q: string; site: string }[]) => {
-    if (!market) return;
-    setWorking("more");
-    setError("");
-    return post<RevisionView>(`/api/reports/${market.id}/more`, { searches })
-      .then(apply)
-      .catch((e: Error) => setAskError(e.message))
-      .finally(() => setWorking(null));
-  };
   const ask = () => {
     if (!market || working || !question.trim()) return;
     const text = question.trim();
     setWorking("ask");
     setAskError("");
-    post<RevisionView>(`/api/reports/${market.id}/ask`, { question: text })
+    setStep(null);
+    apiLines<RevisionView>(
+      `/api/reports/${market.id}/ask`,
+      { question: text },
+      (s) => setStep(s as Step),
+    )
       .then((r) => {
         apply(r);
         setQuestion("");
-        setWorking(null);
-        if (r.supplier) void addSupply(r.supplier);
-        else if (r.more?.length) void moreResearch(r.more);
       })
-      .catch((e: Error) => {
-        setAskError(e.message);
-        setWorking(null);
-      });
+      .catch((e: Error) => setAskError(e.message))
+      .finally(() => setWorking(null));
   };
   const share = async (shared: boolean) => {
     if (!market) return;
@@ -759,37 +791,43 @@ export function Research({
                   />
                 );
               })}
+              {!!f.steps?.length && (
+                <small className="rd-turn-steps">
+                  {f.steps.map((x) => stepText(x)).join(l(" · ", "；"))}
+                </small>
+              )}
               {f.note === "added-supply" && (
                 <small>
                   {l(
-                    "If its page could be read, it is listed under “Competitor analysis”, marked as added by you.",
-                    "页面读取成功后，它会列入「竞品分析」，并标注「用户补充」。",
+                    "If its page could be read, it is listed under “Competitor analysis”, marked as added later.",
+                    "页面读取成功后，它会列入「竞品分析」，并标注「后续补充」。",
                   )}
                 </small>
               )}
               {f.note === "more-research" && (
                 <small>
                   {l(
-                    "New sources are added to the report, which is then reassessed.",
-                    "新采集的来源会并入报告，并据此重新评估。",
+                    "The new sources were added to the report and it was reassessed.",
+                    "新来源已并入报告，结论已据此重新评估。",
                   )}
                 </small>
               )}
-              {!f.quotes.length &&
-                f.note !== "added-supply" &&
-                f.note !== "more-research" && (
-                  <small>
-                    {f.note === "unanswerable"
-                      ? l(
-                          "The collected sources don't answer this.",
-                          "已采集的来源无法回答这个问题。",
-                        )
-                      : l(
-                          "No source quote supports this answer; treat it as an opinion.",
-                          "该回答没有来源原文支撑，仅供参考。",
-                        )}
-                  </small>
-                )}
+              {!f.quotes.length && !f.note && !f.steps?.length && (
+                <small>
+                  {l(
+                    "No source quote supports this answer; treat it as an opinion.",
+                    "该回答没有来源原文支撑，仅供参考。",
+                  )}
+                </small>
+              )}
+              {f.note === "unanswerable" && !f.quotes.length && (
+                <small>
+                  {l(
+                    "The collected sources don't answer this.",
+                    "已采集的来源无法回答这个问题。",
+                  )}
+                </small>
+              )}
             </article>
           ))}
         </div>
@@ -821,23 +859,20 @@ export function Research({
             {askError
               ? askError
               : working === "ask"
-                ? l("Reading the sources to answer…", "正在查阅来源原文…")
-                : working === "more"
+                ? step
+                  ? stepText(step, true)
+                  : l("Working on it…", "正在处理…")
+                : working === "supply"
                   ? l(
-                      "Researching further, then reassessing…",
-                      "正在补充调研，完成后重新评估…",
+                      "Reading that supplier's page, then judging again…",
+                      "正在读取该竞品页面，完成后重新评估…",
                     )
-                  : working === "supply"
+                  : left > 0
                     ? l(
-                        "Reading that supplier's page, then judging again…",
-                        "正在读取该竞品页面，完成后重新评估…",
+                        `Ask anything, point out what's wrong, or ask for more research. ${left} messages left.`,
+                        `可以提问、指出遗漏或错误，也可以让它继续调研。剩余 ${left} 次。`,
                       )
-                    : left > 0
-                      ? l(
-                          `Say what's missing or wrong, and the report is corrected. ${left} follow-ups left.`,
-                          `可指出遗漏或错误，报告会相应修订。剩余提问 ${left} 次。`,
-                        )
-                      : ""}
+                    : ""}
           </p>
         </div>
       )}

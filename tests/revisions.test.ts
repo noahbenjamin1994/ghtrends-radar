@@ -120,7 +120,7 @@ test("dismissing a quote is instant, validated and reversible; status is one fie
   await harness(async ({ post, get, id, legacy, engine }) => {
     assert.deepEqual(await get(`/api/reports/${id}/revision`), {
       revision: null,
-      followupsLeft: 5,
+      followupsLeft: 20,
     });
     assert.equal(
       (await post(`/api/reports/${id}/revision`, { dismiss: "P9:S9Q9" }))
@@ -181,38 +181,35 @@ test("a new judgment never sees removed quotes, and a failed one keeps the corre
   });
 });
 
+/** A follow-up replies in JSON lines; the result is the last one. */
+const lines = async (r: Response) =>
+  (await r.text())
+    .trim()
+    .split("\n")
+    .map((x) => JSON.parse(x));
+
 test("follow-ups answer from collected sources, drop invented citations and are bounded", async () => {
   await harness(async ({ post, id, engine }) => {
     let operation = "";
     engine.research.json = async (_p, _i, _m, op) => {
       operation = op!;
       return {
-        intent: "answer",
+        calls: [],
         answer: "Acme's starter plan excludes it.",
         quotes: ["S3Q1", "S99Q1"],
-        supplier: null,
+        update: false,
       };
     };
-    const view = await (
-      await post(`/api/reports/${id}/ask`, { question: "Why not Acme?" })
-    ).json();
+    const [view] = await lines(
+      await post(`/api/reports/${id}/ask`, { question: "Why not Acme?" }),
+    );
     assert.equal(operation, "report-ask");
-    assert.equal(view.followupsLeft, 4);
+    assert.equal(view.followupsLeft, 19);
     assert.deepEqual(
       view.revision.followups[0].quotes.map((q: any) => q.cid),
       ["S3Q1"],
     );
-    assert.equal(view.supplier, null);
-    engine.research.json = async () => ({
-      intent: "missing_supplier",
-      answer: "I will read TikHub.",
-      quotes: [],
-      supplier: "TikHub",
-    });
-    const missing = await (
-      await post(`/api/reports/${id}/ask`, { question: "You missed TikHub" })
-    ).json();
-    assert.equal(missing.supplier, "TikHub");
+    assert.equal(view.revision.sources, undefined);
     engine.research.json = async () => {
       throw new Error("boom");
     };
@@ -220,12 +217,124 @@ test("follow-ups answer from collected sources, drop invented citations and are 
     assert.equal(failed.status, 502);
     assert.equal(
       engine.store.revision(id)?.followups?.length,
-      2,
+      1,
       "not counted",
     );
     assert.equal(
       (await post(`/api/reports/${id}/ask`, { question: "x" })).status,
       400,
+    );
+  });
+});
+
+test("a follow-up can search and read in steps, and only sources the new judgment uses stay", async () => {
+  await harness(async ({ post, id, engine }) => {
+    engine.trends.forResearch = () =>
+      ({ researchProxy: () => undefined, close: async () => {} }) as any;
+    engine.documents.forResearch = () => engine.documents;
+    const searched: string[] = [];
+    engine.search.collect = async (_t, _g, queries) => {
+      searched.push(queries![0]!.query);
+      return {
+        fetchedAt: new Date().toISOString(),
+        region: "US",
+        language: "en",
+        queries: [
+          {
+            ...queries![0]!,
+            engine: "google",
+            results: [
+              {
+                kind: "organic",
+                title: "Banned again : r/scraping",
+                url: "https://www.reddit.com/r/scraping/comments/1/banned/",
+                excerpt:
+                  "My account gets banned every week when I read logged-in posts, I am tired of making new ones.",
+              },
+              {
+                kind: "organic",
+                title: "Unrelated thread : r/cats",
+                url: "https://www.reddit.com/r/cats/comments/2/cat/",
+                excerpt:
+                  "My cat sleeps on the keyboard all day and I can not get any work done at all.",
+              },
+              {
+                kind: "organic",
+                title: "Bolt review",
+                url: "https://reviews.example/bolt",
+                excerpt: "We tested Bolt for a month.",
+              },
+            ],
+          },
+        ],
+      } as any;
+    };
+    engine.documents.readWeb = async (url) => ({
+      cached: false,
+      read: { url, status: "read", observedAt: new Date().toISOString() },
+      sources: [
+        {
+          label: "Bolt review",
+          url,
+          excerpt: "Bolt lost our session twice a day during the test.",
+        },
+      ],
+    });
+    const turns: any[] = [];
+    engine.research.json = async (_p, input: any, _m, op) => {
+      if (op === "report-rejudge") {
+        const next = draft();
+        next.pains[0]!.quotes.push("S4Q1");
+        return next;
+      }
+      turns.push(input);
+      if (turns.length === 1)
+        return {
+          calls: [
+            { tool: "search", q: "account banned", site: "reddit" },
+            { tool: "read", url: "https://invented.example/" },
+          ],
+        };
+      if (turns.length === 2)
+        return {
+          calls: [
+            {
+              tool: "read",
+              url: "https://reviews.example/bolt",
+              vendor: false,
+            },
+          ],
+        };
+      return {
+        calls: [],
+        answer: "People report weekly bans (S4, S5Q1).",
+        quotes: ["S4Q1"],
+        update: true,
+      };
+    };
+    const out = await lines(
+      await post(`/api/reports/${id}/ask`, { question: "Go deeper" }),
+    );
+    assert.deepEqual(searched, ["site:reddit.com account banned"]);
+    assert.deepEqual(
+      out.slice(0, -1).map((x) => x.step.tool),
+      ["search", "read", "rejudge"],
+    );
+    assert.match(turns[1].done[0].outcome, /^2 forum posts added.*1 pages/);
+    assert.match(turns[1].done[1].outcome, /^rejected/);
+    assert.equal(turns[2].sources.at(-1).id, "S6");
+    const { revision } = out.at(-1);
+    assert.deepEqual(
+      revision.sources.map((s: any) => s.id),
+      ["S4"],
+      "the cat thread and the unused review are dropped",
+    );
+    assert.equal(revision.decision.pains[0].quotes.length, 2);
+    assert.equal(revision.followups[0].note, "more-research");
+    assert.equal(revision.followups[0].answer, "People report weekly bans.");
+    assert.deepEqual(
+      revision.followups[0].steps.map((s: any) => s.tool),
+      ["search", "read"],
     );
   });
 });

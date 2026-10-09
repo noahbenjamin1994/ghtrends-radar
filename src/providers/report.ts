@@ -1004,12 +1004,31 @@ export async function rejudgeReport(
   ];
   const citations = reportCitations(sources);
   for (const cid of excluded) delete citations[cid];
+  const current = revision.decision || brief.decision;
+  const live = (quotes: { cid: string }[]) =>
+    quotes.map((q) => q.cid).filter((cid) => citations[cid]);
   const request = {
     input: market.topic.plan?.input || market.topic.name,
     search: {
       keyword: market.demand.keyword,
       region: market.geo || "WORLDWIDE",
       trend: market.metrics.trend,
+    },
+    // A new judgment builds on the delivered one; without it, rows the reader
+    // already saw vanish for no reason each time a source is added.
+    current: {
+      pains: current.pains.map((p) => ({
+        title: p.title.en,
+        quotes: live(p.quotes),
+      })),
+      commercial: current.commercial.map((x) => ({
+        name: x.name,
+        evidence: live(x.evidence),
+      })),
+      openSource: current.openSource.map((x) => ({
+        name: x.name,
+        evidence: live(x.evidence),
+      })),
     },
     readerCorrections: {
       removedAsIrrelevant: excluded.length,
@@ -1029,7 +1048,7 @@ export async function rejudgeReport(
   const raw = await reportPhase(WRITE_MS, () =>
     engine.research.json(
       DECISION_PROMPT +
-        "\nThe reader corrected the evidence of an earlier report. Quotes they removed as irrelevant are absent from the citations; do not reconstruct them. Suppliers they added are included as sources; list one only when its source supports it. Judge again from what remains.",
+        "\nThe reader corrected the evidence of an earlier report. Quotes they removed as irrelevant are absent from the citations; do not reconstruct them. Suppliers they added are included as sources; list one only when its source supports it. current is the report as the reader has it: keep each of its pains and supply rows that still has a citation, reworded or merged where the sources now say more, and add what the newer sources show. Drop a row only when its citations are gone. Then judge the verdict and directions again from all of it.",
       request,
       6500,
       "report-rejudge",

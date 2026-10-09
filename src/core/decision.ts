@@ -603,6 +603,12 @@ export interface Followup {
   quotes: Quote[];
   at: string;
   note?: "added-supply" | "unanswerable" | "more-research";
+  /** What was searched and read to answer. */
+  steps?: {
+    tool: "search" | "read" | "supplier";
+    text: string;
+    site?: string;
+  }[];
 }
 export interface EffectiveDecision extends Decision {
   /** Directions whose pain evidence the owner removed. */

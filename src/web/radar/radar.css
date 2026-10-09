@@ -1154,8 +1154,12 @@
   font-size: 16px;
 }
 .rd-turn small {
+  display: block;
   color: var(--faint);
   font-size: 13.5px;
+}
+.rd-turn small + small {
+  margin-top: 4px;
 }
 .rd-composer {
   position: sticky;

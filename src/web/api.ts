@@ -85,3 +85,43 @@ export async function api<T>(url: string, options?: RequestInit): Promise<T> {
     );
   return d as T;
 }
+
+/** POST whose reply is JSON lines: steps as they happen, the result last. */
+export async function apiLines<T>(
+  url: string,
+  body: unknown,
+  onStep: (step: { tool: string; text?: string; site?: string }) => void,
+): Promise<T> {
+  const r = await fetch(appUrl(url), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+    credentials: "same-origin",
+    body: JSON.stringify(body),
+  });
+  let last: any,
+    rest = "";
+  const take = (text: string) => {
+    const lines = (rest + text).split("\n");
+    rest = lines.pop()!;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      last = JSON.parse(line);
+      if (last.step) onStep(last.step);
+    }
+  };
+  const reader = r.body?.getReader();
+  const decoder = new TextDecoder();
+  for (;;) {
+    const chunk = await reader?.read();
+    if (!chunk || chunk.done) break;
+    take(decoder.decode(chunk.value, { stream: true }));
+  }
+  take("\n");
+  window.dispatchEvent(new Event("ghtrends:usage"));
+  if (!r.ok || !last || last.error || last.step)
+    throw Object.assign(
+      new Error(last?.error || "The request could not be completed."),
+      { status: r.status },
+    );
+  return last as T;
+}
