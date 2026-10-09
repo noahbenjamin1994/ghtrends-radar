@@ -79,7 +79,7 @@ const stepText = (s: Step, now = false) =>
     : s.tool === "search"
       ? l(
           `${now ? "Searching" : "Searched"} ${SITE_NAMES[s.site || ""] || "the web"}: ${s.text}`,
-          `${now ? "正在检索" : "检索"}${SITE_NAMES[s.site || ""] || "全网"}：${s.text}`,
+          `${now ? "正在检索" : "检索"} ${SITE_NAMES[s.site || ""] || "全网"}：${s.text}`,
         ) + (now ? "…" : "")
       : s.tool === "read"
         ? l(
@@ -300,7 +300,23 @@ export function Research({
   } | null>(null);
   const [opened, setOpened] = useState<Opened | null>(null);
   const [working, setWorking] = useState<Working>(null);
-  const [step, setStep] = useState<Step | null>(null);
+  const [asking, setAsking] = useState<{
+    question: string;
+    steps: Step[];
+  } | null>(null);
+  const follow = useRef(false);
+  const threadEnd = useRef<HTMLDivElement>(null);
+  const turns = revision?.followups?.length || 0;
+  useEffect(() => {
+    if (!follow.current) return;
+    if (!asking) follow.current = false;
+    threadEnd.current?.previousElementSibling?.scrollIntoView({
+      block: "center",
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    });
+  }, [asking?.question, turns]);
   const [original, setOriginal] = useState(false);
   const [error, setError] = useState("");
   const [question, setQuestion] = useState("");
@@ -471,18 +487,26 @@ export function Research({
     const text = question.trim();
     setWorking("ask");
     setAskError("");
-    setStep(null);
+    // The question joins the thread at once; the box is free for the next one.
+    setAsking({ question: text, steps: [] });
+    setQuestion("");
+    follow.current = true;
     apiLines<RevisionView>(
       `/api/reports/${market.id}/ask`,
       { question: text },
-      (s) => setStep(s as Step),
+      (x) => {
+        setAsking((a) => a && { ...a, steps: [...a.steps, x as Step] });
+      },
     )
-      .then((r) => {
-        apply(r);
-        setQuestion("");
+      .then(apply)
+      .catch((e: Error) => {
+        setAskError(e.message);
+        setQuestion(text);
       })
-      .catch((e: Error) => setAskError(e.message))
-      .finally(() => setWorking(null));
+      .finally(() => {
+        setAsking(null);
+        setWorking(null);
+      });
   };
   const share = async (shared: boolean) => {
     if (!market) return;
@@ -774,7 +798,7 @@ export function Research({
           )
         }
       />
-      {followups.length > 0 && (
+      {(followups.length > 0 || asking) && (
         <div className="rd-thread">
           {followups.map((f, i) => (
             <article key={i} className="rd-turn">
@@ -830,6 +854,20 @@ export function Research({
               )}
             </article>
           ))}
+          {asking && (
+            <article className="rd-turn" aria-busy="true">
+              <p className="rd-turn-q">{asking.question}</p>
+              {asking.steps.slice(0, -1).map((x, i) => (
+                <small key={i}>{stepText(x)}</small>
+              ))}
+              <small className="rd-turn-live">
+                {asking.steps.length
+                  ? stepText(asking.steps.at(-1)!, true)
+                  : l("Working on it…", "正在处理…")}
+              </small>
+            </article>
+          )}
+          <div ref={threadEnd} />
         </div>
       )}
       {owner && !original && (
@@ -859,9 +897,7 @@ export function Research({
             {askError
               ? askError
               : working === "ask"
-                ? step
-                  ? stepText(step, true)
-                  : l("Working on it…", "正在处理…")
+                ? ""
                 : working === "supply"
                   ? l(
                       "Reading that supplier's page, then judging again…",

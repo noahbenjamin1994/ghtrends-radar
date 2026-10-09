@@ -1017,6 +1017,7 @@ export async function rejudgeReport(
     // A new judgment builds on the delivered one; without it, rows the reader
     // already saw vanish for no reason each time a source is added.
     current: {
+      verdict: current.verdict.kind,
       pains: current.pains.map((p) => ({
         title: p.title.en,
         quotes: live(p.quotes),
@@ -1048,13 +1049,52 @@ export async function rejudgeReport(
   const raw = await reportPhase(WRITE_MS, () =>
     engine.research.json(
       DECISION_PROMPT +
-        "\nThe reader corrected the evidence of an earlier report. Quotes they removed as irrelevant are absent from the citations; do not reconstruct them. Suppliers they added are included as sources; list one only when its source supports it. current is the report as the reader has it: keep each of its pains and supply rows that still has a citation, reworded or merged where the sources now say more, and add what the newer sources show. Drop a row only when its citations are gone. Then judge the verdict and directions again from all of it.",
+        "\nThe reader corrected the evidence of an earlier report. Quotes they removed as irrelevant are absent from the citations; do not reconstruct them. Suppliers they added are included as sources; list one only when its source supports it. current is the report as the reader has it: keep each of its pains and supply rows that still has a citation, reworded or merged where the sources now say more, and add what the newer sources show. Drop a row only when its citations are gone. Then judge the directions again from all of it. Keep current.verdict as the verdict kind unless the pains or supply rows you added or dropped change which kind applies; more quotes for a pain already listed, or one more seller of the same kind, do not change it.",
       request,
       6500,
       "report-rejudge",
       false,
     ),
   );
+  // The model is asked to keep the rows the reader already has; this makes
+  // sure of it. A row leaves only when its citations are gone or the table is
+  // full.
+  const words = (name: string) =>
+    (name.toLowerCase().match(/[a-z0-9]{3,}|[\u3400-\u9fff]{2,}/g) ||
+      []) as string[];
+  const same = (a: string, b: string) =>
+    words(a).some((w) => words(b).includes(w));
+  const draft = raw as { commercial?: unknown; openSource?: unknown };
+  if (draft && typeof draft === "object")
+    for (const [key, max] of [
+      ["commercial", 6],
+      ["openSource", 4],
+    ] as const) {
+      if (!Array.isArray(draft[key])) continue;
+      const rows = draft[key] as Record<string, unknown>[];
+      for (const row of current[key]) {
+        const evidence = live(row.evidence);
+        if (
+          !evidence.length ||
+          rows.length >= max ||
+          rows.some(
+            (x) => typeof x?.name === "string" && same(x.name, row.name),
+          )
+        )
+          continue;
+        rows.push(
+          "capability" in row
+            ? { name: row.name, capability: row.capability, evidence }
+            : {
+                name: row.name,
+                audience: row.audience,
+                pricing: row.pricing ?? null,
+                gap: row.gap ?? null,
+                evidence,
+              },
+        );
+      }
+    }
   const decision = finalizeDecision(
     parseDecisionDraft(raw, citations),
     market,
@@ -1062,6 +1102,6 @@ export async function rejudgeReport(
   );
   const added = new Set((revision.sources || []).map((s) => s.id));
   for (const row of decision.commercial)
-    if (row.evidence.some((q) => added.has(q.id))) row.added = true;
+    if (row.evidence.every((q) => added.has(q.id))) row.added = true;
   return { decision, excluded };
 }

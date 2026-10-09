@@ -1161,6 +1161,19 @@
 .rd-turn small + small {
   margin-top: 4px;
 }
+.rd-turn-live {
+  animation: rd-live 1.6s ease-in-out infinite;
+}
+@keyframes rd-live {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rd-turn-live {
+    animation: none;
+  }
+}
 .rd-composer {
   position: sticky;
   bottom: 0;

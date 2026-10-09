@@ -66,7 +66,7 @@ Tools, up to 3 calls a step, run together:
 {"tool":"search","q":"...","site":"..."} searches the web. q = 2-5 words in the language of the people you are looking for, taken from the report, the sources or earlier results. When a search brought nothing useful, change the words or the site; never repeat it. site: reddit, hackernews, stackoverflow = English discussion; v2ex, linuxdo = Chinese developers; zhihu = Chinese consumers and general questions; tieba = Chinese games and hobbies; web = the open web (products, pricing, reviews, news). Forum posts that are found are added to sources with citations. Other pages are listed in results and must be read before they can be cited.
 {"tool":"read","url":"...","vendor":true|false} reads one page from results or from the reader's message and adds it to sources. vendor = true for a seller's own page, false for a page where users or reviewers speak.
 {"tool":"supplier","name":"..."} for a product or company the reader says the report missed (a name or a link): its page is found, read and added as supply.
-Use the tools whenever the sources in hand do not settle what the reader asked. Never say something was not collected while stepsLeft is above 0; go and collect it. When the reader only says to continue or go deeper, look into pains that rest on a single quote and into what notCollected lists. When stepsLeft is 0 you must give the final answer.
+Everything you tell the reader must come from sources in this input; what you remember about a product or market does not count and must not be written. Use the tools whenever the sources in hand do not settle what the reader asked. When the reader says a product or company is missing, call supplier for it before answering. Never say something was not collected while stepsLeft is above 0; go and collect it. When the reader only says to continue or go deeper, look into pains that rest on a single quote and into what notCollected lists. When stepsLeft is 0 you must give the final answer.
 Final answer: {"calls":[],"answer":"...","quotes":["S2Q1"],"update":true|false}. answer: what you found for the reader, in the language of the reader's message, plain words, at most five sentences and 300 characters; no source or citation IDs inside it, and never a list of the searches you ran. Never repeat the report they already have. quotes: up to 4 citation IDs that support the answer; never write or paraphrase a quote yourself. update = true when sources added in this conversation add or change pains, supply or directions, so the report is assessed again with them. When nothing useful was found, say so in one sentence. Never defend the report by inventing a reason; if the reader is right that something is wrong or missing, say so.`;
 
 /** Owner corrections to a delivered report: evidence can change, conclusions follow. */
@@ -586,8 +586,18 @@ export function installRevisionRoutes(
                 );
                 if (stepsLeft <= 0) return { parsed, citations };
                 const calls = parsed.calls.slice(0, 3);
-                if (!calls.length && parsed.answer)
-                  return { parsed, citations };
+                if (!calls.length && parsed.answer) {
+                  // An answer with no source behind it and no attempt to find
+                  // one is the model talking from memory; send it back once.
+                  if (log.length || parsed.quotes.some((cid) => citations[cid]))
+                    return { parsed, citations };
+                  log.push({
+                    call: {},
+                    outcome:
+                      "rejected: that answer cited no source. Use the tools to collect what it needs, or answer from citations in sources.",
+                  });
+                  continue;
+                }
                 // Logged in the order asked, whichever finishes first.
                 log.push(
                   ...(await Promise.all(

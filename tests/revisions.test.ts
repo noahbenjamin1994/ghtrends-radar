@@ -394,6 +394,26 @@ test("an added supplier is read from its own page before the report is judged ag
       ],
     );
     assert.equal(view.revision.sources[0].id, "S4");
+    // A later judgment that forgets a row the reader already has gets it back.
+    engine.research.json = async () => {
+      const next = draft();
+      next.commercial = [
+        {
+          name: "TikHub",
+          audience: text,
+          pricing: text,
+          gap: text,
+          evidence: ["S4Q1"],
+        },
+      ];
+      next.directions[0]!.supply = ["C1"];
+      return next;
+    };
+    const again = await (await post(`/api/reports/${id}/rejudge`)).json();
+    assert.deepEqual(
+      again.revision.decision.commercial.map((x: any) => x.name),
+      ["TikHub", "Acme"],
+    );
   });
 });
 
