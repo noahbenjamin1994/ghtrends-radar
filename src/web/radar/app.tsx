@@ -170,6 +170,8 @@ export function Root() {
         <button
           onClick={() => edit("")}
           aria-label={l("Radar home", "Radar 首页")}
+          // The home page carries the mark itself, centred above the input.
+          style={route === "/" && !researching ? { visibility: "hidden" } : {}}
         >
           <Logo />
         </button>

@@ -12,7 +12,8 @@ import type { Account } from "../account.js";
 import { api } from "../api.js";
 import { locale } from "../i18n.js";
 import { Report, SourceDrawer, type Opened } from "./report.js";
-import { Ask, Row, day, l, tx } from "./ui.js";
+import { Logo } from "../components.js";
+import { Ask, day, l, tx } from "./ui.js";
 
 type Framing = {
   who: { en: string; zh: string };
@@ -79,7 +80,7 @@ function Mine({ open }: { open: (path: string) => void }) {
     return () => clearInterval(timer);
   }, [live, load]);
   if (!data) return null;
-  if (!data.items.length && !data.running.length) return <Outline />;
+  if (!data.items.length && !data.running.length) return null;
   const status = (item: Item) =>
     item.status === "won"
       ? l("Did it, a yes", "做了·成")
@@ -162,68 +163,6 @@ function Mine({ open }: { open: (path: string) => void }) {
   );
 }
 
-/** What the page will hold, when there is no real report to show yet. */
-function Outline() {
-  const rows: [string, string][] = [
-    [
-      l("Verdict", "判断"),
-      l(
-        "One of four: worth pursuing, change the angle, don't build this, or not enough evidence to judge. With the reasons.",
-        "四选一：值得往下走、换个切法、别做、证据不足判断不了。带理由。",
-      ),
-    ],
-    [
-      l("Who is in pain", "谁在疼"),
-      l(
-        "People describing the problem in their own words, each quote one click from its original page, and how they cope today.",
-        "有人用自己的话说这个问题，每句原话点一下就能看原文，还有他们现在怎么凑合。",
-      ),
-    ],
-    [
-      l("Who serves them", "谁在做"),
-      l(
-        "Commercial products with who they serve and what they charge; open-source projects with activity and license.",
-        "商业产品服务谁、收多少钱；开源项目近期活跃度和许可。",
-      ),
-    ],
-    [
-      l("Timing", "时机"),
-      l(
-        "Heating up, steady or cooling, with the measurement.",
-        "升温、持平还是降温，带依据。",
-      ),
-    ],
-    [
-      l("What's left open", "口子"),
-      l(
-        "Only the pains that existing supply doesn't cover. Sometimes that is none.",
-        "只有痛点里现有供给没接住的部分。有时候是零个。",
-      ),
-    ],
-    [
-      l("Next step", "下一步"),
-      l(
-        "One thing to do this week: where to go, who to reach, what to ask, what counts as a yes.",
-        "这周能做的一件事：去哪、找谁、问什么、看到什么算成。",
-      ),
-    ],
-  ];
-  return (
-    <section className="rd-below">
-      <h2 className="rd-below-title">
-        {l("What you get back, on one page", "你会拿到这样一页")}
-      </h2>
-      {rows.map(([label, text], i) => (
-        <Row key={label} label={label} className={i ? "" : "is-verdict"}>
-          <p className="rd-empty" style={{ color: "var(--ink)" }}>
-            {text}
-          </p>
-        </Row>
-      ))}
-    </section>
-  );
-}
-
 /** A real, publicly shared report, readable to the end without signing in. */
 function Sample() {
   const [data, setData] = useState<
@@ -237,7 +176,7 @@ function Sample() {
       .catch(() => setData(null));
   }, []);
   if (data === undefined) return null;
-  if (!data?.market.brief?.decision) return <Outline />;
+  if (!data?.market.brief?.decision) return null;
   const { market, revision } = data;
   const framing = market.topic.plan?.framing;
   return (
@@ -298,44 +237,39 @@ export function Home({
   const signedIn = !!account?.user;
   return (
     <div className="rd-wrap rd-home">
-      <h1>
-        {l(
-          "Is this worth building, and where do you cut in?",
-          "这件事值不值得做，从哪切进去",
+      <div className="rd-hero">
+        <h1 className="rd-mark">
+          <Logo />
+        </h1>
+        <Ask
+          value={value}
+          onChange={setValue}
+          onSubmit={() => onStart(value.trim())}
+          inputRef={input}
+          autoFocus
+          label={l("Research", "研究")}
+          placeholder={l("Enter a domain or an idea", "输入一个领域或想法")}
+        />
+        {note ? (
+          <p className="rd-note" role="alert">
+            {note}
+          </p>
+        ) : (
+          <div className="rd-try">
+            {examples.map(([en, zh]) => (
+              <button
+                key={en}
+                onClick={() => {
+                  setValue(l(en, zh));
+                  input.current?.focus();
+                }}
+              >
+                {l(en, zh)}
+              </button>
+            ))}
+          </div>
         )}
-      </h1>
-      <Ask
-        value={value}
-        onChange={setValue}
-        onSubmit={() => onStart(value.trim())}
-        inputRef={input}
-        autoFocus
-        label={l("Start research", "开始研究")}
-        placeholder={l(
-          "A domain or an idea. One sentence is enough.",
-          "一个领域或一个想法，一句话就行",
-        )}
-      />
-      {note ? (
-        <p className="rd-note" role="alert">
-          {note}
-        </p>
-      ) : (
-        <p className="rd-try">
-          {l("Try", "试试")}
-          {examples.map(([en, zh]) => (
-            <button
-              key={en}
-              onClick={() => {
-                setValue(l(en, zh));
-                input.current?.focus();
-              }}
-            >
-              {l(en, zh)}
-            </button>
-          ))}
-        </p>
-      )}
+      </div>
       {account && (signedIn ? <Mine open={open} /> : <Sample />)}
     </div>
   );

@@ -135,18 +135,29 @@
   background: var(--wash);
 }
 
-/* Home */
+/* Home: the mark and one input, centred. Everything else waits below. */
 .rd-home {
-  padding: clamp(40px, 11vh, 120px) 0 56px;
+  padding: 0 0 56px;
 }
-.rd-home h1 {
-  margin: 0 0 28px;
-  max-width: 15em;
-  font-size: clamp(30px, 4.4vw, 46px);
-  line-height: 1.14;
-  font-weight: 640;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
+.rd-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 780px;
+  margin: 0 auto;
+  padding-top: clamp(72px, 24vh, 250px);
+}
+.rd-mark {
+  margin: 0 0 34px;
+  line-height: 1;
+}
+.rd-mark .brand {
+  gap: 13px;
+  font-size: clamp(38px, 5.2vw, 52px);
+}
+.rd-mark .brand svg {
+  width: 1em;
+  height: 1em;
 }
 .rd-ask {
   display: flex;
@@ -199,23 +210,25 @@
 .rd-try {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 6px;
-  margin-top: 14px;
-  color: var(--faint);
-  font-size: 14px;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
 }
 .rd-try button {
-  padding: 2px 6px;
-  border-radius: 5px;
-  color: var(--soft);
-  text-decoration: underline;
-  text-decoration-color: #d3d3cf;
-  text-underline-offset: 4px;
+  padding: 8px 15px;
+  border: 1px solid #e8e8e8;
+  border-radius: 999px;
+  background: #fff;
+  color: #4a4a4a;
+  font-size: 14px;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
 }
 .rd-try button:hover {
+  border-color: #d9d9d9;
+  background: #f7f7f7;
   color: var(--ink);
-  text-decoration-color: var(--ink);
 }
 .rd-note {
   max-width: var(--measure);
@@ -225,6 +238,58 @@
 }
 .rd-note.is-plain {
   color: var(--soft);
+}
+.rd-hero .rd-ask {
+  display: block;
+  position: relative;
+  width: 100%;
+  max-width: none;
+  padding: 18px 14px 12px 20px;
+  border: 1px solid #eaeaea;
+  border-radius: 26px;
+  box-shadow:
+    0 6px 16px #00000008,
+    0 2px 5px #00000005;
+}
+.rd-hero .rd-ask:focus-within {
+  border-color: #dcdcdc;
+  box-shadow:
+    0 8px 22px #0000000d,
+    0 2px 6px #00000008;
+}
+.rd-hero .rd-ask textarea {
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 6px 8px 0;
+  font-size: 16px;
+  line-height: 1.65;
+}
+.rd-hero .rd-ask textarea:focus-visible {
+  outline: 0;
+}
+.rd-hero .rd-go {
+  width: 36px;
+  height: 36px;
+  margin: 8px 0 0 auto;
+  border-radius: 50%;
+  background: #242424;
+  transition:
+    background 180ms ease,
+    transform 180ms ease;
+}
+.rd-hero .rd-go:disabled {
+  opacity: 1;
+  background: #dcdcdc;
+}
+.rd-hero .rd-go:not(:disabled):hover {
+  background: #414141;
+  transform: translateY(-1px);
+}
+.rd-hero .rd-note {
+  align-self: stretch;
+  max-width: none;
+  padding: 0 20px;
 }
 .rd-choices {
   display: flex;
@@ -244,7 +309,11 @@
   background: var(--wash);
 }
 .rd-below {
-  margin-top: clamp(48px, 9vh, 88px);
+  max-width: 780px;
+  margin: clamp(56px, 12vh, 110px) auto 0;
+}
+.rd-below:has(.rd-row) {
+  max-width: none;
   border-top: 1px solid var(--rule);
   padding-top: 22px;
 }
