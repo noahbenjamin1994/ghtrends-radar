@@ -163,9 +163,10 @@ export const forumWords = (s: ResearchSource) => {
     publishedAt,
   };
 };
-/** These refuse page reads; opening them only spends a slot on a failure. */
+/** These refuse page reads or hold a video or an app page with no account in
+ * text; opening them only spends a slot. */
 export const UNREADABLE =
-  /(?:^|\.)(?:reddit\.com|quora\.com|tieba\.baidu\.com|zhihu\.com|nga\.cn|linux\.do|v2ex\.com|fiverr\.com)$/i;
+  /(?:^|\.)(?:reddit\.com|quora\.com|tieba\.baidu\.com|zhihu\.com|nga\.cn|linux\.do|v2ex\.com|fiverr\.com|youtube\.com|bilibili\.com|play\.google\.com)$/i;
 
 export function reportFailure(error: unknown) {
   const e = error as {

@@ -665,8 +665,14 @@
   color: #2b2b2b;
   transition: border-color 0.14s;
 }
+/* A pasted tutorial would fill a phone screen; the click opens all of it. */
 .rd-quote-open q {
   quotes: none;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
 }
 .rd-quote-open:hover,
 .rd-quote-open:focus-visible {

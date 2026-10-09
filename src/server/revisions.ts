@@ -47,6 +47,14 @@ const searchSchema = z.object({
     Object.keys(SITES) as [keyof typeof SITES, ...(keyof typeof SITES)[]],
   ),
 });
+/** The first n sentences; "3.5" and "v2.0" do not end one. */
+export const sentences = (text: string, n: number) => {
+  const ends = [...text.matchAll(/[。！？!?]+|\.(?=\s|$)|\n+/g)];
+  const last = ends[n - 1];
+  return ends.length > n
+    ? text.slice(0, last!.index + last![0].length).trim()
+    : text;
+};
 const stepSchema = z.object({
   calls: z.array(z.record(z.string(), z.unknown())).catch([]),
   answer: z.string().trim().max(1200).nullish().catch(null),
@@ -693,12 +701,15 @@ export function installRevisionRoutes(
           const followup: Followup = {
             question,
             // Quotes carry the sources; IDs in the prose mean nothing to a reader.
-            answer: parsed.answer
-              .replace(
-                /\s*[（(]\s*S\d+(?:Q\d+)?(?:\s*[、,，]\s*S\d+(?:Q\d+)?)*\s*[）)]/g,
-                "",
-              )
-              .trim(),
+            answer: sentences(
+              parsed.answer
+                .replace(
+                  /\s*[（(]\s*S\d+(?:Q\d+)?(?:\s*[、,，]\s*S\d+(?:Q\d+)?)*\s*[）)]/g,
+                  "",
+                )
+                .trim(),
+              5,
+            ),
             quotes,
             at: new Date().toISOString(),
             ...(steps.length ? { steps } : {}),
