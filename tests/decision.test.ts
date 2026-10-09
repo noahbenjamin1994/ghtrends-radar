@@ -11,7 +11,13 @@ import {
   verdictTitle,
 } from "../src/core/decision.js";
 import { parseReport, reportCitations } from "../src/core/report-contract.js";
-import { finalizeReport } from "../src/providers/report.js";
+import {
+  finalizeReport,
+  forumWords,
+  onTopic,
+} from "../src/providers/report.js";
+import { scopedSources, searchSources } from "../src/providers/search.js";
+import { sentences } from "../src/server/revisions.js";
 import type { Market, ResearchSource } from "../src/core/types.js";
 
 const t = (en: string, zh: string) => ({ en, zh });
@@ -355,4 +361,107 @@ test("a red ocean says which kind, a withheld verdict says what is missing, and 
   );
   assert.equal(verdictTitle(none).zh, "待验证（缺少用户反馈）");
   assert.equal(none.users, undefined);
+});
+
+test("user analysis falls back to the title's scoping when the model leaves it out", () => {
+  const raw: any = draft();
+  delete raw.users;
+  const m = withPages();
+  const who = t("Hobby beekeepers.", "业余养蜂人。");
+  const task = t("Weigh hives and keep records.", "给蜂箱称重并记账。");
+  m.topic.plan = { ...(m.topic.plan as any), framing: { who, task } };
+  const d = finalizeDecision(parseDecisionDraft(raw, citations), m, sources);
+  assert.deepEqual(d.users, [
+    { who, scenario: task, pains: d.pains.map((p) => p.id) },
+  ]);
+});
+
+test("a site-scoped search keeps its whole page, and only results on the subject", () => {
+  const hit = (title: string, url: string, excerpt = "") => ({
+    kind: "organic" as const,
+    title,
+    url,
+    excerpt,
+  });
+  const web: any = {
+    fetchedAt: "2026-10-09T00:00:00Z",
+    region: "US",
+    language: "en",
+    queries: [
+      {
+        query: "site:reddit.com Terraria custom map",
+        intent: "demand",
+        engine: "brave",
+        state: "ready",
+        results: [
+          ...Array.from({ length: 8 }, (_, i) =>
+            hit(
+              `r/Terraria on Reddit: custom maps ${i}`,
+              `https://www.reddit.com/r/Terraria/comments/a${i}/x/`,
+              "How are people making custom maps in Terraria these days, any pointers?",
+            ),
+          ),
+          hit(
+            "r/Terraria on Reddit: 最好的地图编辑器是什么？",
+            "https://www.reddit.com/r/Terraria/comments/2b2wtb/x/?tl=zh-hans",
+            "我想为朋友做一张 Terraria custom map，哪个编辑器最适合挖空一个世界？",
+          ),
+          hit(
+            "r/Terraria on Reddit: fan art",
+            "https://www.reddit.com/r/Terraria/comments/b1/art/",
+            "I drew the Terraria bosses over the weekend and wanted to share them with everyone.",
+          ),
+        ],
+      },
+      {
+        query: "site:fiverr.com terraria",
+        intent: "competition",
+        engine: "brave",
+        state: "ready",
+        results: [
+          hit(
+            "Masterper: I will make a realistic terrain map in roblox for $30 on fiverr.com",
+            "https://www.fiverr.com/masterper/make-a-cheap-realistic-terraria-map",
+          ),
+          hit(
+            "Ssemii: I will build anything you want in terraria for $5 on fiverr.com",
+            "https://www.fiverr.com/ssemii/build-anything-you-want-in-terraria",
+          ),
+        ],
+      },
+    ],
+  };
+  // The mixed selection keeps four results of a search; the scoped one all ten.
+  assert.equal(
+    searchSources(web).filter((s) => s.url.includes("reddit.com")).length,
+    4,
+  );
+  const scoped = scopedSources(web);
+  assert.equal(scoped.filter((s) => s.url.includes("reddit.com")).length, 10);
+  const kept = scoped.filter((s) => onTopic(s) && forumWords(s).excerpt);
+  // Fan art names the subject but none of the other search words; the
+  // translated thread is not the poster's own words.
+  assert.equal(kept.filter((s) => s.url.includes("reddit.com")).length, 8);
+  // A seller's address keeps the words of an offer since rewritten.
+  assert.deepEqual(
+    scoped.filter((s) => s.url.includes("fiverr.com") && onTopic(s)).length,
+    1,
+  );
+  assert.equal(
+    forumWords({
+      label: "泰拉瑞亚tedit地图编辑器求一个高版本的_terraria吧_百度贴吧",
+      url: "https://tieba.baidu.com/p/6877024035",
+      excerpt:
+        "x Snippet: 用tedit打开世界后读取不了，tedit最高支持187，当前世界194。强制加载后保存",
+    } as any).label,
+    "terraria吧：泰拉瑞亚tedit地图编辑器求一个高版本的",
+  );
+});
+
+test("a follow-up answer stops at five sentences without cutting a decimal", () => {
+  assert.equal(
+    sentences("一。二！三？四。五，含 3.5 美元。六。七。", 5),
+    "一。二！三？四。五，含 3.5 美元。",
+  );
+  assert.equal(sentences("短答。", 5), "短答。");
 });
