@@ -8,6 +8,7 @@ import {
   finalizeDecision,
   legacyReport,
   parseDecisionDraft,
+  verdictTitle,
 } from "../src/core/decision.js";
 import { parseReport, reportCitations } from "../src/core/report-contract.js";
 import { finalizeReport } from "../src/providers/report.js";
@@ -313,4 +314,45 @@ test("sections nested inside verdict by a misplaced brace are still read", () =>
   );
   assert.equal(draft.commercial[0]!.name, "Acme");
   assert.equal(draft.unverified[0]!.zh, "有没有人付钱。");
+});
+
+test("a red ocean says which kind, a withheld verdict says what is missing, and user groups stand on real pains", () => {
+  const raw: any = draft();
+  raw.verdict = { kind: "stop", cause: "unsolvable", reason: text };
+  raw.users = [
+    { who: text, scenario: text, pains: ["P1", "P2"] },
+    // P2 rests on vendor copy and does not survive the pain gate.
+    { who: text, scenario: text, pains: ["P2"] },
+    { who: text, pains: ["P1"] },
+  ];
+  const d = finalizeDecision(
+    parseDecisionDraft(raw, citations),
+    withPages(),
+    sources,
+  );
+  assert.equal(verdictTitle(d).zh, "红海（结构性限制）");
+  assert.deepEqual(
+    d.users!.map((u) => u.pains),
+    [["P1"]],
+  );
+  raw.verdict = { kind: "stop", cause: "nonsense", reason: text };
+  assert.equal(
+    verdictTitle(
+      finalizeDecision(
+        parseDecisionDraft(raw, citations),
+        withPages(),
+        sources,
+      ),
+    ).zh,
+    "红海",
+  );
+  raw.verdict = { kind: "reframe", cause: "saturated", reason: text };
+  raw.pains = [{ title: text, workaround: null, quotes: ["S4Q1"] }];
+  const none = finalizeDecision(
+    parseDecisionDraft(raw, citations),
+    withPages(),
+    sources,
+  );
+  assert.equal(verdictTitle(none).zh, "待验证（缺少用户反馈）");
+  assert.equal(none.users, undefined);
 });

@@ -2,12 +2,28 @@ import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import {
   verdictLabel,
+  verdictSuffix,
   type EffectiveDecision,
   type Quote,
   type Revision,
 } from "../../core/decision.js";
 import type { Market, ResearchSource } from "../../core/types.js";
 import { QuoteLine, Row, ago, host, l, sourceMeta, tx, when } from "./ui.js";
+
+const CHANNELS: [RegExp, string][] = [
+  [/reddit\.com$/, "Reddit"],
+  [/ycombinator\.com$/, "Hacker News"],
+  [/stackoverflow\.com$|stackexchange\.com$/, "Stack Overflow"],
+  [/v2ex\.com$/, "V2EX"],
+  [/linux\.do$/, "LINUX DO"],
+  [/zhihu\.com$/, l("Zhihu", "知乎")],
+  [/tieba\.baidu\.com$/, l("Baidu Tieba", "百度贴吧")],
+  [/github\.com$/, "GitHub"],
+];
+const channel = (url: string) => {
+  const name = host(url);
+  return CHANNELS.find(([re]) => re.test(name))?.[1] || name;
+};
 
 export interface Opened {
   source: ResearchSource;
@@ -223,11 +239,33 @@ export function Report({
     : "";
   const status = revision?.status;
   const kind = d.verdict.kind;
+  const suffix = verdictSuffix(d);
+  const users = (d.users || [])
+    .map((u) => ({
+      ...u,
+      pains: livePains.filter((p) => u.pains.includes(p.id)),
+    }))
+    .filter((u) => u.pains.length);
+  // Where a group speaks is read off the sources of its own quotes.
+  const channels = (pains: typeof livePains) => [
+    ...new Set(
+      pains
+        .flatMap((p) => p.quotes)
+        .filter((q) => !d.dismissed.some((k) => k.endsWith(`:${q.cid}`)))
+        .flatMap((q) => {
+          const s = source(q.id);
+          return s ? [channel(s.url)] : [];
+        }),
+    ),
+  ];
   return (
     <>
       <Row label={l("Conclusion", "结论")} className="is-verdict">
         <div className={`rd-verdict is-${kind}${landing ? " is-landing" : ""}`}>
-          <h2>{tx(verdictLabel[kind])}</h2>
+          <h2>
+            {tx(verdictLabel[kind])}
+            {suffix && <small>{tx(suffix)}</small>}
+          </h2>
           <p>{tx(d.verdict.reason)}</p>
           {(d.stale || (revision?.decision && owner) || error) && (
             <div className="rd-verdict-note" role="status">
@@ -272,6 +310,34 @@ export function Report({
           )}
         </div>
       </Row>
+
+      {users.length > 0 && (
+        <Row label={l("User analysis", "用户分析")}>
+          {users.map((u, i) => (
+            <article key={i} className="rd-user">
+              <h3>{tx(u.who)}</h3>
+              <dl className="rd-facts">
+                <dt>{l("Scenario", "使用场景")}</dt>
+                <dd>{tx(u.scenario)}</dd>
+                <dt>{l("Needs", "对应需求")}</dt>
+                <dd>
+                  {u.pains.map((p) => (
+                    <button
+                      key={p.id}
+                      className="rd-ref"
+                      onClick={() => jump(`rd-${p.id}`)}
+                    >
+                      {tx(p.title)}
+                    </button>
+                  ))}
+                </dd>
+                <dt>{l("Found on", "活跃渠道")}</dt>
+                <dd>{channels(u.pains).join(l(", ", "、"))}</dd>
+              </dl>
+            </article>
+          ))}
+        </Row>
+      )}
 
       <Row
         id="rd-pains"

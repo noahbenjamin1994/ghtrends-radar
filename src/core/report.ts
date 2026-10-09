@@ -1,4 +1,4 @@
-import { verdictLabel } from "./decision.js";
+import { verdictTitle } from "./decision.js";
 import {
   documentStatusLabel,
   adCollectionMessage,
@@ -83,8 +83,21 @@ export function marketMarkdown(
     return [
       `# ${framing ? `${framing.who[locale]}${l(": ", "：")}${framing.task[locale]}` : m.topic.plan?.input || m.topic.name}`,
       m.asOf,
-      `## ${l("Conclusion", "结论")}: ${verdictLabel[d.verdict.kind][locale]}`,
+      `## ${l("Conclusion", "结论")}: ${verdictTitle(d)[locale]}`,
       d.verdict.reason[locale],
+      ...(d.users?.length
+        ? [
+            `## ${l("User analysis", "用户分析")}`,
+            ...d.users.flatMap((u) => [
+              `### ${u.who[locale]}`,
+              `${l("Scenario", "使用场景")}${l(": ", "：")}${u.scenario[locale]}`,
+              `${l("Needs", "对应需求")}${l(": ", "：")}${u.pains
+                .map((id) => d.pains.find((p) => p.id === id)?.title[locale])
+                .filter(Boolean)
+                .join(l("; ", "；"))}`,
+            ]),
+          ]
+        : []),
       `## ${l("Demand analysis", "需求分析")}`,
       ...(d.pains.length
         ? d.pains.flatMap((p) => [

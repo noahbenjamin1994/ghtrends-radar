@@ -578,6 +578,13 @@
   font-weight: 660;
   letter-spacing: -0.02em;
 }
+.rd-verdict h2 small {
+  margin-left: 0.6em;
+  font-size: 0.5em;
+  font-weight: 560;
+  letter-spacing: 0;
+  vertical-align: 0.18em;
+}
 .rd-verdict p {
   margin: 0;
   color: var(--ink);
@@ -622,6 +629,7 @@
   margin-top: 30px;
 }
 .rd-pain h3,
+.rd-user h3,
 .rd-direction h3 {
   margin: 0 0 10px;
   font-size: 18px;
@@ -883,6 +891,12 @@
 }
 .rd-facts dd {
   margin: 0;
+}
+.rd-user + .rd-user {
+  margin-top: 26px;
+}
+.rd-user .rd-facts {
+  margin-left: 0;
 }
 .rd-ref {
   display: inline;
