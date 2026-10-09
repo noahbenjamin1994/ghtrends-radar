@@ -262,7 +262,7 @@ test("a follow-up can search and read in steps, and only sources the new judgmen
                 kind: "organic",
                 title: "Bolt review",
                 url: "https://reviews.example/bolt",
-                excerpt: "We tested Bolt for a month.",
+                excerpt: "We tested Bolt on one account for a month.",
               },
             ],
           },
@@ -320,14 +320,17 @@ test("a follow-up can search and read in steps, and only sources the new judgmen
       out.slice(0, -1).map((x) => x.step.tool),
       ["search", "read", "rejudge"],
     );
-    assert.match(turns[1].done[0].outcome, /^2 forum posts added.*1 pages/);
+    assert.match(
+      turns[1].done[0].outcome,
+      /^1 posts or listings added.*1 pages/,
+    );
     assert.match(turns[1].done[1].outcome, /^rejected/);
-    assert.equal(turns[2].sources.at(-1).id, "S6");
+    assert.equal(turns[2].sources.at(-1).id, "S5");
     const { revision } = out.at(-1);
     assert.deepEqual(
       revision.sources.map((s: any) => s.id),
       ["S4"],
-      "the cat thread and the unused review are dropped",
+      "the off-topic thread never enters; the unused review is dropped",
     );
     assert.equal(revision.decision.pains[0].quotes.length, 2);
     assert.equal(revision.followups[0].note, "more-research");

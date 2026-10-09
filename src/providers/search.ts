@@ -42,7 +42,16 @@ interface SearchPage {
 export function phraseSearchQuery(query: string, keyword: string) {
   const anchor = keyword.trim().replace(/"/g, "");
   const at = query.toLowerCase().indexOf(anchor.toLowerCase());
-  if (!anchor || at < 0 || query.includes('"')) return query;
+  // A site-scoped search is already narrow; an exact phrase empties it. Nor
+  // may the phrase end inside a word ("custom map"s).
+  if (
+    !anchor ||
+    at < 0 ||
+    query.includes('"') ||
+    query.startsWith("site:") ||
+    /[\p{L}\p{N}]/u.test(query[at + anchor.length] || "")
+  )
+    return query;
   const quoted =
     query.slice(0, at) +
     '"' +

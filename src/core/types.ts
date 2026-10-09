@@ -81,6 +81,7 @@ export interface ResearchSource {
     | "hn-story"
     | "hn-comment"
     | "forum-snippet"
+    | "listing"
     | "github-discussion"
     | "github-issue"
     | "github-comment"
