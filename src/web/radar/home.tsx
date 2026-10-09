@@ -83,13 +83,13 @@ function Mine({ open }: { open: (path: string) => void }) {
   if (!data.items.length && !data.running.length) return null;
   const status = (item: Item) =>
     item.status === "won"
-      ? l("Did it, a yes", "做了·成")
+      ? l("Validated", "已验证")
       : item.status === "lost"
-        ? l("Did it, a no", "做了·没成")
+        ? l("Invalidated", "已证伪")
         : item.status === "parked"
-          ? l("Parked", "先放下")
+          ? l("On hold", "暂缓")
           : item.actionable
-            ? l("To do", "待行动")
+            ? l("To do", "待执行")
             : "";
   return (
     <section className="rd-below">
@@ -112,7 +112,7 @@ function Mine({ open }: { open: (path: string) => void }) {
               <span className="rd-item-verdict">
                 <i className="rd-live" />
                 {r.stage === "brief"
-                  ? l("Writing the verdict", "正在下判断")
+                  ? l("Writing the conclusion", "正在生成结论")
                   : read
                     ? l(`${read} sources read`, `读了 ${read} 条`)
                     : l("Collecting", "正在采集")}
@@ -137,7 +137,7 @@ function Mine({ open }: { open: (path: string) => void }) {
                   {tx(verdictLabel[item.verdict])}
                 </>
               ) : item.failed ? (
-                l("Didn't finish", "没做完")
+                l("Unfinished", "未完成")
               ) : (
                 l("Earlier format", "旧版结构")
               )}

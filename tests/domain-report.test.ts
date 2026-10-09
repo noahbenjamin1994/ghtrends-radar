@@ -183,10 +183,16 @@ test("one report write, short input, private snapshot, bilingual exports and no 
     assert.equal(engine.store.canRead(report.id), false);
     assert.equal(engine.store.canRead(report.id, "qa"), true);
     const md = marketMarkdown(report, undefined, "zh");
-    for (const heading of ["判断", "谁在疼", "谁在做", "时机", "口子"])
+    for (const heading of [
+      "结论",
+      "需求分析",
+      "竞品分析",
+      "市场趋势",
+      "机会方向",
+    ])
       assert.ok(md.includes("## " + heading), heading);
-    assert.match(md, /证据不足，判断不了/);
-    assert.match(md, /没有方向/);
+    assert.match(md, /待验证/);
+    assert.match(md, /暂无机会方向/);
     assert.doesNotMatch(md, /## 下一步/);
     const html = renderDocument(
       readFileSync(new URL("../index.html", import.meta.url), "utf8"),

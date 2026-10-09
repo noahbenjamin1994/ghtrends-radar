@@ -165,7 +165,7 @@ test("no first-hand pain means no directions, no next step and an honest verdict
   );
   assert.equal(d.verdict.kind, "insufficient");
   assert.equal(d.verdict.forced, true);
-  assert.match(d.verdict.reason.zh, /不代表没人有这个问题/);
+  assert.match(d.verdict.reason.zh, /不代表需求不存在/);
   assert.deepEqual(d.directions, []);
   assert.equal(d.nextStep, null);
 });
@@ -244,7 +244,7 @@ test("the previous report shape is derived and passes its own citation check", (
     finalizeReport(legacyReport(d), m, sources),
     sources,
   );
-  assert.equal(legacy.headline.zh, "换个切法");
+  assert.equal(legacy.headline.zh, "细分机会");
   assert.equal(legacy.directions.length, 1);
   assert.equal(legacy.userNeeds.status, "observed");
   assert.match(legacy.commercialSupply.summary.en, /^Acme:/);

@@ -179,11 +179,11 @@ export function userEvidence(source?: ResearchSource) {
 const forced = {
   noPains: {
     en: "No first-hand account of this problem was found in the places searched. That is not proof nobody has it; it means this report cannot judge.",
-    zh: "在查过的地方没有找到用户自己描述这个问题的原话。这不代表没人有这个问题，只是这份报告判断不了。",
+    zh: "已检索的来源中未采集到用户对该问题的一手描述。这不代表需求不存在，只是现有证据不足以得出结论。",
   },
   noDirections: {
     en: "The pains found here could not be matched to an opening left by existing supply, so no direction is recommended.",
-    zh: "找到了痛点，但没能对上现有供给留下的空缺，所以不推荐具体方向。",
+    zh: "已识别用户需求，但未能对应到现有竞品留下的空缺，因此不给出机会方向。",
   },
 };
 
@@ -247,7 +247,7 @@ export function parseDecisionDraft(
       input.unverified = [
         {
           en: "Whether anyone will pay, and how much.",
-          zh: "有没有人愿意为此付钱，愿意付多少。",
+          zh: "用户的付费意愿与可接受价格。",
         },
       ];
     }
@@ -321,7 +321,7 @@ function timing(market: Market): Timing {
     falling: ["Cooling", "降温"],
     flat: ["Holding steady", "持平"],
     mixed: ["Mixed", "走势不一"],
-    unknown: ["Unknown", "看不出来"],
+    unknown: ["Unknown", "暂无法判断"],
   }[status];
   return {
     status,
@@ -331,7 +331,7 @@ function timing(market: Market): Timing {
     summary: missing
       ? {
           en: `Unknown. The search trend was not collected this time, which is not the same as no interest.${repoEn}`,
-          zh: `看不出来。这次没采到搜索趋势，不等于没人关心。${repoZh}`,
+          zh: `暂无法判断。本次未采集到搜索趋势，不代表没有关注度。${repoZh}`,
         }
       : {
           en: `${word[0]}. Searches for “${market.demand.keyword}” ${growth! < 0 ? "fell" : "rose"} ${change} over the last 8 full weeks against the 8 before.${repoEn} Search attention is not paying demand.`,
@@ -480,12 +480,12 @@ export function finalizeDecision(
 }
 
 export const verdictLabel: Record<VerdictKind, L> = {
-  go: { en: "Worth pursuing", zh: "值得往下走" },
-  reframe: { en: "Change the angle", zh: "换个切法" },
-  stop: { en: "Don't build this", zh: "别做" },
+  go: { en: "Blue ocean", zh: "蓝海" },
+  reframe: { en: "Niche opportunity", zh: "细分机会" },
+  stop: { en: "Red ocean", zh: "红海" },
   insufficient: {
-    en: "Not enough evidence to judge",
-    zh: "证据不足，判断不了",
+    en: "Needs validation",
+    zh: "待验证",
   },
 };
 
@@ -519,7 +519,7 @@ export function legacyReport(d: Decision): Omit<ReportContent, "demandTrend"> {
         })),
         {
           en: "No commercial offer was read in this collection.",
-          zh: "本轮没有读到商业产品。",
+          zh: "本次未采集到商业产品。",
         },
       ),
       d.commercial.flatMap((c) => c.evidence.slice(0, 1)),
@@ -542,7 +542,7 @@ export function legacyReport(d: Decision): Omit<ReportContent, "demandTrend"> {
         d.pains.map((p) => p.title),
         {
           en: "No first-hand user account was found in this collection.",
-          zh: "本轮没有找到用户自己的原话。",
+          zh: "本次未采集到用户的一手描述。",
         },
       ),
       d.pains.flatMap((p) => p.quotes.slice(0, 1)),
@@ -575,7 +575,7 @@ export function legacyReport(d: Decision): Omit<ReportContent, "demandTrend"> {
         }
       : {
           en: "The current evidence does not support a next action. Research again when more sources can be read.",
-          zh: "现有证据不支持给出下一步。等能读到更多来源时再研究一次。",
+          zh: "现有证据不足以给出验证计划，建议补充来源后重新研究。",
         },
     limitations: d.unverified.slice(0, 4),
   };

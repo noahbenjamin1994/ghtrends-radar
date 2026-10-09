@@ -144,14 +144,11 @@ function Collecting({ job }: { job?: Job }) {
   const writing = stage === "brief";
   return (
     <>
-      <Row label={l("Verdict", "判断")} className="is-verdict">
+      <Row label={l("Conclusion", "结论")} className="is-verdict">
         <div className="rd-verdict is-pending" role="status">
           <p>
             {!job
-              ? l(
-                  "Working out who this is about…",
-                  "正在弄清楚这说的是谁、要做什么…",
-                )
+              ? l("Working out who this is about…", "正在识别目标用户与任务…")
               : job.state === "queued"
                 ? job.queuePosition
                   ? l(
@@ -162,17 +159,17 @@ function Collecting({ job }: { job?: Job }) {
                 : writing
                   ? l(
                       "The three sections below are in. Writing the verdict from them…",
-                      "下面三段齐了，正在据此下判断…",
+                      "需求、竞品、趋势已采集完，正在生成结论…",
                     )
                   : l(
                       "The verdict comes after the three sections below are in.",
-                      "判断会在下面三段齐了之后给出。",
+                      "结论将在需求、竞品、趋势采集完成后给出。",
                     )}
           </p>
         </div>
       </Row>
       <Row
-        label={l("Who is in pain", "谁在疼")}
+        label={l("Demand analysis", "需求分析")}
         count={
           read(lanes.pains)
             ? l(`${read(lanes.pains)} read`, `读了 ${read(lanes.pains)} 条`)
@@ -185,13 +182,13 @@ function Collecting({ job }: { job?: Job }) {
           waiting(
             l(
               "Looking for people describing this in their own words…",
-              "在找有人用自己的话说这件事…",
+              "正在采集用户的一手描述…",
             ),
           )
         )}
       </Row>
       <Row
-        label={l("Who serves them", "谁在做")}
+        label={l("Competitor analysis", "竞品分析")}
         count={
           lanes.supply.filter((i) => i.state !== "failed").length
             ? l(
@@ -207,28 +204,30 @@ function Collecting({ job }: { job?: Job }) {
           waiting(
             l(
               "Looking for products and open-source projects…",
-              "在找现有的产品和开源项目…",
+              "正在采集现有产品与开源项目…",
             ),
           )
         )}
       </Row>
-      <Row label={l("Timing", "时机")}>
+      <Row label={l("Market trend", "市场趋势")}>
         {lanes.timing.length ? (
           <Lane items={lanes.timing} />
         ) : (
-          waiting(l("Fetching the search trend…", "在取搜索趋势…"))
+          waiting(l("Fetching the search trend…", "正在获取搜索趋势…"))
         )}
       </Row>
-      <Row label={l("What's left open", "口子")}>
+      <Row label={l("Opportunities", "机会方向")}>
         <p className="rd-wait">
           {l(
             "Waits for the two sections above: an opening is a pain that supply doesn't cover.",
-            "等上面两段：口子是痛点里供给没接住的部分。",
+            "待需求分析与竞品分析完成后给出：机会方向是现有竞品未满足的需求。",
           )}
         </p>
       </Row>
-      <Row label={l("Next step", "下一步")}>
-        <p className="rd-wait">{l("Waits for an opening.", "等口子。")}</p>
+      <Row label={l("Validation plan", "验证计划")}>
+        <p className="rd-wait">
+          {l("Pending an opportunity.", "待机会方向确定。")}
+        </p>
       </Row>
     </>
   );
@@ -347,7 +346,7 @@ export function Research({
             input: d.input || d.topic,
             message:
               d.clarification?.[locale] ||
-              l("This research could not be finished.", "这次研究没能做完。"),
+              l("This research could not be finished.", "本次研究未能完成。"),
             returned: d.credit === "returned",
           });
           return true;
@@ -487,7 +486,7 @@ export function Research({
                   style={{ color: "var(--soft)" }}
                   onClick={() => onEdit(launch.input)}
                 >
-                  {l("None of these, let me rephrase", "都不是，我来改")}
+                  {l("None of these, let me rephrase", "都不是，重新输入")}
                 </button>
               </div>
             </>
@@ -508,7 +507,7 @@ export function Research({
                   className="rd-btn is-light"
                   onClick={() => onEdit(launch.input)}
                 >
-                  {l("Rephrase", "改一下问题")}
+                  {l("Rephrase", "修修改问题")}
                 </button>
               </div>
             </>
@@ -523,7 +522,7 @@ export function Research({
   if (view.kind === "missing")
     return (
       <div className="rd-wrap rd-state">
-        <h1>{l("This research isn't available", "这份研究打不开")}</h1>
+        <h1>{l("This research isn't available", "无法打开这份研究")}</h1>
         <p>
           {account?.hosted && !account.user
             ? l(
@@ -536,14 +535,14 @@ export function Research({
               )}
         </p>
         <button className="rd-btn" onClick={() => onEdit("")}>
-          {l("Research something", "研究点别的")}
+          {l("Research something", "开始新的研究")}
         </button>
       </div>
     );
   if (view.kind === "failed")
     return (
       <div className="rd-wrap rd-state">
-        <h1>{l("This one didn't finish", "这次没研究完")}</h1>
+        <h1>{l("This one didn't finish", "本次研究未完成")}</h1>
         <p>
           {view.message}{" "}
           {view.returned
@@ -561,7 +560,7 @@ export function Research({
             className="rd-btn is-light"
             onClick={() => onEdit(view.input)}
           >
-            {l("Rephrase", "改一下问题")}
+            {l("Rephrase", "修修改问题")}
           </button>
         </div>
       </div>
@@ -618,7 +617,7 @@ export function Research({
                   onEdit(input);
                 }}
               >
-                {l("Change the question", "改问题")}
+                {l("Change the question", "修改问题")}
               </button>
             )}
             <span>
@@ -752,8 +751,8 @@ export function Research({
               {f.note === "added-supply" && (
                 <small>
                   {l(
-                    "If its page could be read, it now appears under “Who serves them”, marked as added by you.",
-                    "读到的话，它会出现在「谁在做」里，标着「你补充的」。",
+                    "If its page could be read, it is listed under “Competitor analysis”, marked as added by you.",
+                    "页面读取成功后，它会列入「竞品分析」，并标注「用户补充」。",
                   )}
                 </small>
               )}
@@ -762,11 +761,11 @@ export function Research({
                   {f.note === "unanswerable"
                     ? l(
                         "The collected sources don't answer this.",
-                        "采到的来源答不了这个问题。",
+                        "已采集的来源无法回答这个问题。",
                       )
                     : l(
                         "No source quote supports this answer; treat it as an opinion.",
-                        "这个回答没有原文支撑，当作看法来读。",
+                        "该回答没有来源原文支撑，仅供参考。",
                       )}
                 </small>
               )}
@@ -786,11 +785,11 @@ export function Research({
               left <= 0
                 ? l(
                     "Follow-ups used. Research again to go deeper.",
-                    "追问用完了。想挖得更深，重新研究一次。",
+                    "提问次数已用完。如需深入，请重新研究。",
                   )
                 : l(
                     "What's wrong here, or what else do you want to know?",
-                    "哪里不对，或者想接着问",
+                    "补充信息或继续提问",
                   )
             }
           />
@@ -801,16 +800,16 @@ export function Research({
             {askError
               ? askError
               : working === "ask"
-                ? l("Reading the sources to answer…", "正在翻原文回答…")
+                ? l("Reading the sources to answer…", "正在查阅来源原文…")
                 : working === "supply"
                   ? l(
                       "Reading that supplier's page, then judging again…",
-                      "正在读这一家的页面，读完重新判断…",
+                      "正在读取该竞品页面，完成后重新评估…",
                     )
                   : left > 0
                     ? l(
                         `Say what's missing or wrong, and the report is corrected. ${left} follow-ups left.`,
-                        `说出漏了什么、哪里不对，报告会跟着改。还能追问 ${left} 次。`,
+                        `可指出遗漏或错误，报告会相应修订。剩余提问 ${left} 次。`,
                       )
                     : ""}
           </p>

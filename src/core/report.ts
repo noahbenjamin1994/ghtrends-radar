@@ -83,33 +83,33 @@ export function marketMarkdown(
     return [
       `# ${framing ? `${framing.who[locale]}${l(": ", "：")}${framing.task[locale]}` : m.topic.plan?.input || m.topic.name}`,
       m.asOf,
-      `## ${l("Verdict", "判断")}: ${verdictLabel[d.verdict.kind][locale]}`,
+      `## ${l("Conclusion", "结论")}: ${verdictLabel[d.verdict.kind][locale]}`,
       d.verdict.reason[locale],
-      `## ${l("Who is in pain", "谁在疼")}`,
+      `## ${l("Demand analysis", "需求分析")}`,
       ...(d.pains.length
         ? d.pains.flatMap((p) => [
             `### ${p.title[locale]}`,
             ...p.quotes.flatMap(quote),
             ...(p.workaround
               ? [
-                  `${l("Today they", "他们现在")}${l(" ", "：")}${p.workaround[locale]}`,
+                  `${l("Current workaround", "现有做法")}${l(" ", "：")}${p.workaround[locale]}`,
                 ]
               : []),
           ])
         : [
             l(
-              "Nobody was found describing this problem in their own words. That is not proof the problem doesn't exist.",
-              "没找到有人用自己的话说这个问题。这不代表问题不存在。",
+              "No first-hand user account of this problem was collected. That is not proof the problem doesn't exist.",
+              "未采集到用户对该问题的一手描述。这不代表问题不存在。",
             ),
           ]),
       ...(gaps("pains")
-        ? [`${l("Not collected: ", "没采到：")}${gaps("pains")}`]
+        ? [`${l("Not collected: ", "未采集到：")}${gaps("pains")}`]
         : []),
-      `## ${l("Who serves them", "谁在做")}`,
+      `## ${l("Competitor analysis", "竞品分析")}`,
       ...(d.commercial.length
         ? [
             [
-              `| ${l("Commercial", "商业")} | ${l("Serves", "服务谁")} | ${l("Price", "收费")} | ${l("Leaves open", "没接住什么")} |`,
+              `| ${l("Commercial", "商业")} | ${l("Target users", "目标用户")} | ${l("Pricing", "定价")} | ${l("Unmet need", "未满足需求")} |`,
               "|---|---|---|---|",
               ...d.commercial.map(
                 (c) =>
@@ -121,7 +121,7 @@ export function marketMarkdown(
       ...(d.openSource.length
         ? [
             [
-              `| ${l("Open source", "开源")} | ${l("Does", "能力")} | ${l("Last push", "最近提交")} | ${l("License", "许可")} |`,
+              `| ${l("Open source", "开源")} | ${l("Features", "功能")} | ${l("Last push", "最近提交")} | ${l("License", "许可证")} |`,
               "|---|---|---|---|",
               ...d.openSource.map(
                 (o) =>
@@ -140,37 +140,37 @@ export function marketMarkdown(
         : []),
       ...(gaps("supply")
         ? [
-            `${l("This list may be incomplete. Not collected: ", "这张表可能不全。没采到：")}${gaps("supply")}`,
+            `${l("This list may be incomplete. Not collected: ", "竞品列表可能不完整。未采集到：")}${gaps("supply")}`,
           ]
         : []),
-      `## ${l("Timing", "时机")}`,
+      `## ${l("Market trend", "市场趋势")}`,
       d.timing.summary[locale],
-      `## ${l("What's left open", "口子")}`,
+      `## ${l("Opportunities", "机会方向")}`,
       ...(d.directions.length
         ? d.directions.flatMap((x, i) => [
             `### ${i + 1}. ${x.title[locale]}${x.tentative ? l(" (unconfirmed)", "（待核实）") : ""}`,
-            `- ${l("For", "给谁")}${l(": ", "：")}${x.audience[locale]}`,
-            `- ${l("Answers", "接哪条痛")}${l(": ", "：")}${d.pains.find((p) => p.id === x.pain)?.title[locale] || x.pain}`,
-            `- ${l("Why it's open", "为什么空着")}${l(": ", "：")}${x.whyOpen[locale]} (${x.supply.map(name).join(", ")})`,
-            `- ${l("Not yet known", "还不确定")}${l(": ", "：")}${x.uncertainty[locale]}`,
+            `- ${l("Target users", "目标用户")}${l(": ", "：")}${x.audience[locale]}`,
+            `- ${l("Addresses", "对应需求")}${l(": ", "：")}${d.pains.find((p) => p.id === x.pain)?.title[locale] || x.pain}`,
+            `- ${l("Market gap", "市场空缺")}${l(": ", "：")}${x.whyOpen[locale]} (${x.supply.map(name).join(", ")})`,
+            `- ${l("To validate", "待验证假设")}${l(": ", "：")}${x.uncertainty[locale]}`,
           ])
         : [
             l(
               "No direction: an opening needs a pain that existing supply doesn't cover.",
-              "没有方向：口子需要一条现有供给没接住的痛点。",
+              "暂无机会方向：机会方向需对应一条现有竞品未满足的需求。",
             ),
           ]),
       ...(d.nextStep
         ? [
-            `## ${l("Next step", "下一步")}`,
+            `## ${l("Validation plan", "验证计划")}`,
             d.nextStep.who[locale],
             ...d.nextStep.where.map((w) => documentLink(w.label, w.url)),
             d.nextStep.ask[locale],
-            `- ${l("Counts as a yes", "算成")}${l(": ", "：")}${d.nextStep.success[locale]}`,
-            `- ${l("Counts as a no", "算败")}${l(": ", "：")}${d.nextStep.fail[locale]}`,
+            `- ${l("Success criterion", "成功标准")}${l(": ", "：")}${d.nextStep.success[locale]}`,
+            `- ${l("Failure criterion", "失败标准")}${l(": ", "：")}${d.nextStep.fail[locale]}`,
           ]
         : []),
-      `${l("Only real people and payment can confirm: ", "以下需要真人和付款才能确认：")}${d.unverified.map((u) => u[locale]).join(l("; ", "；"))}`,
+      `${l("To confirm through user interviews and paid trials: ", "以下假设需通过用户访谈和付费验证确认：")}${d.unverified.map((u) => u[locale]).join(l("; ", "；"))}`,
       `## ${l("Sources", "来源")}`,
       ...m.brief.sources.flatMap((s) => [
         documentLink(s.label, s.url),
