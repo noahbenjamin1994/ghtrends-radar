@@ -746,6 +746,13 @@ export async function singleReport(
             q: clean(topic.keyword),
             site: FORUM_SITES.reddit,
           });
+        // People who want such work done post asking who to hire; both
+        // words were checked against real Reddit results on three subjects.
+        if (SERVICE.test(input) && !CJK.test(topic.keyword))
+          forum.push({
+            q: `${clean(topic.keyword).split(" ")[0]} hire commission`,
+            site: FORUM_SITES.reddit,
+          });
         const first = web;
         const merge = (next: WebEvidence): WebEvidence => ({
           ...first,
