@@ -883,6 +883,7 @@ export function createApp(
           guidance?: PreflightResult;
           choices?: { label: string; query: string }[];
           clarification?: { en: string; zh: string };
+          fields?: { path: string }[];
         };
         if (e.status === 422) {
           const result = e.guidance || {
@@ -894,7 +895,13 @@ export function createApp(
           engine.store.set(key, result, 600000);
           return result;
         }
-        engine.store.updateRun(id, "failed", { error: e.message });
+        engine.store.updateRun(id, "failed", {
+          error:
+            e.message +
+            (e.fields?.length
+              ? ` [${e.fields.map((f) => f.path).join(", ")}]`
+              : ""),
+        });
         // Explicit confirmation keeps a service outage from becoming an input rejection.
         // Literal phrases are quoted and bounded; they never become query operators.
         const literal = input

@@ -326,3 +326,32 @@ test("a broad brand tag keeps other device types outside direct phone alternativ
     "direct",
   );
 });
+
+test("a spaced Chinese search counts a project only when every word leads its description", () => {
+  const game = {
+    ...topic,
+    keyword: "Fantasy Westward Journey auto grinding",
+    query: "梦幻西游 自动 in:name,description",
+    queries: ["梦幻西游 自动 in:name,description"],
+  };
+  assert.equal(
+    repoRelevance(
+      repo(1, {
+        name: "someone/mhxy-bot",
+        description: "梦幻西游自动脚本 - 多账号主控版",
+      }),
+      game,
+    ).role,
+    "direct",
+  );
+  assert.equal(
+    repoRelevance(
+      repo(2, {
+        name: "someone/propaganda",
+        description: "宣传库。" + "无关的话题 ".repeat(40) + "梦幻西游 自动",
+      }),
+      game,
+    ).role,
+    "unclear",
+  );
+});

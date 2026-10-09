@@ -61,9 +61,17 @@ export function repoRelevance(
     return tags.length === 1 ? [normalize(tags[0]!)] : [];
   });
   const content = normalize(name + " " + description);
-  const exact = phrases.some(
-    (p) => content.includes(p) || content.includes(p.replace(/s$/, "")),
-  );
+  // An unquoted search matches words anywhere; a project is about them only
+  // when all appear up front, which keyword-stuffed descriptions do not.
+  const lead = content.slice(0, name.length + 121);
+  const wordSets = (topic.queries || [topic.query]).flatMap((q) => {
+    const words = q.match(/^([^"]+?) in:name,description/)?.[1];
+    return words ? [normalize(words).split(" ")] : [];
+  });
+  const exact =
+    phrases.some(
+      (p) => content.includes(p) || content.includes(p.replace(/s$/, "")),
+    ) || wordSets.some((words) => words.every((w) => lead.includes(w)));
   const integration =
     /\b(?:integration (?:for|with)|plugin for|client for|wrapper (?:for|around)|powered by|built (?:with|on)|example (?:of|using))\b/.test(
       description,
