@@ -47,11 +47,11 @@ const RECOVERY_RESERVE_MS = 8000;
 const READ_PAGES = 8;
 /** Threads where people speak for themselves; a result snippet is their words. */
 // Zhihu's question pages are people asking; its column pages are articles.
-const FORUM =
+export const FORUM =
   /^(?!zhuanlan\.)(?:[\w-]+\.)*(?:reddit\.com|stackoverflow\.com|stackexchange\.com|v2ex\.com|linux\.do|news\.ycombinator\.com|quora\.com|tieba\.baidu\.com|zhihu\.com|nga\.cn)$/i;
 const CJK = /[\u3400-\u9fff]/;
 /** Where each kind of person posts, as a search scope. */
-const FORUM_SITES = {
+export const FORUM_SITES = {
   reddit: "reddit.com",
   hackernews: "news.ycombinator.com",
   stackoverflow: "stackoverflow.com",
@@ -72,7 +72,7 @@ const CHROME =
   /加载中|只看楼主|吧内搜索|你必须登录|位会员|切换模式|^LINUX DO ·/;
 /** The poster's words: the result snippet, or the post title when it has none.
  * Search pages prefix the post date; it is the source's date, not its text. */
-const forumWords = (s: ResearchSource) => {
+export const forumWords = (s: ResearchSource) => {
   const raw = (s.excerpt || "").split(" Snippet: ").pop()!.trim();
   const dated =
     /^(?:(\d{4})年(\d{1,2})月(\d{1,2})日|([A-Z][a-z]+ \d{1,2}, \d{4}))\s*-\s*/.exec(
@@ -107,7 +107,7 @@ const forumWords = (s: ResearchSource) => {
   };
 };
 /** These refuse page reads; opening them only spends a slot on a failure. */
-const UNREADABLE =
+export const UNREADABLE =
   /(?:^|\.)(?:reddit\.com|quora\.com|tieba\.baidu\.com|zhihu\.com|nga\.cn|linux\.do|v2ex\.com)$/i;
 
 export function reportFailure(error: unknown) {
@@ -557,6 +557,67 @@ export async function singleReport(
     q.results.filter((r) => r.kind === "organic"),
   );
   const chosen = new Map<string, "demand" | "competition">();
+  const reader = engine.documents.forResearch(options.trends?.researchProxy());
+  const urls: string[] = [];
+  let reading = true;
+  let readStarted = false;
+  // Pages are read while round two searches, so neither waits for the other.
+  const readPages = async () => {
+    readStarted = true;
+    const firstRound = searchSources(web);
+    const hosts = new Set<string>();
+    // Alternate commercial and user-demand results; don't spend all slots on vendors.
+    const commercial = firstRound.filter(
+      (s) => s.searchIntent === "competition" && s.placement !== "ad",
+    );
+    const needs = firstRound.filter(
+      (s) => s.searchIntent === "demand" && s.placement !== "ad",
+    );
+    // Pages picked from the first results come first, voices before vendors.
+    const picked = [...chosen.keys()].flatMap(
+      (url) => firstRound.find((s) => s.url === url) || [],
+    );
+    for (let i = 0; i < Math.max(commercial.length, needs.length); i++) {
+      for (const source of [...(i ? [] : picked), commercial[i], needs[i]]) {
+        if (!source || urls.length >= READ_PAGES) continue;
+        const host = new URL(source.url).hostname;
+        if (UNREADABLE.test(host)) continue;
+        if (!hosts.has(host)) {
+          hosts.add(host);
+          urls.push(source.url);
+        }
+      }
+    }
+    if (!(remaining() > WRITE_RESERVE_MS && reader.enabled)) return;
+    for (const url of urls) opened.add(url);
+    progress("sources");
+    await reportPhase(
+      Math.min(READ_MS, remaining() - WRITE_RESERVE_MS),
+      async () => {
+        await Promise.allSettled(
+          urls.map(async (url) => {
+            const result = await reader.readWeb(
+              url,
+              input,
+              operationContext.getStore()!.signal!,
+            );
+            if (reading) {
+              reads.push(result.read);
+              pages.push(
+                ...result.sources.map((s) => ({
+                  ...s,
+                  searchIntent:
+                    chosen.get(url) ||
+                    firstRound.find((c) => c.url === url)?.searchIntent,
+                })),
+              );
+              progress("sources");
+            }
+          }),
+        );
+      },
+    ).catch(() => {});
+  };
   if (remaining() > WRITE_RESERVE_MS + READ_MS)
     await reportPhase(
       Math.min(COLLECT_MS, remaining() - WRITE_RESERVE_MS),
@@ -607,6 +668,7 @@ export async function singleReport(
           queries: [...first.queries, ...next.queries],
         });
         await Promise.allSettled([
+          readPages(),
           terms.length &&
             engine.github
               .supply(
@@ -678,65 +740,13 @@ export async function singleReport(
   });
   // Keep source roles and dates explicit. A search snippet is never a read page.
   const candidates = searchSources(web);
-  const reader = engine.documents.forResearch(options.trends?.researchProxy());
-  const urls: string[] = [];
-  const hosts = new Set<string>();
-  // Alternate commercial and user-demand results; don't spend all slots on vendors.
   const commercial = candidates.filter(
     (s) => s.searchIntent === "competition" && s.placement !== "ad",
   );
   const needs = candidates.filter(
     (s) => s.searchIntent === "demand" && s.placement !== "ad",
   );
-  // Pages picked from the first results come first, voices before vendors.
-  const picked = [...chosen.keys()].flatMap(
-    (url) => candidates.find((s) => s.url === url) || [],
-  );
-  for (let i = 0; i < Math.max(commercial.length, needs.length); i++) {
-    for (const source of [...(i ? [] : picked), commercial[i], needs[i]]) {
-      if (!source || urls.length >= READ_PAGES) continue;
-      const host = new URL(source.url).hostname;
-      if (UNREADABLE.test(host)) continue;
-      if (!hosts.has(host)) {
-        hosts.add(host);
-        urls.push(source.url);
-      }
-    }
-  }
-  let reading = true;
-  if (remaining() > WRITE_RESERVE_MS && reader.enabled) {
-    for (const url of urls) opened.add(url);
-    progress("researching", { stage: "researching", preview: market });
-    await reportPhase(
-      Math.min(READ_MS, remaining() - WRITE_RESERVE_MS),
-      async () => {
-        await Promise.allSettled(
-          urls.map(async (url) => {
-            const result = await reader.readWeb(
-              url,
-              input,
-              operationContext.getStore()!.signal!,
-            );
-            if (reading) {
-              reads.push(result.read);
-              pages.push(
-                ...result.sources.map((s) => ({
-                  ...s,
-                  searchIntent:
-                    chosen.get(url) ||
-                    candidates.find((c) => c.url === url)?.searchIntent,
-                })),
-              );
-              progress("researching", {
-                stage: "researching",
-                preview: market,
-              });
-            }
-          }),
-        );
-      },
-    ).catch(() => {});
-  }
+  if (!readStarted) await readPages();
   reading = false;
   for (const url of urls)
     if (!reads.some((read) => read.url === url))

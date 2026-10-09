@@ -13,7 +13,7 @@ export interface Opened {
   source: ResearchSource;
   quote?: string;
 }
-export type Working = null | "rejudge" | "supply" | "ask";
+export type Working = null | "rejudge" | "supply" | "more" | "ask";
 
 /** The original text around a quote, without leaving the report. */
 export function SourceDrawer({

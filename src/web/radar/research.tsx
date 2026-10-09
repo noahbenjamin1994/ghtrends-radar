@@ -48,6 +48,7 @@ interface RevisionView {
   revision: Revision | null;
   followupsLeft: number;
   supplier?: string | null;
+  more?: { q: string; site: string }[];
 }
 type View =
   | { kind: "loading" }
@@ -424,6 +425,15 @@ export function Research({
       })
       .finally(() => setWorking(null));
   };
+  const moreResearch = (searches: { q: string; site: string }[]) => {
+    if (!market) return;
+    setWorking("more");
+    setError("");
+    return post<RevisionView>(`/api/reports/${market.id}/more`, { searches })
+      .then(apply)
+      .catch((e: Error) => setAskError(e.message))
+      .finally(() => setWorking(null));
+  };
   const ask = () => {
     if (!market || working || !question.trim()) return;
     const text = question.trim();
@@ -435,6 +445,7 @@ export function Research({
         setQuestion("");
         setWorking(null);
         if (r.supplier) void addSupply(r.supplier);
+        else if (r.more?.length) void moreResearch(r.more);
       })
       .catch((e: Error) => {
         setAskError(e.message);
@@ -756,19 +767,29 @@ export function Research({
                   )}
                 </small>
               )}
-              {!f.quotes.length && f.note !== "added-supply" && (
+              {f.note === "more-research" && (
                 <small>
-                  {f.note === "unanswerable"
-                    ? l(
-                        "The collected sources don't answer this.",
-                        "已采集的来源无法回答这个问题。",
-                      )
-                    : l(
-                        "No source quote supports this answer; treat it as an opinion.",
-                        "该回答没有来源原文支撑，仅供参考。",
-                      )}
+                  {l(
+                    "New sources are added to the report, which is then reassessed.",
+                    "新采集的来源会并入报告，并据此重新评估。",
+                  )}
                 </small>
               )}
+              {!f.quotes.length &&
+                f.note !== "added-supply" &&
+                f.note !== "more-research" && (
+                  <small>
+                    {f.note === "unanswerable"
+                      ? l(
+                          "The collected sources don't answer this.",
+                          "已采集的来源无法回答这个问题。",
+                        )
+                      : l(
+                          "No source quote supports this answer; treat it as an opinion.",
+                          "该回答没有来源原文支撑，仅供参考。",
+                        )}
+                  </small>
+                )}
             </article>
           ))}
         </div>
@@ -801,17 +822,22 @@ export function Research({
               ? askError
               : working === "ask"
                 ? l("Reading the sources to answer…", "正在查阅来源原文…")
-                : working === "supply"
+                : working === "more"
                   ? l(
-                      "Reading that supplier's page, then judging again…",
-                      "正在读取该竞品页面，完成后重新评估…",
+                      "Researching further, then reassessing…",
+                      "正在补充调研，完成后重新评估…",
                     )
-                  : left > 0
+                  : working === "supply"
                     ? l(
-                        `Say what's missing or wrong, and the report is corrected. ${left} follow-ups left.`,
-                        `可指出遗漏或错误，报告会相应修订。剩余提问 ${left} 次。`,
+                        "Reading that supplier's page, then judging again…",
+                        "正在读取该竞品页面，完成后重新评估…",
                       )
-                    : ""}
+                    : left > 0
+                      ? l(
+                          `Say what's missing or wrong, and the report is corrected. ${left} follow-ups left.`,
+                          `可指出遗漏或错误，报告会相应修订。剩余提问 ${left} 次。`,
+                        )
+                      : ""}
           </p>
         </div>
       )}
