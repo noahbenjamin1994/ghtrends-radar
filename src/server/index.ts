@@ -286,7 +286,8 @@ export function createApp(
               runId: job.id,
               userId: job.owner,
               signal: abort.signal,
-              llmBudget: { calls: 0, outputTokens: 0, maxCalls: 1 },
+              // One small call to choose second-round searches, one to write.
+              llmBudget: { calls: 0, outputTokens: 0, maxCalls: 2 },
               onActivity: (activity) => {
                 job.progress = {
                   stage: job.progress?.stage || "interpreting",
