@@ -120,6 +120,8 @@ const CHROME =
 /** The poster's words: the result snippet, or the post title when it has none.
  * Search pages prefix the post date; it is the source's date, not its text. */
 export const forumWords = (s: ResearchSource) => {
+  // Reddit's machine translation of a thread is not what the poster wrote.
+  if (/[?&]tl=/.test(s.url)) return { excerpt: "" };
   const raw = (s.excerpt || "").split(" Snippet: ").pop()!.trim();
   const dated =
     /^(?:(\d{4})年(\d{1,2})月(\d{1,2})日|([A-Z][a-z]+ \d{1,2}, \d{4}))\s*-\s*/.exec(
@@ -899,6 +901,7 @@ export async function singleReport(
   const scoped = scopedSources(web);
   const perHost = new Map<string, number>();
   const forum = [...needs, ...scoped.filter((s) => s.searchIntent === "demand")]
+    .filter((s) => !/[?&]tl=/.test(s.url))
     .filter(
       (s, i, all) =>
         // Reddit serves one thread again under a translation parameter.
