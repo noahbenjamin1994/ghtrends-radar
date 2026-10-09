@@ -150,7 +150,7 @@ pains: 0-5 clusters. Each needs 1-3 citation IDs taken from sources where users 
 commercial: 0-6 named products actually present in the sources, including those a vendor page or comparison article names; list them whether or not any pain was found. audience = who it serves. pricing only when a source states it, with its conditions; otherwise null — never estimate. gap = what the listed pains say it leaves uncovered, or null.
 openSource: 0-4 repositories present in the sources that these same people could use for this task, named exactly as in the source; leave out a repository that does something else, even when it was collected. capability = what it does today. Do not write license, stars or activity; the application adds them from repository data.
 directions: 0-3. pain = the ID of one pain (P1 is your first pain, P2 the second...). supply = IDs of the rows that leave it open (C1 is your first commercial row, O1 your first open-source row...). whyOpen = why that supply does not cover that pain, grounded in the cited text. Zero directions is valid. A repository's license applies only to that repository. Do not propose relicensing or resale without explicit permission evidence.
-verdict.kind: "go" = a pain is real and at least one direction is open; "reframe" = the obvious version is taken but a narrower direction is open; "stop" = pains are covered by existing supply or nobody is in pain; "insufficient" = the sources cannot support a judgment. reason = two or three sentences naming the pain and supply facts that decide it. "insufficient" is an honest result; never dress it as "stop".
+verdict.kind: "go" = a pain is real and at least one direction is open; "reframe" = the obvious version is taken but a narrower direction is open; "stop" = pains are covered by existing supply or nobody is in pain; "insufficient" = no pain could be cited, or the supply could not be collected. Unknown market size or willingness to pay never makes it insufficient; put that in unverified and still compare each cited pain with the supply. reason = two or three sentences naming the pain and supply facts that decide it. "insufficient" is an honest result; never dress it as "stop".
 nextStep: one action for the first direction that can be done within seven days: who to reach, what to ask or offer, what result counts as success, what counts as failure. Do not say "interview users" in general; name the kind of person found in the cited pain sources. null when there are no directions. The application adds where to find them.
 unverified: 1-3 things only real people and payment can confirm.
 Do not equate search interest with paying demand, repository counts with competition, votes with traffic, or provider claims with adoption. Individual complaints are not market size. Preserve negation, limitations, dates and pricing conditions. Missing evidence is not zero demand. No fabricated statistics. No "blue ocean" wording. Do not mention trend numbers; the application writes timing from measured data.
@@ -404,9 +404,12 @@ export function finalizeDecision(
         r.name.toLowerCase().endsWith("/" + key),
     );
     const cited = source(row.evidence[0]?.id || "");
+    // A project is real when it is in the repository sample or its own page was read.
     if (
       !repo &&
       cited?.kind !== "project" &&
+      // An owner/name form claims a repository; only a product name may rest on a page.
+      !(cited?.documentType === "page" && !row.name.includes("/")) &&
       !/github\.com/.test(cited?.url || "")
     )
       return [];
