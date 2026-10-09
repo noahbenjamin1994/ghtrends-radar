@@ -78,22 +78,32 @@ export const listing = (s: ResearchSource): ResearchSource => ({
   excerpt: s.label.replace(/\s*[|｜-]\s*Fiverr\s*$/i, "").trim(),
 });
 /** A site-scoped search also returns that site's posts about other things:
- * keep a result only when it names the subject the query led with. */
+ * keep a result only when it names the subject the query led with and, on a
+ * forum, one more of the query's words. Sellers title offers too loosely for
+ * the second test. */
 export const onTopic = (s: ResearchSource) => {
   const query = /Query: (.*?)\. Search market:/.exec(s.excerpt || "")?.[1];
   if (!query?.startsWith("site:")) return true;
-  const subject = query.split(/\s+/)[1]?.replace(/"/g, "").toLowerCase();
+  const [subject, ...rest] = query
+    .replace(/"/g, "")
+    .toLowerCase()
+    .split(/\s+/)
+    .slice(1);
+  if (!subject) return true;
+  const market = MARKET.test(new URL(s.url).hostname);
+  const text = [
+    s.label,
+    (s.excerpt || "").split(" Snippet: ").pop(),
+    // A seller's address keeps the words of an offer since rewritten.
+    market ? "" : s.url,
+  ]
+    .join(" ")
+    .toLowerCase();
   return (
-    !subject ||
-    [
-      s.label,
-      (s.excerpt || "").split(" Snippet: ").pop(),
-      // A seller's address keeps the words of an offer since rewritten.
-      MARKET.test(new URL(s.url).hostname) ? "" : s.url,
-    ]
-      .join(" ")
-      .toLowerCase()
-      .includes(subject)
+    text.includes(subject) &&
+    (!FORUM.test(new URL(s.url).hostname) ||
+      !rest.length ||
+      rest.some((w) => text.includes(w)))
   );
 };
 const thread = (url: string) => url.split("?")[0]!.replace(/\/$/, "");
@@ -893,7 +903,8 @@ export async function singleReport(
     }))
     // One forum's results must not use up the places of the next forum's.
     .filter((s) => {
-      const site = new URL(s.url).hostname;
+      // fast.v2ex.com and global.v2ex.com are one forum.
+      const site = new URL(s.url).hostname.split(".").slice(-2).join(".");
       const n = perHost.get(site) || 0;
       if (!s.excerpt || n === 5) return false;
       perHost.set(site, n + 1);
