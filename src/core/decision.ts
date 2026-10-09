@@ -506,6 +506,15 @@ export function finalizeDecision(
       pains: u.pains.filter((id) => pains.some((p) => p.id === id)),
     }))
     .filter((u) => u.pains.length);
+  // The model sometimes leaves the section out; the scoping in the title
+  // already names who this report is about and what they are doing.
+  const framing = market.topic.plan?.framing;
+  if (!users.length && pains.length && framing)
+    users.push({
+      who: framing.who,
+      scenario: framing.task,
+      pains: pains.map((p) => p.id),
+    });
   return {
     version: DECISION_VERSION,
     verdict,
