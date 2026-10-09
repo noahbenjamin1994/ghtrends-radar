@@ -1,7 +1,7 @@
 /*
  * Radar. One white page that grows from a question into a report.
- * Lines separate, nothing is boxed inside a box. Sans is our voice;
- * serif with a marker stroke is always someone else's words.
+ * Lines separate, nothing is boxed inside a box. One sans face throughout;
+ * a grey rule down the left marks someone else's words.
  */
 .rd {
   --ink: #191919;
@@ -20,9 +20,6 @@
   --stop-ink: #9a2e21;
   --insufficient-bg: #eef0f3;
   --insufficient-ink: #49505c;
-  --serif:
-    "Iowan Old Style", "Palatino Linotype", "Songti SC", "Noto Serif CJK SC",
-    "Source Han Serif SC", serif;
   --label: 148px;
   --gap: 40px;
   --measure: 680px;
@@ -164,17 +161,22 @@
   align-items: flex-end;
   gap: 10px;
   max-width: var(--measure);
-  padding: 6px 6px 6px 18px;
-  border: 1px solid #cfcfcb;
-  border-radius: 14px;
+  padding: 6px 6px 6px 20px;
+  border: 1px solid #eaeaea;
+  border-radius: 26px;
   background: #fff;
+  box-shadow:
+    0 6px 16px #00000008,
+    0 2px 5px #00000005;
   transition:
     border-color 0.12s,
     box-shadow 0.12s;
 }
 .rd-ask:focus-within {
-  border-color: var(--ink);
-  box-shadow: 0 0 0 3px rgba(25, 25, 25, 0.07);
+  border-color: #dcdcdc;
+  box-shadow:
+    0 8px 22px #0000000d,
+    0 2px 6px #00000008;
 }
 .rd-ask textarea {
   flex: 1;
@@ -187,8 +189,8 @@
   background: none;
   color: var(--ink);
   font: inherit;
-  font-size: 17px;
-  line-height: 1.45;
+  font-size: 16px;
+  line-height: 1.5;
 }
 .rd-ask textarea::placeholder {
   color: var(--faint);
@@ -197,15 +199,19 @@
   flex: none;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: var(--ink);
+  width: 36px;
+  height: 36px;
+  margin: 4px;
+  border-radius: 50%;
+  background: #242424;
   color: #fff;
-  transition: opacity 0.12s;
+  transition: background 180ms ease;
 }
 .rd-go:disabled {
-  opacity: 0.22;
+  background: #dcdcdc;
+}
+.rd-go:not(:disabled):hover {
+  background: #414141;
 }
 .rd-try {
   display: flex;
@@ -277,10 +283,6 @@
   transition:
     background 180ms ease,
     transform 180ms ease;
-}
-.rd-hero .rd-go:disabled {
-  opacity: 1;
-  background: #dcdcdc;
 }
 .rd-hero .rd-go:not(:disabled):hover {
   background: #414141;
@@ -552,8 +554,8 @@
 
 /* Verdict: the one loud thing on the page. */
 .rd-verdict {
-  padding: 22px 26px 24px;
-  border-radius: 14px;
+  padding: 24px 28px 26px;
+  border-radius: 22px;
   background: var(--insufficient-bg);
   color: var(--insufficient-ink);
 }
@@ -647,24 +649,23 @@
 .rd-quote-open {
   display: block;
   width: 100%;
+  padding-left: 14px;
+  border-left: 2px solid #e3e3e3;
   text-align: left;
-  font-family: var(--serif);
-  font-size: 17.5px;
+  font-size: 16px;
   line-height: 1.7;
-  color: var(--ink);
+  color: #2b2b2b;
+  transition: border-color 0.14s;
 }
 .rd-quote-open q {
   quotes: none;
-  background: linear-gradient(transparent 62%, var(--marker) 62%);
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-  transition: background 0.14s;
 }
-.rd-quote-open:hover q,
-.rd-quote-open:focus-visible q {
-  background: linear-gradient(transparent 0%, var(--marker) 0%);
+.rd-quote-open:hover,
+.rd-quote-open:focus-visible {
+  border-left-color: var(--ink);
 }
 .rd-quote-source {
+  padding-left: 16px;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -693,9 +694,6 @@
   color: var(--faint);
   text-decoration: line-through;
   text-decoration-color: #c9c9c5;
-}
-.rd-quote.is-gone .rd-quote-open q {
-  background: none;
 }
 .rd-cope {
   margin: 12px 0 0;
@@ -888,14 +886,16 @@
 }
 .rd-ref {
   display: inline;
-  padding: 1px 0;
-  background: linear-gradient(transparent 62%, var(--marker) 62%);
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: #f3f3f3;
   text-align: left;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
+  transition: background 150ms ease;
 }
 .rd-ref:hover {
-  background: var(--marker);
+  background: #e8e8e8;
 }
 .rd-ref + .rd-ref {
   margin-left: 0.7em;
@@ -1105,8 +1105,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   quotes: none;
-  font-family: var(--serif);
-  font-size: 16.5px;
+  font-size: 15.5px;
   line-height: 1.65;
 }
 .rd-lane-host {
@@ -1248,8 +1247,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 20px 24px;
-  font-family: var(--serif);
-  font-size: 16.5px;
+  font-size: 15.5px;
   line-height: 1.8;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
