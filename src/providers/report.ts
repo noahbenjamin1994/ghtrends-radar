@@ -887,6 +887,13 @@ export async function singleReport(
             market,
             sources,
           );
+          if (decision.pains.length && !decision.users)
+            console.warn("Report user groups missing", {
+              runId: diagnosticId,
+              written: JSON.stringify(
+                (raw as { users?: unknown })?.users ?? null,
+              ).slice(0, 400),
+            });
           // Older exports read the previous shape; it is checked the same way.
           const result = {
             decision,
