@@ -138,8 +138,17 @@ export const forumWords = (s: ResearchSource) => {
   // Chinese says in 25 characters what English says in 60.
   const long = (text: string, cjk: number, latin: number) =>
     text.length >= (CJK.test(text) ? cjk : latin);
+  // A Tieba page title ends in the bar and the site; a reader wants the bar
+  // first, as Reddit titles have it.
+  const bar =
+    /^(?:【[^】]{1,4}】)?(.+?)(?:_|【)([^_【】]{1,20}吧)】?_百度贴吧$/.exec(
+      s.label,
+    );
+  const label = bar
+    ? `${bar[2]}：${bar[1]}`
+    : s.label.replace(/\s*[-_]\s*百度贴吧$/, "");
   if (long(snippet, 25, 60) && !CHROME.test(snippet))
-    return { excerpt: snippet, publishedAt };
+    return { label, excerpt: snippet, publishedAt };
   const title = s.label
     .replace(/^r\/\w+ on Reddit:\s*/i, "")
     .replace(
@@ -149,6 +158,7 @@ export const forumWords = (s: ResearchSource) => {
     .replace(/【[^】]*吧】$/, "")
     .trim();
   return {
+    label,
     excerpt: long(title, 8, 20) && !/^https?:/.test(title) ? title : "",
     publishedAt,
   };
