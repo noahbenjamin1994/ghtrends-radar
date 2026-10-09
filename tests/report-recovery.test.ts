@@ -48,6 +48,7 @@ async function harness(
     return base.demand;
   };
   engine.github.supply = async () => base.supply;
+  engine.github.gaps = async () => [];
   engine.search.collect = async () => ({
     provider: "multi-search",
     region: "US",

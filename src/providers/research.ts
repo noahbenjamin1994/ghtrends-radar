@@ -163,6 +163,7 @@ const planSchema = z
     webQueries: z.array(searchQuerySchema).max(3).default([]),
     explanation: bilingual,
     framing: z.object({ who: bilingual, task: bilingual }).nullish(),
+    painQueries: z.array(z.string().min(3).max(60)).max(2).nullish(),
     needsClarification: z.boolean().default(false),
     ambiguity: bilingual.optional(),
     choices: z
@@ -188,7 +189,7 @@ const paragraph = z.object({
   nextSteps: z.array(z.string().min(1).max(220)).min(1).max(3),
 });
 const briefSchema = z.object({ en: paragraph, zh: paragraph });
-export const QUERY_PLAN_VERSION = "18";
+export const QUERY_PLAN_VERSION = "19";
 export function parseModelJson(text: string): any {
   try {
     return JSON.parse(text);
@@ -891,7 +892,7 @@ Use affirmative wording for all user-visible prose: measured facts, current stat
 
 Choose exactly one response shape:
 1. Recognized, unambiguous topic:
-{"slug":"lowercase-hyphenated-id","name":"Short English name","scope":"category","intent":"Opportunities around the original object","entity":null,"trends":["primary search phrase"],"githubTopics":[],"githubTopicGroups":[],"githubTerms":[],"webQueries":[{"query":"specific buyer search","intent":"competition"},{"query":"specific user problem","intent":"demand"},{"query":"relevant open source","intent":"opensource"}],"explanation":{"en":"Why these queries match","zh":"中文说明"},"framing":{"who":{"en":"The kind of people who have this problem","zh":"有这个问题的那类人"},"task":{"en":"What they are trying to get done","zh":"他们想做成的事"}},"needsClarification":false,"choices":[]}
+{"slug":"lowercase-hyphenated-id","name":"Short English name","scope":"category","intent":"Opportunities around the original object","entity":null,"trends":["primary search phrase"],"githubTopics":[],"githubTopicGroups":[],"githubTerms":[],"webQueries":[{"query":"specific buyer search","intent":"competition"},{"query":"specific user problem","intent":"demand"},{"query":"relevant open source","intent":"opensource"}],"explanation":{"en":"Why these queries match","zh":"中文说明"},"framing":{"who":{"en":"The kind of people who have this problem","zh":"有这个问题的那类人"},"task":{"en":"What they are trying to get done","zh":"他们想做成的事"}},"painQueries":["object plus the trouble","second wording"],"needsClarification":false,"choices":[]}
 2. A genuinely ambiguous term with at least two established meanings:
 {"needsClarification":true,"ambiguity":{"en":"Ask which meaning","zh":"询问具体含义"},"choices":[{"label":"Established meaning / 中文含义","query":"specific research phrase"},{"label":"Another established meaning / 中文含义","query":"another specific phrase"}]}
 3. Unrecognizable text, gibberish, or an unknown name without context:
@@ -911,6 +912,7 @@ For shape 1:
 - GitHub queries retrieve candidate projects, then their descriptions establish product fit. Generic delivery nouns such as app, tool, software and platform can be omitted from a quoted GitHub phrase while the intended user task stays identical. For "cat translator app", use "cat translator" and "meow translator" on GitHub; keep the explicitly requested Google Trends keyword exactly as supplied. Keep scope-defining terms such as cat, self-hosted, offline and AI.
 - Search intent anchor: every web query retains the original object or a genuine Trends synonym, plus scope-defining modifiers. For autoresearch / auto research, the object is AI automated research: preserve "autoresearch" or "auto research" together with "AI" in buyer queries. AI research assistants and autonomous experiment tools solve distinct tasks within that field; identify each task. Conventional survey/market-research and pricing-research platforms serve a separate task. For "Karpathy autoresearch" preserve the specific project and experimentation job. Generic words like automated research platform discard this distinction.
 - webQueries: exactly three {query,intent} objects for web search, with intents competition, demand, opensource once each. Use short natural phrases in the original input language for commercial alternatives and concrete user problems, and established English names for open-source projects. Preserve the original object. For a broad brand, cover relevant services and ecosystem tools as well as the main product. Use the competition query to find a concrete product/service people could buy and its pricing, using ordinary buyer wording. For 小米手机, a query such as 小米手机 回收 验机 服务 价格 targets an actual job; adapt the job to the original topic. For a narrow software category, search its established name plus pricing or alternatives. Queries should describe actual offers rather than append generic 竞品 服务. Demand queries target a concrete user task or complaint. Search for current alternatives, user workarounds, and reusable projects; avoid leading phrases that presuppose a gap or monopoly. Max query 160 characters.
+- painQueries: two English forum searches, 2-4 plain words each, naming the concrete thing these people use plus the trouble they hit, the way a stuck person titles a post: "twitter api pricing", "instagram scraper blocked". Name real products or platforms inside the input's scope; no operators, no "problems" or "reviews" filler.
 - framing: restate the input as who + task, the way the research will be titled. who = the specific kind of people who have this problem (a role in a situation, not "users" or "everyone"). task = what they are trying to get done, as a verb phrase in their words. Each under 60 characters per language. Stay inside the input's scope; when the input is a broad field, name the field's main practitioners and their central job without narrowing to one niche.
 - Provide at least one GitHub topic, group or phrase. Max slug length 70, name 80, intent 300, each search term 70, each explanation 600 characters.
 Never infer popularity, growth or measurements. Never broaden scope in order to get more results. No extra fields.`,
@@ -1083,6 +1085,7 @@ Never infer popularity, growth or measurements. Never broaden scope in order to 
       githubTerms: terms,
       webQueries: p.webQueries,
       ...(p.framing ? { framing: p.framing } : {}),
+      ...(p.painQueries?.length ? { painQueries: p.painQueries } : {}),
       explanation: {
         en: hasNegativeWording(p.explanation.en)
           ? "The displayed phrases follow this research scope. Review the source links for the exact queries."

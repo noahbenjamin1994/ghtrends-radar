@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  userEvidence,
   DECISION_PROMPT,
   effectiveDecision,
   finalizeDecision,
@@ -265,4 +266,51 @@ test("dismissing the last quote of a pain collapses what depends on it and can b
   assert.equal(after.stale, true);
   assert.equal(after.pains[0]!.quotes.length, 1, "kept so it can be restored");
   assert.ok(d.nextStep, "the delivered report is never mutated");
+});
+
+test("a forum snippet and a forum comment count as a user's own words", () => {
+  assert.equal(
+    userEvidence({
+      label: "thread",
+      url: "https://www.reddit.com/r/x/comments/1",
+      kind: "search",
+      documentType: "forum-snippet",
+    }),
+    true,
+  );
+  assert.equal(
+    userEvidence({
+      label: "vendor",
+      url: "https://vendor.example/blog",
+      kind: "search",
+      searchIntent: "demand",
+    }),
+    false,
+  );
+});
+
+test("sections nested inside verdict by a misplaced brace are still read", () => {
+  const draft = parseDecisionDraft(
+    {
+      verdict: {
+        kind: "insufficient",
+        reason: { en: "Not enough to judge.", zh: "证据不够判断。" },
+        pains: [],
+        commercial: [
+          {
+            name: "Acme",
+            audience: { en: "Small teams.", zh: "小团队。" },
+            evidence: ["S1Q1"],
+          },
+        ],
+        openSource: [],
+        directions: [],
+        nextStep: null,
+        unverified: [{ en: "Whether anyone pays.", zh: "有没有人付钱。" }],
+      },
+    },
+    { S1Q1: { id: "S1", quote: "Acme serves small teams." } },
+  );
+  assert.equal(draft.commercial[0]!.name, "Acme");
+  assert.equal(draft.unverified[0]!.zh, "有没有人付钱。");
 });

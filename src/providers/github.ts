@@ -149,19 +149,27 @@ export function researchExcerpt(text: string, limit: number, focus = "") {
   const ranked = blocks
     .map((block) => ({
       ...block,
-      score: /table of contents|^contents$|目录|导航|致谢|赞助|支持者|观众支持|捐赠|sponsors|acknowledg|donors/i.test(block.title.trim())
-        ? 0
-        : (/features|capabilities|limitations|requirements|license|核心功能|功能介绍|使用限制|许可|部署要求/i.test(block.title) ? 3 : 0) + patterns.reduce(
-            (sum, pattern, i) =>
-              sum +
-              (pattern.test(block.title)
-                ? 4
-                : pattern.test(block.text)
-                  ? 1
-                  : 0) *
-                weights[i]!,
-            0,
-          ),
+      score:
+        /table of contents|^contents$|目录|导航|致谢|赞助|支持者|观众支持|捐赠|sponsors|acknowledg|donors/i.test(
+          block.title.trim(),
+        )
+          ? 0
+          : (/features|capabilities|limitations|requirements|license|核心功能|功能介绍|使用限制|许可|部署要求/i.test(
+              block.title,
+            )
+              ? 3
+              : 0) +
+            patterns.reduce(
+              (sum, pattern, i) =>
+                sum +
+                (pattern.test(block.title)
+                  ? 4
+                  : pattern.test(block.text)
+                    ? 1
+                    : 0) *
+                  weights[i]!,
+              0,
+            ),
     }))
     .filter((b) => b.score > 0)
     .sort((a, b) => b.score - a.score || a.start - b.start);

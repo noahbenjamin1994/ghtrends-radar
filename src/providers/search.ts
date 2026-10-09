@@ -86,10 +86,11 @@ export function parseBravePage(html: string): SearchResult[] {
       title: title.slice(0, 240),
       url,
       kind: "organic",
-      excerpt: row
-        .find(".generic-snippet .content")
-        .first()
-        .text()
+      // Forum threads render as a question card: the body is the poster's text.
+      excerpt: (
+        row.find(".generic-snippet .content").first().text() ||
+        row.find(".inline-qa-question").first().text()
+      )
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 1200),
@@ -691,7 +692,7 @@ export class GoogleSearch {
             : [];
         }),
       ).values(),
-    ].slice(0, topic.plan?.version?.startsWith("deep-") ? 4 : 3);
+    ].slice(0, targeted ? 5 : topic.plan?.version?.startsWith("deep-") ? 4 : 3);
     const web: WebEvidence = {
       provider: this.mode === "api" ? "decodo-google" : "multi-search",
       version: SEARCH_VERSION,
@@ -835,130 +836,127 @@ export class GoogleSearch {
     const preceding = researchProxy
       ? Promise.resolve()
       : this.queues.get(scope) || Promise.resolve();
-    const task = preceding.then(
-      async () => {
-        operationContext.getStore()?.signal?.throwIfAborted();
-        if (Date.now() >= deadline) throw new Error("search_timeout");
-        if (this.mode === "direct") {
-          const wait = researchProxy
-            ? 0
-            : 1500 - (Date.now() - (this.lastRequests.get(scope) || 0));
-          if (wait > 0)
-            await new Promise((resolve) => setTimeout(resolve, wait));
-          try {
-            if (Date.now() >= deadline) throw new Error("search_timeout");
-            const page = await this.direct(
-              query,
-              region,
-              language,
-              deadline,
-              researchProxy,
-              fallbackQuery,
-            );
-            // Give the primary source another chance after a short fallback cache.
-            this.store.set(
-              key,
-              page,
-              page.engine === "google" ? 6 * 3600000 : 30 * 60000,
-            );
-            return page;
-          } finally {
-            if (!researchProxy) this.lastRequests.set(scope, Date.now());
-          }
-        }
-        const cooling = this.store.get<{ error: string; retryAt: string }>(
-          "google-search:cooldown:" + identity,
-        );
-        if (cooling)
-          throw searchFailure(
-            new Error(cooling.error || "search_cooldown"),
-            cooling.retryAt,
-          );
-        const started = Date.now();
-        const call: ProviderCall = {
-          provider: "search",
-          operation: "google-serp",
-          started: new Date(started).toISOString(),
-          durationMs: 0,
-        };
+    const task = preceding.then(async () => {
+      operationContext.getStore()?.signal?.throwIfAborted();
+      if (Date.now() >= deadline) throw new Error("search_timeout");
+      if (this.mode === "direct") {
+        const wait = researchProxy
+          ? 0
+          : 1500 - (Date.now() - (this.lastRequests.get(scope) || 0));
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
         try {
-          const token = process.env.DECODO_SCRAPER_TOKEN!.replace(
-            /^Basic\s+/i,
-            "",
+          if (Date.now() >= deadline) throw new Error("search_timeout");
+          const page = await this.direct(
+            query,
+            region,
+            language,
+            deadline,
+            researchProxy,
+            fallbackQuery,
           );
-          const response = await fetch(
-            "https://scraper-api.decodo.com/v2/scrape",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Basic ${token}`,
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              body: JSON.stringify({
-                target: "google_search",
-                query,
-                parse: true,
-                headless: "html",
-                geo: region,
-                locale: language === "zh-CN" ? "zh-cn" : "en-us",
-                page_count: 1,
-              }),
-              signal: operationSignal(35000),
-              redirect: "error",
-            },
-          );
-          call.status = response.status;
-          if (!response.ok) {
-            await response.body?.cancel();
-            throw new Error(`search_http_${response.status}`);
-          }
-          // Bound provider data before parsing. API transfer is separate from residential plan billing.
-          const reader = response.body?.getReader();
-          if (!reader) throw new Error("search_body");
-          let size = 0;
-          const chunks: Uint8Array[] = [];
-          while (true) {
-            const r = await reader.read();
-            if (r.done) break;
-            size += r.value.length;
-            if (size > 2_000_000) {
-              await reader.cancel();
-              throw new Error("search_size");
-            }
-            chunks.push(r.value);
-          }
-          const result = parseSearchResults(
-            JSON.parse(Buffer.concat(chunks).toString("utf8")),
-          );
-          const page: SearchPage = {
-            results: result,
-            fetchedAt: new Date().toISOString(),
-            engine: "google",
-            adCoverage: "visible-placements",
-          };
-          this.store.set(key, page, 6 * 3600000);
-          return page;
-        } catch (e) {
-          call.error =
-            e instanceof Error && /^search_[a-z0-9_]+$/.test(e.message)
-              ? e.message
-              : "search_transport";
-          const delay =
-            call.status === 401 || call.status === 403 ? 5 * 60000 : 60000;
-          const retryAt = new Date(Date.now() + delay).toISOString();
+          // Give the primary source another chance after a short fallback cache.
           this.store.set(
-            "google-search:cooldown:" + identity,
-            { error: call.error, retryAt },
-            delay,
+            key,
+            page,
+            page.engine === "google" ? 6 * 3600000 : 30 * 60000,
           );
-          throw searchFailure(new Error(call.error), retryAt);
+          return page;
         } finally {
-          call.durationMs = Date.now() - started;
-          this.store.recordCall(call);
+          if (!researchProxy) this.lastRequests.set(scope, Date.now());
         }
-      },
-    );
+      }
+      const cooling = this.store.get<{ error: string; retryAt: string }>(
+        "google-search:cooldown:" + identity,
+      );
+      if (cooling)
+        throw searchFailure(
+          new Error(cooling.error || "search_cooldown"),
+          cooling.retryAt,
+        );
+      const started = Date.now();
+      const call: ProviderCall = {
+        provider: "search",
+        operation: "google-serp",
+        started: new Date(started).toISOString(),
+        durationMs: 0,
+      };
+      try {
+        const token = process.env.DECODO_SCRAPER_TOKEN!.replace(
+          /^Basic\s+/i,
+          "",
+        );
+        const response = await fetch(
+          "https://scraper-api.decodo.com/v2/scrape",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Basic ${token}`,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              target: "google_search",
+              query,
+              parse: true,
+              headless: "html",
+              geo: region,
+              locale: language === "zh-CN" ? "zh-cn" : "en-us",
+              page_count: 1,
+            }),
+            signal: operationSignal(35000),
+            redirect: "error",
+          },
+        );
+        call.status = response.status;
+        if (!response.ok) {
+          await response.body?.cancel();
+          throw new Error(`search_http_${response.status}`);
+        }
+        // Bound provider data before parsing. API transfer is separate from residential plan billing.
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("search_body");
+        let size = 0;
+        const chunks: Uint8Array[] = [];
+        while (true) {
+          const r = await reader.read();
+          if (r.done) break;
+          size += r.value.length;
+          if (size > 2_000_000) {
+            await reader.cancel();
+            throw new Error("search_size");
+          }
+          chunks.push(r.value);
+        }
+        const result = parseSearchResults(
+          JSON.parse(Buffer.concat(chunks).toString("utf8")),
+        );
+        const page: SearchPage = {
+          results: result,
+          fetchedAt: new Date().toISOString(),
+          engine: "google",
+          adCoverage: "visible-placements",
+        };
+        this.store.set(key, page, 6 * 3600000);
+        return page;
+      } catch (e) {
+        call.error =
+          e instanceof Error && /^search_[a-z0-9_]+$/.test(e.message)
+            ? e.message
+            : "search_transport";
+        const delay =
+          call.status === 401 || call.status === 403 ? 5 * 60000 : 60000;
+        const retryAt = new Date(Date.now() + delay).toISOString();
+        this.store.set(
+          "google-search:cooldown:" + identity,
+          { error: call.error, retryAt },
+          delay,
+        );
+        throw searchFailure(new Error(call.error), retryAt);
+      } finally {
+        call.durationMs = Date.now() - started;
+        this.store.recordCall(call);
+      }
+    });
     const settled = task.then(
       () => {},
       () => {},
@@ -1015,7 +1013,9 @@ export class GoogleSearch {
       attempts[3] = { engine: "duckduckgo", proxy: routes[1], route: 1 };
     }
     let failure = searchFailure(new Error("search_cooldown")),
-      primaryError: string | undefined;
+      primaryError: string | undefined,
+      // An exact phrase nobody writes returns almost nothing; ask again plainly.
+      thin: SearchPage | undefined;
     const exhausted = new Map<
       string,
       { error: string; retryAt: string; delay: number }
@@ -1053,7 +1053,7 @@ export class GoogleSearch {
       try {
         const raw = await this.transport({
           engine,
-          query: engine === "brave" ? fallbackQuery! : query,
+          query: engine === "brave" && !thin ? fallbackQuery! : query,
           region,
           language,
           proxy: researchProxy ? researchSessionProxy(proxy) : proxy,
@@ -1081,8 +1081,10 @@ export class GoogleSearch {
         exhausted.delete(cooldown);
         for (const [key, value] of exhausted)
           this.store.set(key, value, value.delay);
-        return {
-          ...(engine === "brave" ? { query: fallbackQuery } : {}),
+        const page: SearchPage = {
+          ...(engine === "brave"
+            ? { query: thin ? query : fallbackQuery }
+            : {}),
           results,
           engine,
           region:
@@ -1093,6 +1095,16 @@ export class GoogleSearch {
           adCoverage: engine === "google" ? "limited" : "organic-only",
           ...(engine === "duckduckgo" ? { fallbackReason: primaryError } : {}),
         };
+        if (
+          engine === "brave" &&
+          !thin &&
+          fallbackQuery !== query &&
+          results.filter((r) => r.kind === "organic").length < 3
+        ) {
+          thin = page;
+          continue;
+        }
+        return thin && results.length <= thin.results.length ? thin : page;
       } catch (e) {
         call.error = searchFailure(e).message;
         if (engine === "google") primaryError = call.error;
@@ -1124,6 +1136,7 @@ export class GoogleSearch {
     }
     for (const [key, value] of exhausted)
       this.store.set(key, value, value.delay);
+    if (thin) return thin;
     throw failure;
   }
 }

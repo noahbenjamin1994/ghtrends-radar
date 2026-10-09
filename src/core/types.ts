@@ -28,7 +28,12 @@ export interface QueryPlan {
   ambiguity?: { en: string; zh: string };
   webQueries?: import("../providers/search.js").SearchQuery[];
   /** The input restated as who is doing what; shown as the research title. */
-  framing?: { who: { en: string; zh: string }; task: { en: string; zh: string } };
+  /** How someone stuck on this task would phrase it in a forum. */
+  painQueries?: string[];
+  framing?: {
+    who: { en: string; zh: string };
+    task: { en: string; zh: string };
+  };
 }
 export interface Brief {
   report?: import("./report-contract.js").ReportContent;
@@ -75,6 +80,7 @@ export interface ResearchSource {
     | "license"
     | "hn-story"
     | "hn-comment"
+    | "forum-snippet"
     | "github-discussion"
     | "github-issue"
     | "github-comment"

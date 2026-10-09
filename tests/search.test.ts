@@ -111,7 +111,9 @@ test("research queries start with Brave on fresh exits and publish completed que
     );
     assert.equal(web.state, "ready");
     assert.equal(calls.filter((c) => c.engine === "duckduckgo").length, 0);
-    assert.equal(calls.filter((c) => c.engine === "brave").length, 2);
+    // The fixture page is thin, so each exact phrase is asked again plainly.
+    assert.equal(calls.filter((c) => c.engine === "brave").length, 4);
+    assert.ok(calls.some((c) => c.query === "token relay pricing"));
     assert.ok(calls.every((c) => c.proxy !== proxy));
     assert.equal(new Set(calls.map((c) => c.proxy)).size, calls.length);
     assert.ok(
@@ -1492,4 +1494,14 @@ test("direct collection observes a shared time budget instead of starting anothe
     store.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("a forum thread card yields the poster's own text as the excerpt", () => {
+  const [result] = parseBravePage(
+    `<html><body><div class="snippet" data-type="web"><a href="https://www.reddit.com/r/Twitter/comments/1635mu0/searching_users_with_the_api/"><div class="title search-snippet-title">r/Twitter on Reddit: Searching Users with the API</div></a><div class="inline-qa-question">August 27, 2023 - Please tell me I don't need to pay hundreds of dollars to search accounts.</div><div class="inline-qa"><div class="inline-qa-answer"><span>This is an automated message.</span></div></div></div></body></html>`,
+  );
+  assert.equal(
+    result!.excerpt,
+    "August 27, 2023 - Please tell me I don't need to pay hundreds of dollars to search accounts.",
+  );
 });

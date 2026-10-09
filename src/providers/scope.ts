@@ -62,8 +62,12 @@ export function report(span: SpanInput): void {
         error: span.error?.slice(0, 4000),
         evidence: span.evidence,
         started_at: new Date(span.startedAt).toISOString(),
-        ended_at: span.endedAt ? new Date(span.endedAt).toISOString() : undefined,
-        duration_ms: span.endedAt ? Math.round(span.endedAt - span.startedAt) : undefined,
+        ended_at: span.endedAt
+          ? new Date(span.endedAt).toISOString()
+          : undefined,
+        duration_ms: span.endedAt
+          ? Math.round(span.endedAt - span.startedAt)
+          : undefined,
       },
     ],
   };
@@ -71,7 +75,10 @@ export function report(span: SpanInput): void {
   // a blocked report is a stalled research run. Those are not comparable.
   void fetch(new URL("/v1/spans", base), {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${token()}` },
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token()}`,
+    },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(5000),
   }).catch(() => {});
@@ -81,7 +88,11 @@ export function report(span: SpanInput): void {
 export function traced<A extends unknown[], R>(
   op: string,
   fn: (...args: A) => Promise<R>,
-  describe: (args: A, result?: R, error?: unknown) => Omit<SpanInput, "op" | "status" | "startedAt" | "endedAt">,
+  describe: (
+    args: A,
+    result?: R,
+    error?: unknown,
+  ) => Omit<SpanInput, "op" | "status" | "startedAt" | "endedAt">,
   // A transport that resolves with `{ error }` failed just as truly as one that
   // threw. Recording it as ok is how a dashboard ends up disagreeing with reality.
   failedIf?: (result: R) => string | undefined,
@@ -113,7 +124,9 @@ export function traced<A extends unknown[], R>(
         status: "failed",
         // The thrown message is the outcome bucket here (search_timeout,
         // document_access…), which is exactly what distinguishes the sites.
-        outcome: detail.outcome || (error instanceof Error ? error.message : "unknown"),
+        outcome:
+          detail.outcome ||
+          (error instanceof Error ? error.message : "unknown"),
         error: error instanceof Error ? error.message : String(error),
         startedAt,
         endedAt: Date.now(),

@@ -42,7 +42,37 @@ const READ_MS = seconds("GHTRENDS_READ_SECONDS", 20);
 const WRITE_MS = seconds("GHTRENDS_WRITE_SECONDS", 80);
 const WRITE_RESERVE_MS = 24000;
 const RECOVERY_RESERVE_MS = 8000;
-const READ_PAGES = 6;
+const READ_PAGES = 8;
+/** Threads where people speak for themselves; a result snippet is their words. */
+const FORUM =
+  /(?:^|\.)(?:reddit\.com|stackoverflow\.com|stackexchange\.com|v2ex\.com|news\.ycombinator\.com|quora\.com)$/i;
+/** The poster's words: the result snippet, or the post title when it has none.
+ * Search pages prefix the post date; it is the source's date, not its text. */
+const forumWords = (s: ResearchSource) => {
+  const raw = (s.excerpt || "").split(" Snippet: ").pop()!.trim();
+  const dated =
+    /^(?:(\d{4})年(\d{1,2})月(\d{1,2})日|([A-Z][a-z]+ \d{1,2}, \d{4}))\s*-\s*/.exec(
+      raw,
+    );
+  const time = dated
+    ? Date.parse(
+        dated[4] ||
+          `${dated[1]}-${dated[2]!.padStart(2, "0")}-${dated[3]!.padStart(2, "0")}`,
+      )
+    : NaN;
+  const publishedAt = Number.isNaN(time)
+    ? undefined
+    : new Date(time).toISOString();
+  const snippet = dated ? raw.slice(dated[0].length) : raw;
+  if (snippet.length >= 60) return { excerpt: snippet, publishedAt };
+  const title = s.label
+    .replace(/^r\/\w+ on Reddit:\s*/i, "")
+    .replace(/\s*[-|:]\s*(?:Reddit|Stack Overflow|Hacker News)\s*$/i, "")
+    .trim();
+  return { excerpt: title.length >= 20 ? title : "", publishedAt };
+};
+/** These refuse page reads; opening them only spends a slot on a failure. */
+const UNREADABLE = /(?:^|\.)(?:reddit\.com|quora\.com)$/i;
 
 export function reportFailure(error: unknown) {
   const e = error as {
@@ -231,6 +261,13 @@ export async function singleReport(
     queries: [],
   };
   const pages: ResearchSource[] = [];
+  // First-hand accounts from issue trackers, each already a full text.
+  const voices: ResearchSource[] = [];
+  const painQueries = (topic.plan?.painQueries || [])
+    .map((q) => q.replace(/[<>()"\x00-\x1f]/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 2);
+  const voiceGaps: string[] = [];
   const reads: NonNullable<Market["documents"]>["reads"] = [];
   const opened = new Set<string>();
   const host = (url: string) => {
@@ -262,6 +299,23 @@ export async function singleReport(
       if (read) return { state: "failed" };
       return { state: opened.has(url) ? "reading" : "found" };
     };
+    for (const v of voices.slice(0, 6)) {
+      const words = (v.excerpt || "").replace(/\s+/g, " ").trim();
+      result.pains.push({
+        label: v.label,
+        url: v.url,
+        host: host(v.url),
+        kind: "page",
+        state: "read",
+        quote:
+          /^.{40,170}?[.!?。！？](?=\s|$)/u.exec(words)?.[0] ||
+          (words.length > 150
+            ? words.slice(0, 150).replace(/\s+\S*$/, "") + "…"
+            : words),
+      });
+    }
+    for (const label of voiceGaps)
+      result.pains.push({ label, state: "failed", kind: "search" });
     for (const q of web.queries) {
       const lane = q.intent === "demand" ? result.pains : result.supply;
       if (q.state === "failed")
@@ -274,6 +328,23 @@ export async function singleReport(
             host: host(r.url),
             kind: q.intent === "opensource" ? "repository" : "page",
             ...page(r.url),
+            // A forum result is shown with the poster's own opening words.
+            ...(q.intent === "demand" &&
+            FORUM.test(new URL(r.url).hostname) &&
+            r.excerpt.length >= 60
+              ? {
+                  state: "read" as const,
+                  quote: ((words) =>
+                    words.length > 150
+                      ? words.slice(0, 150).replace(/\s+\S*$/, "") + "…"
+                      : words)(
+                    r.excerpt.replace(
+                      /^(?:\d{4}年\d{1,2}月\d{1,2}日|[A-Z][a-z]+ \d{1,2}, \d{4})\s*-\s*/,
+                      "",
+                    ),
+                  ),
+                }
+              : {}),
             // Repository facts come from the GitHub sample, not a page read.
             ...(supply.repositories.some((repo) => repo.url === r.url)
               ? { state: "read" as const }
@@ -333,16 +404,56 @@ export async function singleReport(
           undefined,
           true,
         )
-        .then((s) => {
+        .then(async (s) => {
           if (!collecting) return;
           supply = s;
+          progress("sources");
+          // People who already use the open-source options say where they fall short.
+          const direct = s.repositories.filter(
+            (r) => !r.relevance || r.relevance.role === "direct",
+          );
+          if (!direct.length) return;
+          const issues = await engine.github.gaps(direct).catch(() => {
+            voiceGaps.push("GitHub Issues");
+            return [];
+          });
+          if (!collecting) return;
+          voices.push(
+            ...issues.slice(0, 5).map((g): ResearchSource => ({
+              kind: "request",
+              documentType: "github-issue",
+              searchIntent: "demand",
+              label: `${g.repo}: ${g.title}`.slice(0, 180),
+              url: g.url,
+              fetchedAt: g.observedAt || stamp(),
+              publishedAt: g.createdAt || undefined,
+              request: {
+                state: g.state,
+                createdAt: g.createdAt,
+                updatedAt: g.updatedAt,
+                observedAt: g.observedAt,
+                reactions: g.reactions,
+                comments: g.comments,
+              },
+              excerpt: `${g.title}. ${g.excerpt}`.replace(/\s+/g, " ").trim(),
+            })),
+          );
           progress("sources");
         }),
       engine.search
         .collect(
           topic,
           options.geo,
-          scopedWebQueries(topic),
+          [
+            ...scopedWebQueries(topic).slice(0, 3),
+            // Where people ask and complain, searched the way they would write.
+            ...(painQueries.length ? painQueries : [topic.keyword]).map(
+              (q) => ({
+                intent: "demand" as const,
+                query: `site:reddit.com ${q.slice(0, 70)}`,
+              }),
+            ),
+          ],
           20000,
           options.trends?.researchProxy(),
           (partial) => {
@@ -359,6 +470,15 @@ export async function singleReport(
     ]);
   }).catch(() => {});
   collecting = false;
+  // A source that could not be reached is reported as coverage, not hidden.
+  for (const label of voiceGaps.splice(0))
+    web.queries.push({
+      query: label,
+      intent: "demand",
+      state: "failed",
+      results: [],
+      error: "blocked",
+    });
   // A phase deadline preserves completed queries and closes the remaining ones.
   if (web.queries.some((q) => q.state === "pending")) {
     web.queries = web.queries.map((q) =>
@@ -394,6 +514,7 @@ export async function singleReport(
     for (const source of [commercial[i], needs[i]]) {
       if (!source || urls.length >= READ_PAGES) continue;
       const host = new URL(source.url).hostname;
+      if (UNREADABLE.test(host)) continue;
       if (!hosts.has(host)) {
         hosts.add(host);
         urls.push(source.url);
@@ -472,14 +593,35 @@ export async function singleReport(
     needs[1],
     candidates.find((s) => s.searchIntent === "opensource"),
   ].filter((s): s is ResearchSource => !!s);
+  // A forum result that was not read still carries the poster's opening words.
+  const forum = needs
+    .filter(
+      (s) =>
+        FORUM.test(new URL(s.url).hostname) &&
+        !pages.some((p) => p.url === s.url),
+    )
+    .slice(0, 8)
+    .map((s): ResearchSource => ({
+      ...s,
+      documentType: "forum-snippet",
+      ...forumWords(s),
+    }))
+    .filter((s) => s.excerpt);
   const seen = new Set<string>();
-  const sources = [...metricSources, ...pages, ...repos, ...snippets]
+  const sources = [
+    ...metricSources,
+    ...voices.slice(0, 9),
+    ...forum,
+    ...pages,
+    ...repos,
+    ...snippets,
+  ]
     .filter((s) => {
       if (seen.has(s.url)) return false;
       seen.add(s.url);
       return true;
     })
-    .slice(0, 16)
+    .slice(0, 24)
     .map((s, i) => ({
       ...s,
       id: `S${i + 1}`,
@@ -515,7 +657,7 @@ export async function singleReport(
     }),
   };
   try {
-    if (!pages.length && !repos.length && !snippets.length)
+    if (!pages.length && !repos.length && !snippets.length && !voices.length)
       throw new Error("No topic evidence available.");
     const written = await reportPhase(remaining(), async () => {
       for (let attempt = 0; attempt < 2; attempt++) {
