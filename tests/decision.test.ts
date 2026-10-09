@@ -124,7 +124,7 @@ test("the prompt derives directions from pains minus supply and keeps the guard 
     /Preserve negation/,
     /never by shared keywords/,
     /Never write, translate or paraphrase a quote/,
-    /never dress it as "stop"/,
+    /"insufficient" is only for zero pains or zero supply rows/,
     /Do not say "interview users" in general/,
   ])
     assert.match(DECISION_PROMPT, rule);

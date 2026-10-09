@@ -44,8 +44,19 @@ const WRITE_RESERVE_MS = 24000;
 const RECOVERY_RESERVE_MS = 8000;
 const READ_PAGES = 8;
 /** Threads where people speak for themselves; a result snippet is their words. */
+// Zhihu's question pages are people asking; its column pages are articles.
 const FORUM =
-  /(?:^|\.)(?:reddit\.com|stackoverflow\.com|stackexchange\.com|v2ex\.com|news\.ycombinator\.com|quora\.com)$/i;
+  /^(?!zhuanlan\.)(?:[\w-]+\.)*(?:reddit\.com|stackoverflow\.com|stackexchange\.com|v2ex\.com|news\.ycombinator\.com|quora\.com|tieba\.baidu\.com|zhihu\.com|nga\.cn)$/i;
+const CJK = /[\u3400-\u9fff]/;
+/** A search in Chinese is asked where Chinese speakers post; the rest on Reddit. */
+const forumSite = (query: string, index: number) =>
+  CJK.test(query)
+    ? index % 2
+      ? "www.zhihu.com"
+      : "tieba.baidu.com"
+    : "reddit.com";
+/** Page furniture a search engine captured in place of the post. */
+const CHROME = /加载中|只看楼主|吧内搜索|你必须登录|位会员|切换模式/;
 /** The poster's words: the result snippet, or the post title when it has none.
  * Search pages prefix the post date; it is the source's date, not its text. */
 const forumWords = (s: ResearchSource) => {
@@ -64,15 +75,27 @@ const forumWords = (s: ResearchSource) => {
     ? undefined
     : new Date(time).toISOString();
   const snippet = dated ? raw.slice(dated[0].length) : raw;
-  if (snippet.length >= 60) return { excerpt: snippet, publishedAt };
+  // Chinese says in 25 characters what English says in 60.
+  const long = (text: string, cjk: number, latin: number) =>
+    text.length >= (CJK.test(text) ? cjk : latin);
+  if (long(snippet, 25, 60) && !CHROME.test(snippet))
+    return { excerpt: snippet, publishedAt };
   const title = s.label
     .replace(/^r\/\w+ on Reddit:\s*/i, "")
-    .replace(/\s*[-|:]\s*(?:Reddit|Stack Overflow|Hacker News)\s*$/i, "")
+    .replace(
+      /\s*[-|:_]\s*(?:Reddit|Stack Overflow|Hacker News|百度贴吧|知乎|NGA玩家社区)\s*$/i,
+      "",
+    )
+    .replace(/【[^】]*吧】$/, "")
     .trim();
-  return { excerpt: title.length >= 20 ? title : "", publishedAt };
+  return {
+    excerpt: long(title, 8, 20) && !/^https?:/.test(title) ? title : "",
+    publishedAt,
+  };
 };
 /** These refuse page reads; opening them only spends a slot on a failure. */
-const UNREADABLE = /(?:^|\.)(?:reddit\.com|quora\.com)$/i;
+const UNREADABLE =
+  /(?:^|\.)(?:reddit\.com|quora\.com|tieba\.baidu\.com|zhihu\.com|nga\.cn)$/i;
 
 export function reportFailure(error: unknown) {
   const e = error as {
@@ -263,7 +286,15 @@ export async function singleReport(
   const pages: ResearchSource[] = [];
   // First-hand accounts from issue trackers, each already a full text.
   const voices: ResearchSource[] = [];
-  const painQueries = (topic.plan?.painQueries || [])
+  // Without planned searches, ask in the user's own words: on both Chinese
+  // forums for a Chinese input, on Reddit otherwise.
+  const painQueries = (
+    topic.plan?.painQueries?.length
+      ? topic.plan.painQueries
+      : CJK.test(input)
+        ? [input, input]
+        : [topic.keyword]
+  )
     .map((q) => q.replace(/[<>()"\x00-\x1f]/g, " ").trim())
     .filter(Boolean)
     .slice(0, 2);
@@ -331,7 +362,8 @@ export async function singleReport(
             // A forum result is shown with the poster's own opening words.
             ...(q.intent === "demand" &&
             FORUM.test(new URL(r.url).hostname) &&
-            r.excerpt.length >= 60
+            r.excerpt.length >= (CJK.test(r.excerpt) ? 25 : 60) &&
+            !CHROME.test(r.excerpt)
               ? {
                   state: "read" as const,
                   quote: ((words) =>
@@ -447,12 +479,10 @@ export async function singleReport(
           [
             ...scopedWebQueries(topic).slice(0, 3),
             // Where people ask and complain, searched the way they would write.
-            ...(painQueries.length ? painQueries : [topic.keyword]).map(
-              (q) => ({
-                intent: "demand" as const,
-                query: `site:reddit.com ${q.slice(0, 70)}`,
-              }),
-            ),
+            ...painQueries.map((q, i) => ({
+              intent: "demand" as const,
+              query: `site:${forumSite(q, i)} ${q.slice(0, 70)}`,
+            })),
           ],
           20000,
           options.trends?.researchProxy(),
