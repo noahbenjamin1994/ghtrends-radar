@@ -552,6 +552,39 @@ export function searchProxy(raw: string): string {
       .replace(/-session-[a-z0-9]+/gi, "");
   return url.href;
 }
+const searchSource = (
+  web: WebEvidence,
+  q: WebEvidence["queries"][number],
+  i: number,
+  r: SearchResult,
+  j: number,
+): ResearchSource => ({
+  id: `W${i + 1}R${j + 1}`,
+  kind: "search" as const,
+  label: r.title,
+  url: r.url,
+  fetchedAt: q.fetchedAt || web.fetchedAt,
+  searchIntent: q.intent,
+  ...(r.relevance?.role === "direct" || r.relevance?.role === "resource"
+    ? { searchRole: r.relevance.role }
+    : {}),
+  placement: r.kind,
+  excerpt: `${q.engine === "hackernews" ? "Hacker News / Algolia" : q.engine === "duckduckgo" ? "DuckDuckGo" : q.engine === "brave" ? "Brave" : "Google"} search excerpt. Query: ${q.query}. Search market: ${q.region || web.region}. Language: ${web.language}. Placement: ${r.kind}. Title: ${r.title}. Snippet: ${r.excerpt}`,
+});
+/** Every result of the searches scoped to one site. The mixed selection keeps
+ * a few results per search; a forum or marketplace search is asked for its
+ * whole first page. */
+export function scopedSources(web?: WebEvidence): ResearchSource[] {
+  return (
+    web?.queries.flatMap((q, i) =>
+      q.query.startsWith("site:")
+        ? q.results
+            .filter((r) => r.kind === "organic")
+            .map((r, j) => searchSource(web, q, i, r, j))
+        : [],
+    ) || []
+  );
+}
 export function searchSources(web?: WebEvidence): ResearchSource[] {
   const groups =
     web?.queries.map((q, i) => {
@@ -602,19 +635,7 @@ export function searchSources(web?: WebEvidence): ResearchSource[] {
             selected.push(r);
         }
       selected.push(...usable.filter((r) => r.kind === "ad").slice(0, 2));
-      return selected.map((r, j) => ({
-        id: `W${i + 1}R${j + 1}`,
-        kind: "search" as const,
-        label: r.title,
-        url: r.url,
-        fetchedAt: q.fetchedAt || web!.fetchedAt,
-        searchIntent: q.intent,
-        ...(r.relevance?.role === "direct" || r.relevance?.role === "resource"
-          ? { searchRole: r.relevance.role }
-          : {}),
-        placement: r.kind,
-        excerpt: `${q.engine === "hackernews" ? "Hacker News / Algolia" : q.engine === "duckduckgo" ? "DuckDuckGo" : q.engine === "brave" ? "Brave" : "Google"} search excerpt. Query: ${q.query}. Search market: ${q.region || web!.region}. Language: ${web!.language}. Placement: ${r.kind}. Title: ${r.title}. Snippet: ${r.excerpt}`,
-      }));
+      return selected.map((r, j) => searchSource(web!, q, i, r, j));
     }) || [];
   const output: ResearchSource[] = [],
     seen = new Set<string>();

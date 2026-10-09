@@ -23,7 +23,7 @@ import {
   onTopic,
   rejudgeReport,
 } from "../providers/report.js";
-import { searchSources } from "../providers/search.js";
+import { scopedSources, searchSources } from "../providers/search.js";
 import type { installAuth } from "./auth.js";
 
 const FOLLOWUPS = Math.max(
@@ -500,7 +500,7 @@ export function installRevisionRoutes(
           );
           const posts: string[] = [];
           let pages = 0;
-          for (const s of searchSources(web)) {
+          for (const s of [...scopedSources(web), ...searchSources(web)]) {
             if (s.placement === "ad" || seen.has(s.url) || !onTopic(s))
               continue;
             const host = new URL(s.url).hostname;
@@ -516,7 +516,7 @@ export function installRevisionRoutes(
                 add({ ...s, documentType: "forum-snippet", ...words }),
               )?.[0];
               if (id) posts.push(id);
-            } else if (!UNREADABLE.test(host)) {
+            } else if (!UNREADABLE.test(host) && !results.has(s.url)) {
               results.set(s.url, {
                 url: s.url,
                 title: s.label,

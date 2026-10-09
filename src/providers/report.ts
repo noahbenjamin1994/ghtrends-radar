@@ -31,7 +31,12 @@ import type {
   SupplyEvidence,
   Topic,
 } from "../core/types.js";
-import { searchSources, scopedWebQueries, type WebEvidence } from "./search.js";
+import {
+  scopedSources,
+  searchSources,
+  scopedWebQueries,
+  type WebEvidence,
+} from "./search.js";
 import { githubTermQuery } from "./research.js";
 import { DOCUMENT_VERSION } from "./documents.js";
 
@@ -80,7 +85,12 @@ export const onTopic = (s: ResearchSource) => {
   const subject = query.split(/\s+/)[1]?.replace(/"/g, "").toLowerCase();
   return (
     !subject ||
-    [s.label, (s.excerpt || "").split(" Snippet: ").pop(), s.url]
+    [
+      s.label,
+      (s.excerpt || "").split(" Snippet: ").pop(),
+      // A seller's address keeps the words of an offer since rewritten.
+      MARKET.test(new URL(s.url).hostname) ? "" : s.url,
+    ]
       .join(" ")
       .toLowerCase()
       .includes(subject)
@@ -509,7 +519,9 @@ export async function singleReport(
     const direct = s.repositories
       .filter((r) => !r.relevance || r.relevance.role === "direct")
       .filter((r) => !asked.has(r.name));
-    if (!direct.length) return;
+    // Issues on a tool's repository are not the voice of people buying a
+    // service done by hand.
+    if (!direct.length || SERVICE.test(input)) return;
     for (const r of direct.slice(0, 5)) asked.add(r.name);
     const issues = await engine.github.gaps(direct).catch(() => {
       voiceGaps.push("GitHub Issues");
@@ -858,22 +870,37 @@ export async function singleReport(
     candidates.find((s) => s.searchIntent === "opensource"),
   ].filter((s): s is ResearchSource => !!s);
   // A forum result that was not read still carries the poster's opening words.
-  const forum = needs
+  const scoped = scopedSources(web);
+  const perHost = new Map<string, number>();
+  const forum = [...needs, ...scoped.filter((s) => s.searchIntent === "demand")]
     .filter(
-      (s) =>
+      (s, i, all) =>
+        all.findIndex((o) => o.url === s.url) === i &&
         FORUM.test(new URL(s.url).hostname) &&
         onTopic(s) &&
         !pages.some((p) => p.url === s.url),
     )
-    .slice(0, 8)
     .map((s): ResearchSource => ({
       ...s,
       documentType: "forum-snippet",
       ...forumWords(s),
     }))
-    .filter((s) => s.excerpt);
-  const listings = commercial
-    .filter((s) => MARKET.test(new URL(s.url).hostname) && onTopic(s))
+    // One forum's results must not use up the places of the next forum's.
+    .filter((s) => {
+      const site = new URL(s.url).hostname;
+      const n = perHost.get(site) || 0;
+      if (!s.excerpt || n === 5) return false;
+      perHost.set(site, n + 1);
+      return true;
+    })
+    .slice(0, 10);
+  const listings = [...commercial, ...scoped]
+    .filter(
+      (s, i, all) =>
+        all.findIndex((o) => o.url === s.url) === i &&
+        MARKET.test(new URL(s.url).hostname) &&
+        onTopic(s),
+    )
     .slice(0, 5)
     .map(listing);
   const seen = new Set<string>();
@@ -891,7 +918,7 @@ export async function singleReport(
       seen.add(s.url);
       return true;
     })
-    .slice(0, 24)
+    .slice(0, 28)
     .map((s, i) => ({
       ...s,
       id: `S${i + 1}`,
