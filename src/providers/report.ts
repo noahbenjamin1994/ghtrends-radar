@@ -44,7 +44,7 @@ import { DOCUMENT_VERSION } from "./documents.js";
 const seconds = (name: string, fallback: number) =>
   Math.max(1, Number(process.env[name]) || fallback) * 1000;
 /** Phase budgets inside the overall deadline. Collection never eats the write. */
-const COLLECT_MS = seconds("GHTRENDS_COLLECT_SECONDS", 25);
+const COLLECT_MS = seconds("GHTRENDS_COLLECT_SECONDS", 35);
 const READ_MS = seconds("GHTRENDS_READ_SECONDS", 20);
 const WRITE_MS = seconds("GHTRENDS_WRITE_SECONDS", 80);
 const WRITE_RESERVE_MS = 24000;
@@ -609,7 +609,7 @@ export async function singleReport(
             { intent: "competition" as const, query: literal },
             ...scopedWebQueries(topic).slice(0, 3),
           ].filter((q) => q.query),
-          20000,
+          30000,
           options.trends?.researchProxy(),
           (partial) => {
             if (!collecting) return;
@@ -819,7 +819,7 @@ export async function singleReport(
                     query: `site:${MARKET_SITES.fiverr} ${q}`,
                   })),
               ],
-              20000,
+              30000,
               options.trends?.researchProxy(),
               (partial) => {
                 if (!collecting) return;

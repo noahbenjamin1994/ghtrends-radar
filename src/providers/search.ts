@@ -1068,7 +1068,8 @@ export class GoogleSearch {
       }
       if (attempt) await new Promise((r) => setTimeout(r, 750));
       const timeoutMs = Math.min(
-        researchProxy ? 6000 : 18000,
+        // Brave's slowest ordinary answers took six seconds through the proxy.
+        researchProxy ? 10000 : 18000,
         deadline - Date.now(),
       );
       if (timeoutMs < 1000) break;
