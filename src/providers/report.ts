@@ -1009,6 +1009,11 @@ export async function singleReport(
     if (!pages.length && !repos.length && !snippets.length && !voices.length)
       throw new Error("No topic evidence available.");
     const written = await reportPhase(remaining(), async () => {
+      // A report whose verdict names an opening but lists no direction is
+      // asked for once more; it stands if the second answer is no better.
+      let kept:
+        | { decision: Decision; report: ReturnType<typeof parseReport> }
+        | undefined;
       for (let attempt = 0; attempt < 2; attempt++) {
         // Reserve time for one recovery without extending the original deadline.
         const budget = Math.min(
@@ -1066,8 +1071,27 @@ export async function singleReport(
               sections: incomplete,
             });
           }
-          return result;
+          if (
+            attempt === 0 &&
+            decision.verdict.forced &&
+            decision.pains.length &&
+            remaining() >= RECOVERY_RESERVE_MS
+          ) {
+            kept = result;
+            console.warn("Report verdict without a direction", {
+              runId: diagnosticId,
+            });
+            failures.push({
+              code: "report_schema",
+              detail:
+                "The verdict said a direction is open but directions was empty or pointed at no listed pain and supply row. Write that direction with its pain and supply IDs, or choose stop.",
+              retryable: true,
+            });
+            continue;
+          }
+          return result.decision.verdict.forced && kept ? kept : result;
         } catch (error) {
+          if (kept) return kept;
           const failure = reportFailure(error);
           failures.push(failure);
           console.warn("Report attempt rejected", {
