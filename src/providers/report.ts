@@ -119,11 +119,15 @@ const forumSite = (query: string, index: number) =>
 /** Page furniture a search engine captured in place of the post. */
 const CHROME =
   /加载中|只看楼主|吧内搜索|你必须登录|位会员|切换模式|^LINUX DO ·/;
+const PROMO =
+  /兑换码|优惠码|折扣码|免费试用|限时|✅|🔥|送.{0,12}(?:流量|会员|额度)|promo code|coupon code|giveaway|free trial/i;
 /** The poster's words: the result snippet, or the post title when it has none.
  * Search pages prefix the post date; it is the source's date, not its text. */
 export const forumWords = (s: ResearchSource) => {
   // Reddit's machine translation of a thread is not what the poster wrote.
   if (/[?&]tl=/.test(s.url)) return { excerpt: "" };
+  // A thread giving away codes or a free trial is a seller's advertisement.
+  if (PROMO.test(s.label)) return { excerpt: "" };
   const raw = (s.excerpt || "").split(" Snippet: ").pop()!.trim();
   const dated =
     /^(?:(\d{4})年(\d{1,2})月(\d{1,2})日|([A-Z][a-z]+ \d{1,2}, \d{4}))\s*-\s*/.exec(

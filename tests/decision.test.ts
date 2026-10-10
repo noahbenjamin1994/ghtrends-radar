@@ -456,6 +456,20 @@ test("a site-scoped search keeps its whole page, and only results on the subject
     } as any).label,
     "terraria吧：泰拉瑞亚tedit地图编辑器求一个高版本的",
   );
+  for (const label of [
+    "10 个住宅 IP 兑换码，双 ISP+不限并发，店铺/社媒/采集/广告",
+    "9HTTP✅免费试用 500M✅美国 IP $2.45/IP",
+    "谁需要住宅 IP？送动态 IP 流量（采集/店铺/社媒/抢货都能用）",
+  ])
+    assert.equal(
+      forumWords({
+        label,
+        url: "https://www.v2ex.com/t/1227360",
+        excerpt:
+          "x Snippet: 专为大数据采集、跨境电商、社媒矩阵打造，主打无限流量",
+      } as any).excerpt,
+      "",
+    );
 });
 
 test("a follow-up answer stops at five sentences without cutting a decimal", () => {
