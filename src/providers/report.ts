@@ -81,6 +81,7 @@ export const listing = (s: ResearchSource): ResearchSource => ({
  * keep a result only when it names the subject the query led with and, on a
  * forum, one more of the query's words. Sellers title offers too loosely for
  * the second test. */
+const FORUM_NAME = /^(知乎|贴吧|百度贴吧|reddit|v2ex|zhihu|tieba)$/;
 export const onTopic = (s: ResearchSource) => {
   const query = /Query: (.*?)\. Search market:/.exec(s.excerpt || "")?.[1];
   if (!query?.startsWith("site:")) return true;
@@ -90,7 +91,7 @@ export const onTopic = (s: ResearchSource) => {
     .split(/\s+/)
     .slice(1)
     // The forum's own name is on every one of its pages.
-    .filter((w) => !/^(知乎|贴吧|百度贴吧|reddit|v2ex|zhihu|tieba)$/.test(w));
+    .filter((w) => !FORUM_NAME.test(w));
   if (!subject) return true;
   const market = MARKET.test(new URL(s.url).hostname);
   const text = [
@@ -765,6 +766,76 @@ export async function singleReport(
             q: `${clean(topic.keyword).split(" ")[0]} hire commission`,
             site: FORUM_SITES.reddit,
           });
+        // Chinese readers describe their trouble on Zhihu, which only a
+        // logged-in browser can read; perch owns those browsers.
+        const zhihu = async () => {
+          const words =
+            forum.find((f) => CJK.test(f.q))?.q ||
+            (CJK.test(input) ? clean(input) : "");
+          // Zhihu's own search returns nothing for a long phrase.
+          const keyword = words
+            .split(" ")
+            .filter((w) => !FORUM_NAME.test(w.toLowerCase()))
+            .slice(0, 2)
+            .join(" ");
+          if (!keyword || !engine.perch.enabled) return;
+          const until = Date.now() + 25000;
+          const subject = keyword.split(" ")[0]!.toLowerCase();
+          const found = (
+            await engine.perch.run(
+              "zhihu.search",
+              { keyword, limit: 10 },
+              until,
+            )
+          ).filter(
+            (i) =>
+              i.extra?.content_type === "answer" &&
+              i.external_id &&
+              (i.title + i.body).toLowerCase().includes(subject),
+          );
+          const read = await Promise.all(
+            found
+              .slice(0, 2)
+              .map((i) =>
+                engine.perch.run(
+                  "zhihu.answer",
+                  { answer_id: i.external_id! },
+                  until,
+                ),
+              ),
+          );
+          if (!collecting) return;
+          const full = new Map(read.flat().map((i) => [i.url, i]));
+          voices.unshift(
+            ...found
+              .slice(0, 5)
+              .map((i): ResearchSource => {
+                const answer = full.get(i.url) || i;
+                return {
+                  documentType: "forum-snippet",
+                  searchIntent: "demand",
+                  label: `知乎：${i.title}`.slice(0, 180),
+                  url: i.url,
+                  fetchedAt: stamp(),
+                  ...(answer.published_at
+                    ? {
+                        publishedAt: new Date(
+                          answer.published_at * 1000,
+                        ).toISOString(),
+                      }
+                    : {}),
+                  // A search result opens with the author's name.
+                  excerpt: answer.body
+                    .replace(/^[^：\n]{1,20}：/, "")
+                    .replace(/\s+/g, " ")
+                    .trim()
+                    .slice(0, 1500),
+                };
+              })
+              .filter((v) => (v.excerpt || "").length >= 25),
+          );
+          progress("sources");
+        };
         const first = web;
         const merge = (next: WebEvidence): WebEvidence => ({
           ...first,
@@ -776,6 +847,7 @@ export async function singleReport(
         });
         await Promise.allSettled([
           readPages(),
+          zhihu(),
           terms.length &&
             engine.github
               .supply(
