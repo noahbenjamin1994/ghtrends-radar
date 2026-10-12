@@ -13,7 +13,7 @@ import {
 } from "../providers/search.js";
 import { marketGapSignals, mergeRequestEvidence } from "./gaps.js";
 import { Research } from "../providers/research.js";
-import { Perch } from "../providers/perch.js";
+import { DataApi } from "../providers/dataapi.js";
 import {
   DocumentReader,
   documentTransport,
@@ -85,14 +85,14 @@ export class Engine {
   trends: Trends;
   research: Research;
   search: GoogleSearch;
-  perch: Perch;
+  dataApi: DataApi;
   documents: DocumentReader;
   constructor(public store = new Store()) {
     this.github = new GitHub(store);
     this.trends = new Trends(store);
     this.research = new Research(store);
     this.search = new GoogleSearch(store);
-    this.perch = new Perch(store);
+    this.dataApi = new DataApi(store);
     this.documents = new DocumentReader(
       store,
       documentTransport(

@@ -767,7 +767,7 @@ export async function singleReport(
             site: FORUM_SITES.reddit,
           });
         // Chinese readers describe their trouble on Zhihu, which only a
-        // logged-in browser can read; perch owns those browsers.
+        // logged-in browser can read; the Data API owns those browsers.
         const zhihu = async () => {
           const words =
             forum.find((f) => CJK.test(f.q))?.q ||
@@ -778,11 +778,11 @@ export async function singleReport(
             .filter((w) => !FORUM_NAME.test(w.toLowerCase()))
             .slice(0, 2)
             .join(" ");
-          if (!keyword || !engine.perch.enabled) return;
+          if (!keyword || !engine.dataApi.enabled) return;
           const until = Date.now() + 25000;
           const subject = keyword.split(" ")[0]!.toLowerCase();
           const found = (
-            await engine.perch.run(
+            await engine.dataApi.run(
               "zhihu.search",
               { keyword, limit: 10 },
               until,
@@ -797,7 +797,7 @@ export async function singleReport(
             found
               .slice(0, 2)
               .map((i) =>
-                engine.perch.run(
+                engine.dataApi.run(
                   "zhihu.answer",
                   { answer_id: i.external_id! },
                   until,
