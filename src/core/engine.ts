@@ -91,8 +91,8 @@ export class Engine {
     this.github = new GitHub(store);
     this.trends = new Trends(store);
     this.research = new Research(store);
-    this.search = new GoogleSearch(store);
     this.dataApi = new DataApi(store);
+    this.search = new GoogleSearch(store, undefined, this.dataApi);
     this.documents = new DocumentReader(
       store,
       documentTransport(

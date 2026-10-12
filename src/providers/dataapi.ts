@@ -26,6 +26,7 @@ const callSchema = z.object({
     .catch(null),
 });
 export type DataItem = z.infer<typeof itemSchema>;
+type DataOp = "zhihu.search" | "zhihu.answer" | "brave.search";
 
 export class DataApi {
   private url = (process.env.DATA_API_URL || "").replace(/\/+$/, "");
@@ -37,11 +38,20 @@ export class DataApi {
   /** One call, waited for on the server. An account that is busy or logged
    * out is a gap in the sources, never an error in the report. */
   async run(
-    op: "zhihu.search" | "zhihu.answer",
+    op: DataOp,
     params: Record<string, string | number>,
     deadline: number,
   ): Promise<DataItem[]> {
-    if (!this.enabled) return [];
+    return (await this.call(op, params, deadline)).items;
+  }
+  /** The same call for a caller that must tell an empty answer from a failed
+   * one. */
+  async call(
+    op: DataOp,
+    params: Record<string, string | number>,
+    deadline: number,
+  ): Promise<{ items: DataItem[]; error?: string }> {
+    if (!this.enabled) return { items: [], error: "dataapi_setup" };
     const started = Date.now();
     const signal = operationContext.getStore()?.signal;
     const wait = Math.max(1, (deadline - started) / 1000 - 2);
@@ -76,12 +86,12 @@ export class DataApi {
         : "dataapi_transport";
     }
     this.store.recordCall({
-      provider: "documents",
+      provider: op === "brave.search" ? "search" : "documents",
       operation: "dataapi-" + op,
       started: new Date(started).toISOString(),
       durationMs: Date.now() - started,
       ...(error ? { error } : { status: 200 }),
     });
-    return items;
+    return { items, ...(error ? { error } : {}) };
   }
 }

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Store } from "../src/core/store.js";
 import { DataApi } from "../src/providers/dataapi.js";
+import { GoogleSearch } from "../src/providers/search.js";
 
 test("the Data API client keeps a finished call's valid items and nothing from an unfinished or failed one", async () => {
   const originalFetch = globalThis.fetch;
@@ -72,6 +73,71 @@ test("the Data API client keeps a finished call's valid items and nothing from a
     globalThis.fetch = originalFetch;
     delete process.env.DATA_API_URL;
     delete process.env.DATA_API_KEY;
+    store.close?.();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a web search is bought from the Data API, and Radar's own route answers only when that fails", async () => {
+  const originalFetch = globalThis.fetch;
+  const dir = mkdtempSync(join(tmpdir(), "dataapi-search-"));
+  process.env.DATA_API_URL = "http://api.test";
+  process.env.DATA_API_KEY = "sk_" + "t".repeat(40);
+  process.env.GOOGLE_SEARCH_PROXY = "http://user:pass@proxy.test:8000";
+  const store = new Store(dir);
+  try {
+    const asked: string[] = [];
+    let http = 200;
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      const sent = JSON.parse(String(init?.body));
+      assert.equal(sent.op, "brave.search");
+      assert.equal(sent.params.region, "us");
+      asked.push(sent.params.keyword);
+      return Response.json(
+        {
+          status: "ok",
+          outcome: "ok",
+          result: {
+            items: ["a", "b", "c", "a"].map((id) => ({
+              title: ` Password  manager ${id} `,
+              url: `https://example.com/${id}`,
+              body: `They  said ${id}`,
+            })),
+          },
+        },
+        { status: http },
+      );
+    }) as typeof fetch;
+    let own = 0;
+    const search = new GoogleSearch(
+      store,
+      async () => {
+        own++;
+        return { status: 429 };
+      },
+      new DataApi(store),
+    );
+    const page = await search.lookupWeb("password manager pricing");
+    assert.equal(page.engine, "brave");
+    assert.deepEqual(
+      page.results.map((r) => [r.title, r.url, r.excerpt, r.kind]),
+      ["a", "b", "c"].map((id) => [
+        `Password manager ${id}`,
+        `https://example.com/${id}`,
+        `They said ${id}`,
+        "organic",
+      ]),
+    );
+    assert.deepEqual(asked, ["password manager pricing"]);
+    assert.equal(own, 0);
+    http = 502;
+    await assert.rejects(search.lookupWeb("keepass alternatives"));
+    assert.ok(own > 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.DATA_API_URL;
+    delete process.env.DATA_API_KEY;
+    delete process.env.GOOGLE_SEARCH_PROXY;
     store.close?.();
     rmSync(dir, { recursive: true, force: true });
   }

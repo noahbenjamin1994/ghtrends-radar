@@ -15,6 +15,7 @@ import type { ProviderCall } from "../core/operations.js";
 import { operationContext, operationSignal } from "../core/operations.js";
 import { researchSessionProxy } from "./trends.js";
 import { exitLabel, traced } from "./scope.js";
+import type { DataApi } from "./dataapi.js";
 
 export const searchQuerySchema = z.object({
   query: z
@@ -656,6 +657,7 @@ export class GoogleSearch {
   constructor(
     private store: Store,
     private transport: SearchTransport = directRequest,
+    private api?: DataApi,
   ) {}
   get mode(): "direct" | "api" | "off" {
     const mode = process.env.GHTRENDS_SEARCH_MODE;
@@ -996,6 +998,52 @@ export class GoogleSearch {
     void task.finally(() => this.pending.delete(pendingKey)).catch(() => {});
     return task;
   }
+  private async bought(
+    query: string,
+    region: string,
+    language: string,
+    deadline: number,
+    fallbackQuery?: string,
+  ): Promise<SearchPage | undefined> {
+    let thin: SearchPage | undefined;
+    // An exact phrase nobody writes returns almost nothing; ask again plainly.
+    for (const keyword of [...new Set([fallbackQuery || query, query])]) {
+      const until = Math.min(deadline, Date.now() + 20000);
+      if (until - Date.now() < 3000) break;
+      const { items, error } = await this.api!.call(
+        "brave.search",
+        { keyword, limit: 10, region: region.toLowerCase(), language },
+        until,
+      );
+      if (error) break;
+      const seen = new Set<string>(),
+        results = items.flatMap((item): SearchResult[] => {
+          const url = publicSearchUrl(item.url),
+            title = item.title.replace(/\s+/g, " ").trim();
+          if (!url || !title || seen.has(url)) return [];
+          seen.add(url);
+          return [
+            {
+              title: title.slice(0, 240),
+              url,
+              kind: "organic",
+              excerpt: item.body.replace(/\s+/g, " ").trim().slice(0, 1200),
+            },
+          ];
+        });
+      const page: SearchPage = {
+        query: keyword,
+        results: results.slice(0, 10),
+        engine: "brave",
+        region,
+        fetchedAt: new Date().toISOString(),
+        adCoverage: "organic-only",
+      };
+      if (results.length >= 3) return page;
+      if (!thin || results.length > thin.results.length) thin = page;
+    }
+    return thin;
+  }
   private async direct(
     query: string,
     region: string,
@@ -1004,6 +1052,18 @@ export class GoogleSearch {
     researchProxy?: string,
     fallbackQuery?: string,
   ): Promise<SearchPage> {
+    // The Data API runs the search; Radar's own routes remain only as its
+    // fallback until that path has proved itself in production.
+    if (this.api?.enabled) {
+      const page = await this.bought(
+        query,
+        region,
+        language,
+        deadline,
+        fallbackQuery,
+      );
+      if (page) return page;
+    }
     const routes = researchProxy
       ? [researchProxy]
       : [
