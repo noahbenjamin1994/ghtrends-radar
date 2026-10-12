@@ -785,7 +785,9 @@ export async function singleReport(
             await engine.dataApi.run(
               "zhihu.search",
               { keyword, limit: 10 },
-              until,
+              // A search that finds answers returns within eight seconds; one
+              // that finds none sits on the page for thirty.
+              Date.now() + 14000,
             )
           ).filter(
             (i) =>
