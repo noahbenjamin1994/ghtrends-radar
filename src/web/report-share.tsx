@@ -161,7 +161,7 @@ export function ReportShare({
           <div className="share-dialog-inner">
             <header className="share-heading">
               <div>
-                <span>GHTRENDS / SHARE STUDIO</span>
+                <span>FIND BLUE OCEAN / SHARE STUDIO</span>
                 <h2 id="share-heading">
                   {l("Ideas worth passing on.", "让好想法，被更多人看见。")}
                 </h2>

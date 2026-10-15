@@ -518,8 +518,8 @@ export function marketMarkdown(
     ...a.scopeNotes.map((x) => `- ${t(x)}`),
     "",
     baseUrl
-      ? `[${t("View this snapshot")}](${localeUrl(baseUrl + "/report/" + m.id, locale)}) · [ghtrends](https://github.com/noahbenjamin1994/ghtrends-radar)`
-      : `${t("Local report")} ${m.id} · [ghtrends](https://github.com/noahbenjamin1994/ghtrends-radar)`,
+      ? `[${t("View this snapshot")}](${localeUrl(baseUrl + "/report/" + m.id, locale)}) · [Find Blue Ocean](https://findblueocean.com)`
+      : `${t("Local report")} ${m.id} · [Find Blue Ocean](https://findblueocean.com)`,
     "",
   ].join("\n");
 }

@@ -475,7 +475,7 @@ export function App({
         <button
           className="brand-link"
           onClick={() => navigate("/")}
-          aria-label={t("ghtrends home")}
+          aria-label={t("Find Blue Ocean home")}
         >
           <Logo />
         </button>
@@ -1674,7 +1674,7 @@ function MarketView({
               </p>
               <div className="outlook-byline">
                 <span>
-                  {"ghtrends research"} ·{" "}
+                  {"Find Blue Ocean"} ·{" "}
                   {assessment.narrative.kind === "ai"
                     ? l("Source-led interpretation", "基于来源的解读")
                     : l("Collected evidence", "采集证据摘要")}
@@ -3002,7 +3002,7 @@ function StartView() {
         <div className="code-block">
           <pre>{`npm install -g https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.20.0/ghtrends-radar-0.20.0.tgz\n\nghtrends scan --topic mcp-servers --json\nghtrends repo facebook/react\nghtrends compare facebook/react vuejs/core --format md\nghtrends watch add facebook/react\nghtrends watch run\nghtrends report --topic agent-memory --format md\nghtrends ui --port 3721\nghtrends mcp`}</pre>
           <CopyButton
-            value="npm install -g https://ghtrends.dev/radar/ghtrends.tgz"
+            value="npm install -g https://findblueocean.com/ghtrends.tgz"
             label={t("Copy installation command")}
             onCopied={() => track("install_copy")}
           />
@@ -3052,7 +3052,7 @@ function Docs() {
       <h1>{t("A signal you can inspect")}</h1>
       <p className="page-intro">
         {t(
-          "ghtrends puts two independent questions together: how much active open-source supply exists, and whether search demand is growing.",
+          "Find Blue Ocean puts two independent questions together: how much active open-source supply exists, and whether search demand is growing.",
         )}
       </p>
       <section className="panel">

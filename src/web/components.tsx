@@ -63,7 +63,7 @@ export function Logo() {
         <circle className="logo-dot" cx="36" cy="6" r="3" />
       </svg>
       <span>
-        gh<span className="brand-weight">trends</span>
+        find<span className="brand-weight">blueocean</span>
         <sup>↗</sup>
       </span>
     </span>

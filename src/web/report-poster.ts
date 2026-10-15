@@ -103,7 +103,7 @@ export async function renderReportPoster(
     write(label, 21, muted, 600);
     y += 22;
   };
-  write("ghtrends  /  FIELD NOTES", 23, ink, 700);
+  write("FIND BLUE OCEAN  /  FIELD NOTES", 23, ink, 700);
   y += 38;
   write(l("OPPORTUNITY RESEARCH", "一份关于机会的研究"), 22, muted, 500);
   y += 15;
@@ -315,7 +315,7 @@ export async function renderReportPoster(
     publicUrl ? 640 : 928,
   );
   y += 18;
-  write("ghtrends.dev", 23, ink, 600);
+  write("findblueocean.com", 23, ink, 600);
   if (publicUrl) {
     const qr = document.createElement("canvas");
     await QRCode.toCanvas(qr, publicUrl, {

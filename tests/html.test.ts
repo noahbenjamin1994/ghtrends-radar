@@ -102,7 +102,7 @@ test("report text and source links cannot inject markup or executable URLs", () 
   );
   assert.equal(
     schema.name,
-    `${hostile.topic.name}: ${hostile.headline} · ghtrends`,
+    `${hostile.topic.name}: ${hostile.headline} · Find Blue Ocean`,
   );
 });
 

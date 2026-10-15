@@ -27,7 +27,7 @@ const robotsParser = createRequire(import.meta.url)("robots-parser") as (
 
 export const DOCUMENT_VERSION = "4";
 const agentName = "ghtrendsbot";
-const agentHeader = "ghtrendsbot/1.0 (+https://ghtrends.dev/radar/)";
+const agentHeader = "ghtrendsbot/1.0 (+https://findblueocean.com/)";
 // Documentation shells can exceed 1 MB while their useful article is short.
 // Keep a bounded download; only the existing 6,000-character excerpt is retained.
 const MAX_BYTES = 2_000_000;

@@ -87,32 +87,32 @@ export function renderDocument(
     `<div class="snapshot-table"><table><caption>${e("Measured open-source categories")}</caption><thead><tr>${["Category", "Landscape", "Active projects", "Search growth"].map((s) => `<th scope="col">${e(s)}</th>`).join("")}</tr></thead><tbody>${markets.map((market) => `<tr><th scope="row">${link(marketPath(market), market.topic.name)}</th><td>${e(marketAssessment(market, locale).title)}</td><td>${market.supply.error ? "—" : (market.supply.complete ? "" : "≥") + number(market.supply.total)}</td><td>${growth(market)}</td></tr>`).join("")}</tbody></table></div>`;
   const assessment = m ? marketAssessment(m, locale) : null;
   const titles: Record<string, string> = {
-    "/": "ghtrends — Know where to build",
-    "/docs": "GitHub opportunity analysis: methodology, CLI and MCP · ghtrends",
+    "/": "Find Blue Ocean — Know where to build",
+    "/docs": "GitHub opportunity analysis: methodology, CLI and MCP · Find Blue Ocean",
     "/start": "Use the open-source CLI and MCP server on GitHub",
-    "/gaps": "Open-source feature requests and friction signals · ghtrends",
-    "/compare": "Compare GitHub repositories · ghtrends",
-    "/watch": "Your GitHub watchlist · ghtrends",
-    "/admin": "Operations · ghtrends",
-    "/history": "Your research history · ghtrends",
+    "/gaps": "Open-source feature requests and friction signals · Find Blue Ocean",
+    "/compare": "Compare GitHub repositories · Find Blue Ocean",
+    "/watch": "Your GitHub watchlist · Find Blue Ocean",
+    "/admin": "Operations · Find Blue Ocean",
+    "/history": "Your research history · Find Blue Ocean",
     "/account":
       locale === "zh"
-        ? "账户与研究次数 · ghtrends"
-        : "Account & credits · ghtrends",
+        ? "账户与研究次数 · Find Blue Ocean"
+        : "Account & credits · Find Blue Ocean",
   };
   if (path.startsWith("/research/"))
     titles[path] =
-      locale === "zh" ? "专项研究 · ghtrends" : "Focused research · ghtrends";
+      locale === "zh" ? "专项研究 · Find Blue Ocean" : "Focused research · Find Blue Ocean";
   const reportTitle =
     assessment?.narrative.kind === "ai" && assessment.narrative.headline
       ? assessment.narrative.headline
       : assessment?.title;
   const title =
     status === 404
-      ? t("Page not found · ghtrends")
+      ? t("Page not found · Find Blue Ocean")
       : m
-        ? `${reportTitle} · ghtrends`
-        : t(titles[path] || "Repository intelligence · ghtrends");
+        ? `${reportTitle} · Find Blue Ocean`
+        : t(titles[path] || "Repository intelligence · Find Blue Ocean");
   const description = m
     ? `${reportTitle}. ${t("{count} active projects match the published GitHub search scope.", { count: m.supply.complete ? m.supply.total : "≥" + m.supply.total })} ${t("Evidence dated {date}.", { date: m.asOf.slice(0, 10) })}`
     : t(
@@ -253,11 +253,11 @@ export function renderDocument(
   } else if (path === "/") {
     content = `<p class="eyebrow">${e("GITHUB SUPPLY × GOOGLE SEARCH DEMAND")}</p><h1>${e("Know where to build")}</h1><p>${e("Explore active open-source supply and sustained search growth. Every category links to its evidence, dates and limitations.")}</p>${table()}<p>${e("Search growth compares the last eight complete weeks with the previous eight. Counts can overlap; GitHub topic labels do not cover every competitor.")}</p>`;
   } else if (path === "/start") {
-    content = `<h1>${e("Research in your own workflow")}</h1><p>${e("Use the hosted website, or run the same open-source engine with your own keys.")}</p><h2>${e("Hosted website")}</h2><p>${e("Read public reports freely. Sign in for private scans, saved reports and projects across devices.")}</p><h2>CLI / MCP</h2><p>${e("CLI, MCP and local Web share your SQLite workspace. Configure your GitHub key and an optional DeepSeek key. Hosted account history is separate.")}</p><pre>npm install -g https://ghtrends.dev/radar/ghtrends.tgz\nghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>${link(SOURCE, "Source and setup instructions")}</p>`;
+    content = `<h1>${e("Research in your own workflow")}</h1><p>${e("Use the hosted website, or run the same open-source engine with your own keys.")}</p><h2>${e("Hosted website")}</h2><p>${e("Read public reports freely. Sign in for private scans, saved reports and projects across devices.")}</p><h2>CLI / MCP</h2><p>${e("CLI, MCP and local Web share your SQLite workspace. Configure your GitHub key and an optional DeepSeek key. Hosted account history is separate.")}</p><pre>npm install -g https://findblueocean.com/ghtrends.tgz\nghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>${link(SOURCE, "Source and setup instructions")}</p>`;
   } else if (path === "/docs") {
     content = `<h1>${e("Read the signals.")}</h1><section><h2>${e("The four landscapes")}</h2>${list([MARKET_LABELS.blue, MARKET_LABELS.expanding, MARKET_LABELS.contested, MARKET_LABELS.quiet])}<p>${e("Ocean labels summarize search direction and observed open-source supply. They are research signals, not verified measures of commercial competition. A quiet ocean may still be a valuable niche.")}</p><p>${e("Partial evidence")}: ${e("This recommendation uses the evidence already available. It is not an LLM-generated forecast.")}</p></section>
       <section><h2>${e("Method")} ${ALGORITHM_VERSION}</h2><p>${e("GitHub searches use relevant topics and specific name or description phrases. Original, active projects qualify with at least one star and a push within 365 days. We review their roles, group projects by owner, and calculate pressure from direct alternatives.")}</p><p>${e("Counts are deduplicated across topic searches; incomplete searches show a lower bound.")}</p><p>${e("Search direction compares 4-, 8- and 13-week windows, sustained changes and a resampling range. Slow growth can qualify across a full quarter. A repeating annual pattern switches the direction comparison to the same period last year. Opposing synonyms keep a mixed signal.")}</p><p>${e(`At least ${POLICY.minWeeks} complete weekly observations are required.`)}</p><p>${e("A low-base rise is reported without a percentage when the prior median is below 3, at least six of the last eight weekly indices reach 10, and the last-four-week median retains at least 80% of the first four. It remains a low-confidence early signal; sparse or isolated spikes stay unconfirmed.")}</p><p>${e("Known categories retain their published query scope. Compound requirements use intersecting GitHub topics. For incomplete unions, the lower bound is the larger of the deduplicated sample and any complete individual search count.")}</p><p>${e("A weekly observation is usable only after that week ended at collection time. Invalid rows cannot refresh old evidence, and conflicting values for the same week prevent classification.")}</p><p>${link("https://support.google.com/trends/answer/4365533", "How Google Trends works")}</p></section>
-      <section><h2>CLI / MCP</h2><p>${e("Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.")}</p><pre>npx --yes --package=https://ghtrends.dev/radar/ghtrends.tgz ghtrends ui</pre><pre>ghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>ghtrends_scan · ghtrends_repo · ghtrends_compare · ghtrends_watch_list</p>${link(SOURCE, "Full installation and configuration instructions")}</section>`;
+      <section><h2>CLI / MCP</h2><p>${e("Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.")}</p><pre>npx --yes --package=https://findblueocean.com/ghtrends.tgz ghtrends ui</pre><pre>ghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>ghtrends_scan · Find Blue Ocean_repo · Find Blue Ocean_compare · Find Blue Ocean_watch_list</p>${link(SOURCE, "Full installation and configuration instructions")}</section>`;
   } else if (path === "/gaps") {
     const gaps = selectGapSignals([
       ...new Map(
@@ -266,7 +266,7 @@ export function renderDocument(
     ]).slice(0, 20);
     content = `<h1>${e("Find the friction")}</h1><p>${e("Open issues people care enough to react to. Follow the source, understand the workflow, and validate the need.")}</p><ul>${gaps.map((g) => `<li>${link(g.url, g.title)} — ${escapeHtml(g.repo)} · ↑ ${number(g.reactions)}</li>`).join("")}</ul>`;
   } else {
-    content = `<h1>${e(titles[path]?.replace(" · ghtrends", "") || "Repository intelligence")}</h1><p>${e("Browse public reports without an account. Sign in to run AI-assisted scans and keep your history and watchlist across devices.")} ${link("/docs", "CLI / MCP")}</p>`;
+    content = `<h1>${e(titles[path]?.replace(" · Find Blue Ocean", "") || "Repository intelligence")}</h1><p>${e("Browse public reports without an account. Sign in to run AI-assisted scans and keep your history and watchlist across devices.")} ${link("/docs", "CLI / MCP")}</p>`;
   }
   if (m?.brief?.report) {
     const report = m.brief.report;
@@ -299,7 +299,7 @@ export function renderDocument(
   const other = locale === "zh" ? "en" : "zh",
     switchUrl = new URL(identity);
   switchUrl.searchParams.set("lang", other);
-  content = `<div class="snapshot"><nav aria-label="${e("Main navigation")}">${link("/", "ghtrends ↗")} ${link("/start", "Use open source")} ${link("/docs", "Methodology")} ${link(SOURCE, "Star on GitHub")} <a href="${escapeHtml(switchUrl.pathname + switchUrl.search)}" lang="${other}">${other === "zh" ? "中文" : "English"}</a></nav><main>${content}</main><footer>${e("Built for the curious. Open for everyone.")} ${link(SOURCE, "MIT source code")}</footer></div>`;
+  content = `<div class="snapshot"><nav aria-label="${e("Main navigation")}">${link("/", "Find Blue Ocean ↗")} ${link("/start", "Use open source")} ${link("/docs", "Methodology")} ${link(SOURCE, "Star on GitHub")} <a href="${escapeHtml(switchUrl.pathname + switchUrl.search)}" lang="${other}">${other === "zh" ? "中文" : "English"}</a></nav><main>${content}</main><footer>${e("Built for the curious. Open for everyone.")} ${link(SOURCE, "MIT source code")}</footer></div>`;
   const schema = {
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -316,7 +316,7 @@ export function renderDocument(
           ],
         }
       : {}),
-    isPartOf: { "@type": "WebSite", name: "ghtrends", url: base },
+    isPartOf: { "@type": "WebSite", name: "Find Blue Ocean", url: base },
   };
   const initialSkeleton = renderToStaticMarkup(
     createElement(Skeleton, {
@@ -329,7 +329,7 @@ export function renderDocument(
       text: locale === "zh" ? "正在准备页面…" : "Preparing the page…",
     }),
   );
-  const boot = `<div class="boot-shell"><header class="boot-header"><a class="boot-brand" href="${escapeHtml(localeUrl(base, locale))}" aria-label="ghtrends"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="20" cy="20" r="14"/><path d="m8 28 11-12 7 7L36 6"/><circle cx="36" cy="6" r="3" fill="currentColor" stroke="none"/></svg><span>gh<b>trends</b></span></a><div class="boot-nav" aria-hidden="true"><span class="skeleton-block skeleton-tab"></span><span class="skeleton-block skeleton-tab"></span><span class="skeleton-block skeleton-tab"></span></div><div class="boot-actions" aria-hidden="true"><span class="skeleton-block"></span><span class="skeleton-block"></span></div></header><main>${initialSkeleton}<p class="boot-help">${locale === "zh" ? "加载时间较长？" : "Taking longer than expected?"} <a href="${escapeHtml(localeUrl(identity, locale))}">${locale === "zh" ? "重新加载" : "Reload"}</a></p></main></div>`;
+  const boot = `<div class="boot-shell"><header class="boot-header"><a class="boot-brand" href="${escapeHtml(localeUrl(base, locale))}" aria-label="Find Blue Ocean"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="20" cy="20" r="14"/><path d="m8 28 11-12 7 7L36 6"/><circle cx="36" cy="6" r="3" fill="currentColor" stroke="none"/></svg><span>find<b>blueocean</b></span></a><div class="boot-nav" aria-hidden="true"><span class="skeleton-block skeleton-tab"></span><span class="skeleton-block skeleton-tab"></span><span class="skeleton-block skeleton-tab"></span></div><div class="boot-actions" aria-hidden="true"><span class="skeleton-block"></span><span class="skeleton-block"></span></div></header><main>${initialSkeleton}<p class="boot-help">${locale === "zh" ? "加载时间较长？" : "Taking longer than expected?"} <a href="${escapeHtml(localeUrl(identity, locale))}">${locale === "zh" ? "重新加载" : "Reload"}</a></p></main></div>`;
   return template
     .replace(
       /((?:src|href)=["'])(?:\.\/|\/(?!\/))/g,
@@ -354,7 +354,7 @@ export function renderDocument(
     .replace(/<title>[^]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`)
     .replace(
       "</head>",
-      `<meta name="description" content="${escapeHtml(description)}"><link rel="canonical" href="${escapeHtml(canonical)}">${(["en", "zh"] as const).map((l) => `<link rel="alternate" hreflang="${l === "zh" ? "zh-CN" : "en"}" href="${escapeHtml(localeUrl(identity, l))}">`).join("")}${noindex ? '<meta name="robots" content="noindex,follow">' : ""}<meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(canonical)}"><meta property="og:type" content="website"><meta property="og:site_name" content="ghtrends"><meta property="og:locale" content="${locale === "zh" ? "zh_CN" : "en_US"}"><meta property="og:image" content="${escapeHtml(image)}"><meta property="og:image:alt" content="${escapeHtml(title)}"><meta name="twitter:card" content="summary_large_image"><script type="application/ld+json">${JSON.stringify(schema).replaceAll("<", "\\u003c")}</script></head>`,
+      `<meta name="description" content="${escapeHtml(description)}"><link rel="canonical" href="${escapeHtml(canonical)}">${(["en", "zh"] as const).map((l) => `<link rel="alternate" hreflang="${l === "zh" ? "zh-CN" : "en"}" href="${escapeHtml(localeUrl(identity, l))}">`).join("")}${noindex ? '<meta name="robots" content="noindex,follow">' : ""}<meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(canonical)}"><meta property="og:type" content="website"><meta property="og:site_name" content="Find Blue Ocean"><meta property="og:locale" content="${locale === "zh" ? "zh_CN" : "en_US"}"><meta property="og:image" content="${escapeHtml(image)}"><meta property="og:image:alt" content="${escapeHtml(title)}"><meta name="twitter:card" content="summary_large_image"><script type="application/ld+json">${JSON.stringify(schema).replaceAll("<", "\\u003c")}</script></head>`,
     )
     .replace(
       '<div id="root"></div>',

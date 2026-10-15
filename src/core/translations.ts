@@ -289,7 +289,7 @@ export const zh: Record<string, string> = {
   "Use it to decide where to investigate next. Validate real workflows with people, inspect existing alternatives and account for commercial products. Search measurements do not predict revenue, investment outcomes or GitHub stars.":
     "用这些线索确定下一步研究方向，向用户验证工作流，并比较开源与商业方案。收入和产品采用情况可通过实际使用与交易测量。",
   Account: "账户",
-  "Operations · ghtrends": "运行管理 · ghtrends",
+  "Operations · Find Blue Ocean": "运行管理 · Find Blue Ocean",
   Admin: "管理",
   "Recently updated": "最近更新",
   "Run an updated scan": "重新扫描",
@@ -335,7 +335,7 @@ export const zh: Record<string, string> = {
     "请重试以获取通过校验的 AI 回复。",
   "Relative search interest": "相对搜索热度",
   "Sign-in is not configured on this server.": "请联系运营者完成登录配置。",
-  "Your research history · ghtrends": "我的研究历史 · ghtrends",
+  "Your research history · Find Blue Ocean": "我的研究历史 · Find Blue Ocean",
   "Supply counts active repositories matching the displayed GitHub topic and phrase queries; unmatched and closed-source competitors are outside this coverage.":
     "供给统计覆盖当前 GitHub 查询匹配的活跃仓库。进一步的竞争研究可结合其他仓库与商业产品。",
   "Blue ocean": "蓝海",
@@ -458,7 +458,7 @@ export const zh: Record<string, string> = {
   "Primary query": "主关键词",
   "Measured separately; normalized indices are not added.":
     "各关键词分别测量并展示归一化曲线。",
-  "ghtrends home": "ghtrends 首页",
+  "Find Blue Ocean home": "Find Blue Ocean 首页",
   "Main navigation": "主导航",
   "Star on GitHub": "去 GitHub 点 Star",
   "Toggle navigation": "展开导航",
@@ -875,8 +875,8 @@ export const zh: Record<string, string> = {
     "近期搜索增幅接近去年同期水平，延长观察周期可进一步识别重复模式。",
   "The lower resampling bound does not establish positive growth.":
     "重采样区间跨越零值，继续积累观测可明确方向。",
-  "ghtrends puts two independent questions together: how much active open-source supply exists, and whether search demand is growing.":
-    "ghtrends 把两个独立问题放在一起：活跃开源供给有多少，搜索需求是否正在增长。",
+  "Find Blue Ocean puts two independent questions together: how much active open-source supply exists, and whether search demand is growing.":
+    "Find Blue Ocean 把两个独立问题放在一起：活跃开源供给有多少，搜索需求是否正在增长。",
   "Google Trends returned no observations for this keyword.":
     "该关键词的 Trends 覆盖待补充，可试试常用同义表达。",
   "Partial evidence": "部分证据",
@@ -885,7 +885,7 @@ export const zh: Record<string, string> = {
     "数量汇总去重后的搜索结果，部分结果以下限展示。",
   "Measured open-source categories": "已测量的开源赛道",
   Category: "赛道",
-  "Page not found · ghtrends": "返回研究 · ghtrends",
+  "Page not found · Find Blue Ocean": "返回研究 · Find Blue Ocean",
   "Evidence dated {date}.": "证据日期：{date}。",
   "GitHub supply × Google search demand. Explore category evidence, compare repositories, and use the open-source CLI and MCP server.":
     "GitHub 供给 × Google 搜索需求。探索赛道证据、对比仓库，也可通过开源 CLI 和 MCP 服务使用。",
@@ -931,14 +931,14 @@ export const zh: Record<string, string> = {
     "在 GitHub 获取开源 CLI 与 MCP 服务",
   "Full installation and configuration instructions": "完整安装与配置说明",
   "MIT source code": "MIT 开源代码",
-  "ghtrends — Know where to build": "ghtrends — 看清机会，再开始做",
-  "GitHub opportunity analysis: methodology, CLI and MCP · ghtrends":
-    "GitHub 机会分析：方法、CLI 与 MCP · ghtrends",
-  "Open-source feature requests and friction signals · ghtrends":
-    "开源功能请求与使用阻力 · ghtrends",
-  "Compare GitHub repositories · ghtrends": "对比 GitHub 仓库 · ghtrends",
-  "Your GitHub watchlist · ghtrends": "你的 GitHub 关注清单 · ghtrends",
-  "Repository intelligence · ghtrends": "仓库情报 · ghtrends",
+  "Find Blue Ocean — Know where to build": "Find Blue Ocean — 看清机会，再开始做",
+  "GitHub opportunity analysis: methodology, CLI and MCP · Find Blue Ocean":
+    "GitHub 机会分析：方法、CLI 与 MCP · Find Blue Ocean",
+  "Open-source feature requests and friction signals · Find Blue Ocean":
+    "开源功能请求与使用阻力 · Find Blue Ocean",
+  "Compare GitHub repositories · Find Blue Ocean": "对比 GitHub 仓库 · Find Blue Ocean",
+  "Your GitHub watchlist · Find Blue Ocean": "你的 GitHub 关注清单 · Find Blue Ocean",
+  "Repository intelligence · Find Blue Ocean": "仓库情报 · Find Blue Ocean",
   "Compare GitHub repositories": "对比 GitHub 仓库",
   "Your GitHub watchlist": "你的 GitHub 关注清单",
   "Repository intelligence": "仓库情报",
@@ -1172,7 +1172,7 @@ export const en: Record<string, string> = {
     "Google Trends coverage for this keyword is pending. Try a familiar same-intent phrase.",
   "Counts are deduplicated across topic searches; incomplete searches show a lower bound.":
     "Counts combine deduplicated search results. Partial results display a lower bound.",
-  "Page not found · ghtrends": "Return to research · ghtrends",
+  "Page not found · Find Blue Ocean": "Return to research · Find Blue Ocean",
   "Search interest measures attention, not paying customers. Classification thresholds are published heuristics and still require empirical calibration.":
     "Search interest measures attention. Customer demand needs user research; classification thresholds are published heuristics subject to empirical calibration.",
   "Page not found.": "Return to the research homepage.",

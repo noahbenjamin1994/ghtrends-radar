@@ -130,7 +130,7 @@ export function installAuth(app: Express, store: Store) {
       .status(status)
       .type("html")
       .send(
-        `<!doctype html><html lang="en"><meta name="viewport" content="width=device-width"><title>ghtrends sign-in</title><body><h1>Sign-in could not finish</h1><p>${message}</p><p><a href="${appPath("/", basePath)}">Return to ghtrends</a></p></body></html>`,
+        `<!doctype html><html lang="en"><meta name="viewport" content="width=device-width"><title>Find Blue Ocean sign-in</title><body><h1>Sign-in could not finish</h1><p>${message}</p><p><a href="${appPath("/", basePath)}">Return to Find Blue Ocean</a></p></body></html>`,
       );
   app.get("/auth/login", async (q, r) => {
     if (!enabled)
