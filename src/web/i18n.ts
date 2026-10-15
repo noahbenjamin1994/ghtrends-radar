@@ -9,7 +9,12 @@ export const localUrl = (input: string) => appUrl(localeUrl(input, locale));
 export const loginUrl = (returnTo: string) =>
   appUrl("/auth/login") + "?returnTo=" + encodeURIComponent(localUrl(returnTo));
 export function switchLanguage() {
-  const next = locale === "zh" ? "en" : "zh";
+  setLanguage(locale === "zh" ? "en" : "zh");
+}
+
+/** Go to the same page in `next`. A no-op when it is already the current language. */
+export function setLanguage(next: "en" | "zh") {
+  if (next === locale) return;
   const url = new URL(location.href);
   url.searchParams.set("lang", next);
   location.assign(url.href);

@@ -576,9 +576,9 @@ export function App({
             className="language-switch"
             onClick={switchLanguage}
             aria-label={locale === "zh" ? "Switch to English" : "切换到中文"}
+            title={locale === "zh" ? "Switch to English" : "切换到中文"}
           >
-            <Globe2 size={14} />
-            {locale === "zh" ? "EN" : "中文"}
+            <Globe2 size={16} />
           </button>
           <a
             className="github-button"

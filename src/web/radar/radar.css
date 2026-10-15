@@ -91,6 +91,17 @@
 .rd-menu > summary::-webkit-details-marker {
   display: none;
 }
+/* Icon-only trigger (the language globe): square, same hover as .rd-quiet. */
+.rd-icon {
+  padding: 7px;
+}
+.rd-lang-panel {
+  min-width: 140px;
+}
+.rd-lang-panel button[aria-current="true"] {
+  color: var(--ink);
+  font-weight: 600;
+}
 .rd-menu-credits {
   font-variant-numeric: tabular-nums;
   color: var(--ink);

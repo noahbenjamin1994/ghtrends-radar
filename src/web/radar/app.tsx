@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Globe } from "lucide-react";
 import { inspectInput, type PreflightResult } from "../../core/preflight.js";
 import type { Account } from "../account.js";
 import { api, setCsrf } from "../api.js";
 import { Logo } from "../components.js";
 import { enableEngagement, track } from "../engagement.js";
-import { locale, localUrl, loginUrl, switchLanguage, t } from "../i18n.js";
+import { locale, localUrl, loginUrl, setLanguage, t } from "../i18n.js";
 import { currentRoute } from "../paths.js";
 import { Home } from "./home.js";
 import { Research, started, type Job, type Launch } from "./research.js";
@@ -176,13 +176,37 @@ export function Root() {
           <Logo />
         </button>
         <div className="rd-top-end">
-          <button
-            className="rd-quiet"
-            onClick={switchLanguage}
-            aria-label={locale === "zh" ? "Switch to English" : "切换到中文"}
-          >
-            {locale === "zh" ? "EN" : "中文"}
-          </button>
+          {/* Language: one globe icon that opens the list, same as the account menu. */}
+          <details className="rd-menu">
+            <summary
+              className="rd-quiet rd-icon"
+              aria-label={l("Language", "语言")}
+              title={locale === "zh" ? "简体中文" : "English"}
+            >
+              <Globe size={16} />
+            </summary>
+            <div
+              className="rd-menu-panel rd-lang-panel"
+              onClick={(event) =>
+                event.currentTarget.closest("details")?.removeAttribute("open")
+              }
+            >
+              <button
+                lang="en"
+                aria-current={locale === "en"}
+                onClick={() => setLanguage("en")}
+              >
+                English
+              </button>
+              <button
+                lang="zh-CN"
+                aria-current={locale === "zh"}
+                onClick={() => setLanguage("zh")}
+              >
+                简体中文
+              </button>
+            </div>
+          </details>
           {account?.user ? (
             <details className="rd-menu">
               <summary
