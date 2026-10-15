@@ -58,13 +58,13 @@ export function Logo() {
   return (
     <span className="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true">
-        <circle cx="20" cy="20" r="14" />
-        <path d="m8 28 11-12 7 7L36 6" />
-        <circle className="logo-dot" cx="36" cy="6" r="3" />
+        <circle className="logo-disc" cx="20" cy="20" r="18" />
+        <path className="logo-wave" d="M9.5 18.5c2.6-2.6 4.6-2.6 7.2 0s4.6 2.6 7.2 0 4.6-2.6 6.6 0" />
+        <path className="logo-wave" d="M11.5 25c2.2-2.2 4-2.2 6.2 0s4 2.2 6.2 0 3.4-2 4.6 0" />
       </svg>
       <span>
-        find<span className="brand-weight">blueocean</span>
-        <sup>↗</sup>
+        <span className="brand-find">Find</span>
+        <span className="brand-weight">BlueOcean</span>
       </span>
     </span>
   );
