@@ -260,9 +260,9 @@ export function Root() {
                 {account.hosted && (
                   <button
                     onClick={() =>
-                      void api("/auth/logout", { method: "POST" }).then(() =>
-                        location.assign(localUrl("/")),
-                      )
+                      void api<{ next?: string }>("/auth/logout", {
+                        method: "POST",
+                      }).then((d) => location.assign(d.next || localUrl("/")))
                     }
                   >
                     {l("Sign out", "退出登录")}

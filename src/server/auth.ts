@@ -223,7 +223,7 @@ export function installAuth(app: Express, store: Store) {
       );
     }
   });
-  app.post("/auth/logout", (q, r) => {
+  app.post("/auth/logout", async (q, r) => {
     try {
       protect(q);
     } catch {
@@ -233,7 +233,21 @@ export function installAuth(app: Express, store: Store) {
     }
     store.take(sessionKey(readCookie(q, cookieName)));
     r.clearCookie(cookieName, cookie);
-    return r.set("Cache-Control", "no-store").json({ ok: true });
+    // Clearing only our cookie leaves the identity provider session alive, so the
+    // next "Sign in" silently logs the same person back in. Send the browser
+    // through the provider's end-session endpoint as well.
+    let next: string | undefined;
+    if (enabled) {
+      try {
+        next = oidc.buildEndSessionUrl(await config(), {
+          client_id: appId!,
+          post_logout_redirect_uri: base + "/",
+        }).href;
+      } catch {
+        /* Provider unreachable: the local session is still gone. */
+      }
+    }
+    return r.set("Cache-Control", "no-store").json({ ok: true, next });
   });
   return { hosted, enabled, user, requireUser, protect, isAdmin, requireAdmin };
 }

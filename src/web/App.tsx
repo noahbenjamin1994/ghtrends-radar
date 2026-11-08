@@ -555,8 +555,8 @@ export function App({
                 {account.hosted && (
                   <button
                     onClick={() =>
-                      void api("/auth/logout", { method: "POST" })
-                        .then(() => location.assign(localUrl("/")))
+                      void api<{ next?: string }>("/auth/logout", { method: "POST" })
+                        .then((d) => location.assign(d.next || localUrl("/")))
                         .catch((e) => setError(e.message))
                     }
                   >
