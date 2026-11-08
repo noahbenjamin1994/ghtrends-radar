@@ -1238,6 +1238,11 @@ export function App({
             <ArrowUpRight size={12} />
           </a>
           <button onClick={() => navigate("/docs")}>{t("Methodology")}</button>
+          <a href="/pricing">{t("Pricing")}</a>
+          <a href="/terms">{t("Terms")}</a>
+          <a href="/privacy">{t("Privacy")}</a>
+          <a href="/refund">{t("Refunds")}</a>
+          <a href="mailto:support@findblueocean.com">{t("Contact")}</a>
         </div>
         <small>{t("Not affiliated with GitHub, Inc.")}</small>
       </footer>

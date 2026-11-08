@@ -333,6 +333,12 @@ export function Root() {
           <a href="https://ghtrends.dev">
             {l("Daily GitHub trends", "每日 GitHub 热榜")}
           </a>
+          {/* Pricing and the legal pages are English only, served by the server. */}
+          <a href="/pricing">{l("Pricing", "价格")}</a>
+          <a href="/terms">{l("Terms", "服务条款")}</a>
+          <a href="/privacy">{l("Privacy", "隐私政策")}</a>
+          <a href="/refund">{l("Refunds", "退款政策")}</a>
+          <a href="mailto:support@findblueocean.com">{l("Contact", "联系我们")}</a>
         </nav>
       </footer>
     </div>

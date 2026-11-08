@@ -45,6 +45,7 @@ import { ALGORITHM_VERSION, POLICY } from "../core/analyze.js";
 import { marketMarkdown } from "../core/report.js";
 import type { Market, Topic } from "../core/types.js";
 import { renderDocument } from "./html.js";
+import { LEGAL_PATHS, registerLegal } from "./legal.js";
 import {
   sourceEvidenceIsFresh,
   researchWarnings,
@@ -1336,11 +1337,12 @@ export function createApp(
       "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.20.0/ghtrends-radar-0.20.0.tgz",
     ),
   );
+  registerLegal(app, baseURL);
   app.get("/sitemap.xml", (q, r) =>
     r
       .type("application/xml")
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/start", "/docs", "/gaps", ...dashboardMarkets().map((m) => "/market/" + m.topic.slug)].flatMap((path) => (["en", "zh"] as const).map((locale) => `<url><loc>${escape(localeUrl(baseURL(q) + path, locale))}</loc></url>`)).join("")}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/start", "/docs", "/gaps", ...dashboardMarkets().map((m) => "/market/" + m.topic.slug)].flatMap((path) => (["en", "zh"] as const).map((locale) => `<url><loc>${escape(localeUrl(baseURL(q) + path, locale))}</loc></url>`)).join("")}${LEGAL_PATHS.map((path) => `<url><loc>${escape(baseURL(q) + path)}</loc></url>`).join("")}</urlset>`,
       ),
   );
   app.get("/robots.txt", (q, r) =>
