@@ -313,26 +313,30 @@ export function Root() {
       </main>
       <footer className="rd-foot rd-wrap">
         <span>
-          {l(
-            "Open source. Not affiliated with GitHub, Inc.",
-            "开源项目，与 GitHub, Inc. 无关联。",
-          )}
+          {account?.hosted === false
+            ? l(
+                "Open source. Not affiliated with GitHub, Inc.",
+                "开源项目，与 GitHub, Inc. 无关联。",
+              )
+            : l("Not affiliated with GitHub, Inc.", "与 GitHub, Inc. 无关联。")}
         </span>
         <nav aria-label={l("About", "关于")}>
-          <a
-            href={SOURCE}
-            target="_blank"
-            rel="noreferrer"
-            onClick={() => track("github_click")}
-          >
-            {l("Source code", "源代码")}
-          </a>
-          <a href={SOURCE + "#readme"} target="_blank" rel="noreferrer">
-            {l("How it works and self-hosting", "方法说明与自部署")}
-          </a>
-          <a href="https://ghtrends.dev">
-            {l("Daily GitHub trends", "每日 GitHub 热榜")}
-          </a>
+          {/* Source links only show on a self-hosted install. */}
+          {account?.hosted === false && (
+            <>
+              <a
+                href={SOURCE}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => track("github_click")}
+              >
+                {l("Source code", "源代码")}
+              </a>
+              <a href={SOURCE + "#readme"} target="_blank" rel="noreferrer">
+                {l("How it works and self-hosting", "方法说明与自部署")}
+              </a>
+            </>
+          )}
           {/* Pricing and the legal pages are English only, served by the server. */}
           <a href="/pricing">{l("Pricing", "价格")}</a>
           <a href="/terms">{l("Terms", "服务条款")}</a>

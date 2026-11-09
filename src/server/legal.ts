@@ -9,7 +9,7 @@ import type { Express } from "express";
 export const BRAND = "Find Blue Ocean";
 export const SUPPORT_EMAIL = "support@findblueocean.com";
 /** The operator's legal name (passport spelling). Empty hides the line. */
-export const OPERATOR = "";
+export const OPERATOR = "Xiaoxi Cao";
 const UPDATED = "November 8, 2026";
 
 export const PLANS = [

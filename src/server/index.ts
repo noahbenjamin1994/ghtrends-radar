@@ -670,7 +670,9 @@ export function createApp(
     r.json({
       version: ALGORITHM_VERSION,
       policy: POLICY,
-      source: "https://github.com/noahbenjamin1994/ghtrends-radar",
+      ...(auth.hosted
+        ? {}
+        : { source: "https://github.com/noahbenjamin1994/ghtrends-radar" }),
       scope:
         "Open-source supply and relative search-demand signals. Not a revenue or investment forecast.",
     }),
@@ -1331,18 +1333,20 @@ export function createApp(
     "../../web-dist",
   );
   app.use(express.static(web, { maxAge: "1h", index: false }));
-  app.get("/ghtrends.tgz", (_q, r) =>
-    r.redirect(
-      302,
-      "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.20.0/ghtrends-radar-0.20.0.tgz",
-    ),
-  );
+  // The CLI install link points at the source release; hosted sites do not offer it.
+  if (!auth.hosted)
+    app.get("/ghtrends.tgz", (_q, r) =>
+      r.redirect(
+        302,
+        "https://github.com/noahbenjamin1994/ghtrends-radar/releases/download/v0.20.0/ghtrends-radar-0.20.0.tgz",
+      ),
+    );
   registerLegal(app, baseURL);
   app.get("/sitemap.xml", (q, r) =>
     r
       .type("application/xml")
       .send(
-        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/start", "/docs", "/gaps", ...dashboardMarkets().map((m) => "/market/" + m.topic.slug)].flatMap((path) => (["en", "zh"] as const).map((locale) => `<url><loc>${escape(localeUrl(baseURL(q) + path, locale))}</loc></url>`)).join("")}${LEGAL_PATHS.map((path) => `<url><loc>${escape(baseURL(q) + path)}</loc></url>`).join("")}</urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", ...(auth.hosted ? [] : ["/start"]), "/docs", "/gaps", ...dashboardMarkets().map((m) => "/market/" + m.topic.slug)].flatMap((path) => (["en", "zh"] as const).map((locale) => `<url><loc>${escape(localeUrl(baseURL(q) + path, locale))}</loc></url>`)).join("")}${LEGAL_PATHS.map((path) => `<url><loc>${escape(baseURL(q) + path)}</loc></url>`).join("")}</urlset>`,
       ),
   );
   app.get("/robots.txt", (q, r) =>
@@ -1418,7 +1422,7 @@ export function createApp(
         [
           "/",
           "/docs",
-          "/start",
+          ...(auth.hosted ? [] : ["/start"]),
           "/gaps",
           "/compare",
           "/watch",
@@ -1433,6 +1437,7 @@ export function createApp(
       const markets = dashboardMarkets(geo);
       const html = renderDocument(readFileSync(file, "utf8"), {
         base: baseURL(q),
+        hosted: auth.hosted,
         locale,
         path,
         geo,

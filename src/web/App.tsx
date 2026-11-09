@@ -116,6 +116,8 @@ export function App({
     [watch, setWatch] = useState<string[]>([]),
     [mobileMenu, setMobileMenu] = useState(false);
   const [account, setAccount] = useState<Account | null>(null);
+  // Source links and the CLI page only show on a self-hosted install.
+  const selfHosted = account?.hosted === false;
   const [creditNotice, setCreditNotice] = useState("");
   const preparationVersion = useRef(0);
   const [preparing, setPreparing] = useState(false);
@@ -487,7 +489,7 @@ export function App({
           {[
             ["radar", "Explore", "/"],
             ...(account?.user ? [["history", "My research", "/history"]] : []),
-            ["start", "Use open source", "/start"],
+            ...(selfHosted ? [["start", "Use open source", "/start"]] : []),
           ].map(([key, label, href]) => {
             return (
               <button
@@ -580,23 +582,25 @@ export function App({
           >
             <Globe2 size={16} />
           </button>
-          <a
-            className="github-button"
-            aria-label={t("Star on GitHub")}
-            title={t("Star on GitHub")}
-            href={SOURCE}
-            onClick={() => track("github_click")}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {/* Official, unmodified asset: https://brand.github.com/foundations/logo */}
-            <img
-              src={appUrl("/github-mark.svg")}
-              width="22"
-              height="22"
-              alt=""
-            />
-          </a>
+          {selfHosted && (
+            <a
+              className="github-button"
+              aria-label={t("Star on GitHub")}
+              title={t("Star on GitHub")}
+              href={SOURCE}
+              onClick={() => track("github_click")}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {/* Official, unmodified asset: https://brand.github.com/foundations/logo */}
+              <img
+                src={appUrl("/github-mark.svg")}
+                width="22"
+                height="22"
+                alt=""
+              />
+            </a>
+          )}
           <button
             className="icon-button mobile-menu"
             aria-label={t("Toggle navigation")}
@@ -1134,24 +1138,26 @@ export function App({
                 />
               </section>
             </details>
-            <section className="cli-strip">
-              <span className="terminal-icon">
-                <Terminal size={25} />
-              </span>
-              <div>
-                <h3>{t("Take the radar into your workflow.")}</h3>
-                <p>
-                  {t("The same evidence. In your terminal or your AI agent.")}
-                </p>
-              </div>
-              <code>ghtrends scan --topic mcp-servers</code>
-              <button
-                className="button subtle"
-                onClick={() => navigate("/start")}
-              >
-                CLI & MCP <ArrowUpRight size={15} />
-              </button>
-            </section>
+            {selfHosted && (
+              <section className="cli-strip">
+                <span className="terminal-icon">
+                  <Terminal size={25} />
+                </span>
+                <div>
+                  <h3>{t("Take the radar into your workflow.")}</h3>
+                  <p>
+                    {t("The same evidence. In your terminal or your AI agent.")}
+                  </p>
+                </div>
+                <code>ghtrends scan --topic mcp-servers</code>
+                <button
+                  className="button subtle"
+                  onClick={() => navigate("/start")}
+                >
+                  CLI & MCP <ArrowUpRight size={15} />
+                </button>
+              </section>
+            )}
             <p className="footnote">
               {t(
                 "* Category counts can overlap. Search interest is a demand signal, not a measure of paying customers. All classifications include their evidence and limitations.",
@@ -1207,10 +1213,10 @@ export function App({
           </HistoryView>
         ) : route === "/gaps" ? (
           <GapView />
-        ) : route === "/start" ? (
+        ) : route === "/start" && selfHosted ? (
           <StartView />
         ) : route === "/docs" ? (
-          <Docs />
+          <Docs selfHosted={selfHosted} />
         ) : (
           <Empty
             title={t("This page has drifted off the map")}
@@ -1229,14 +1235,12 @@ export function App({
         <Logo />
         <span>{t("Built for the curious. Open for everyone.")}</span>
         <div>
-          <a href={SOURCE}>
-            {t("Source code")}
-            <ArrowUpRight size={12} />
-          </a>
-          <a href="https://ghtrends.dev">
-            {t("Daily discoveries")}
-            <ArrowUpRight size={12} />
-          </a>
+          {selfHosted && (
+            <a href={SOURCE}>
+              {t("Source code")}
+              <ArrowUpRight size={12} />
+            </a>
+          )}
           <button onClick={() => navigate("/docs")}>{t("Methodology")}</button>
           <a href="/pricing">{t("Pricing")}</a>
           <a href="/terms">{t("Terms")}</a>
@@ -3050,7 +3054,7 @@ function StartView() {
     </div>
   );
 }
-function Docs() {
+function Docs({ selfHosted }: { selfHosted: boolean }) {
   return (
     <div className="docs-page">
       <div className="eyebrow">{t("OPEN DATA. OPEN METHOD.")}</div>
@@ -3179,15 +3183,17 @@ function Docs() {
               "Repository charts use GitHub’s official star-history calendar buckets. Issue-response times cover a recent sample, separating unanswered issues. All raw evidence is exportable.",
             )}
           </p>
-          <a
-            className="text-link"
-            href={SOURCE + "/tree/main/src/core"}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t("Inspect the algorithm")}
-            <ArrowUpRight size={14} />
-          </a>
+          {selfHosted && (
+            <a
+              className="text-link"
+              href={SOURCE + "/tree/main/src/core"}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("Inspect the algorithm")}
+              <ArrowUpRight size={14} />
+            </a>
+          )}
         </section>
       </div>
       <section className="panel">

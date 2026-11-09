@@ -51,10 +51,13 @@ export function renderDocument(
     status: number;
     noindex?: boolean;
     locale?: Locale;
+    /** Hosted sites show no source links and no CLI install. */
+    hosted?: boolean;
   },
 ) {
   const { base, path, geo, market: m, markets, status } = options,
-    locale = options.locale || "en";
+    locale = options.locale || "en",
+    hosted = !!options.hosted;
   const basePath = basePathFromUrl(base);
   const t = (v: string, vars: Record<string, string | number> = {}) =>
     text(v, locale, vars);
@@ -247,17 +250,17 @@ export function renderDocument(
               .join("")}</section>`
           : ""
       }
-      <section><h2>${e("Use and share the evidence")}</h2><p>${link(`/report/${m.id}`, "Permanent report")} · ${link(`/api/reports/${m.id}?format=md&v=2`, "Markdown")} · ${link(`/api/reports/${m.id}`, "JSON")} · ${link(`/api/cards/${m.id}.png?v=2`, "PNG card")}</p><p>${link(SOURCE, "Use the open-source CLI and MCP server on GitHub")}</p></section>`;
+      <section><h2>${e("Use and share the evidence")}</h2><p>${link(`/report/${m.id}`, "Permanent report")} · ${link(`/api/reports/${m.id}?format=md&v=2`, "Markdown")} · ${link(`/api/reports/${m.id}`, "JSON")} · ${link(`/api/cards/${m.id}.png?v=2`, "PNG card")}</p>${hosted ? "" : `<p>${link(SOURCE, "Use the open-source CLI and MCP server on GitHub")}</p>`}</section>`;
   } else if (status === 404) {
     content = `<h1>${e("Page not found.")}</h1><p>${e("This report or page is unavailable.")} ${link("/", "Explore the radar")}</p>`;
   } else if (path === "/") {
     content = `<p class="eyebrow">${e("GITHUB SUPPLY × GOOGLE SEARCH DEMAND")}</p><h1>${e("Know where to build")}</h1><p>${e("Explore active open-source supply and sustained search growth. Every category links to its evidence, dates and limitations.")}</p>${table()}<p>${e("Search growth compares the last eight complete weeks with the previous eight. Counts can overlap; GitHub topic labels do not cover every competitor.")}</p>`;
-  } else if (path === "/start") {
+  } else if (path === "/start" && !hosted) {
     content = `<h1>${e("Research in your own workflow")}</h1><p>${e("Use the hosted website, or run the same open-source engine with your own keys.")}</p><h2>${e("Hosted website")}</h2><p>${e("Read public reports freely. Sign in for private scans, saved reports and projects across devices.")}</p><h2>CLI / MCP</h2><p>${e("CLI, MCP and local Web share your SQLite workspace. Configure your GitHub key and an optional DeepSeek key. Hosted account history is separate.")}</p><pre>npm install -g https://findblueocean.com/ghtrends.tgz\nghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>${link(SOURCE, "Source and setup instructions")}</p>`;
   } else if (path === "/docs") {
     content = `<h1>${e("Read the signals.")}</h1><section><h2>${e("The four landscapes")}</h2>${list([MARKET_LABELS.blue, MARKET_LABELS.expanding, MARKET_LABELS.contested, MARKET_LABELS.quiet])}<p>${e("Ocean labels summarize search direction and observed open-source supply. They are research signals, not verified measures of commercial competition. A quiet ocean may still be a valuable niche.")}</p><p>${e("Partial evidence")}: ${e("This recommendation uses the evidence already available. It is not an LLM-generated forecast.")}</p></section>
-      <section><h2>${e("Method")} ${ALGORITHM_VERSION}</h2><p>${e("GitHub searches use relevant topics and specific name or description phrases. Original, active projects qualify with at least one star and a push within 365 days. We review their roles, group projects by owner, and calculate pressure from direct alternatives.")}</p><p>${e("Counts are deduplicated across topic searches; incomplete searches show a lower bound.")}</p><p>${e("Search direction compares 4-, 8- and 13-week windows, sustained changes and a resampling range. Slow growth can qualify across a full quarter. A repeating annual pattern switches the direction comparison to the same period last year. Opposing synonyms keep a mixed signal.")}</p><p>${e(`At least ${POLICY.minWeeks} complete weekly observations are required.`)}</p><p>${e("A low-base rise is reported without a percentage when the prior median is below 3, at least six of the last eight weekly indices reach 10, and the last-four-week median retains at least 80% of the first four. It remains a low-confidence early signal; sparse or isolated spikes stay unconfirmed.")}</p><p>${e("Known categories retain their published query scope. Compound requirements use intersecting GitHub topics. For incomplete unions, the lower bound is the larger of the deduplicated sample and any complete individual search count.")}</p><p>${e("A weekly observation is usable only after that week ended at collection time. Invalid rows cannot refresh old evidence, and conflicting values for the same week prevent classification.")}</p><p>${link("https://support.google.com/trends/answer/4365533", "How Google Trends works")}</p></section>
-      <section><h2>CLI / MCP</h2><p>${e("Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.")}</p><pre>npx --yes --package=https://findblueocean.com/ghtrends.tgz ghtrends ui</pre><pre>ghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>ghtrends_scan · Find Blue Ocean_repo · Find Blue Ocean_compare · Find Blue Ocean_watch_list</p>${link(SOURCE, "Full installation and configuration instructions")}</section>`;
+      <section><h2>${e("Method")} ${ALGORITHM_VERSION}</h2><p>${e("GitHub searches use relevant topics and specific name or description phrases. Original, active projects qualify with at least one star and a push within 365 days. We review their roles, group projects by owner, and calculate pressure from direct alternatives.")}</p><p>${e("Counts are deduplicated across topic searches; incomplete searches show a lower bound.")}</p><p>${e("Search direction compares 4-, 8- and 13-week windows, sustained changes and a resampling range. Slow growth can qualify across a full quarter. A repeating annual pattern switches the direction comparison to the same period last year. Opposing synonyms keep a mixed signal.")}</p><p>${e(`At least ${POLICY.minWeeks} complete weekly observations are required.`)}</p><p>${e("A low-base rise is reported without a percentage when the prior median is below 3, at least six of the last eight weekly indices reach 10, and the last-four-week median retains at least 80% of the first four. It remains a low-confidence early signal; sparse or isolated spikes stay unconfirmed.")}</p><p>${e("Known categories retain their published query scope. Compound requirements use intersecting GitHub topics. For incomplete unions, the lower bound is the larger of the deduplicated sample and any complete individual search count.")}</p><p>${e("A weekly observation is usable only after that week ended at collection time. Invalid rows cannot refresh old evidence, and conflicting values for the same week prevent classification.")}</p><p>${link("https://support.google.com/trends/answer/4365533", "How Google Trends works")}</p></section>${hosted ? "" : `
+      <section><h2>CLI / MCP</h2><p>${e("Node.js 22.13 or newer. Public queries work without credentials within GitHub’s unauthenticated limits. Configure your own token or GitHub App for larger scans.")}</p><pre>npx --yes --package=https://findblueocean.com/ghtrends.tgz ghtrends ui</pre><pre>ghtrends scan --topic ai4s --json\nghtrends mcp</pre><p>ghtrends_scan · Find Blue Ocean_repo · Find Blue Ocean_compare · Find Blue Ocean_watch_list</p>${link(SOURCE, "Full installation and configuration instructions")}</section>`}`;
   } else if (path === "/gaps") {
     const gaps = selectGapSignals([
       ...new Map(
@@ -299,7 +302,7 @@ export function renderDocument(
   const other = locale === "zh" ? "en" : "zh",
     switchUrl = new URL(identity);
   switchUrl.searchParams.set("lang", other);
-  content = `<div class="snapshot"><nav aria-label="${e("Main navigation")}">${link("/", "Find Blue Ocean ↗")} ${link("/start", "Use open source")} ${link("/docs", "Methodology")} ${link(SOURCE, "Star on GitHub")} <a href="${escapeHtml(switchUrl.pathname + switchUrl.search)}" lang="${other}">${other === "zh" ? "中文" : "English"}</a></nav><main>${content}</main><footer>${e("Built for the curious. Open for everyone.")} ${link(SOURCE, "MIT source code")}</footer></div>`;
+  content = `<div class="snapshot"><nav aria-label="${e("Main navigation")}">${link("/", "Find Blue Ocean ↗")} ${hosted ? "" : `${link("/start", "Use open source")} `}${link("/docs", "Methodology")} ${hosted ? "" : `${link(SOURCE, "Star on GitHub")} `}<a href="${escapeHtml(switchUrl.pathname + switchUrl.search)}" lang="${other}">${other === "zh" ? "中文" : "English"}</a></nav><main>${content}</main><footer>${e("Built for the curious. Open for everyone.")}${hosted ? "" : ` ${link(SOURCE, "MIT source code")}`}</footer></div>`;
   const schema = {
     "@context": "https://schema.org",
     "@type": "WebPage",

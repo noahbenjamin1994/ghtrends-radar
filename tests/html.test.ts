@@ -121,3 +121,12 @@ test("first paint uses a styled report skeleton; the alternate report is only a 
   const home = renderDocument(template, { ...options, path: "/", market: null });
   assert.match(home, /content-skeleton skeleton-home/);
 });
+
+test("a hosted site links no source repository and offers no CLI install", () => {
+  for (const path of [`/report/${market.id}`, "/docs", "/"]) {
+    const html = renderDocument(template, { ...options, path, hosted: true });
+    assert.doesNotMatch(html, /github\.com\/noahbenjamin1994|ghtrends\.tgz|Use open source/);
+  }
+  const self = renderDocument(template, { ...options, path: "/docs" });
+  assert.match(self, /github\.com\/noahbenjamin1994\/ghtrends-radar/);
+});
